@@ -82,6 +82,8 @@ const TAG = { SOLARA: 1, DRIFTA: 2, CILIO: 4, BACILLUS: 8, MYCORA: 16, NECRO: 32
 //   trophic:  diet (bitmask of edible bodyTags), bite, digest[], digestP[] (per-prey-species),
 //             detritivore {rateE,effE,rateP,effP,minRate}, corpsivore {rate,effE,effP,radius,minMass}
 //   defense:  grazeFloor (ungrazeable remnant), pursuitPenalty, escape {p,kick}
+//   registry: live (seeded in the shipped world), apex (top predator: reported, never required;
+//             no bloom/crash detection, "hunters" wording), mat (the carpet-rendered producer)
 //   lifecycle: hazard, reproFrac, spread, reproCooldown, matureCd,
 //              settleLimited + settleLimit (per-guild crowding cap),
 //              cyst {enter, wake:"light"|"prey"|"detritus", p, grace, scMin}, cystDrainMul
@@ -95,6 +97,7 @@ const TRAIT_DEFAULTS = {
   settleLimited: false, settleLimit: 0, photosynth: false, diet: 0,
   cyst: null, escape: null, detritivore: null, corpsivore: null, locus: null,
   flee: null, alarmEmit: 0, burst: null,
+  live: true, apex: false, mat: false,
 };
 const CYST_DEFAULTS = { scMin: 0.03 };
 const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
@@ -117,12 +120,28 @@ function normalizeTraits(rows){
     if (t.cyst) for (const k in CYST_DEFAULTS) if (t.cyst[k] === undefined) t.cyst[k] = CYST_DEFAULTS[k];
     if (t.corpsivore) for (const k in CORPSIVORE_DEFAULTS) if (t.corpsivore[k] === undefined) t.corpsivore[k] = CORPSIVORE_DEFAULTS[k];
     if (t.locus) for (const k in LOCUS_DEFAULTS) if (t.locus[k] === undefined) t.locus[k] = LOCUS_DEFAULTS[k];
+    if (t.locus) checkLocus(t);
   }
   return rows;
 }
+// Load-time guardrail: every multiplier a locus can express must stay inside [LOCUS_MULT_MIN, LOCUS_MULT_MAX]
+// across the whole corridor, curvature included. A typo in a slope fails here, not in a 54k-tick run.
+const LOCUS_MULT_MIN = 0.3, LOCUS_MULT_MAX = 3.0;
+function checkLocus(t){
+  const L = t.locus, bad = [];
+  for (const g of [0, 0.25, 0.5, 0.75, 1]){
+    const d = g - L.g0, q = L.curve*d*d;
+    const mults = { kb: 1 + L.kbSlope*d - q, kp: 1 - L.kpSlope*d - q, catch: 1 - L.catchSlope*d - q,
+      rate: 1 + L.rateSlope*d - q, eff: 1 - L.effSlope*d - q,
+      lightDark: 1 + L.lightSlope*d - q, lightBright: 1 - L.lightSlope*d - q,
+      escape: t.escape ? (t.escape.p + L.escSlope*d - t.escape.p*L.curve*d*d)/t.escape.p : 1 };
+    for (const k in mults) if (!(mults[k] >= LOCUS_MULT_MIN && mults[k] <= LOCUS_MULT_MAX)) bad.push(k+"@g="+g+"="+mults[k].toFixed(2));
+  }
+  if (bad.length) throw new Error("locus on "+t.name+" expresses a multiplier outside ["+LOCUS_MULT_MIN+","+LOCUS_MULT_MAX+"]: "+bad.join(" "));
+}
 const TRAITS = normalizeTraits([
   { // 0 — Solara: sessile benthic producer (mats)
-    name: "Solara", bodyTag: TAG.SOLARA, layer: "benthic",
+    name: "Solara", bodyTag: TAG.SOLARA, layer: "benthic", mat: true,
     movement: "sessile", photosynth: true, kp: 0.12, kb: 0.05, mUp: 0.22, mQm: 0.65, pSynth: 0.10,
     hazard: 0.0012, grazeFloor: 35, pursuitPenalty: 1.8,
     reproFrac: 0.70, spread: 70, settleLimited: true, settleLimit: 90,
@@ -196,7 +215,7 @@ const TRAITS = normalizeTraits([
              hiTrait: "feeding rate", loTrait: "yield" },
   },
   { // 4 - Mycora: sessile fungus. Best digestion in the world; pays for it with immobility.
-    name: "Mycora", bodyTag: TAG.MYCORA, layer: "fungal",
+    name: "Mycora", bodyTag: TAG.MYCORA, layer: "fungal", live: false,
     movement: "sessile", photosynth: false, kp: 0, kb: 0.04, cystDrainMul: 0.3,
     mUp: 0, mQm: 0.8, pSynth: 0,
     hazard: 0.0008, grazeFloor: 0, pursuitPenalty: 1.0,
@@ -208,7 +227,7 @@ const TRAITS = normalizeTraits([
     escape: null,
   },
   { // 5 - Necro: scavenger. Follows the death-scent; starves in paradise, thrives after crashes.
-    name: "Necro", bodyTag: TAG.NECRO, layer: "none",
+    name: "Necro", bodyTag: TAG.NECRO, layer: "none", live: false,
     movement: "tumble", tumbleField: "scent", photosynth: false, kp: 0, kb: 0.035, torpor: 0.35,
     mUp: 0, mQm: 1.0, pSynth: 0,
     hazard: 0, grazeFloor: 0, pursuitPenalty: 1.0,
@@ -220,7 +239,7 @@ const TRAITS = normalizeTraits([
     escape: null,
   },
   { // 6 — Venator: pursuit predator. Fast in a straight line, outturned by its prey.
-    name: "Venator", bodyTag: TAG.VENATOR, layer: "none",
+    name: "Venator", bodyTag: TAG.VENATOR, layer: "none", apex: true,
     movement: "steer", photosynth: false, kb: 0.04,
     mQm: 1.0, alarmEmit: 0.3,
     speed: 2.4, sense: 50, turnRate: 0.30, bite: 14,
@@ -237,7 +256,17 @@ const TRAITS = normalizeTraits([
     escape: null,
   },
 ]);
-
+// ---------- species registry (derived from TRAITS; the one place that knows which index is what) ----------
+const SPECIES = {
+  ALL: TRAITS.map((_, sp) => sp),
+  LIVE: TRAITS.map((T, sp) => T.live ? sp : -1).filter(sp => sp >= 0),          // seeded in the shipped world
+  CORE: TRAITS.map((T, sp) => T.live && !T.apex ? sp : -1).filter(sp => sp >= 0), // the ecosystem criterion
+  APEX: TRAITS.findIndex(T => T.apex),
+  MAT: TRAITS.findIndex(T => T.mat),
+  LOCI: TRAITS.map((T, sp) => T.locus ? sp : -1).filter(sp => sp >= 0),
+  // the Yoshida pair: the evolving prey and the grazer that eats it (harness experiments and gate5)
+  PREY: 1, GRAZER: 2,
+};
 const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
 // Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
@@ -389,7 +418,8 @@ function applyEvent(ev){
     case "locus": {
       const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].locus; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break;
       const prev = Lc[ev.key];
-      Lc[ev.key] = ev.key === "sigma" ? Math.max(0, Math.min(0.12, ev.v)) : ev.key === "curve" ? Math.max(-0.5, Math.min(0.8, ev.v)) : ev.v;
+      const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : [0, 1.5]; // slopes are prices: bounded too
+      Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));
       done && done({ prev }); break; }
     case "sun":
       W.sun.x = wrap(ev.x); W.sun.y = wrap(ev.y);
@@ -561,22 +591,23 @@ function detectEcology(r, awake){
   const rPrev = ((W.recHead-1+N)%N)*CH, r10 = ((W.recHead-10+N)%N)*CH;
   for (let sp=0; sp<7; sp++){
     const name = TRAITS[sp].name;
-    const now = sp===6 ? awake[6] : B[r+sp];
-    const before = havePrev ? (sp===6 ? -1 : B[rPrev+sp]) : -1;
+    const apex = TRAITS[sp].apex;
+    const now = apex ? awake[sp] : B[r+sp];
+    const before = havePrev ? (apex ? -1 : B[rPrev+sp]) : -1;
     // establishment (sustained)
     if (!det.estab[sp]){
       det.run[sp] = now >= DET_ESTAB[sp] ? det.run[sp]+1 : 0;
       if (det.run[sp] >= 5){ det.estab[sp]=1;
-        pushEvent("estab", sp, sp===6 ? name+" established — "+(now|0)+" hunters." : name+" established — "+(now|0)+" strong."); }
+        pushEvent("estab", sp, apex ? name+" established — "+(now|0)+" hunters." : name+" established — "+(now|0)+" strong."); }
     }
     // predator wake (first hunter out of its cyst)
-    if (sp===6 && !det.packAwake && awake[6] >= 1){ det.packAwake=true;
+    if (apex && !det.packAwake && awake[sp] >= 1){ det.packAwake=true;
       pushEvent("wake", sp, "The pack wakes — "+name+" is hunting."); }
     // extinction (any presence to zero, on the full count incl. dormant)
     if (havePrev && B[rPrev+sp] > 0 && B[r+sp] === 0)
       pushEvent("extinct", sp, name+" has died out.");
     // bloom onset / crash over a 10-sample window
-    if (have10 && sp !== 6){
+    if (have10 && !apex){
       const ago = B[r10+sp], growth = B[r+sp]/Math.max(1, ago);
       if (det.bloom[sp]===0 && growth >= 1.8 && B[r+sp] >= 50){ det.bloom[sp]=1;
         pushEvent("bloom", sp, name+" bloom under way — up "+growth.toFixed(1)+"x in "+winSec+" s."); }
@@ -757,7 +788,7 @@ function indicators(){ // labels follow the naming rule: functional first, scien
   const total = B[r0+14]+B[r0+15]+B[r0+16]+B[r0+17];
   const turnoverTicks = (up>0) ? B[r0+15] / (up/(K*REC.STRIDE)) : Infinity;
   const strain = [];
-  for(let sp=0;sp<7;sp++) strain.push(sp===6 ? null : strainOf(sp));
+  for(let sp=0;sp<7;sp++) strain.push(TRAITS[sp].apex ? null : strainOf(sp));
   let ven = null;
   if (B[r0+6] > 0){
     const meanSz = B[r0+32]||9, cap = P.capMul*meanSz;
@@ -1204,7 +1235,9 @@ const SPECIES_PROFILE = [
     food:"Cilio only", eatenBy:"nothing",
     size:"9 units", lifecycle:"the slowest breeder (700-tick cooldown); a knife-edged apex — reported, never required" },
 ];
-const SHAPES = ["nucleus","dot","tri","square","dot","dot","tri"]; // sprite shape per species (Venator is drawn as paths)
+const SHAPES = ["nucleus","dot","tri","square","dot","dot","ray"]; // sprite shape per species; "ray" = drawn as paths (drawGhostRay)
+const SPRITE_SCALE = [1.1, 1.9, 2.2, 1.6, 2.2, 2.2, 1.0];          // screen radius = size * scale * zoom
+const GLYPH = ["●","●","▲","▪","●","●","△"];                      // status-strip glyph per species
 // Genotype tint (Phase 5.3): a bounded shift WITHIN the species hue. t=0 (the loWord end) leans
 // paler and warmer, t=1 (the hiWord end) deeper and cooler; the midpoint is the species color
 // exactly, so a silent genome renders precisely as before. Species identity stays legible at
@@ -1598,7 +1631,7 @@ function drawMetabolism(g, wpx, hpx){
 // it is the fuel gauge of evolution, and a sweep is visible as the ribbon narrowing while it moves.
 function drawTraits(g, wpx, hpx){
   g.fillStyle = "#0B131E"; g.fillRect(0, 0, wpx, hpx);
-  const loci = []; for (let sp=0;sp<7;sp++) if (TRAITS[sp].locus && sp !== 6) loci.push(sp);
+  const loci = SPECIES.LOCI.filter(sp => !TRAITS[sp].apex);
   const n = W.recCount;
   if (!loci.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
   const bandH = hpx / loci.length;
@@ -1656,7 +1689,7 @@ function TraitsLegend(){
   const n = W.recCount; if (n < 1) return null;
   const r = ((W.recHead-1+REC.N)%REC.N)*REC.CH;
   const rows = [];
-  for (let sp=0;sp<7;sp++){ const L = TRAITS[sp].locus; if (!L || sp===6) continue;
+  for (const sp of SPECIES.LOCI){ const L = TRAITS[sp].locus; if (TRAITS[sp].apex) continue;
     const c = SPECIES_META[sp].rgb, mean = W.rec[r+42+sp], sd = W.rec[r+49+sp];
     let hi=0, tot=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ tot++; if (W.g[i] > L.g0+0.05) hi++; }
     rows.push(<span key={sp} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
@@ -1677,7 +1710,7 @@ function HealthPage(){
   );
   const lightFor = lv => lv===2 ? ["●","rgb(226,96,96)","critical"] : lv===1 ? ["●","rgb(206,186,120)","tense"] : ["●","rgb(94,150,116)","calm"];
   const rows = [];
-  for (const sp of [0,1,2,3]){
+  for (const sp of SPECIES.CORE){
     const st = ind.strain[sp];
     if (!st) continue;
     const [dot, col, word] = lightFor(st.level);
@@ -1787,7 +1820,7 @@ function DataMode({ docked }){
       )}
       {page === 0 && (
         <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
-          {[0,1,2,3,6].map(sp => { const c=SPECIES_META[sp].rgb; return (
+          {SPECIES.LIVE.map(sp => { const c=SPECIES_META[sp].rgb; return (
             <span key={sp} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
               ● {SPECIES_META[sp].name} {at2(sp)}</span> ); })}
           <span style={{ color:"#5E7386", marginLeft:"auto" }}>{scrub!==null ? ago+"s ago" : "live"}</span>
@@ -1911,7 +1944,7 @@ export default function Microcosm(){
       makeSprite(COL.mycora,"dot"), makeSprite(COL.necro,"dot"), makeSprite(COL.venator,"tri")];
     // one sprite per genotype bin for every species that carries a locus (7 bins across [0,1])
     const TINT_BINS = 7;
-    const tints = TRAITS.map((T, sp) => T.locus && sp !== 6
+    const tints = TRAITS.map((T, sp) => T.locus && SHAPES[sp] !== "ray"
       ? Array.from({ length: TINT_BINS }, (_, b) => makeSprite(tintRgb(SPECIES_META[sp].rgb, b/(TINT_BINS-1)), SHAPES[sp]))
       : null);
 
@@ -1936,10 +1969,10 @@ export default function Microcosm(){
     const updateCarpet = () => {
       if (W.tick === carpetTick) return; carpetTick = W.tick;
       const d = mcImg.data, dm = mnImg.data;
-      const matLocus = TRAITS[0].locus;
+      const matLocus = SPECIES.MAT >= 0 && TRAITS[SPECIES.MAT].locus;
       if (matLocus){
         cellG.fill(0); cellGn.fill(0);
-        for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === 0){ const c = cellOf(i); cellG[c] += W.g[i]; cellGn[c]++; }
+        for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === SPECIES.MAT){ const c = cellOf(i); cellG[c] += W.g[i]; cellGn[c]++; }
       }
       for (let c = 0; c < P.GRID*P.GRID; c++){
         const o = c*4;
@@ -1984,13 +2017,13 @@ export default function Microcosm(){
     const selValid = () => sel.i >= 0 && W.alive[sel.i] && W.gen[sel.i] === sel.gen;
     let follow = false;
     const SPECIES = SPECIES_META;
-    const stateOf = i => W.cy[i] ? "Dormant (cyst)"
-      : W.sp[i]===0 ? "Photosynthesizing"
+    const stateOf = i => { const T = TRAITS[W.sp[i]]; return W.cy[i] ? "Dormant (cyst)"
+      : T.photosynth && T.movement === "sessile" ? "Photosynthesizing"
       : W.bst[i]>0 ? "Striking"
-      : W.sp[i]===3 ? "Decomposing"
-      : W.sp[i]===1 ? "Drifting"
+      : T.detritivore ? "Decomposing"
+      : T.movement === "drift" ? "Drifting"
       : W.handle[i]>0 ? "Digesting"
-      : W.en[i] < TRAITS[W.sp[i]].torpor*P.capMul*W.sz[i] ? "Torpid" : "Foraging";
+      : W.en[i] < T.torpor*P.capMul*W.sz[i] ? "Torpid" : "Foraging"; };
     const buildCard = () => {
       if (!selValid()) return null;
       const i = sel.i, spc = SPECIES[W.sp[i]], T = TRAITS[W.sp[i]];
@@ -2272,17 +2305,17 @@ export default function Microcosm(){
           continue;
         }
         const spb = W.sp[i];
-        if (spb === 3 && z < LOD_Z){ // bacteria dot-LOD: batched rects instead of sprite blits
+        if (SHAPES[spb] === "square" && z < LOD_Z){ // bacteria dot-LOD: batched rects instead of sprite blits
           ctx.fillStyle = "rgba(196,206,150,0.8)";
           ctx.fillRect(sx-1.1, sy-1.1, 2.2, 2.2);
           continue;
         }
-        const r = (spb===0 ? W.sz[i]*1.1 : spb===1 ? W.sz[i]*1.9 : spb===3 ? W.sz[i]*1.6 : spb===6 ? W.sz[i]*1.0 : W.sz[i]*2.2) * z;
+        const r = W.sz[i] * SPRITE_SCALE[spb] * z;
         const spr = tints[spb] ? tints[spb][Math.max(0, Math.min(TINT_BINS-1, Math.round(W.g[i]*(TINT_BINS-1))))] : sprites[spb];
-        if (spb === 2){
+        if (SHAPES[spb] === "tri"){
           ctx.save(); ctx.translate(sx, sy); ctx.rotate(W.hd[i]);
           ctx.drawImage(spr, -r, -r, r*2, r*2); ctx.restore();
-        } else if (spb === 6){
+        } else if (SHAPES[spb] === "ray"){
           drawGhostRay(ctx, sx, sy, W.hd[i], r, W.bst[i] > 0, null);
         } else {
           ctx.drawImage(spr, sx-r, sy-r, r*2, r*2);
@@ -2448,14 +2481,14 @@ export default function Microcosm(){
         <span>t {String(ui.tick).padStart(6," ")}  ·  {ui.fps} fps</span>
         {/* species counts double as view toggles: click to hide a species from the world, click again to show */}
         <span style={{ pointerEvents:"auto", display:"inline-flex", gap:10 }}>
-          {[[0,"●"],[1,"●"],[2,"▲"],[3,"▪"],[6,"△"],[7,"◌"]].map(([sp, glyph]) => {
+          {[...SPECIES.LIVE.map(sp => [sp, GLYPH[sp]]), [7,"◌"]].map(([sp, glyph]) => {
             const debris = sp === 7, c = debris ? [158,168,178] : SPECIES_META[sp].rgb, name = debris ? "debris" : SPECIES_META[sp].name;
             return (
             <button key={sp} className="mc-tab"
               onClick={() => setHidden(h => h.map((v, k) => k === sp ? !v : v))}
               title={(hidden[sp] ? "Show " : "Hide ") + name}
               style={{ background:"transparent", border:"none", padding:"2px 3px", cursor:"pointer", font:"inherit",
-                color: sp === 6 ? "rgb(230,240,250)" : `rgb(${c[0]},${c[1]},${c[2]})`,
+                color: !debris && TRAITS[sp].apex ? "rgb(230,240,250)" : `rgb(${c[0]},${c[1]},${c[2]})`,
                 opacity: hidden[sp] ? 0.32 : 1, textDecoration: hidden[sp] ? "line-through" : "none",
                 textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
               {glyph} {debris ? (ui.corpses || 0) : ui.pops[sp]}
@@ -2545,7 +2578,7 @@ export default function Microcosm(){
           top: Math.max(96, ui.spawnPick.sy - 76),
           display:"flex", gap:6, padding:8, borderRadius:14,
           background:"rgba(11,19,30,0.94)", border:"1px solid rgba(242,178,74,0.45)" }}>
-          {[0,1,2,3,6].map(sp => { const c = SPECIES_META[sp].rgb; return (
+          {SPECIES.LIVE.map(sp => { const c = SPECIES_META[sp].rgb; return (
             <button key={sp}
               onClick={() => actionsRef.current.seedAt(sp, ui.spawnPick.x, ui.spawnPick.y, ui.spawnPick.sx, ui.spawnPick.sy)}
               style={{ padding:"7px 9px", borderRadius:10, fontSize:11, border:"none",

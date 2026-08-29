@@ -11,7 +11,7 @@
   "scripts": {
     "start": "node tools/dev-server.js",
     "build": "python3 tools/build.py",
-    "syntax": "esbuild --loader=jsx --log-level=warning < dist/microcosm.jsx > /dev/null",
+    "syntax": "node tools/syntax.js",
     "conform": "npm run build && node harness/conform.js",
     "conform:capture": "npm run build && node harness/conform.js --capture",
     "tune": "npm run build && node harness/tune2.js",
@@ -23,7 +23,7 @@
     "selftest": "node harness/selftest.js",
     "yoshida:capture": "npm run build && node harness/yoshida.js --capture",
     "test": "npm run build && npm run syntax && node harness/selftest.js && node harness/conform.js",
-    "test:full": "npm run test && npm run tune && npm run gate"
+    "test:full": "npm run test && npm run tune && npm run gate && node harness/gate5.js && node harness/corridor.js --rails --fuzz"
   },
   "devDependencies": {
     "esbuild": "^0.28.0",

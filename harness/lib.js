@@ -5,9 +5,10 @@ const CORE = process.env.MC_CORE || path.join(__dirname, "..", "dist", "core.js"
 const C = require(CORE);
 const { W, P, TRAITS, REC } = C;
 
+const { SPECIES } = C;
 const SEEDS = [11,22,33,44,55,66,77,88];
 const HORIZON = 18000;                       // the acceptance horizon (ticks)
-const LOCI = []; for (let sp=0; sp<7; sp++) if (TRAITS[sp].locus) LOCI.push(sp);
+const LOCI = SPECIES.LOCI;
 
 function pops(){ const p=[0,0,0,0,0,0,0]; for (let i=0;i<W.n;i++) if (W.alive[i]) p[W.sp[i]]++; return p; }
 function auditM(){ let t=0; for (let c=0;c<P.GRID*P.GRID;c++) t+=W.M[c]+W.dM[c];
@@ -19,7 +20,8 @@ const fmtG = s => s.mean.toFixed(2)+"±"+s.sd.toFixed(2);
 function start(seed, mutation){ P.mutation = mutation; C.resetWorld(); C.initWorld(seed); }
 function pin(corner){ for (const [sp,g] of corner) for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp) W.g[i]=g; }
 // the amended ecosystem criterion: the four core species persist; the apex is reported, not required
-function coreCollapsed(p, t){ return p[0]===0 || p[1]===0 || p[3]===0 || (t>950 && p[2]===0); }
+function coreCollapsed(p, t){ // a core species gone; the grazer only counts after its founding transient
+  return SPECIES.CORE.some(sp => p[sp]===0 && (sp !== SPECIES.GRAZER || t > 950)); }
 
 // Cycle analysis (5.2). Series are demeaned samples; lags in samples.
 const demean = xs => { const m = xs.reduce((a,b)=>a+b,0)/xs.length; return xs.map(v=>v-m); };
@@ -48,7 +50,7 @@ const cv = x => { const m=x.reduce((a,b)=>a+b,0)/x.length; const v=x.reduce((a,b
 function series(seed, mutation, ticks=30000, stride=20, skipTicks=3000){
   start(seed, mutation); const D=[], G=[]; let gEnd=0;
   for (let t=1;t<=ticks;t++){ C.step(); if (t%stride) continue; let d=0,c=0,gm=0;
-    for (let i=0;i<W.n;i++){ if(!W.alive[i]) continue; if(W.sp[i]===1){ d++; gm+=W.g[i]; } else if(W.sp[i]===2) c++; }
+    for (let i=0;i<W.n;i++){ if(!W.alive[i]) continue; if(W.sp[i]===SPECIES.PREY){ d++; gm+=W.g[i]; } else if(W.sp[i]===SPECIES.GRAZER) c++; }
     D.push(d); G.push(c); gEnd = d? gm/d : 0; }
   const skip = skipTicks/stride; return { D:D.slice(skip), G:G.slice(skip), gEnd }; }
 function cycleMetrics(seed){ // the 5.2 measurement for one seed, mutation off vs on
@@ -58,5 +60,5 @@ function cycleMetrics(seed){ // the 5.2 measurement for one seed, mutation off v
   return { seed, pOff:pOff*20, pOn:pOn*20, phOff:+phaseLag(Do,Go,pOff).frac.toFixed(2), phOn:+phaseLag(Dn,Gn,pOn).frac.toFixed(2),
     cvOff:+cv(off.D).toFixed(2), cvOn:+cv(on.D).toFixed(2), gEnd:+on.gEnd.toFixed(2) }; }
 
-module.exports = { C, W, P, TRAITS, REC, SEEDS, HORIZON, LOCI, pops, auditM, locusStats, fmtG, start, pin, coreCollapsed,
+module.exports = { C, W, P, TRAITS, REC, SPECIES, SEEDS, HORIZON, LOCI, pops, auditM, locusStats, fmtG, start, pin, coreCollapsed,
   demean, detrend, xcorr, period, phaseLag, cv, series, cycleMetrics };

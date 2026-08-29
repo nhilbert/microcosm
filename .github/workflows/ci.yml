@@ -33,6 +33,9 @@ jobs:
       - name: Syntax check
         run: npm run syntax
 
+      - name: Harness self-test (estimators on synthetic series)
+        run: npm run selftest
+
       - name: Conformance (must be bit-identical)
         run: |
           out=$(npm run --silent conform)
@@ -43,16 +46,25 @@ jobs:
           fi
 
   acceptance:
-    name: Ecology acceptance (manual)
+    name: Ecology acceptance (manual, ~40 min)
     runs-on: ubuntu-latest
-    # Long-horizon runs. Known to fail on the current tree - see README "Status".
+    # Long-horizon runs; every one passes on the shipped tree (see README "Status" for the numbers).
+    # Manual because of the wall time, not because of doubt.
     if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: npm install --no-audit --no-fund
       - name: 8-seed ecology harness
         run: npm run tune
-      - name: K6 observatory gate
+      - name: K6 observatory gate (reference world)
         run: npm run gate
+      - name: Phase 5 gate (the Observatory narrates the evolution)
+        run: npm run gate5
+      - name: Corridor certification (rails + evolution as the fuzzer)
+        run: npm run build && node harness/corridor.js --rails --fuzz

@@ -52,7 +52,7 @@ export default function Microcosm(){
       makeSprite(COL.mycora,"dot"), makeSprite(COL.necro,"dot"), makeSprite(COL.venator,"tri")];
     // one sprite per genotype bin for every species that carries a locus (7 bins across [0,1])
     const TINT_BINS = 7;
-    const tints = TRAITS.map((T, sp) => T.locus && sp !== 6
+    const tints = TRAITS.map((T, sp) => T.locus && SHAPES[sp] !== "ray"
       ? Array.from({ length: TINT_BINS }, (_, b) => makeSprite(tintRgb(SPECIES_META[sp].rgb, b/(TINT_BINS-1)), SHAPES[sp]))
       : null);
 
@@ -77,10 +77,10 @@ export default function Microcosm(){
     const updateCarpet = () => {
       if (W.tick === carpetTick) return; carpetTick = W.tick;
       const d = mcImg.data, dm = mnImg.data;
-      const matLocus = TRAITS[0].locus;
+      const matLocus = SPECIES.MAT >= 0 && TRAITS[SPECIES.MAT].locus;
       if (matLocus){
         cellG.fill(0); cellGn.fill(0);
-        for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === 0){ const c = cellOf(i); cellG[c] += W.g[i]; cellGn[c]++; }
+        for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === SPECIES.MAT){ const c = cellOf(i); cellG[c] += W.g[i]; cellGn[c]++; }
       }
       for (let c = 0; c < P.GRID*P.GRID; c++){
         const o = c*4;
@@ -125,13 +125,13 @@ export default function Microcosm(){
     const selValid = () => sel.i >= 0 && W.alive[sel.i] && W.gen[sel.i] === sel.gen;
     let follow = false;
     const SPECIES = SPECIES_META;
-    const stateOf = i => W.cy[i] ? "Dormant (cyst)"
-      : W.sp[i]===0 ? "Photosynthesizing"
+    const stateOf = i => { const T = TRAITS[W.sp[i]]; return W.cy[i] ? "Dormant (cyst)"
+      : T.photosynth && T.movement === "sessile" ? "Photosynthesizing"
       : W.bst[i]>0 ? "Striking"
-      : W.sp[i]===3 ? "Decomposing"
-      : W.sp[i]===1 ? "Drifting"
+      : T.detritivore ? "Decomposing"
+      : T.movement === "drift" ? "Drifting"
       : W.handle[i]>0 ? "Digesting"
-      : W.en[i] < TRAITS[W.sp[i]].torpor*P.capMul*W.sz[i] ? "Torpid" : "Foraging";
+      : W.en[i] < T.torpor*P.capMul*W.sz[i] ? "Torpid" : "Foraging"; };
     const buildCard = () => {
       if (!selValid()) return null;
       const i = sel.i, spc = SPECIES[W.sp[i]], T = TRAITS[W.sp[i]];
@@ -413,17 +413,17 @@ export default function Microcosm(){
           continue;
         }
         const spb = W.sp[i];
-        if (spb === 3 && z < LOD_Z){ // bacteria dot-LOD: batched rects instead of sprite blits
+        if (SHAPES[spb] === "square" && z < LOD_Z){ // bacteria dot-LOD: batched rects instead of sprite blits
           ctx.fillStyle = "rgba(196,206,150,0.8)";
           ctx.fillRect(sx-1.1, sy-1.1, 2.2, 2.2);
           continue;
         }
-        const r = (spb===0 ? W.sz[i]*1.1 : spb===1 ? W.sz[i]*1.9 : spb===3 ? W.sz[i]*1.6 : spb===6 ? W.sz[i]*1.0 : W.sz[i]*2.2) * z;
+        const r = W.sz[i] * SPRITE_SCALE[spb] * z;
         const spr = tints[spb] ? tints[spb][Math.max(0, Math.min(TINT_BINS-1, Math.round(W.g[i]*(TINT_BINS-1))))] : sprites[spb];
-        if (spb === 2){
+        if (SHAPES[spb] === "tri"){
           ctx.save(); ctx.translate(sx, sy); ctx.rotate(W.hd[i]);
           ctx.drawImage(spr, -r, -r, r*2, r*2); ctx.restore();
-        } else if (spb === 6){
+        } else if (SHAPES[spb] === "ray"){
           drawGhostRay(ctx, sx, sy, W.hd[i], r, W.bst[i] > 0, null);
         } else {
           ctx.drawImage(spr, sx-r, sy-r, r*2, r*2);
@@ -589,14 +589,14 @@ export default function Microcosm(){
         <span>t {String(ui.tick).padStart(6," ")}  ·  {ui.fps} fps</span>
         {/* species counts double as view toggles: click to hide a species from the world, click again to show */}
         <span style={{ pointerEvents:"auto", display:"inline-flex", gap:10 }}>
-          {[[0,"●"],[1,"●"],[2,"▲"],[3,"▪"],[6,"△"],[7,"◌"]].map(([sp, glyph]) => {
+          {[...SPECIES.LIVE.map(sp => [sp, GLYPH[sp]]), [7,"◌"]].map(([sp, glyph]) => {
             const debris = sp === 7, c = debris ? [158,168,178] : SPECIES_META[sp].rgb, name = debris ? "debris" : SPECIES_META[sp].name;
             return (
             <button key={sp} className="mc-tab"
               onClick={() => setHidden(h => h.map((v, k) => k === sp ? !v : v))}
               title={(hidden[sp] ? "Show " : "Hide ") + name}
               style={{ background:"transparent", border:"none", padding:"2px 3px", cursor:"pointer", font:"inherit",
-                color: sp === 6 ? "rgb(230,240,250)" : `rgb(${c[0]},${c[1]},${c[2]})`,
+                color: !debris && TRAITS[sp].apex ? "rgb(230,240,250)" : `rgb(${c[0]},${c[1]},${c[2]})`,
                 opacity: hidden[sp] ? 0.32 : 1, textDecoration: hidden[sp] ? "line-through" : "none",
                 textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
               {glyph} {debris ? (ui.corpses || 0) : ui.pops[sp]}
@@ -686,7 +686,7 @@ export default function Microcosm(){
           top: Math.max(96, ui.spawnPick.sy - 76),
           display:"flex", gap:6, padding:8, borderRadius:14,
           background:"rgba(11,19,30,0.94)", border:"1px solid rgba(242,178,74,0.45)" }}>
-          {[0,1,2,3,6].map(sp => { const c = SPECIES_META[sp].rgb; return (
+          {SPECIES.LIVE.map(sp => { const c = SPECIES_META[sp].rgb; return (
             <button key={sp}
               onClick={() => actionsRef.current.seedAt(sp, ui.spawnPick.x, ui.spawnPick.y, ui.spawnPick.sx, ui.spawnPick.sy)}
               style={{ padding:"7px 9px", borderRadius:10, fontSize:11, border:"none",

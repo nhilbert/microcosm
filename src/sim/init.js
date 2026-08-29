@@ -38,7 +38,7 @@ function initWorld(seed){
 
 // __NODE_EXPORTS__ (everything below is stripped from the artifact by build.py)
 if (typeof module !== "undefined" && module.exports !== undefined){
-  module.exports = { P, W, R, TRAITS, TAG, REC, indicators, impact, cellOf, diffuseM, wrap, wd, spawn, killOrg, computeLight, rebuild,
+  module.exports = { P, W, R, TRAITS, TAG, REC, SPECIES, LOCUS_DEFAULTS, normalizeTraits, indicators, impact, cellOf, diffuseM, wrap, wd, spawn, killOrg, computeLight, rebuild,
     cellLight, neighbors, step, initWorld, resetWorld, applyEvent, drainEvents,
     queueEvent, mulberry32, CELL, MAXN };
 }

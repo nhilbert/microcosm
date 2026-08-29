@@ -41,7 +41,9 @@ const SPECIES_PROFILE = [
     food:"Cilio only", eatenBy:"nothing",
     size:"9 units", lifecycle:"the slowest breeder (700-tick cooldown); a knife-edged apex — reported, never required" },
 ];
-const SHAPES = ["nucleus","dot","tri","square","dot","dot","tri"]; // sprite shape per species (Venator is drawn as paths)
+const SHAPES = ["nucleus","dot","tri","square","dot","dot","ray"]; // sprite shape per species; "ray" = drawn as paths (drawGhostRay)
+const SPRITE_SCALE = [1.1, 1.9, 2.2, 1.6, 2.2, 2.2, 1.0];          // screen radius = size * scale * zoom
+const GLYPH = ["●","●","▲","▪","●","●","△"];                      // status-strip glyph per species
 // Genotype tint (Phase 5.3): a bounded shift WITHIN the species hue. t=0 (the loWord end) leans
 // paler and warmer, t=1 (the hiWord end) deeper and cooler; the midpoint is the species color
 // exactly, so a silent genome renders precisely as before. Species identity stays legible at

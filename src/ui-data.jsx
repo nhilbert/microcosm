@@ -215,7 +215,7 @@ function drawMetabolism(g, wpx, hpx){
 // it is the fuel gauge of evolution, and a sweep is visible as the ribbon narrowing while it moves.
 function drawTraits(g, wpx, hpx){
   g.fillStyle = "#0B131E"; g.fillRect(0, 0, wpx, hpx);
-  const loci = []; for (let sp=0;sp<7;sp++) if (TRAITS[sp].locus && sp !== 6) loci.push(sp);
+  const loci = SPECIES.LOCI.filter(sp => !TRAITS[sp].apex);
   const n = W.recCount;
   if (!loci.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
   const bandH = hpx / loci.length;
@@ -273,7 +273,7 @@ function TraitsLegend(){
   const n = W.recCount; if (n < 1) return null;
   const r = ((W.recHead-1+REC.N)%REC.N)*REC.CH;
   const rows = [];
-  for (let sp=0;sp<7;sp++){ const L = TRAITS[sp].locus; if (!L || sp===6) continue;
+  for (const sp of SPECIES.LOCI){ const L = TRAITS[sp].locus; if (TRAITS[sp].apex) continue;
     const c = SPECIES_META[sp].rgb, mean = W.rec[r+42+sp], sd = W.rec[r+49+sp];
     let hi=0, tot=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ tot++; if (W.g[i] > L.g0+0.05) hi++; }
     rows.push(<span key={sp} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
@@ -294,7 +294,7 @@ function HealthPage(){
   );
   const lightFor = lv => lv===2 ? ["●","rgb(226,96,96)","critical"] : lv===1 ? ["●","rgb(206,186,120)","tense"] : ["●","rgb(94,150,116)","calm"];
   const rows = [];
-  for (const sp of [0,1,2,3]){
+  for (const sp of SPECIES.CORE){
     const st = ind.strain[sp];
     if (!st) continue;
     const [dot, col, word] = lightFor(st.level);
@@ -404,7 +404,7 @@ function DataMode({ docked }){
       )}
       {page === 0 && (
         <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
-          {[0,1,2,3,6].map(sp => { const c=SPECIES_META[sp].rgb; return (
+          {SPECIES.LIVE.map(sp => { const c=SPECIES_META[sp].rgb; return (
             <span key={sp} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
               ● {SPECIES_META[sp].name} {at2(sp)}</span> ); })}
           <span style={{ color:"#5E7386", marginLeft:"auto" }}>{scrub!==null ? ago+"s ago" : "live"}</span>

@@ -10,6 +10,8 @@
 //   trophic:  diet (bitmask of edible bodyTags), bite, digest[], digestP[] (per-prey-species),
 //             detritivore {rateE,effE,rateP,effP,minRate}, corpsivore {rate,effE,effP,radius,minMass}
 //   defense:  grazeFloor (ungrazeable remnant), pursuitPenalty, escape {p,kick}
+//   registry: live (seeded in the shipped world), apex (top predator: reported, never required;
+//             no bloom/crash detection, "hunters" wording), mat (the carpet-rendered producer)
 //   lifecycle: hazard, reproFrac, spread, reproCooldown, matureCd,
 //              settleLimited + settleLimit (per-guild crowding cap),
 //              cyst {enter, wake:"light"|"prey"|"detritus", p, grace, scMin}, cystDrainMul
@@ -23,6 +25,7 @@ const TRAIT_DEFAULTS = {
   settleLimited: false, settleLimit: 0, photosynth: false, diet: 0,
   cyst: null, escape: null, detritivore: null, corpsivore: null, locus: null,
   flee: null, alarmEmit: 0, burst: null,
+  live: true, apex: false, mat: false,
 };
 const CYST_DEFAULTS = { scMin: 0.03 };
 const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
@@ -45,12 +48,28 @@ function normalizeTraits(rows){
     if (t.cyst) for (const k in CYST_DEFAULTS) if (t.cyst[k] === undefined) t.cyst[k] = CYST_DEFAULTS[k];
     if (t.corpsivore) for (const k in CORPSIVORE_DEFAULTS) if (t.corpsivore[k] === undefined) t.corpsivore[k] = CORPSIVORE_DEFAULTS[k];
     if (t.locus) for (const k in LOCUS_DEFAULTS) if (t.locus[k] === undefined) t.locus[k] = LOCUS_DEFAULTS[k];
+    if (t.locus) checkLocus(t);
   }
   return rows;
 }
+// Load-time guardrail: every multiplier a locus can express must stay inside [LOCUS_MULT_MIN, LOCUS_MULT_MAX]
+// across the whole corridor, curvature included. A typo in a slope fails here, not in a 54k-tick run.
+const LOCUS_MULT_MIN = 0.3, LOCUS_MULT_MAX = 3.0;
+function checkLocus(t){
+  const L = t.locus, bad = [];
+  for (const g of [0, 0.25, 0.5, 0.75, 1]){
+    const d = g - L.g0, q = L.curve*d*d;
+    const mults = { kb: 1 + L.kbSlope*d - q, kp: 1 - L.kpSlope*d - q, catch: 1 - L.catchSlope*d - q,
+      rate: 1 + L.rateSlope*d - q, eff: 1 - L.effSlope*d - q,
+      lightDark: 1 + L.lightSlope*d - q, lightBright: 1 - L.lightSlope*d - q,
+      escape: t.escape ? (t.escape.p + L.escSlope*d - t.escape.p*L.curve*d*d)/t.escape.p : 1 };
+    for (const k in mults) if (!(mults[k] >= LOCUS_MULT_MIN && mults[k] <= LOCUS_MULT_MAX)) bad.push(k+"@g="+g+"="+mults[k].toFixed(2));
+  }
+  if (bad.length) throw new Error("locus on "+t.name+" expresses a multiplier outside ["+LOCUS_MULT_MIN+","+LOCUS_MULT_MAX+"]: "+bad.join(" "));
+}
 const TRAITS = normalizeTraits([
   { // 0 — Solara: sessile benthic producer (mats)
-    name: "Solara", bodyTag: TAG.SOLARA, layer: "benthic",
+    name: "Solara", bodyTag: TAG.SOLARA, layer: "benthic", mat: true,
     movement: "sessile", photosynth: true, kp: 0.12, kb: 0.05, mUp: 0.22, mQm: 0.65, pSynth: 0.10,
     hazard: 0.0012, grazeFloor: 35, pursuitPenalty: 1.8,
     reproFrac: 0.70, spread: 70, settleLimited: true, settleLimit: 90,
@@ -124,7 +143,7 @@ const TRAITS = normalizeTraits([
              hiTrait: "feeding rate", loTrait: "yield" },
   },
   { // 4 - Mycora: sessile fungus. Best digestion in the world; pays for it with immobility.
-    name: "Mycora", bodyTag: TAG.MYCORA, layer: "fungal",
+    name: "Mycora", bodyTag: TAG.MYCORA, layer: "fungal", live: false,
     movement: "sessile", photosynth: false, kp: 0, kb: 0.04, cystDrainMul: 0.3,
     mUp: 0, mQm: 0.8, pSynth: 0,
     hazard: 0.0008, grazeFloor: 0, pursuitPenalty: 1.0,
@@ -136,7 +155,7 @@ const TRAITS = normalizeTraits([
     escape: null,
   },
   { // 5 - Necro: scavenger. Follows the death-scent; starves in paradise, thrives after crashes.
-    name: "Necro", bodyTag: TAG.NECRO, layer: "none",
+    name: "Necro", bodyTag: TAG.NECRO, layer: "none", live: false,
     movement: "tumble", tumbleField: "scent", photosynth: false, kp: 0, kb: 0.035, torpor: 0.35,
     mUp: 0, mQm: 1.0, pSynth: 0,
     hazard: 0, grazeFloor: 0, pursuitPenalty: 1.0,
@@ -148,7 +167,7 @@ const TRAITS = normalizeTraits([
     escape: null,
   },
   { // 6 — Venator: pursuit predator. Fast in a straight line, outturned by its prey.
-    name: "Venator", bodyTag: TAG.VENATOR, layer: "none",
+    name: "Venator", bodyTag: TAG.VENATOR, layer: "none", apex: true,
     movement: "steer", photosynth: false, kb: 0.04,
     mQm: 1.0, alarmEmit: 0.3,
     speed: 2.4, sense: 50, turnRate: 0.30, bite: 14,
@@ -165,4 +184,14 @@ const TRAITS = normalizeTraits([
     escape: null,
   },
 ]);
-
+// ---------- species registry (derived from TRAITS; the one place that knows which index is what) ----------
+const SPECIES = {
+  ALL: TRAITS.map((_, sp) => sp),
+  LIVE: TRAITS.map((T, sp) => T.live ? sp : -1).filter(sp => sp >= 0),          // seeded in the shipped world
+  CORE: TRAITS.map((T, sp) => T.live && !T.apex ? sp : -1).filter(sp => sp >= 0), // the ecosystem criterion
+  APEX: TRAITS.findIndex(T => T.apex),
+  MAT: TRAITS.findIndex(T => T.mat),
+  LOCI: TRAITS.map((T, sp) => T.locus ? sp : -1).filter(sp => sp >= 0),
+  // the Yoshida pair: the evolving prey and the grazer that eats it (harness experiments and gate5)
+  PREY: 1, GRAZER: 2,
+};

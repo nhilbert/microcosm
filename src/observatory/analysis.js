@@ -57,7 +57,7 @@ function indicators(){ // labels follow the naming rule: functional first, scien
   const total = B[r0+14]+B[r0+15]+B[r0+16]+B[r0+17];
   const turnoverTicks = (up>0) ? B[r0+15] / (up/(K*REC.STRIDE)) : Infinity;
   const strain = [];
-  for(let sp=0;sp<7;sp++) strain.push(sp===6 ? null : strainOf(sp));
+  for(let sp=0;sp<7;sp++) strain.push(TRAITS[sp].apex ? null : strainOf(sp));
   let ven = null;
   if (B[r0+6] > 0){
     const meanSz = B[r0+32]||9, cap = P.capMul*meanSz;

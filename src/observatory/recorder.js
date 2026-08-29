@@ -40,22 +40,23 @@ function detectEcology(r, awake){
   const rPrev = ((W.recHead-1+N)%N)*CH, r10 = ((W.recHead-10+N)%N)*CH;
   for (let sp=0; sp<7; sp++){
     const name = TRAITS[sp].name;
-    const now = sp===6 ? awake[6] : B[r+sp];
-    const before = havePrev ? (sp===6 ? -1 : B[rPrev+sp]) : -1;
+    const apex = TRAITS[sp].apex;
+    const now = apex ? awake[sp] : B[r+sp];
+    const before = havePrev ? (apex ? -1 : B[rPrev+sp]) : -1;
     // establishment (sustained)
     if (!det.estab[sp]){
       det.run[sp] = now >= DET_ESTAB[sp] ? det.run[sp]+1 : 0;
       if (det.run[sp] >= 5){ det.estab[sp]=1;
-        pushEvent("estab", sp, sp===6 ? name+" established — "+(now|0)+" hunters." : name+" established — "+(now|0)+" strong."); }
+        pushEvent("estab", sp, apex ? name+" established — "+(now|0)+" hunters." : name+" established — "+(now|0)+" strong."); }
     }
     // predator wake (first hunter out of its cyst)
-    if (sp===6 && !det.packAwake && awake[6] >= 1){ det.packAwake=true;
+    if (apex && !det.packAwake && awake[sp] >= 1){ det.packAwake=true;
       pushEvent("wake", sp, "The pack wakes — "+name+" is hunting."); }
     // extinction (any presence to zero, on the full count incl. dormant)
     if (havePrev && B[rPrev+sp] > 0 && B[r+sp] === 0)
       pushEvent("extinct", sp, name+" has died out.");
     // bloom onset / crash over a 10-sample window
-    if (have10 && sp !== 6){
+    if (have10 && !apex){
       const ago = B[r10+sp], growth = B[r+sp]/Math.max(1, ago);
       if (det.bloom[sp]===0 && growth >= 1.8 && B[r+sp] >= 50){ det.bloom[sp]=1;
         pushEvent("bloom", sp, name+" bloom under way — up "+growth.toFixed(1)+"x in "+winSec+" s."); }

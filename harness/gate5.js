@@ -15,8 +15,8 @@
 //   5. cycle change reproduced -- the 5.2 measurement on seed 22 matches harness/yoshida-baseline.json
 //                          (written by `node harness/yoshida.js --capture`) on this build, bit-exactly
 const fs = require("fs"), path = require("path");
-const L = require("./lib.js"); const { C, W, REC, TRAITS, SEEDS, HORIZON } = L;
-const LOC = TRAITS[1].locus;
+const L = require("./lib.js"); const { C, W, REC, TRAITS, SPECIES, SEEDS, HORIZON } = L;
+const SP = SPECIES.PREY, LOC = TRAITS[SP].locus; // the gate watches the Yoshida prey's locus
 const chan = (back, ch) => W.rec[((W.recHead-back+REC.N)%REC.N)*REC.CH + ch];
 const HERED = e => e.type==="sweep" || e.type==="uniform" || e.type==="diverse";
 
@@ -25,16 +25,16 @@ function run(seed, mutation){
   let sd2k = -1, sweepMeanAtFire = null, sweepShareAtFire = null, sweepTick = -1;
   for (let t=1;t<=HORIZON;t++){
     C.step();
-    if (t === 2000) sd2k = chan(1, 49+1);
+    if (t === 2000) sd2k = chan(1, 49+SP);
     if (sweepTick < 0){
-      const ev = W.sysEvents.find(e => e.type === "sweep" && e.sp === 1);
-      if (ev){ sweepTick = ev.tick; sweepMeanAtFire = chan(1, 42+1);
-        let hi=0,lo=0,n=0; for (let i=0;i<W.n;i++) if (W.alive[i]&&W.sp[i]===1){ n++; if (W.g[i]>LOC.g0+0.05) hi++; else if (W.g[i]<LOC.g0-0.05) lo++; }
+      const ev = W.sysEvents.find(e => e.type === "sweep" && e.sp === SP);
+      if (ev){ sweepTick = ev.tick; sweepMeanAtFire = chan(1, 42+SP);
+        let hi=0,lo=0,n=0; for (let i=0;i<W.n;i++) if (W.alive[i]&&W.sp[i]===SP){ n++; if (W.g[i]>LOC.g0+0.05) hi++; else if (W.g[i]<LOC.g0-0.05) lo++; }
         sweepShareAtFire = Math.max(hi,lo)/Math.max(1,n); }
     }
   }
-  const diverseTick = (W.sysEvents.find(e => e.type==="diverse" && e.sp===1) || { tick:-1 }).tick;
-  return { sweepTick, diverseTick, sweepMeanAtFire, sweepShareAtFire, sd2k, sd18k: chan(1, 49+1), mean18k: chan(1, 42+1), hered: W.sysEvents.filter(HERED) };
+  const diverseTick = (W.sysEvents.find(e => e.type==="diverse" && e.sp===SP) || { tick:-1 }).tick;
+  return { sweepTick, diverseTick, sweepMeanAtFire, sweepShareAtFire, sd2k, sd18k: chan(1, 49+SP), mean18k: chan(1, 42+SP), hered: W.sysEvents.filter(HERED) };
 }
 
 console.log("=== evolving world (P.mutation=true) ===");

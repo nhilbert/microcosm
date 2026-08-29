@@ -58,7 +58,8 @@ function applyEvent(ev){
     case "locus": {
       const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].locus; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break;
       const prev = Lc[ev.key];
-      Lc[ev.key] = ev.key === "sigma" ? Math.max(0, Math.min(0.12, ev.v)) : ev.key === "curve" ? Math.max(-0.5, Math.min(0.8, ev.v)) : ev.v;
+      const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : [0, 1.5]; // slopes are prices: bounded too
+      Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));
       done && done({ prev }); break; }
     case "sun":
       W.sun.x = wrap(ev.x); W.sun.y = wrap(ev.y);
