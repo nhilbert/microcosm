@@ -829,6 +829,27 @@ function EvolutionPanel({ desktop, mono, onLog }){
   const read = () => ({ mutation: P.mutation, rows: loci.map(sp => ({ sp, sigma: TRAITS[sp].locus.sigma, curve: TRAITS[sp].locus.curve })) });
   const [evo, setEvo] = React.useState(read);
   const [open, setOpen] = React.useState(desktop);
+  const [advanced, setAdvanced] = React.useState(false);
+  // 6.1: the effect slopes are prices; "balance" marks the value where the 5.x price surfaces held the locus mid-corridor
+  const PRICE_KEYS = ["escSlope","kpSlope","catchSlope","kbSlope","lightSlope","rateSlope","effSlope"];
+  const BALANCE = { 1:{ kpSlope:0.5 }, 2:{ kbSlope:0.15 }, 0:{ lightSlope:0.5 }, 3:{ effSlope:0.15, rateSlope:0.5 } };
+  // 6.3: presets are one intervention each -- a bundle of events, one log entry, one undo that restores every prev
+  const PRESETS = {
+    shipped: { label:"Shipped", mutation:true,  set:(sp,L)=>({ sigma:L.sigma0, curve:0 }) },
+    settled: { label:"Settled", mutation:true,  set:(sp,L)=>({ curve:0.3 }) },
+    wild:    { label:"Wild",    mutation:true,  set:(sp,L)=>({ curve:-0.2, sigma:Math.min(0.12, L.sigma0*2) }) },
+    frozen:  { label:"Frozen",  mutation:false, set:()=>({}) },
+  };
+  const shipped = React.useRef(loci.map(sp => ({ sp, sigma0: TRAITS[sp].locus.sigma }))); // captured on first mount
+  const applyPreset = name => {
+    const pr = PRESETS[name]; const prevs = [];
+    if (P.mutation !== pr.mutation){ prevs.push({ type:"mutation", v:P.mutation }); queueEvent({ type:"mutation", v:pr.mutation }); }
+    for (const sp of loci){ const L = TRAITS[sp].locus, s0 = shipped.current.find(x => x.sp===sp).sigma0;
+      const vals = pr.set(sp, { ...L, sigma0:s0 });
+      for (const key in vals){ if (Math.abs(L[key]-vals[key]) < 1e-9) continue; prevs.push({ type:"locus", sp, key, v:L[key] }); queueEvent({ type:"locus", sp, key, v:vals[key] }); } }
+    if (prevs.length) onLog("preset", "Preset: " + pr.label, () => prevs.forEach(e => queueEvent(e)));
+    setTimeout(() => setEvo(read), 150);
+  };
   const dragStart = React.useRef({});   // value at the start of a drag, so one drag = one undo
   const logTimer = React.useRef({});
   React.useEffect(() => { const iv = setInterval(() => setEvo(read), 1000); return () => clearInterval(iv); }, []);
@@ -881,6 +902,30 @@ function EvolutionPanel({ desktop, mono, onLog }){
             </React.Fragment> ); })}
           <span style={{ gridColumn:"1 / -1", color:"rgba(242,178,74,0.7)", fontSize:9, marginTop:2 }}>
             curve &lt; 0 sweeps and splits · 0 as shipped · &gt; 0 settles to the middle</span>
+          <span style={{ gridColumn:"1 / -1", display:"flex", gap:6, alignItems:"center", marginTop:4, flexWrap:"wrap" }}>
+            <span style={{ color:"#5E7386", fontSize:9 }}>presets</span>
+            {Object.keys(PRESETS).map(k => (
+              <button key={k} className="mc-hit mc-hit-amber" onClick={() => applyPreset(k)}
+                style={{ padding:"2px 8px", borderRadius:8, cursor:"pointer", font:"inherit", fontSize:10,
+                  border:"1px solid rgba(242,178,74,0.45)", background:"transparent", color:amber }}>{PRESETS[k].label}</button>))}
+            <button className="mc-hit" onClick={() => setAdvanced(a => !a)}
+              style={{ marginLeft:"auto", padding:"2px 8px", borderRadius:8, cursor:"pointer", font:"inherit", fontSize:10,
+                border:"1px solid rgba(94,115,134,0.4)", background:"transparent", color:"#8FA3B5" }}>{advanced ? "hide prices" : "prices…"}</button>
+          </span>
+          {advanced && evo.rows.map(r => { const L = TRAITS[r.sp].locus, c = SPECIES_META[r.sp].rgb;
+            const keys = PRICE_KEYS.filter(k => L[k]); return (
+            <React.Fragment key={"p"+r.sp}>
+              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})`, fontSize:10, alignSelf:"start", paddingTop:3 }}>{SPECIES_META[r.sp].name} prices</span>
+              <span style={{ gridColumn:"2 / -1", display:"grid", gridTemplateColumns:"auto auto auto", gap:"2px 8px", alignItems:"center" }}>
+                {keys.map(k => { const bal = BALANCE[r.sp] && BALANCE[r.sp][k]; return (
+                  <React.Fragment key={k}>
+                    <span style={{ color:"#5E7386", fontSize:9 }}>{k.replace("Slope","")}{bal !== undefined ? <span style={{ color:"rgba(242,178,74,0.6)" }}> · balance {bal}</span> : ""}</span>
+                    <input type="range" min={0} max={1} step={0.05} value={L[k]} onChange={e => commit(r.sp, k, +e.target.value, "Price · " + SPECIES_META[r.sp].name + " " + k.replace("Slope",""))}
+                      style={{ width: desktop ? 110 : 84, accentColor: amber }} />
+                    <span style={{ width:30, color:amber, fontSize:10 }}>{L[k].toFixed(2)}</span>
+                  </React.Fragment> ); })}
+              </span>
+            </React.Fragment> ); })}
         </div>
       )}
     </div>

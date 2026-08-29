@@ -12,7 +12,7 @@ const PAGE_TITLES = [
 ];
 const IV_LABEL = { pour:"You poured mineral", kill:"You killed a specimen", feed:"You fed a specimen", seed:"You introduced organisms",
   sun:"You moved the sun", sunlight:"You changed the sunlight", undo:"You undid the last action",
-  mutation:"You switched mutation", evolution:"You changed an evolution setting" };
+  mutation:"You switched mutation", evolution:"You changed an evolution setting", preset:"You applied an evolution preset" };
 function ImpactLine({ ev }){
   const r = typeof impact === "function" ? impact(ev) : null;
   if (!r) return null;

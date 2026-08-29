@@ -202,3 +202,21 @@ The estimator used for the 5.2, 5.6 and 5.7 tables above was defective (see the 
 **What changes in the verdict.** The faulty estimator had *over*-estimated the silent world's period (it read founding trends as cycles: 5698) and *under*-estimated the evolving world's (quarter-period artifacts). Corrected, the direction reverses: **evolution lengthens the Drifta–Cilio cycle in every world**, 3340 → 4100–5300 ticks — the literature's first prediction, which the earlier records called unconfirmed, is in fact reproduced, weakly and at small n. The antiphase prediction is still not: the lag moves *toward zero*, not toward 0.5. And the sweeping world of 5.5 does something the balanced world does not — it often erases the cycle altogether, which is what a prey population fixed at maximum defense should do.
 
 What survives unchanged: Drifta CV (measured without the estimator) — no cryptic regime in any world; the balanced world's polymorphism; every acceptance verdict (they do not use the estimator). The self-test that caught this now guards it.
+
+---
+
+## 5.9 — Bacillus rate–yield locus: four loci (2026-08-29)
+
+**Design.** *Metabolism* (voracious ↔ frugal): detritus uptake rate × `(1 + rateSlope·(g−g₀))`, yield `effE × (1 − effSlope·(g−g₀))` — the rate–yield trade-off of microbial metabolism (Pfeiffer, Schuster & Bonhoeffer 2001), chosen over motility for grounding. Draw-free; silent fingerprint identical to 5.8.
+
+**Price surface** (3 seeds × 36k, mean Bacillus g at 36k):
+
+| rateSlope / effSlope | 0.3 / 0.3 | 0.5 / 0.3 | 0.8 / 0.3 | 0.5 / 0.15 | 0.5 / 0.5 |
+|---|---|---|---|---|---|
+| mean g | 0.17–0.27 | 0.17–0.34 | 0.34–0.42 | **0.49–0.53** | 0.07–0.14 (rail) |
+
+Yield beats rate at every feeding-rate benefit up to 0.8 unless the yield cost is small; shipped `rateSlope 0.5, effSlope 0.15`.
+
+**The four-locus world, 8 seeds × 18k.** Every locus balanced: Solara 0.43–0.62, Drifta 0.45–0.62, Cilio 0.40–0.57, Bacillus 0.39–0.53; standing sd 0.09–0.17. The Observatory narrated *diversifying* on 8/8 seeds for Drifta, 6/8 for Bacillus, plus sweeps on three seeds (Drifta twice, Solara once, Bacillus once). Apex held 3/8 at 18k.
+
+**Re-acceptance.** `tune2` 8/8 ecosystem. Corridor (rails + fuzz + 16 samples, and one last full 16-corner enumeration), Yoshida capture and `gate5`: recorded below when complete.
