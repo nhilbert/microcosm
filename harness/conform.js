@@ -1,6 +1,13 @@
 // Fast conformance check: 2 seeds x 3000 ticks, fingerprints world state.
 // Usage:  npm run conform            -> compare against conform-baseline.json
 //         npm run conform:capture    -> (re)write the baseline (declare a reason!)
+//
+// Two fingerprints per seed since Phase 5.0:
+//   silent   P.mutation=false — every locus pinned at its g0. This IS the Phase 4
+//            reference world (the K6 gate reproduces to the second on it). Any
+//            change here that is not a declared ecology change is a defect.
+//   evolving P.mutation=true — the shipped world. Observer/instrumentation edits
+//            must leave BOTH bit-identical; a heredity change moves only this one.
 const fs = require("fs");
 const crypto = require("crypto");
 const path = require("path");
@@ -9,26 +16,35 @@ const BASELINE = path.join(__dirname, "conform-baseline.json");
 const coreHash = crypto.createHash("sha256").update(fs.readFileSync(CORE)).digest("hex").slice(0,16);
 const C = require(CORE);
 const { W, P } = C;
-function fingerprint(seed){
+function fingerprint(seed, mutation){
+  P.mutation = mutation;
   C.resetWorld(); C.initWorld(seed);
   for (let t=0; t<3000; t++) C.step();
-  const p=[0,0,0,0,0,0,0]; let sx=0, se=0, sm=0;
+  const p=[0,0,0,0,0,0,0]; let sx=0, se=0, sm=0, sg=0;
   for (let i=0;i<W.n;i++){ if(!W.alive[i]) continue;
-    p[W.sp[i]]++; sx+=W.x[i]+W.y[i]; se+=W.en[i]; sm+=W.mn[i]; }
+    p[W.sp[i]]++; sx+=W.x[i]+W.y[i]; se+=W.en[i]; sm+=W.mn[i]; sg+=W.g[i]; }
   let fM=0; for (let c=0;c<P.GRID*P.GRID;c++) fM+=W.M[c];
-  return { pops:p, posSum:+sx.toFixed(3), enSum:+se.toFixed(3), mnSum:+sm.toFixed(3), fieldM:+fM.toFixed(3) };
+  return { pops:p, posSum:+sx.toFixed(3), enSum:+se.toFixed(3), mnSum:+sm.toFixed(3), fieldM:+fM.toFixed(3), gSum:+sg.toFixed(3) };
 }
-const result = { coreHash, 11: fingerprint(11), 88: fingerprint(88) };
+const result = { coreHash,
+  silent:   { 11: fingerprint(11, false), 88: fingerprint(88, false) },
+  evolving: { 11: fingerprint(11, true),  88: fingerprint(88, true)  } };
+P.mutation = true;
 if (process.argv.includes("--capture")){
   fs.writeFileSync(BASELINE, JSON.stringify(result, null, 1));
   console.log("baseline captured:", JSON.stringify(result));
 } else {
   const base = JSON.parse(fs.readFileSync(BASELINE));
-  if (base.coreHash === undefined)
-    console.log("WARNING: baseline predates hash-binding — recapture required");
+  if (base.coreHash === undefined || !base.silent)
+    console.log("WARNING: baseline predates the current format — recapture required");
   else if (base.coreHash !== coreHash)
     console.log("NOTE: core file differs from the one this baseline certifies (hash " + base.coreHash + " vs " + coreHash + ") — a changed fingerprint below means an undeclared behavior change; an identical fingerprint means the edit was behavior-neutral");
-  const same = JSON.stringify(base["11"]) === JSON.stringify(result["11"]) && JSON.stringify(base["88"]) === JSON.stringify(result["88"]);
-  console.log(same ? "CONFORMANCE PASS (bit-identical to baseline)" : "CONFORMANCE FAIL");
-  if (!same){ console.log("expected:", JSON.stringify(base)); console.log("actual:  ", JSON.stringify(result)); process.exit(1); }
+  let ok = true;
+  for (const mode of ["silent","evolving"]) for (const seed of ["11","88"]){
+    const same = base[mode] && JSON.stringify(base[mode][seed]) === JSON.stringify(result[mode][seed]);
+    console.log(`  ${mode.padEnd(8)} seed ${seed}: ${same ? "identical" : "DIFFERS"}`);
+    if (!same){ ok = false; console.log("    expected:", JSON.stringify(base[mode] && base[mode][seed])); console.log("    actual:  ", JSON.stringify(result[mode][seed])); }
+  }
+  console.log(ok ? "CONFORMANCE PASS (bit-identical to baseline)" : "CONFORMANCE FAIL");
+  if (!ok) process.exit(1);
 }

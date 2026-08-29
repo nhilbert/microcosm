@@ -11,7 +11,8 @@ const W = {
   hd: new Float32Array(MAXN), handle: new Int16Array(MAXN),
   cd: new Int16Array(MAXN), cy: new Uint8Array(MAXN), gr: new Int16Array(MAXN),
   mn: new Float32Array(MAXN), pr: new Float32Array(MAXN), mem: new Float32Array(MAXN),
-  g: new Float32Array(MAXN),
+  g: new Float32Array(MAXN),          // heritable locus value in [0,1] (species with TRAITS.locus), else 0
+  lg: new Uint16Array(MAXN),          // lineage generation: founders 0, child = parent + 1 (draw-free bookkeeping)
   flee: new Int16Array(MAXN), bst: new Int16Array(MAXN),
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
@@ -49,7 +50,7 @@ function spawn(species, sx, sy, e, size, mnEndow, prEndow){
   W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.sp[i]=species; W.alive[i]=1;
   W.hd[i]=R()*6.283; W.cd[i]=TRAITS[species].matureCd; W.handle[i]=0; W.cy[i]=0; W.gr[i]=0;
   W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0;
-  W.g[i]=TRAITS[species].locus ? TRAITS[species].locus.g0 : 0;
+  W.g[i]=TRAITS[species].locus ? TRAITS[species].locus.g0 : 0; W.lg[i]=0;
   W.birth[i]=W.tick; W.gen[i]=(W.gen[i]+1)&0xffff;
   return i;
 }

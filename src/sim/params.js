@@ -20,6 +20,7 @@ const P = {
   mutSigma: 0.08,  // (settleLimit moved to per-trait rows in 3.0b)
   lightMul: 1.0,    // press lever 4.2b: sun intensity multiplier
   spawnDecomposers: true,  // K6 experiment switch: false = run the world without its recycling guild
+  mutation: true,   // Phase 5 switch: false = silent genome (every locus pinned at its g0), the certified reference world
   // mineral cycle (2.2): stock-constrained, strictly conserved
   M0: 2.2,          // initial dissolved mineral per cell
   mDiff: 0.22,      // turbulent mixing: molecular diffusion alone leaves the dark-edge reservoir stranded

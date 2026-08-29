@@ -247,13 +247,16 @@ function step(){
       const childSz = Math.max(1.5, W.sz[i]*(R()<0.2? (1+(R()-0.5)*P.mutSigma*2):1));
       W.en[i]-=P.sBody*childSz; // structural substance: an energy sink now, a corpse credit later
       const ci = spawn(W.sp[i], nx, ny, childE, childSz, childM, childP);
-      if (ci >= 0 && T.locus){
-        let gc = W.g[i];
-        if (T.locus.sigma > 0){ // draw only when mutating: silent genome consumes zero draws
-          gc += (R()-0.5)*2*T.locus.sigma;
-          gc = gc < 0 ? 0 : gc > 1 ? 1 : gc; // the corridor
+      if (ci >= 0){
+        W.lg[ci] = W.lg[i] + 1;
+        if (T.locus){ // heredity: child = parent, plus one uniform kick of +-sigma when mutation is on
+          let gc = W.g[i];
+          if (T.locus.sigma > 0 && P.mutation){ // draw only when mutating: the silent genome consumes zero draws
+            gc += (R()-0.5)*2*T.locus.sigma;
+            gc = gc < 0 ? 0 : gc > 1 ? 1 : gc; // the corridor
+          }
+          W.g[ci] = gc;
         }
-        W.g[ci] = gc;
       }
       if(T.reproCooldown) W.cd[i]=T.reproCooldown;
     }

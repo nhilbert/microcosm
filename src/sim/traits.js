@@ -52,9 +52,13 @@ const TRAITS = normalizeTraits([
     cyst: { enter: 0.18, wake: "light", p: 0.015, grace: 60 },
     escape: { p: 0.35, kick: 16 },
     // Phase 5 heredity: one locus, the Yoshida trade-off as antagonistic pleiotropy.
-    // g in [0,1]; defense (escape) rises with g, growth (kp) falls. At g0 the world
-    // is EXACTLY the certified baseline: silent genome = bit-identical world.
-    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25 },  // defense must cost: cheap defense sweeps to the rail and starves the apex
+    // g in [0,1]; defense (escape.p + escSlope*(g-g0)) rises with g, growth (kp*(1+kpSlope*(g0-g)))
+    // falls. At g = g0 both expressions collapse to the bare trait, so a silent genome
+    // (P.mutation=false) is bit-identical to the Phase 4 reference world.
+    // Mutation kernel: one uniform draw in [-sigma, sigma] per division (a Gaussian would cost
+    // two draws); the corridor clamp bounds it. kpSlope 0.10 -> 0.25 by measurement: cheap
+    // defense swept to the rail and starved the apex.
+    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25 },
   },
   { // 2 — Cilio: steering grazer
     name: "Cilio", bodyTag: TAG.CILIO, layer: "none",

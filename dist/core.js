@@ -20,6 +20,7 @@ const P = {
   mutSigma: 0.08,  // (settleLimit moved to per-trait rows in 3.0b)
   lightMul: 1.0,    // press lever 4.2b: sun intensity multiplier
   spawnDecomposers: true,  // K6 experiment switch: false = run the world without its recycling guild
+  mutation: true,   // Phase 5 switch: false = silent genome (every locus pinned at its g0), the certified reference world
   // mineral cycle (2.2): stock-constrained, strictly conserved
   M0: 2.2,          // initial dissolved mineral per cell
   mDiff: 0.22,      // turbulent mixing: molecular diffusion alone leaves the dark-edge reservoir stranded
@@ -96,9 +97,13 @@ const TRAITS = normalizeTraits([
     cyst: { enter: 0.18, wake: "light", p: 0.015, grace: 60 },
     escape: { p: 0.35, kick: 16 },
     // Phase 5 heredity: one locus, the Yoshida trade-off as antagonistic pleiotropy.
-    // g in [0,1]; defense (escape) rises with g, growth (kp) falls. At g0 the world
-    // is EXACTLY the certified baseline: silent genome = bit-identical world.
-    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25 },  // defense must cost: cheap defense sweeps to the rail and starves the apex
+    // g in [0,1]; defense (escape.p + escSlope*(g-g0)) rises with g, growth (kp*(1+kpSlope*(g0-g)))
+    // falls. At g = g0 both expressions collapse to the bare trait, so a silent genome
+    // (P.mutation=false) is bit-identical to the Phase 4 reference world.
+    // Mutation kernel: one uniform draw in [-sigma, sigma] per division (a Gaussian would cost
+    // two draws); the corridor clamp bounds it. kpSlope 0.10 -> 0.25 by measurement: cheap
+    // defense swept to the rail and starved the apex.
+    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25 },
   },
   { // 2 — Cilio: steering grazer
     name: "Cilio", bodyTag: TAG.CILIO, layer: "none",
@@ -184,7 +189,8 @@ const W = {
   hd: new Float32Array(MAXN), handle: new Int16Array(MAXN),
   cd: new Int16Array(MAXN), cy: new Uint8Array(MAXN), gr: new Int16Array(MAXN),
   mn: new Float32Array(MAXN), pr: new Float32Array(MAXN), mem: new Float32Array(MAXN),
-  g: new Float32Array(MAXN),
+  g: new Float32Array(MAXN),          // heritable locus value in [0,1] (species with TRAITS.locus), else 0
+  lg: new Uint16Array(MAXN),          // lineage generation: founders 0, child = parent + 1 (draw-free bookkeeping)
   flee: new Int16Array(MAXN), bst: new Int16Array(MAXN),
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
@@ -222,7 +228,7 @@ function spawn(species, sx, sy, e, size, mnEndow, prEndow){
   W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.sp[i]=species; W.alive[i]=1;
   W.hd[i]=R()*6.283; W.cd[i]=TRAITS[species].matureCd; W.handle[i]=0; W.cy[i]=0; W.gr[i]=0;
   W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0;
-  W.g[i]=TRAITS[species].locus ? TRAITS[species].locus.g0 : 0;
+  W.g[i]=TRAITS[species].locus ? TRAITS[species].locus.g0 : 0; W.lg[i]=0;
   W.birth[i]=W.tick; W.gen[i]=(W.gen[i]+1)&0xffff;
   return i;
 }
@@ -930,13 +936,16 @@ function step(){
       const childSz = Math.max(1.5, W.sz[i]*(R()<0.2? (1+(R()-0.5)*P.mutSigma*2):1));
       W.en[i]-=P.sBody*childSz; // structural substance: an energy sink now, a corpse credit later
       const ci = spawn(W.sp[i], nx, ny, childE, childSz, childM, childP);
-      if (ci >= 0 && T.locus){
-        let gc = W.g[i];
-        if (T.locus.sigma > 0){ // draw only when mutating: silent genome consumes zero draws
-          gc += (R()-0.5)*2*T.locus.sigma;
-          gc = gc < 0 ? 0 : gc > 1 ? 1 : gc; // the corridor
+      if (ci >= 0){
+        W.lg[ci] = W.lg[i] + 1;
+        if (T.locus){ // heredity: child = parent, plus one uniform kick of +-sigma when mutation is on
+          let gc = W.g[i];
+          if (T.locus.sigma > 0 && P.mutation){ // draw only when mutating: the silent genome consumes zero draws
+            gc += (R()-0.5)*2*T.locus.sigma;
+            gc = gc < 0 ? 0 : gc > 1 ? 1 : gc; // the corridor
+          }
+          W.g[ci] = gc;
         }
-        W.g[ci] = gc;
       }
       if(T.reproCooldown) W.cd[i]=T.reproCooldown;
     }
