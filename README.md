@@ -191,11 +191,16 @@ the second. The baseline now certifies both worlds explicitly.
 against grazing, priced in growth. Under grazing it is selected all the way to
 the defended rail (mean 0.50 → 0.93 in 36k ticks), the Observatory narrates the
 sweep as it happens, and the grazer's cycle becomes tighter and more regular.
-The textbook prediction — long antiphase cycles — did *not* appear, because it
-needs two genotypes trading places and this population sweeps instead. A steeper
-cost (`kpSlope` 0.5) produces the balanced polymorphism that prediction requires;
-that is recorded as a decision, not shipped. All of it is in
-`docs/phase5-plan.md`, numbers included.
+The textbook prediction came out half right: evolution *lengthens* the
+grazer–prey cycle (3,340 → 4,100–5,300 ticks), but the lag collapses toward zero
+rather than toward antiphase, and no cryptic regime appears. The first version
+of that measurement said otherwise — its period estimator returned quarter
+periods, a self-test caught it, and the records were re-measured on the
+historical builds and corrected rather than footnoted. Prices are now set by
+measured surfaces (a balanced polymorphism ships), Cilio evolves its pursuit,
+Solara its light adaptation, and the loci carry a curvature term because linear
+trade-offs turned out to be knife-edges. All of it is in `docs/phase5-plan.md`
+and `docs/genetics-scaling.md`, numbers included.
 
 ## License
 

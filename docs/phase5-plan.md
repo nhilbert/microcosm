@@ -185,3 +185,20 @@ Recorded as found; not re-priced. The scaling note (`genetics-scaling.md`) expla
 **Yoshida on the 5.8 world, corrected estimator** (see the estimator note below): period 3340 ± 1383 (n=7) → 4090 ± 1923 ticks (n=6); phase 0.28 ± 0.11 → 0.14 ± 0.26; Drifta CV 0.34 → 0.32. Of the 6 seeds with a dominant cycle in both worlds, the period lengthens on 3 and the phase moves farther from zero on 4. Seed 22 alone shows the textbook transformation — period 5300 → 6100, phase 0.05 → 0.41 — and is the captured reproduction baseline. Ensemble verdict unchanged: no systematic transformation; the polymorphic world holds two lines without cycling them.
 
 **Estimator correction (applies to every Yoshida table above).** A self-test on synthetic series (`harness/selftest.js`, added with the harness library) showed the period estimator stopping inside the autocorrelation's descending trough and returning roughly a *quarter* period; series with a founding trend then had no recoverable cycle at all. Fixed: linear detrend before the ACF, and the peak search waits for the ACF to go negative and come back. The 5.2, 5.6 and 5.7 tables were measured with the faulty estimator; their period and phase columns are re-measured on the historical builds and corrected in the section that follows. The qualitative verdicts survive the correction; the numbers did not, and are replaced rather than footnoted.
+
+---
+
+## Corrected Yoshida tables (detrended estimator, 2026-08-29)
+
+The estimator used for the 5.2, 5.6 and 5.7 tables above was defective (see the note in 5.8). Every historical build was re-measured with the corrected one (`MC_CORE=<build> node harness/yoshida.js`). Off-world numbers are identical across rows because the silent world is the same in every build. NaN = no dominant cycle in that series.
+
+| world | period off → on (n) | phase off → on (n) | seeds with both | longer on | verdict |
+|---|---|---|---|---|---|
+| 5.5 (Drifta sweeps) | 3340 → 4730 (7 → **2**) | 0.28 → −0.11 | 2/8 | 2 | **the cycle mostly disappears** — 6/8 evolving series have no dominant cycle |
+| 5.6 (+ Cilio, sweeps) | 3340 → 4773 (7 → 6) | 0.28 → 0.26 | 5/8 | 3 | period longer, phase unchanged |
+| 5.7 (balanced) | 3340 → 5304 (7 → 5) | 0.28 → 0.00 | 4/8 | **4** | period longer on every comparable seed; lag collapses to zero |
+| 5.8 (+ Solara) | 3340 → 4090 (7 → 6) | 0.28 → 0.14 | 6/8 | 3 | period longer, lag halves |
+
+**What changes in the verdict.** The faulty estimator had *over*-estimated the silent world's period (it read founding trends as cycles: 5698) and *under*-estimated the evolving world's (quarter-period artifacts). Corrected, the direction reverses: **evolution lengthens the Drifta–Cilio cycle in every world**, 3340 → 4100–5300 ticks — the literature's first prediction, which the earlier records called unconfirmed, is in fact reproduced, weakly and at small n. The antiphase prediction is still not: the lag moves *toward zero*, not toward 0.5. And the sweeping world of 5.5 does something the balanced world does not — it often erases the cycle altogether, which is what a prey population fixed at maximum defense should do.
+
+What survives unchanged: Drifta CV (measured without the estimator) — no cryptic regime in any world; the balanced world's polymorphism; every acceptance verdict (they do not use the estimator). The self-test that caught this now guards it.
