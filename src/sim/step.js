@@ -188,10 +188,11 @@ function step(){
     }
     if(T.detritivore){
       const c0=cellOf(i), D=T.detritivore;
-      const eatE=Math.min(W.dE[c0], D.rateE*W.sz[i]);
-      if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE); }
+      const rateG = T.locus ? 1 + T.locus.rateSlope*gd - gq : 1, effG = T.locus ? 1 - T.locus.effSlope*gd - gq : 1; // rate-yield locus; both exactly 1 at g0
+      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]);
+      if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE*effG); }
       const pQ3=P.pQuota*W.sz[i];
-      const eatP=Math.min(W.dP[c0], D.rateP*W.sz[i], Math.max(0,(pQ3-W.pr[i])/D.effP));
+      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i], Math.max(0,(pQ3-W.pr[i])/D.effP));
       if(eatP>0){ W.dP[c0]-=eatP; W.pr[i]+=eatP*D.effP; }
       const minz=Math.min(W.dM[c0], D.minRate*W.sz[i]);
       if(minz>0){

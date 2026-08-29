@@ -36,7 +36,9 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //              A linear trade-off is a knife-edge (the population sweeps to whichever rail has the
 //              larger marginal value); concavity gives an interior optimum whose position the
 //              ecology sets. See docs/genetics-scaling.md. 0 = the original linear form.
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, curve: 0 };
+//   rateSlope  detritivore feeding rate x (1 + rateSlope*(g-g0))   effSlope   yield effE x (1 - effSlope*(g-g0))
+//              the rate-yield trade-off of microbial metabolism (Pfeiffer, Schuster & Bonhoeffer 2001)
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, curve: 0 };
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
@@ -113,6 +115,13 @@ const TRAITS = normalizeTraits([
     reproCooldown: 0, matureCd: 0, diet: 0,
     cyst: { enter: 0.20, wake: "detritus", p: 0.03, grace: 60 },
     escape: null,
+    // Phase 5.9 heredity: rate vs yield, the textbook microbial trade-off. A voracious colony
+    // takes up detritus faster and wastes more of it; a frugal one is slow and efficient.
+    // Price by measurement (5.9): effSlope 0.3 and 0.5 drift/sweep frugal, rateSlope 0.3-0.8 cannot
+    // offset them; rateSlope 0.5 with effSlope 0.15 holds 0.49-0.53 at 36k on 3/3 seeds.
+    locus: { g0: 0.5, sigma: 0.03, rateSlope: 0.5, effSlope: 0.15,
+             label: "Metabolism", hiWord: "voracious", loWord: "frugal",
+             hiTrait: "feeding rate", loTrait: "yield" },
   },
   { // 4 - Mycora: sessile fungus. Best digestion in the world; pays for it with immobility.
     name: "Mycora", bodyTag: TAG.MYCORA, layer: "fungal",

@@ -1,3 +1,5 @@
+// the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul)
+const LOCUS_SHIPPED = TRAITS.map(T => T.locus ? { sigma: T.locus.sigma, curve: T.locus.curve } : null);
 function resetWorld(){
   W.initialized = false; W.n = 0; W.freeList.length = 0; W.alive.fill(0);
   W.tick = 0; W.events.length = 0; W.eventLog.length = 0;
@@ -9,6 +11,8 @@ function initWorld(seed){
   W.M.fill(P.M0); W.dE.fill(0); W.dP.fill(0); W.dM.fill(0); W.sc.fill(0); W.al.fill(0);
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
+  // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
+  TRAITS.forEach((T, sp) => { if (T.locus){ T.locus.sigma = LOCUS_SHIPPED[sp].sigma; T.locus.curve = LOCUS_SHIPPED[sp].curve; } });
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
   det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0);
   recPrev.uptake=recPrev.gpp=recPrev.resp=recPrev.bacRelease=recPrev.corpseToDet=recPrev.egestE=recPrev.deaths=0;

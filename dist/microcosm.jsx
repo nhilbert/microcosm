@@ -108,7 +108,9 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //              A linear trade-off is a knife-edge (the population sweeps to whichever rail has the
 //              larger marginal value); concavity gives an interior optimum whose position the
 //              ecology sets. See docs/genetics-scaling.md. 0 = the original linear form.
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, curve: 0 };
+//   rateSlope  detritivore feeding rate x (1 + rateSlope*(g-g0))   effSlope   yield effE x (1 - effSlope*(g-g0))
+//              the rate-yield trade-off of microbial metabolism (Pfeiffer, Schuster & Bonhoeffer 2001)
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, curve: 0 };
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
@@ -185,6 +187,13 @@ const TRAITS = normalizeTraits([
     reproCooldown: 0, matureCd: 0, diet: 0,
     cyst: { enter: 0.20, wake: "detritus", p: 0.03, grace: 60 },
     escape: null,
+    // Phase 5.9 heredity: rate vs yield, the textbook microbial trade-off. A voracious colony
+    // takes up detritus faster and wastes more of it; a frugal one is slow and efficient.
+    // Price by measurement (5.9): effSlope 0.3 and 0.5 drift/sweep frugal, rateSlope 0.3-0.8 cannot
+    // offset them; rateSlope 0.5 with effSlope 0.15 holds 0.49-0.53 at 36k on 3/3 seeds.
+    locus: { g0: 0.5, sigma: 0.03, rateSlope: 0.5, effSlope: 0.15,
+             label: "Metabolism", hiWord: "voracious", loWord: "frugal",
+             hiTrait: "feeding rate", loTrait: "yield" },
   },
   { // 4 - Mycora: sessile fungus. Best digestion in the world; pays for it with immobility.
     name: "Mycora", bodyTag: TAG.MYCORA, layer: "fungal",
@@ -369,6 +378,18 @@ function applyEvent(ev){
       const prev = P.lightMul;
       P.lightMul = Math.max(0.2, Math.min(2.0, ev.v));
       computeLight();
+      done && done({ prev }); break; }
+    // Phase 6 evolution settings: the player's hand on the second-order loop. Same rules as every
+    // lever -- through the queue, logged, undoable via prev. Changing sigma changes the future
+    // PRNG stream (draws appear or vanish at divisions) exactly as moving the sun does.
+    case "mutation": {
+      const prev = P.mutation;
+      P.mutation = !!ev.v;
+      done && done({ prev }); break; }
+    case "locus": {
+      const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].locus; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break;
+      const prev = Lc[ev.key];
+      Lc[ev.key] = ev.key === "sigma" ? Math.max(0, Math.min(0.12, ev.v)) : ev.key === "curve" ? Math.max(-0.5, Math.min(0.8, ev.v)) : ev.v;
       done && done({ prev }); break; }
     case "sun":
       W.sun.x = wrap(ev.x); W.sun.y = wrap(ev.y);
@@ -754,7 +775,7 @@ const IMPACT_CHS = [[0,"Solara"],[1,"Drifta"],[2,"Cilio"],[3,"Bacillus"],[6,"Ven
 // natural-variability floors (measured: mats barely move, plankton blooms 2.5x unprovoked)
 const IMPACT_NOISE = { 0:12, 1:170, 2:55, 3:20, 6:25, 14:15, 19:30 };
 function impact(entry){
-  const isPress = entry.type==="sun" || entry.type==="sunlight";
+  const isPress = entry.type==="sun" || entry.type==="sunlight" || entry.type==="mutation" || entry.type==="evolution";
   const i0 = W.recCount-1 - Math.floor((W.tick - entry.tick)/REC.STRIDE);
   if (i0 < 15) return { status:"rolled" };
   const avail = W.recCount-1 - i0, need = isPress ? 45 : 30;
@@ -802,7 +823,7 @@ function impact(entry){
   const mixed = W.evLog.some(e => e !== entry && e.type !== "undo" &&
     e.tick > entry.tick - 600 && e.tick < entry.tick + win*REC.STRIDE);
   const pressBackdrop = !isPress && W.evLog.some(e => e !== entry &&
-    (e.type === "sun" || e.type === "sunlight") && e.tick < entry.tick);
+    (e.type === "sun" || e.type === "sunlight" || e.type === "mutation" || e.type === "evolution") && e.tick < entry.tick);
   return { status:"done", isPress, notable, recoveredS, mixed, pressBackdrop, complete: win >= need };
 }
 // ============================================================
@@ -995,10 +1016,11 @@ function step(){
     }
     if(T.detritivore){
       const c0=cellOf(i), D=T.detritivore;
-      const eatE=Math.min(W.dE[c0], D.rateE*W.sz[i]);
-      if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE); }
+      const rateG = T.locus ? 1 + T.locus.rateSlope*gd - gq : 1, effG = T.locus ? 1 - T.locus.effSlope*gd - gq : 1; // rate-yield locus; both exactly 1 at g0
+      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]);
+      if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE*effG); }
       const pQ3=P.pQuota*W.sz[i];
-      const eatP=Math.min(W.dP[c0], D.rateP*W.sz[i], Math.max(0,(pQ3-W.pr[i])/D.effP));
+      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i], Math.max(0,(pQ3-W.pr[i])/D.effP));
       if(eatP>0){ W.dP[c0]-=eatP; W.pr[i]+=eatP*D.effP; }
       const minz=Math.min(W.dM[c0], D.minRate*W.sz[i]);
       if(minz>0){
@@ -1090,6 +1112,8 @@ function step(){
   if (W.tick % REC.STRIDE === 0) record();
 }
 
+// the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul)
+const LOCUS_SHIPPED = TRAITS.map(T => T.locus ? { sigma: T.locus.sigma, curve: T.locus.curve } : null);
 function resetWorld(){
   W.initialized = false; W.n = 0; W.freeList.length = 0; W.alive.fill(0);
   W.tick = 0; W.events.length = 0; W.eventLog.length = 0;
@@ -1101,6 +1125,8 @@ function initWorld(seed){
   W.M.fill(P.M0); W.dE.fill(0); W.dP.fill(0); W.dM.fill(0); W.sc.fill(0); W.al.fill(0);
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
+  // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
+  TRAITS.forEach((T, sp) => { if (T.locus){ T.locus.sigma = LOCUS_SHIPPED[sp].sigma; T.locus.curve = LOCUS_SHIPPED[sp].curve; } });
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
   det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0);
   recPrev.uptake=recPrev.gpp=recPrev.resp=recPrev.bacRelease=recPrev.corpseToDet=recPrev.egestE=recPrev.deaths=0;
@@ -1357,7 +1383,8 @@ const PAGE_TITLES = [
   ["Traits", "what is being inherited · mean and spread over time, the population now"],
 ];
 const IV_LABEL = { pour:"You poured mineral", kill:"You killed a specimen", feed:"You fed a specimen", seed:"You introduced organisms",
-  sun:"You moved the sun", sunlight:"You changed the sunlight", undo:"You undid the last action" };
+  sun:"You moved the sun", sunlight:"You changed the sunlight", undo:"You undid the last action",
+  mutation:"You switched mutation", evolution:"You changed an evolution setting" };
 function ImpactLine({ ev }){
   const r = typeof impact === "function" ? impact(ev) : null;
   if (!r) return null;
@@ -1979,6 +2006,8 @@ export default function Microcosm(){
         if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
         if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
         if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
+        if (L.rateSlope) parts.push([L.hiTrait, Math.round(100 * L.rateSlope*(g - L.g0))]);
+        if (L.effSlope) parts.push([L.loTrait, Math.round(-100 * L.effSlope*(g - L.g0))]);
         if (L.lightSlope){ parts.push([L.hiTrait, Math.round(100 * L.lightSlope*(g - L.g0))]);
                            parts.push([L.loTrait, Math.round(-100 * L.lightSlope*(g - L.g0))]); }
         heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
@@ -2062,6 +2091,7 @@ export default function Microcosm(){
       },
       pushUndoExt: (label, fn) => pushUndo(label, fn),
       reset: () => {
+        P.mutation = true; // a fresh world starts with the shipped settings (locus settings are restored by initWorld)
         resetWorld(); initWorld((Math.random()*1e9)|0);
         sel.i = -1; follow = false; undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
         cam.x = W.sun.x; cam.y = W.sun.y;
@@ -2492,6 +2522,11 @@ export default function Microcosm(){
             drag → sun · tap water → pour · hold → seed organisms</div>
         </div>
       )}
+      {uiMode === "intervene" && (
+        <EvolutionPanel desktop={desktop} mono={mono}
+          onLog={(type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
+            actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt(label + " · Undo", undoFn); }} />
+      )}
       {ui.spawnPick && (
         <div style={{ position:"absolute", zIndex:7,
           left: Math.min(Math.max(8, ui.spawnPick.sx - 130), Math.max(8, vp.vw - panelW - 268)),
@@ -2634,6 +2669,70 @@ export default function Microcosm(){
   );
 }
 
+// Phase 6.0 — evolution settings. Every control is an intervention: it goes through the event
+// queue (logged, undoable, replay-safe) and never writes P or TRAITS directly. Amber = the hand.
+function EvolutionPanel({ desktop, mono, onLog }){
+  const loci = []; for (let sp=0; sp<7; sp++) if (TRAITS[sp].locus) loci.push(sp);
+  const read = () => ({ mutation: P.mutation, rows: loci.map(sp => ({ sp, sigma: TRAITS[sp].locus.sigma, curve: TRAITS[sp].locus.curve })) });
+  const [evo, setEvo] = React.useState(read);
+  const [open, setOpen] = React.useState(desktop);
+  const dragStart = React.useRef({});   // value at the start of a drag, so one drag = one undo
+  const logTimer = React.useRef({});
+  React.useEffect(() => { const iv = setInterval(() => setEvo(read), 1000); return () => clearInterval(iv); }, []);
+  const amber = "#F2B24A";
+  const commit = (sp, key, v, label) => {
+    const k = sp + key;
+    if (dragStart.current[k] === undefined) dragStart.current[k] = TRAITS[sp].locus[key];
+    queueEvent({ type:"locus", sp, key, v });
+    setEvo(e => ({ ...e, rows: e.rows.map(r => r.sp === sp ? { ...r, [key]: v } : r) }));
+    clearTimeout(logTimer.current[k]);
+    logTimer.current[k] = setTimeout(() => {
+      const prev = dragStart.current[k]; dragStart.current[k] = undefined;
+      if (prev !== undefined && Math.abs(prev - v) > 1e-9)
+        onLog("evolution", label, () => queueEvent({ type:"locus", sp, key, v: prev }));
+    }, 700);
+  };
+  const toggleMutation = () => {
+    const prev = P.mutation, v = !prev;
+    queueEvent({ type:"mutation", v }); setEvo(e => ({ ...e, mutation: v }));
+    onLog("mutation", v ? "Mutation on" : "Mutation off", () => queueEvent({ type:"mutation", v: prev }));
+  };
+  const slider = (sp, key, min, max, step, label) => { const row = evo.rows.find(r => r.sp === sp); return (
+    <input type="range" min={min} max={max} step={step} value={row ? row[key] : 0}
+      onChange={e => commit(sp, key, +e.target.value, label)}
+      title={label} style={{ width: desktop ? 110 : 84, accentColor: amber }} /> ); };
+  return (
+    <div style={{ position:"absolute", top: 126, left:"50%", transform:"translateX(-50%)", zIndex:5,
+      padding:"6px 12px 8px", borderRadius:12, background:"rgba(11,19,30,0.78)", border:"1px solid rgba(242,178,74,0.35)",
+      color:"#C9D7E3", fontSize:11, fontFamily:mono, maxWidth:"calc(100vw - 24px)" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <button className="mc-hit" onClick={() => setOpen(o => !o)}
+          style={{ background:"transparent", border:"none", color:amber, cursor:"pointer", font:"inherit", padding:0 }}>
+          {open ? "▾" : "▸"} Evolution</button>
+        <button className="mc-hit mc-hit-amber" onClick={toggleMutation}
+          style={{ marginLeft:"auto", padding:"3px 9px", borderRadius:8, cursor:"pointer", font:"inherit", fontSize:10,
+            border:"1px solid rgba(242,178,74,0.6)", background: evo.mutation ? "rgba(242,178,74,0.18)" : "transparent",
+            color: evo.mutation ? amber : "#8FA3B5" }}>
+          mutation {evo.mutation ? "on" : "off"}</button>
+      </div>
+      {open && (
+        <div style={{ display:"grid", gridTemplateColumns:"auto auto auto", gap:"4px 10px", alignItems:"center", marginTop:6 }}>
+          <span style={{ color:"#5E7386", fontSize:9 }}></span>
+          <span style={{ color:"#5E7386", fontSize:9 }}>mutation rate</span>
+          <span style={{ color:"#5E7386", fontSize:9 }}>trade-off curve</span>
+          {evo.rows.map(r => { const c = SPECIES_META[r.sp].rgb; return (
+            <React.Fragment key={r.sp}>
+              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})` }}>{SPECIES_META[r.sp].name} <span style={{ color:"#5E7386" }}>{TRAITS[r.sp].locus.label.toLowerCase()}</span></span>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, "sigma", 0, 0.12, 0.005, "Mutation rate · " + SPECIES_META[r.sp].name)}<span style={{ width:34, color:amber }}>{r.sigma.toFixed(3)}</span></span>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, "curve", -0.5, 0.8, 0.05, "Trade-off curvature · " + SPECIES_META[r.sp].name)}<span style={{ width:34, color:amber }}>{r.curve >= 0 ? "+" : ""}{r.curve.toFixed(2)}</span></span>
+            </React.Fragment> ); })}
+          <span style={{ gridColumn:"1 / -1", color:"rgba(242,178,74,0.7)", fontSize:9, marginTop:2 }}>
+            curve &lt; 0 sweeps and splits · 0 as shipped · &gt; 0 settles to the middle</span>
+        </div>
+      )}
+    </div>
+  );
+}
 // Specimen detail. One implementation for both layouts: the mobile sheet passes
 // its detent, the desktop dock passes 2 (everything visible, nothing to drag).
 function SpecimenBody({ card, tick, detail, onFeed, onKill }){

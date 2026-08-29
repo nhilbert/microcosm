@@ -2,7 +2,7 @@ const IMPACT_CHS = [[0,"Solara"],[1,"Drifta"],[2,"Cilio"],[3,"Bacillus"],[6,"Ven
 // natural-variability floors (measured: mats barely move, plankton blooms 2.5x unprovoked)
 const IMPACT_NOISE = { 0:12, 1:170, 2:55, 3:20, 6:25, 14:15, 19:30 };
 function impact(entry){
-  const isPress = entry.type==="sun" || entry.type==="sunlight";
+  const isPress = entry.type==="sun" || entry.type==="sunlight" || entry.type==="mutation" || entry.type==="evolution";
   const i0 = W.recCount-1 - Math.floor((W.tick - entry.tick)/REC.STRIDE);
   if (i0 < 15) return { status:"rolled" };
   const avail = W.recCount-1 - i0, need = isPress ? 45 : 30;
@@ -50,6 +50,6 @@ function impact(entry){
   const mixed = W.evLog.some(e => e !== entry && e.type !== "undo" &&
     e.tick > entry.tick - 600 && e.tick < entry.tick + win*REC.STRIDE);
   const pressBackdrop = !isPress && W.evLog.some(e => e !== entry &&
-    (e.type === "sun" || e.type === "sunlight") && e.tick < entry.tick);
+    (e.type === "sun" || e.type === "sunlight" || e.type === "mutation" || e.type === "evolution") && e.tick < entry.tick);
   return { status:"done", isPress, notable, recoveredS, mixed, pressBackdrop, complete: win >= need };
 }

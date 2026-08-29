@@ -48,6 +48,18 @@ function applyEvent(ev){
       P.lightMul = Math.max(0.2, Math.min(2.0, ev.v));
       computeLight();
       done && done({ prev }); break; }
+    // Phase 6 evolution settings: the player's hand on the second-order loop. Same rules as every
+    // lever -- through the queue, logged, undoable via prev. Changing sigma changes the future
+    // PRNG stream (draws appear or vanish at divisions) exactly as moving the sun does.
+    case "mutation": {
+      const prev = P.mutation;
+      P.mutation = !!ev.v;
+      done && done({ prev }); break; }
+    case "locus": {
+      const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].locus; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break;
+      const prev = Lc[ev.key];
+      Lc[ev.key] = ev.key === "sigma" ? Math.max(0, Math.min(0.12, ev.v)) : ev.key === "curve" ? Math.max(-0.5, Math.min(0.8, ev.v)) : ev.v;
+      done && done({ prev }); break; }
     case "sun":
       W.sun.x = wrap(ev.x); W.sun.y = wrap(ev.y);
       computeLight(); W.lightDirty = true; break;

@@ -159,6 +159,8 @@ export default function Microcosm(){
         if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
         if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
         if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
+        if (L.rateSlope) parts.push([L.hiTrait, Math.round(100 * L.rateSlope*(g - L.g0))]);
+        if (L.effSlope) parts.push([L.loTrait, Math.round(-100 * L.effSlope*(g - L.g0))]);
         if (L.lightSlope){ parts.push([L.hiTrait, Math.round(100 * L.lightSlope*(g - L.g0))]);
                            parts.push([L.loTrait, Math.round(-100 * L.lightSlope*(g - L.g0))]); }
         heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
@@ -242,6 +244,7 @@ export default function Microcosm(){
       },
       pushUndoExt: (label, fn) => pushUndo(label, fn),
       reset: () => {
+        P.mutation = true; // a fresh world starts with the shipped settings (locus settings are restored by initWorld)
         resetWorld(); initWorld((Math.random()*1e9)|0);
         sel.i = -1; follow = false; undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
         cam.x = W.sun.x; cam.y = W.sun.y;
@@ -672,6 +675,11 @@ export default function Microcosm(){
             drag → sun · tap water → pour · hold → seed organisms</div>
         </div>
       )}
+      {uiMode === "intervene" && (
+        <EvolutionPanel desktop={desktop} mono={mono}
+          onLog={(type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
+            actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt(label + " · Undo", undoFn); }} />
+      )}
       {ui.spawnPick && (
         <div style={{ position:"absolute", zIndex:7,
           left: Math.min(Math.max(8, ui.spawnPick.sx - 130), Math.max(8, vp.vw - panelW - 268)),
@@ -814,6 +822,70 @@ export default function Microcosm(){
   );
 }
 
+// Phase 6.0 — evolution settings. Every control is an intervention: it goes through the event
+// queue (logged, undoable, replay-safe) and never writes P or TRAITS directly. Amber = the hand.
+function EvolutionPanel({ desktop, mono, onLog }){
+  const loci = []; for (let sp=0; sp<7; sp++) if (TRAITS[sp].locus) loci.push(sp);
+  const read = () => ({ mutation: P.mutation, rows: loci.map(sp => ({ sp, sigma: TRAITS[sp].locus.sigma, curve: TRAITS[sp].locus.curve })) });
+  const [evo, setEvo] = React.useState(read);
+  const [open, setOpen] = React.useState(desktop);
+  const dragStart = React.useRef({});   // value at the start of a drag, so one drag = one undo
+  const logTimer = React.useRef({});
+  React.useEffect(() => { const iv = setInterval(() => setEvo(read), 1000); return () => clearInterval(iv); }, []);
+  const amber = "#F2B24A";
+  const commit = (sp, key, v, label) => {
+    const k = sp + key;
+    if (dragStart.current[k] === undefined) dragStart.current[k] = TRAITS[sp].locus[key];
+    queueEvent({ type:"locus", sp, key, v });
+    setEvo(e => ({ ...e, rows: e.rows.map(r => r.sp === sp ? { ...r, [key]: v } : r) }));
+    clearTimeout(logTimer.current[k]);
+    logTimer.current[k] = setTimeout(() => {
+      const prev = dragStart.current[k]; dragStart.current[k] = undefined;
+      if (prev !== undefined && Math.abs(prev - v) > 1e-9)
+        onLog("evolution", label, () => queueEvent({ type:"locus", sp, key, v: prev }));
+    }, 700);
+  };
+  const toggleMutation = () => {
+    const prev = P.mutation, v = !prev;
+    queueEvent({ type:"mutation", v }); setEvo(e => ({ ...e, mutation: v }));
+    onLog("mutation", v ? "Mutation on" : "Mutation off", () => queueEvent({ type:"mutation", v: prev }));
+  };
+  const slider = (sp, key, min, max, step, label) => { const row = evo.rows.find(r => r.sp === sp); return (
+    <input type="range" min={min} max={max} step={step} value={row ? row[key] : 0}
+      onChange={e => commit(sp, key, +e.target.value, label)}
+      title={label} style={{ width: desktop ? 110 : 84, accentColor: amber }} /> ); };
+  return (
+    <div style={{ position:"absolute", top: 126, left:"50%", transform:"translateX(-50%)", zIndex:5,
+      padding:"6px 12px 8px", borderRadius:12, background:"rgba(11,19,30,0.78)", border:"1px solid rgba(242,178,74,0.35)",
+      color:"#C9D7E3", fontSize:11, fontFamily:mono, maxWidth:"calc(100vw - 24px)" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <button className="mc-hit" onClick={() => setOpen(o => !o)}
+          style={{ background:"transparent", border:"none", color:amber, cursor:"pointer", font:"inherit", padding:0 }}>
+          {open ? "▾" : "▸"} Evolution</button>
+        <button className="mc-hit mc-hit-amber" onClick={toggleMutation}
+          style={{ marginLeft:"auto", padding:"3px 9px", borderRadius:8, cursor:"pointer", font:"inherit", fontSize:10,
+            border:"1px solid rgba(242,178,74,0.6)", background: evo.mutation ? "rgba(242,178,74,0.18)" : "transparent",
+            color: evo.mutation ? amber : "#8FA3B5" }}>
+          mutation {evo.mutation ? "on" : "off"}</button>
+      </div>
+      {open && (
+        <div style={{ display:"grid", gridTemplateColumns:"auto auto auto", gap:"4px 10px", alignItems:"center", marginTop:6 }}>
+          <span style={{ color:"#5E7386", fontSize:9 }}></span>
+          <span style={{ color:"#5E7386", fontSize:9 }}>mutation rate</span>
+          <span style={{ color:"#5E7386", fontSize:9 }}>trade-off curve</span>
+          {evo.rows.map(r => { const c = SPECIES_META[r.sp].rgb; return (
+            <React.Fragment key={r.sp}>
+              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})` }}>{SPECIES_META[r.sp].name} <span style={{ color:"#5E7386" }}>{TRAITS[r.sp].locus.label.toLowerCase()}</span></span>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, "sigma", 0, 0.12, 0.005, "Mutation rate · " + SPECIES_META[r.sp].name)}<span style={{ width:34, color:amber }}>{r.sigma.toFixed(3)}</span></span>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, "curve", -0.5, 0.8, 0.05, "Trade-off curvature · " + SPECIES_META[r.sp].name)}<span style={{ width:34, color:amber }}>{r.curve >= 0 ? "+" : ""}{r.curve.toFixed(2)}</span></span>
+            </React.Fragment> ); })}
+          <span style={{ gridColumn:"1 / -1", color:"rgba(242,178,74,0.7)", fontSize:9, marginTop:2 }}>
+            curve &lt; 0 sweeps and splits · 0 as shipped · &gt; 0 settles to the middle</span>
+        </div>
+      )}
+    </div>
+  );
+}
 // Specimen detail. One implementation for both layouts: the mobile sheet passes
 // its detent, the desktop dock passes 2 (everything visible, nothing to drag).
 function SpecimenBody({ card, tick, detail, onFeed, onKill }){
