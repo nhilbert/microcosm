@@ -61,11 +61,10 @@ npm install
 npm start       # -> http://127.0.0.1:5173
 ```
 
-That serves a dev page holding the app inside a phone-sized **iframe**, with
-buttons for a few device sizes and a fill-the-window mode. The iframe matters:
-the app roots itself with `position:fixed` and reads `window.innerWidth`, so it
-needs a real viewport — a CSS box would not constrain it. Edit anything in
-`src/` and the frame rebuilds and reloads itself.
+That serves the app itself, filling the browser window. Edit anything in `src/`
+and the page rebuilds and reloads itself. For phone-sized testing, use your
+browser's device emulation (F12 → device toolbar) — the app takes its size from
+the viewport, so that is all it needs.
 
 To build the artifact from the layers in `src/`:
 
