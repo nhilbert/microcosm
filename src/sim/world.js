@@ -1,5 +1,8 @@
 const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
+// Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
+// Lives here because W.rec is sized from it; changing CH is a declared rebaseline.
+const REC = { N: 900, STRIDE: 20, CH: 56 };
 
 // ---------- world state (module singletons; one artifact instance) ----------
 const W = {
@@ -30,7 +33,7 @@ const W = {
   hashHead: new Int32Array(P.GRID * P.GRID), hashNext: new Int32Array(MAXN),
   cHashHead: new Int32Array(P.GRID * P.GRID), cHashNext: new Int32Array(1500),
   pops: [0, 0, 0, 0, 0, 0, 0],
-  rec: new Float32Array(900*42), recHead: 0, recCount: 0, sysEvents: [],
+  rec: new Float32Array(REC.N*REC.CH), recHead: 0, recCount: 0, sysEvents: [],
   addedM: 0,  // provenance: mineral added by the human hand (fertilize lever)
   evLog: [],  // committed interventions, for chart markers and impact cards
   // corpse pool (separate entity class: no behavior, only decay)

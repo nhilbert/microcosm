@@ -58,7 +58,9 @@ const TRAITS = normalizeTraits([
     // Mutation kernel: one uniform draw in [-sigma, sigma] per division (a Gaussian would cost
     // two draws); the corridor clamp bounds it. kpSlope 0.10 -> 0.25 by measurement: cheap
     // defense swept to the rail and starved the apex.
-    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25 },
+    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25,
+             label: "Defense", hiWord: "tougher", loWord: "faster-growing",  // functional names for the two ends
+             hiTrait: "escape chance", loTrait: "growth rate" },
   },
   { // 2 — Cilio: steering grazer
     name: "Cilio", bodyTag: TAG.CILIO, layer: "none",

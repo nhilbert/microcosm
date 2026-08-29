@@ -130,7 +130,9 @@ const TRAITS = normalizeTraits([
     // Mutation kernel: one uniform draw in [-sigma, sigma] per division (a Gaussian would cost
     // two draws); the corridor clamp bounds it. kpSlope 0.10 -> 0.25 by measurement: cheap
     // defense swept to the rail and starved the apex.
-    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25 },
+    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25,
+             label: "Defense", hiWord: "tougher", loWord: "faster-growing",  // functional names for the two ends
+             hiTrait: "escape chance", loTrait: "growth rate" },
   },
   { // 2 — Cilio: steering grazer
     name: "Cilio", bodyTag: TAG.CILIO, layer: "none",
@@ -205,6 +207,9 @@ const TRAITS = normalizeTraits([
 
 const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
+// Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
+// Lives here because W.rec is sized from it; changing CH is a declared rebaseline.
+const REC = { N: 900, STRIDE: 20, CH: 56 };
 
 // ---------- world state (module singletons; one artifact instance) ----------
 const W = {
@@ -235,7 +240,7 @@ const W = {
   hashHead: new Int32Array(P.GRID * P.GRID), hashNext: new Int32Array(MAXN),
   cHashHead: new Int32Array(P.GRID * P.GRID), cHashNext: new Int32Array(1500),
   pops: [0, 0, 0, 0, 0, 0, 0],
-  rec: new Float32Array(900*42), recHead: 0, recCount: 0, sysEvents: [],
+  rec: new Float32Array(REC.N*REC.CH), recHead: 0, recCount: 0, sysEvents: [],
   addedM: 0,  // provenance: mineral added by the human hand (fertilize lever)
   evLog: [],  // committed interventions, for chart markers and impact cards
   // corpse pool (separate entity class: no behavior, only decay)
@@ -478,15 +483,20 @@ function neighbors(i, radius, cb){
 //        18 uptake  19 GPP  20 respiration  21 mineralization(bacRelease)
 //        22 corpseToDet  23 egested E  24 deaths
 //  25    corpse count       26-32 mean size per species   33-34 sun x,y
+//  35-41 deaths per species since previous sample
+//  42-48 locus mean per species (Phase 5.1; 0 for species without a locus or with none alive)
+//  49-55 locus standard deviation per species — variance is the fuel gauge of evolution
 // CONTRACT: the recorder is a pure observer — zero PRNG draws, zero
 // mutation of dynamic state. Conformance bit-identity with the recorder
 // running is the standing acceptance test for this whole layer.
+// (REC itself is declared in src/sim/world.js, where the buffer is sized from it.)
 // ============================================================
-const REC = { N: 900, STRIDE: 20, CH: 42 }; // 35-41: deaths per species since previous sample
 // ---- system-event detectors (Phase 4.1): pure observers narrating the world ----
 const DET_ESTAB = [40, 40, 20, 80, 10, 4, 4]; // establishment thresholds per species
 const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0], crash:[0,0,0,0,0,0,0],
-  packAwake:false, depleted:false, lockedWarn:false };
+  packAwake:false, depleted:false, lockedWarn:false,
+  sweep:[0,0,0,0,0,0,0],   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
+  uniform:[0,0,0,0,0,0,0] };
 function pushEvent(type, sp, text){
   W.sysEvents.push({ tick: W.tick, type, sp, text });
   if (W.sysEvents.length > 200) W.sysEvents.shift();
@@ -523,6 +533,33 @@ function detect(r, awake){
       else if (det.crash[sp]===1 && growth > 0.9) det.crash[sp]=0;
     }
   }
+  // ---- heredity detectors (Phase 5.1): sweeps and diversity collapse, per species with a locus ----
+  // Calibrated on the 8-seed evolving ensemble: founders sit within +-0.05 of g0 for the first
+  // ~2,000 ticks (sd 0.02-0.05), so the dead zone silences the founding; a real sweep carries the
+  // mean >= 0.10 from g0 with a 60% majority on that side, reached at t ~ 8,000-12,000.
+  for (let sp=0; sp<7; sp++){
+    const L = TRAITS[sp].locus; if (!L || B[r+sp] < 50) continue;
+    const mean = B[r+42+sp], sd = B[r+49+sp], name = TRAITS[sp].name;
+    let hi=0, lo=0, n=0;
+    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; if (W.g[i] > L.g0+0.05) hi++; else if (W.g[i] < L.g0-0.05) lo++; }
+    const shareHi = hi/n, shareLo = lo/n;
+    const dir = (mean - L.g0 >= 0.10 && shareHi >= 0.6) ? 1 : (L.g0 - mean >= 0.10 && shareLo >= 0.6) ? -1 : 0;
+    const share = dir > 0 ? shareHi : shareLo;
+    const word = dir > 0 ? L.hiWord : L.loWord;
+    if (det.sweep[sp] === 0 && dir !== 0){ det.sweep[sp] = dir;
+      pushEvent("sweep", sp, "A "+word+" "+name+" line is taking over — "+Math.round(share*100)+"% of the population and rising."); }
+    else if (Math.abs(det.sweep[sp]) === 1 && dir === det.sweep[sp] && share >= 0.85){ det.sweep[sp] *= 2;
+      pushEvent("sweep", sp, "The "+word+" "+name+" line has taken over — "+Math.round(share*100)+"% of the population."); }
+    else if (det.sweep[sp] !== 0 && Math.max(shareHi, shareLo) < 0.45) det.sweep[sp] = 0;
+    // diversity collapse: variation falls to well under half of what it was 270 samples ago.
+    // Selection consuming variation is the normal end of a sweep; the event names the cost.
+    if (W.recCount >= 271){
+      const sdAgo = B[((W.recHead-270+N)%N)*CH + 49 + sp];
+      if (!det.uniform[sp] && sdAgo >= 0.06 && sd <= 0.4*sdAgo){ det.uniform[sp] = 1;
+        pushEvent("uniform", sp, "Variation collapsing in "+name+" — the population is becoming uniform."); }
+      else if (det.uniform[sp] && sd > 0.7*sdAgo) det.uniform[sp] = 0;
+    }
+  }
   const total = B[r+14]+B[r+15]+B[r+16]+B[r+17];
   const dissolvedFrac = B[r+14]/Math.max(1,total), lockedFrac = (B[r+16]+B[r+17])/Math.max(1,total);
   // Depletion is a trend, not a level (calibrated: healthy worlds DIP to 17% and recover;
@@ -557,6 +594,14 @@ function record(){
     if (!W.cy[i]) awake[sp]++;
   }
   for (let sp=0;sp<7;sp++) if (B[r+sp]>0) B[r+26+sp]/=B[r+sp];
+  // locus mean + sd per species, awake and dormant alike (the genome does not sleep)
+  for (let sp=0;sp<7;sp++){
+    if (!TRAITS[sp].locus || B[r+sp] === 0) continue;
+    let m=0, m2=0;
+    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ const g=W.g[i]; m+=g; m2+=g*g; }
+    const n=B[r+sp], mean=m/n, varr=Math.max(0, m2/n - mean*mean);
+    B[r+42+sp]=mean; B[r+49+sp]=Math.sqrt(varr);
+  }
   let fM=0, dM=0;
   for (let c=0;c<P.GRID*P.GRID;c++){ fM+=W.M[c]; dM+=W.dM[c]; }
   let bM=0; for (let i=0;i<W.n;i++) if (W.alive[i]) bM+=W.mn[i];
@@ -1007,7 +1052,7 @@ function initWorld(seed){
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
-  det.packAwake=false; det.depleted=false; det.lockedWarn=false;
+  det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0);
   recPrev.uptake=recPrev.gpp=recPrev.resp=recPrev.bacRelease=recPrev.corpseToDet=recPrev.egestE=recPrev.deaths=0;
   recPrev.deathsBy.fill(0);
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);
