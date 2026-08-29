@@ -14,7 +14,7 @@ function initWorld(seed){
   // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
   TRAITS.forEach((T, sp) => { if (T.locus){ T.locus.sigma = LOCUS_SHIPPED[sp].sigma; T.locus.curve = LOCUS_SHIPPED[sp].curve; } });
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
-  det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0);
+  det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0);
   recPrev.uptake=recPrev.gpp=recPrev.resp=recPrev.bacRelease=recPrev.corpseToDet=recPrev.egestE=recPrev.deaths=0;
   recPrev.deathsBy.fill(0);
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);

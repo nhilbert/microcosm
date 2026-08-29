@@ -65,7 +65,10 @@ function indicators(){ // labels follow the naming rule: functional first, scien
     for(let k=1;k<=KL;k++) loss+=B[((W.recHead-k+REC.N)%REC.N)*REC.CH+35+2];
     ven = { reserve: (B[r0+13]/B[r0+6])/cap, preyLossRate: loss/(KL*REC.STRIDE/10) };
   }
+  let adSum=0, adN=0; // adaptability (6.2): mean locus sd over species with a locus and >= 20 alive
+  for (let sp=0;sp<7;sp++) if (TRAITS[sp].locus && B[r0+sp] >= 20){ adSum += B[r0+49+sp]; adN++; }
   return {
+    adaptability: adN ? +(adSum/adN).toFixed(3) : null, // subtitle: mean heritable variation
     variety: +H.toFixed(2),                      // subtitle: Shannon diversity
     prodVsCons: +(g/(rr||1)).toFixed(2),         // subtitle: P/R (Odum)
     recyclingMin: turnoverTicks===Infinity ? null : +(turnoverTicks/600).toFixed(1), // subtitle: mineral turnover time

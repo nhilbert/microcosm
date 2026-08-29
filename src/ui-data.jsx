@@ -320,6 +320,7 @@ function HealthPage(){
         {tile("PRODUCTION VS CONSUMPTION", "P/R ratio, Odum", ind.prodVsCons)}
         {tile("RECYCLING SPEED", "mineral turnover", ind.recyclingMin===null ? "–" : "every "+Math.round(ind.recyclingMin*60)+" s")}
         {tile("LOCKED AWAY", "corpses + detritus", ind.lockedPct+"%")}
+        {ind.adaptability !== null && tile("ADAPTABILITY", "mean heritable variation", ind.adaptability < 0.03 ? "low · "+ind.adaptability.toFixed(2) : ind.adaptability.toFixed(2))}
       </div>
       <div style={{ marginTop:14, fontSize:11, color:"#5E7386" }}>SPECIES VITALS</div>
       <div style={{ marginTop:4 }}>{rows}</div>

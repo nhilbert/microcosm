@@ -21,7 +21,8 @@ const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0],
   packAwake:false, depleted:false, lockedWarn:false,
   sweep:[0,0,0,0,0,0,0],   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
   uniform:[0,0,0,0,0,0,0],
-  diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0] }; // standing polymorphism: both ends coexist
+  diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0],   // standing polymorphism: both ends coexist
+  rail:[0,0,0,0,0,0,0], railRun:[0,0,0,0,0,0,0] };         // corridor contact: a locus pinned at its edge (6.2)
 function pushEvent(type, sp, text){
   W.sysEvents.push({ tick: W.tick, type, sp, text });
   if (W.sysEvents.length > 200) W.sysEvents.shift();
@@ -74,9 +75,16 @@ function detectHeredity(r){
   for (let sp=0; sp<7; sp++){
     const L = TRAITS[sp].locus; if (!L || B[r+sp] < 50) continue;
     const mean = B[r+42+sp], sd = B[r+49+sp], name = TRAITS[sp].name;
-    let hi=0, lo=0, n=0;
-    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; if (W.g[i] > L.g0+0.05) hi++; else if (W.g[i] < L.g0-0.05) lo++; }
+    let hi=0, lo=0, n=0, railHi=0, railLo=0;
+    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; const g=W.g[i]; if (g > L.g0+0.05) hi++; else if (g < L.g0-0.05) lo++; if (g > 0.98) railHi++; else if (g < 0.02) railLo++; }
     const shareHi = hi/n, shareLo = lo/n;
+    // rail contact (6.2): a third of the population pinned at a corridor edge for 10 samples -- the
+    // trait has run out of room, which is a certification concern the player should see as a story
+    const railShare = Math.max(railHi, railLo)/n, railDir = railHi >= railLo ? 1 : -1;
+    det.railRun[sp] = railShare >= 0.30 ? det.railRun[sp]+1 : 0;
+    if (!det.rail[sp] && det.railRun[sp] >= 10){ det.rail[sp] = railDir;
+      pushEvent("rail", sp, name+" has reached the limit of its "+L.label.toLowerCase()+" — "+Math.round(railShare*100)+"% at the "+(railDir>0 ? L.hiWord : L.loWord)+" edge."); }
+    else if (det.rail[sp] && railShare < 0.15) det.rail[sp] = 0;
     const dir = (mean - L.g0 >= 0.10 && shareHi >= 0.6) ? 1 : (L.g0 - mean >= 0.10 && shareLo >= 0.6) ? -1 : 0;
     const share = dir > 0 ? shareHi : shareLo;
     const word = dir > 0 ? L.hiWord : L.loWord;
