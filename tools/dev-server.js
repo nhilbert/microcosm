@@ -25,7 +25,7 @@ function buildArtifact(){
 
   let timer = null;
   fs.watch(path.join(ROOT, "src"), { persistent: true }, (_e, file) => {
-    if (file && !/\.(js|jsx)$/.test(file)) return;
+    if (file && !/\.(js|jsx|json)$/.test(file)) return;
     clearTimeout(timer);
     timer = setTimeout(buildArtifact, 80);   // debounce editor multi-writes
   });

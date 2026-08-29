@@ -4,7 +4,7 @@ A mobile-first ecosystem sandbox: a single-file React artifact in which artifici
 
 ## Files
 
-- `src/sim/` — the simulation: `params.js` (PRNG + constants), `traits.js` (species-as-data), `world.js` (SoA state, spawn/kill), `events.js` (the only legal outside mutation), `fields.js` (diffusion, light, spatial hash), `step.js` (**the RNG-order contract + the tick**), `init.js` (setup + Node exports). Pure, deterministic, UI-free. The precious thing.
+- `src/sim/` — the simulation: `params.js` (PRNG + constants), `species.json` (**the species table — row order is the species index, part of the RNG contract**; inlined by build.py; schema + design notes in docs/species-schema.md), `traits.js` (defaults, loader, locus guardrail, `SPECIES` registry — use it instead of literal species indices), `world.js` (SoA state, spawn/kill), `events.js` (the only legal outside mutation), `fields.js` (diffusion, light, spatial hash), `step.js` (**the RNG-order contract + the tick**), `init.js` (setup + Node exports). Pure, deterministic, UI-free. The precious thing.
 - `src/observatory/` — `recorder.js`, `analysis.js`, `impact.js`. Pure observers: **zero PRNG draws**, no mutation of dynamic state. Free to rewrite in a port; the sim is not.
 - `src/header.jsx`, `src/ui-render.js`, `src/ui-data.jsx`, `src/ui-reset.jsx`, `src/ui.jsx` — UI layers; `tools/build.py` concatenates all into `dist/microcosm.jsx`, the deliverable artifact. Generated and committed; never hand-edit, CI enforces that it matches `src/`.
 - `harness/tune2.js` — 8-seed × 18,000-tick ecology harness (seeds 11,22,33,44,55,66,77,88). The acceptance authority. Exits non-zero if any seed aborts.

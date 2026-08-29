@@ -1,0 +1,303 @@
+[
+  {
+    "name": "Solara",
+    "bodyTag": "SOLARA",
+    "layer": "benthic",
+    "mat": true,
+    "movement": "sessile",
+    "photosynth": true,
+    "kp": 0.12,
+    "mUp": 0.22,
+    "mQm": 0.65,
+    "pSynth": 0.1,
+    "hazard": 0.0012,
+    "grazeFloor": 35,
+    "pursuitPenalty": 1.8,
+    "spread": 70,
+    "settleLimited": true,
+    "settleLimit": 90,
+    "locus": {
+      "g0": 0.5,
+      "sigma": 0.03,
+      "lightSlope": 0.5,
+      "label": "Light",
+      "hiWord": "shade-tolerant",
+      "loWord": "sun-loving",
+      "hiTrait": "shade tolerance",
+      "loTrait": "sun tolerance"
+    }
+  },
+  {
+    "name": "Drifta",
+    "bodyTag": "DRIFTA",
+    "layer": "plankton",
+    "movement": "drift",
+    "photosynth": true,
+    "kp": 0.3,
+    "mUp": 0.6,
+    "pSynth": 0.08,
+    "damp": 0.96,
+    "noise": 0.09,
+    "phototaxis": 0.035,
+    "driftSpeed": 0.5,
+    "moveCostMul": 0.3,
+    "cyst": {
+      "enter": 0.18,
+      "wake": "light",
+      "p": 0.015,
+      "grace": 60
+    },
+    "escape": {
+      "p": 0.35,
+      "kick": 16
+    },
+    "locus": {
+      "g0": 0.5,
+      "sigma": 0.03,
+      "escSlope": 0.22,
+      "kpSlope": 0.5,
+      "label": "Defense",
+      "hiWord": "tougher",
+      "loWord": "faster-growing",
+      "hiTrait": "grazing resistance",
+      "loTrait": "growth rate"
+    }
+  },
+  {
+    "name": "Cilio",
+    "bodyTag": "CILIO",
+    "layer": "none",
+    "movement": "steer",
+    "alarmEmit": 0.25,
+    "flee": {
+      "sense": 0.06,
+      "speedMul": 1.15,
+      "dur": 25
+    },
+    "speed": 2,
+    "sense": 42,
+    "turnRate": 0.35,
+    "bite": 8,
+    "digest": [
+      0.1,
+      0.5,
+      0,
+      0.25,
+      0,
+      0,
+      0
+    ],
+    "digestP": [
+      0.2,
+      0.5,
+      0,
+      0.4,
+      0,
+      0,
+      0
+    ],
+    "satiation": 0.85,
+    "torpor": 0.3,
+    "interfRadius": 40,
+    "interfCost": 0.05,
+    "handling": 14,
+    "reproFrac": 0.9,
+    "reproCooldown": 160,
+    "matureCd": 200,
+    "diet": [
+      "SOLARA",
+      "DRIFTA",
+      "BACILLUS"
+    ],
+    "cyst": {
+      "enter": 0.22,
+      "wake": "prey",
+      "p": 0.02,
+      "grace": 100
+    },
+    "escape": {
+      "p": 0.3,
+      "kick": 22
+    },
+    "locus": {
+      "g0": 0.5,
+      "sigma": 0.03,
+      "catchSlope": 0.4,
+      "kbSlope": 0.15,
+      "label": "Pursuit",
+      "hiWord": "keener",
+      "loWord": "thriftier",
+      "hiTrait": "catch chance",
+      "loTrait": "energy thrift"
+    }
+  },
+  {
+    "name": "Bacillus",
+    "bodyTag": "BACILLUS",
+    "layer": "none",
+    "cystYield": 0.5,
+    "grazeFloor": 4,
+    "movement": "tumble",
+    "mQm": 0.8,
+    "pursuitPenalty": 1.6,
+    "speed": 0.8,
+    "tumbleLow": 0.05,
+    "tumbleHigh": 0.35,
+    "detritivore": {
+      "rateE": 0.5,
+      "effE": 0.6,
+      "rateP": 0.15,
+      "effP": 0.7,
+      "minRate": 0.15
+    },
+    "spread": 15,
+    "cyst": {
+      "enter": 0.2,
+      "wake": "detritus",
+      "p": 0.03,
+      "grace": 60
+    },
+    "locus": {
+      "g0": 0.5,
+      "sigma": 0.03,
+      "rateSlope": 0.5,
+      "effSlope": 0.15,
+      "label": "Metabolism",
+      "hiWord": "voracious",
+      "loWord": "frugal",
+      "hiTrait": "feeding rate",
+      "loTrait": "yield"
+    }
+  },
+  {
+    "name": "Mycora",
+    "bodyTag": "MYCORA",
+    "layer": "fungal",
+    "live": false,
+    "movement": "sessile",
+    "kb": 0.04,
+    "cystDrainMul": 0.3,
+    "mQm": 0.8,
+    "hazard": 0.0008,
+    "detritivore": {
+      "rateE": 0.2,
+      "effE": 0.55,
+      "rateP": 0.1,
+      "effP": 0.8,
+      "minRate": 0.08
+    },
+    "corpsivore": {
+      "rate": 0.35,
+      "effE": 0.7,
+      "effP": 0.8,
+      "radius": 14
+    },
+    "reproFrac": 0.75,
+    "spread": 120,
+    "settleLimited": true,
+    "settleLimit": 70,
+    "reproCooldown": 120,
+    "cyst": {
+      "enter": 0.25,
+      "wake": "detritus",
+      "p": 0.03,
+      "grace": 60
+    }
+  },
+  {
+    "name": "Necro",
+    "bodyTag": "NECRO",
+    "layer": "none",
+    "live": false,
+    "movement": "tumble",
+    "tumbleField": "scent",
+    "kb": 0.035,
+    "torpor": 0.35,
+    "speed": 1.4,
+    "tumbleLow": 0.04,
+    "tumbleHigh": 0.3,
+    "cystDrainMul": 0.25,
+    "corpsivore": {
+      "rate": 0.5,
+      "effE": 0.55,
+      "effP": 0.6,
+      "radius": 12,
+      "minMass": 5,
+      "maxMass": 15
+    },
+    "reproFrac": 0.8,
+    "reproCooldown": 120,
+    "matureCd": 150,
+    "cyst": {
+      "enter": 0.22,
+      "wake": "detritus",
+      "p": 0.02,
+      "grace": 80,
+      "scMin": 0.012
+    }
+  },
+  {
+    "name": "Venator",
+    "bodyTag": "VENATOR",
+    "layer": "none",
+    "apex": true,
+    "movement": "steer",
+    "kb": 0.04,
+    "alarmEmit": 0.3,
+    "speed": 2.4,
+    "sense": 50,
+    "turnRate": 0.3,
+    "bite": 14,
+    "burst": {
+      "mul": 1.8,
+      "dur": 6,
+      "cd": 60,
+      "range": 30
+    },
+    "digest": [
+      0,
+      0,
+      0.8,
+      0,
+      0,
+      0,
+      0
+    ],
+    "digestP": [
+      0,
+      0,
+      0.7,
+      0,
+      0,
+      0,
+      0
+    ],
+    "corpsivore": {
+      "rate": 1.2,
+      "effE": 0.8,
+      "effP": 0.7,
+      "radius": 14,
+      "minMass": 5,
+      "dietOnly": true
+    },
+    "satiation": 0.85,
+    "torpor": 0.3,
+    "interfRadius": 80,
+    "interfCost": 0.25,
+    "handling": 30,
+    "reproFrac": 0.92,
+    "spread": 25,
+    "reproCooldown": 700,
+    "matureCd": 700,
+    "diet": [
+      "CILIO"
+    ],
+    "cyst": {
+      "enter": 0.25,
+      "wake": "prey",
+      "p": 0.02,
+      "grace": 120
+    },
+    "cystDrainMul": 0.3
+  }
+]

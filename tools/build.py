@@ -19,7 +19,8 @@ import io, os, sys
 # references observatory bindings, so it must be evaluated after them).
 CORE_PARTS = [
     "src/sim/params.js",            # PRNG, tunable constants P, body tags
-    "src/sim/traits.js",            # species-as-data: the TRAITS table
+    "src/sim/species.json",         # the species table, inlined as `const SPECIES_ROWS = [...]`
+    "src/sim/traits.js",            # schema, defaults, loader, registry
     "src/sim/world.js",             # world state W (structure-of-arrays), spawn/kill
     "src/sim/events.js",            # interventions: the only legal outside mutation
     "src/sim/fields.js",            # mineral diffusion, light, spatial hash, neighbours
@@ -48,7 +49,12 @@ def read(part):
     if not os.path.exists(path):
         sys.exit("build.py: missing %s" % part)
     with io.open(path, encoding="utf-8") as fh:
-        return fh.read()
+        text = fh.read()
+    if part.endswith(".json"):  # data parts become one const in the shared scope
+        import json
+        json.loads(text)  # fail loudly on malformed JSON
+        return "const SPECIES_ROWS = " + text.strip() + ";\n"
+    return text
 
 
 def strip_exports(text):
