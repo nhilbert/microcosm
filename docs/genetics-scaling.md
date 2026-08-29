@@ -63,3 +63,19 @@ What was done by hand today — pick three slope values, three seeds, 36k ticks,
 4. Then multi-locus, with the budget from §2 fixed in advance.
 
 *Sources: Levins, Evolution in Changing Environments (1968); de Mazancourt & Dieckmann, Am. Nat. 164 (2004); Rueffler, Van Dooren & Metz, TREE 21 (2006); Geritz, Kisdi, Meszéna & Metz, Evol. Ecol. 12 (1998); van Noordwijk & de Jong, Am. Nat. 128 (1986); McKay, Beckman & Conover, Technometrics 21 (1979); Morris, Technometrics 33 (1991); Lehman, Stanley et al., "The surprising creativity of digital evolution" (2018).*
+
+---
+
+## Appendix A — measured (2026-08-29): curvature makes the equilibrium price-robust
+
+The claim in §1, tested. Same price ranges that swept to a rail under the linear form, with `curve` on both Drifta and Cilio; 3 seeds × 36k ticks; mean g at 36k. No point reached a rail (rail share < 20% everywhere).
+
+| price | curve 0 (linear, from 5.7) | curve 0.3 | curve 0.6 |
+|---|---|---|---|
+| Drifta kpSlope 0.25 | 0.91–0.94 (rail) | 0.62–0.70 | 0.56–0.58 |
+| Drifta kpSlope 0.50 | 0.50–0.68 | 0.50–0.51 | 0.51–0.56 |
+| Drifta kpSlope 0.75 | 0.09–0.18 (rail) | 0.34–0.50 | 0.30–0.46 |
+| Cilio kbSlope 0 | 0.59–0.74 (keener) | 0.54–0.77 | 0.65–0.78 |
+| Cilio kbSlope 0.30 | 0.41–0.52 | 0.43–0.67 | 0.40–0.63 |
+
+Existence of an interior equilibrium is set by curvature; its position still moves with price (and therefore with the ecology), which is what the levers should do. The cost, measured: standing sd narrows from 0.10–0.17 (linear) to 0.06–0.12 (curve 0.3) — concavity is stabilizing selection, and it suppresses exactly the two-line splitting the owner had watched under the linear form. **Decision (owner):** the linear form ships; `curve` stays 0 and becomes a Phase 6 slider, so the player chooses between a world that sweeps and splits and one that settles.

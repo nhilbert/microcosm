@@ -18,6 +18,7 @@
     "gate": "npm run build && node harness/k6gate.js",
     "yoshida": "npm run build && node harness/yoshida.js",
     "corridor": "npm run build && node harness/corridor.js",
+    "corridor:full": "npm run build && node harness/corridor.js --rails --fuzz --sample 16",
     "gate5": "npm run build && node harness/gate5.js",
     "selftest": "node harness/selftest.js",
     "yoshida:capture": "npm run build && node harness/yoshida.js --capture",
