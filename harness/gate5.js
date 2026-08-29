@@ -52,7 +52,7 @@ const c3 = SEEDS.every(s => ev[s].sd18k > ev[s].sd2k);
 const c4 = SEEDS.every(s => ref[s].hered.length === 0 && ref[s].sd18k === 0);
 
 // 5. reproduce the 5.2 measurement on seed 22 with this build (numbers recorded from harness/yoshida.js)
-const RECORDED = { seed: 22, pOff: 6420, pOn: 5680, phOff: 0.04, phOn: -0.26, gEnd: 0.91 };
+const RECORDED = { seed: 22, pOff: 6420, pOn: 1600, phOff: 0.04, phOn: 0.00, gEnd: 0.77 }; // 5.6 coevolving world
 const STRIDE = 20, SKIP = 150;
 function series(seed, mutation){ P.mutation = mutation; C.resetWorld(); C.initWorld(seed);
   const D=[], G=[]; let gEnd=0;

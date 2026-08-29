@@ -104,3 +104,32 @@ A clean dose–response. At 0.5 the population holds standing variation (sd 0.08
 | 5 | 5.2 measurement reproduced on the shipped build (seed 22) | PASS — period 6420/5680, phase 0.04/−0.26, g end 0.91, bit-exact |
 
 Not in this phase, deferred with the plan's own list: sex, recombination, HGT, explicit speciation, Venator heredity. Emergent ecotype structure did not appear at the shipped trade-off; the kpSlope-0.5 world, where variation persists, is where to look for it.
+
+---
+
+## 5.6 — Cilio pursuit locus: the coevolutionary counterweight (2026-08-29)
+
+R5 named the cost of one-sided evolution: with only prey evolving, nothing pushes back. This increment gives the grazer its own locus and measures whether an arms race appears.
+
+**Design.** One locus on Cilio, *Pursuit* (keener ↔ thriftier): a keener grazer multiplies its prey's escape chance by `1 + 0.4·(g0 − g)` (×0.8 at full keenness) and pays basal upkeep `kb·(1 + 0.3·(g − g0))` (+15%). Expression only at the existing draw sites — the escape roll and the basal-cost line — so the silent genome stays bit-identical; the locus schema gained defaults so every unnamed slope is an exact no-op. Detectors, Traits page, tint and specimen card needed no change: they read the locus row.
+
+**Declared change, proven.** Silent fingerprint: behavioural fields identical to the 5.5 baseline on both seeds. Evolving fingerprint: changed, as declared (Cilio divisions now draw). The conformance `gSum` was redefined as Σ(g − g0) over locus species, which is exactly 0 in any silent world however many species carry a locus — the old definition would have flagged a behaviour-neutral locus addition.
+
+**Result: no arms race.** 8 seeds × 18,000 ticks:
+
+| | Drifta defense at 18k | Cilio pursuit at 18k |
+|---|---|---|
+| range over 8 seeds | 0.66 – 0.90 (up from 0.50) | 0.41 – 0.52 (from 0.50) |
+
+Cilio's pursuit does not rise; it drifts slightly *thriftier*. At this price the upkeep outweighs the catch gain, so selection on the grazer runs the other way from the plan's hope, while Drifta still sweeps to defense on 8/8. Reported as found; not re-tuned, per the corridor policy (the ecosystem holds).
+
+**Re-acceptance.**
+
+| Harness | Result |
+|---|---|
+| `tune2` | 8/8 ecosystem; apex held 3/8 (late losses on the rest) |
+| `corridor` | **CERTIFIED at all 4 corners** (both loci × both rails), 8/8 each; apex held 2–4/8 per corner |
+| `yoshida` | period 5698 → 3495 ticks (longer on 1/8), phase 0.17 → −0.10, Drifta CV 0.34 → 0.25. The antiphase prediction fails as before, more decisively: two sweeping loci make the cycle faster and tighter. Method caveat: seed 44's on-period of 520 ticks is the first-ACF-peak estimator locking onto a short component; kept in the table, not in any claim. |
+| `gate5` | **ALL CRITERIA PASS** on the coevolving world: sweep narrated 8/8 (t = 5,180–14,660), each grounded, variance rising 8/8, control silent 8/8, seed-22 measurement reproduced bit-exactly |
+
+**What this tells the next cut.** Both loci sweep monotonically. The world as tuned selects *directionally* on every heritable knob tried; balanced polymorphism appeared only when the trade-off was made steep (kpSlope 0.5, informational run). If coevolutionary cycling is the goal, the next lever is the *price* of keenness and defense, decided by the owner — not another species.

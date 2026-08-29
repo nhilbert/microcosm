@@ -137,10 +137,12 @@ export default function Microcosm(){
       let heredity = null;
       if (T.locus){
         const L = T.locus, g = W.g[i];
-        const escPct = T.escape ? Math.round(100 * L.escSlope*(g - L.g0) / T.escape.p) : 0;
-        const kpPct = Math.round(100 * L.kpSlope*(L.g0 - g));
-        heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord,
-          parts: [[L.hiTrait, escPct], [L.loTrait, kpPct]] };
+        const parts = [];
+        if (L.escSlope && T.escape) parts.push([L.hiTrait, Math.round(100 * L.escSlope*(g - L.g0) / T.escape.p)]);
+        if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
+        if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
+        if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
+        heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
       }
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
         age: Math.floor((W.tick - W.birth[i]) / 10), state: stateOf(i),

@@ -98,11 +98,17 @@ const TRAIT_DEFAULTS = {
 };
 const CYST_DEFAULTS = { scMin: 0.03 };
 const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
+// Locus effects: each slope is an exact no-op at 0, so a species expresses only the ones its row names.
+//   escSlope   prey escape.p  + escSlope*(g-g0)         kpSlope   kp * (1 + kpSlope*(g0-g))
+//   catchSlope prey's escape chance against THIS hunter x (1 + catchSlope*(g0-g))
+//   kbSlope    basal cost kb * (1 + kbSlope*(g-g0))     (the price of keenness)
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0 };
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
     if (t.cyst) for (const k in CYST_DEFAULTS) if (t.cyst[k] === undefined) t.cyst[k] = CYST_DEFAULTS[k];
     if (t.corpsivore) for (const k in CORPSIVORE_DEFAULTS) if (t.corpsivore[k] === undefined) t.corpsivore[k] = CORPSIVORE_DEFAULTS[k];
+    if (t.locus) for (const k in LOCUS_DEFAULTS) if (t.locus[k] === undefined) t.locus[k] = LOCUS_DEFAULTS[k];
   }
   return rows;
 }
@@ -149,6 +155,11 @@ const TRAITS = normalizeTraits([
     diet: TAG.SOLARA | TAG.DRIFTA | TAG.BACILLUS,
     cyst: { enter: 0.22, wake: "prey", p: 0.02, grace: 100 },
     escape: { p: 0.30, kick: 22 },
+    // Phase 5.6 heredity: pursuit, the coevolutionary counterweight to Drifta's defense (R5).
+    // A keener grazer cuts its prey's escape chance; it pays in basal upkeep every tick.
+    locus: { g0: 0.5, sigma: 0.03, catchSlope: 0.4, kbSlope: 0.3,
+             label: "Pursuit", hiWord: "keener", loWord: "thriftier",
+             hiTrait: "catch chance", loTrait: "energy thrift" },
   },
   { // 3 — Bacillus: detritivorous colony (decomposer). Its job: shrink the locked pool.
     name: "Bacillus", bodyTag: TAG.BACILLUS, layer: "none", cystYield: 0.5, grazeFloor: 4,
@@ -808,7 +819,7 @@ function step(){
     if(T.cyst && W.gr[i]<=0 && W.en[i]<T.cyst.enter*cap){
       W.cy[i]=1; W.vx[i]=0; W.vy[i]=0; continue;
     }
-    let cost = T.kb*Math.pow(W.sz[i],0.75);
+    let cost = T.kb*(T.locus ? 1 + T.locus.kbSlope*(W.g[i]-T.locus.g0) : 1)*Math.pow(W.sz[i],0.75);
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -891,7 +902,8 @@ function step(){
         speed=T.speed*(torpid?0.75:1);
         if(best<W.sz[i]+6 && target>=0){
           const TJ = TRAITS[W.sp[target]];
-          const escP = TJ.escape ? (TJ.locus ? TJ.escape.p + TJ.locus.escSlope*(W.g[target]-TJ.locus.g0) : TJ.escape.p) : 0;
+          const escP = TJ.escape ? (TJ.locus ? TJ.escape.p + TJ.locus.escSlope*(W.g[target]-TJ.locus.g0) : TJ.escape.p)
+                                   * (T.locus ? 1 + T.locus.catchSlope*(T.locus.g0-W.g[i]) : 1) : 0;
           if(TJ.escape && R()<escP){ // escape jink: prey darts away, contact broken
             const ja=R()*6.283;
             W.x[target]=wrap(W.x[target]+Math.cos(ja)*TJ.escape.kick);
@@ -1863,10 +1875,12 @@ export default function Microcosm(){
       let heredity = null;
       if (T.locus){
         const L = T.locus, g = W.g[i];
-        const escPct = T.escape ? Math.round(100 * L.escSlope*(g - L.g0) / T.escape.p) : 0;
-        const kpPct = Math.round(100 * L.kpSlope*(L.g0 - g));
-        heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord,
-          parts: [[L.hiTrait, escPct], [L.loTrait, kpPct]] };
+        const parts = [];
+        if (L.escSlope && T.escape) parts.push([L.hiTrait, Math.round(100 * L.escSlope*(g - L.g0) / T.escape.p)]);
+        if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
+        if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
+        if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
+        heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
       }
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
         age: Math.floor((W.tick - W.birth[i]) / 10), state: stateOf(i),

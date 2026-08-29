@@ -26,11 +26,17 @@ const TRAIT_DEFAULTS = {
 };
 const CYST_DEFAULTS = { scMin: 0.03 };
 const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
+// Locus effects: each slope is an exact no-op at 0, so a species expresses only the ones its row names.
+//   escSlope   prey escape.p  + escSlope*(g-g0)         kpSlope   kp * (1 + kpSlope*(g0-g))
+//   catchSlope prey's escape chance against THIS hunter x (1 + catchSlope*(g0-g))
+//   kbSlope    basal cost kb * (1 + kbSlope*(g-g0))     (the price of keenness)
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0 };
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
     if (t.cyst) for (const k in CYST_DEFAULTS) if (t.cyst[k] === undefined) t.cyst[k] = CYST_DEFAULTS[k];
     if (t.corpsivore) for (const k in CORPSIVORE_DEFAULTS) if (t.corpsivore[k] === undefined) t.corpsivore[k] = CORPSIVORE_DEFAULTS[k];
+    if (t.locus) for (const k in LOCUS_DEFAULTS) if (t.locus[k] === undefined) t.locus[k] = LOCUS_DEFAULTS[k];
   }
   return rows;
 }
@@ -77,6 +83,11 @@ const TRAITS = normalizeTraits([
     diet: TAG.SOLARA | TAG.DRIFTA | TAG.BACILLUS,
     cyst: { enter: 0.22, wake: "prey", p: 0.02, grace: 100 },
     escape: { p: 0.30, kick: 22 },
+    // Phase 5.6 heredity: pursuit, the coevolutionary counterweight to Drifta's defense (R5).
+    // A keener grazer cuts its prey's escape chance; it pays in basal upkeep every tick.
+    locus: { g0: 0.5, sigma: 0.03, catchSlope: 0.4, kbSlope: 0.3,
+             label: "Pursuit", hiWord: "keener", loWord: "thriftier",
+             hiTrait: "catch chance", loTrait: "energy thrift" },
   },
   { // 3 — Bacillus: detritivorous colony (decomposer). Its job: shrink the locked pool.
     name: "Bacillus", bodyTag: TAG.BACILLUS, layer: "none", cystYield: 0.5, grazeFloor: 4,

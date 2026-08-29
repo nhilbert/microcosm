@@ -10,8 +10,9 @@ living system and find out what happens.
 
 ## What's in the world
 
-Seven species are defined; five are alive in the shipped world. One of them,
-Drifta, carries a heritable trait and evolves:
+Seven species are defined; five are alive in the shipped world. Two of them
+carry a heritable trait and evolve — Drifta's defense against grazing, and
+Cilio's pursuit of it:
 
 | Species | Role |
 | --- | --- |
@@ -158,8 +159,8 @@ Measured on this tree, 2026-08-29:
 - **`gate5.js` — the Observatory narrates the evolution unprompted**: a sweep
   event on 8/8 evolving seeds, each grounded in the locus-mean channel; the
   silent control emits nothing and its variance channel reads exactly 0.
-- **`corridor.js` — CERTIFIED**: the locus may evolve anywhere in [0,1]; both
-  rails pass the ecosystem criterion on 8/8 seeds.
+- **`corridor.js` — CERTIFIED**: both loci may evolve anywhere in [0,1]; all
+  four rail corners pass the ecosystem criterion on 8/8 seeds.
 
 **On the acceptance criterion.** Venator was originally certified to establish on
 all eight seeds. After an undeclared RNG drift in Phase 4 (recorded in
