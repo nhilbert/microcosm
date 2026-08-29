@@ -91,7 +91,8 @@ export default function Microcosm(){
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
         age: Math.floor((W.tick - W.birth[i]) / 10), state: stateOf(i),
         en: W.en[i], cap, pr: W.pr[i], pQ, mn: W.mn[i], mQ, size: W.sz[i],
-        badge, bind, lineage: W.lg[i], heredity, sp: W.sp[i] };
+        badge, bind, lineage: W.lg[i], heredity, sp: W.sp[i],
+        warmth: W.temp[cellOf(i)], qR: W.qR[cellOf(i)], topt: T.topt, ctmax: T.ctmax }; // 7.H: what the warmth here does to this one
     };
     const clearChips = () => { clearTimeout(chipTimer); setUi(u => (u.chips ? { ...u, chips: null } : u)); };
     const selectIndex = i => {
@@ -916,6 +917,12 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
           <div><div style={{fontSize:11,color:COL.silt}}>DIVISION GATE</div>{Math.round(100*card.bind)}%</div>
           <div><div style={{fontSize:11,color:COL.silt}}>SIM TIME / TICK</div>{tick}</div>
           <div><div style={{fontSize:11,color:COL.silt}}>GENERATION</div>{card.lineage}</div>
+          {Math.abs(card.warmth) > 0.05 && (
+            <div><div style={{fontSize:11,color:COL.silt}}>WARMTH HERE</div>
+              {(card.warmth > 0 ? "+" : "") + card.warmth.toFixed(1)}° · upkeep ×{card.qR.toFixed(2)}
+              {card.warmth > card.ctmax ? <span style={{ color:"rgb(226,96,96)" }}> · past its limit</span>
+               : card.warmth > card.topt ? <span style={{ color:"rgb(206,186,120)" }}> · past its optimum</span> : null}</div>
+          )}
         </div>
       )}
       {detail >= 1 && card.heredity && (

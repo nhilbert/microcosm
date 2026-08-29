@@ -25,7 +25,9 @@
       "loWord": "sun-loving",
       "hiTrait": "shade tolerance",
       "loTrait": "sun tolerance"
-    }
+    },
+    "topt": 7,
+    "ctmax": 12
   },
   {
     "name": "Drifta",
@@ -61,7 +63,9 @@
       "loWord": "faster-growing",
       "hiTrait": "grazing resistance",
       "loTrait": "growth rate"
-    }
+    },
+    "topt": 9,
+    "ctmax": 14
   },
   {
     "name": "Cilio",
@@ -129,7 +133,9 @@
       "loWord": "thriftier",
       "hiTrait": "catch chance",
       "loTrait": "energy thrift"
-    }
+    },
+    "topt": 5,
+    "ctmax": 10
   },
   {
     "name": "Bacillus",
@@ -167,7 +173,9 @@
       "loWord": "frugal",
       "hiTrait": "feeding rate",
       "loTrait": "yield"
-    }
+    },
+    "topt": 12,
+    "ctmax": 18
   },
   {
     "name": "Mycora",
@@ -298,6 +306,8 @@
       "p": 0.02,
       "grace": 120
     },
-    "cystDrainMul": 0.3
+    "cystDrainMul": 0.3,
+    "topt": 3,
+    "ctmax": 8
   }
 ]

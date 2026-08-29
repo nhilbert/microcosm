@@ -183,6 +183,10 @@ function record(){
   // 7.L local adaptation: the locus spread between light patches for the mat (56) and the plankton (57);
   // exactly 0 with one sun. (Measured first as a genotype-light correlation: the wrong instrument -- Solara's
   // locus reads shaded light, which mat density equalises across patches; the patch difference is what moved.)
+  // 7.H: mean warmth experienced per species (58-64); exactly 0 without a warm source
+  { const st = [0,0,0,0,0,0,0], sn = [0,0,0,0,0,0,0];
+    for (let i=0;i<W.n;i++) if (W.alive[i]){ st[W.sp[i]] += W.temp[cellOf(i)]; sn[W.sp[i]]++; }
+    for (let sp=0;sp<7;sp++) B[r+58+sp] = sn[sp] ? st[sp]/sn[sp] : 0; }
   B[r+56] = W.sources.length > 1 && TRAITS[SPECIES.MAT].locus ? patchMeans(SPECIES.MAT).spread : 0;
   B[r+57] = W.sources.length > 1 && TRAITS[SPECIES.PREY].locus ? patchMeans(SPECIES.PREY).spread : 0;
   let fM=0, dM=0;

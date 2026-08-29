@@ -27,8 +27,10 @@ function step(){
     if(!W.alive[i]) continue;
     const T = TRAITS[W.sp[i]];
     const cap = P.capMul*W.sz[i];
+    const cT = cellOf(i), dT = W.temp[cT]; // 7.H: warmth here; tpc = the falling limb of the thermal performance curve
+    const tpc = dT <= T.topt ? 1 : Math.max(0, 1 - (dT - T.topt)/(T.ctmax - T.topt));
     if(W.cy[i]){ // dormant cyst
-      W.en[i]-=0.002*W.sz[i]*T.cystDrainMul;
+      W.en[i]-=0.002*W.sz[i]*T.cystDrainMul*W.qR[cT];
       if(W.en[i]<=0){ killOrg(i); continue; }
       if(T.cyst && T.cyst.wake==="light"){
         const c=(Math.floor(W.y[i]/CELL)&(P.GRID-1))*P.GRID+(Math.floor(W.x[i]/CELL)&(P.GRID-1));
@@ -48,7 +50,7 @@ function step(){
       W.cy[i]=1; W.vx[i]=0; W.vy[i]=0; continue;
     }
     const gd = T.locus ? W.g[i]-T.locus.g0 : 0, gq = T.locus ? T.locus.curve*gd*gd : 0; // locus deviation and its curvature penalty (exactly 0 at g0)
-    let cost = T.kb*(T.locus ? 1 + T.locus.kbSlope*gd - gq : 1)*Math.pow(W.sz[i],0.75);
+    let cost = T.kb*(T.locus ? 1 + T.locus.kbSlope*gd - gq : 1)*Math.pow(W.sz[i],0.75)*W.qR[cT]; // maintenance: Q10 2.5
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -60,7 +62,7 @@ function step(){
       const sat = Math.min(1, W.mn[i]/mQ); // Liebig: mineral-starved cells photosynthesize weakly
       const Lc = cellLight(i);
       const kpG = T.locus ? (1 + T.locus.kpSlope*(-gd) - gq) * (1 + T.locus.lightSlope*gd*(1 - 2*Lc) - gq) : 1;
-      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat;
+      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat*W.qP[cT]*tpc; // photosynthesis: Q10 1.6, cut off past ctmax
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
       if (W.pr[i] < pQ && W.en[i] > 0.6*cap){
@@ -135,7 +137,7 @@ function step(){
         const ta=Math.atan2(ty,tx);
         let da=ta-W.hd[i]; while(da>Math.PI)da-=6.283; while(da<-Math.PI)da+=6.283;
         W.hd[i]+=Math.max(-T.turnRate,Math.min(T.turnRate,da));
-        speed=T.speed*(torpid?0.75:1);
+        speed=T.speed*(torpid?0.75:1)*W.qS[cT]; // pursuit quickens with warmth (Q10 1.3), its quadratic cost with it
         if(best<W.sz[i]+6 && target>=0){
           const TJ = TRAITS[W.sp[target]];
           const tgd = TJ.locus ? W.g[target]-TJ.locus.g0 : 0;
@@ -151,7 +153,7 @@ function step(){
             if(bite>0){
               if(TJ.alarmEmit) W.al[cellOf(target)] += TJ.alarmEmit; // Schreckstoff: injury broadcasts alarm
               const yieldMul = W.cy[target] ? TJ.cystYield : 1;
-              const effE2 = T.digest[W.sp[target]]*yieldMul, effP2 = T.digestP[W.sp[target]]*yieldMul;
+              const effE2 = T.digest[W.sp[target]]*yieldMul*tpc, effP2 = T.digestP[W.sp[target]]*yieldMul*tpc; // past ctmax the meal is wasted, not eaten
               const frac = W.en[target] > 0 ? bite/W.en[target] : 0;
               const mShare = W.mn[target]*frac, pShare = W.pr[target]*frac;
               const cHere = cellOf(i);
@@ -175,7 +177,7 @@ function step(){
                 const spill = mShare-kept;
                 if (spill>0){ W.M[cellOf(i)]+=spill; W.flows.excrete+=spill; }
               }
-              if(W.en[target]<=0.5){ killOrg(target); W.handle[i]=T.handling; }
+              if(W.en[target]<=0.5){ killOrg(target); W.handle[i]=T.handling*W.qH[cT]; } // handling shortens with warmth (Q10 0.65)
             }
           }
         }
@@ -195,10 +197,10 @@ function step(){
     if(T.detritivore){
       const c0=cellOf(i), D=T.detritivore;
       const rateG = T.locus ? 1 + T.locus.rateSlope*gd - gq : 1, effG = T.locus ? 1 - T.locus.effSlope*gd - gq : 1; // rate-yield locus; both exactly 1 at g0
-      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]);
+      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]*W.qD[c0]*tpc); // decomposition: Q10 2.0
       if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE*effG); }
       const pQ3=P.pQuota*W.sz[i];
-      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i], Math.max(0,(pQ3-W.pr[i])/D.effP));
+      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i]*W.qD[c0]*tpc, Math.max(0,(pQ3-W.pr[i])/D.effP));
       if(eatP>0){ W.dP[c0]-=eatP; W.pr[i]+=eatP*D.effP; }
       const minz=Math.min(W.dM[c0], D.minRate*W.sz[i]);
       if(minz>0){
@@ -280,7 +282,7 @@ function step(){
       W.dE[c]+=W.cE[k]; W.dP[c]+=W.cP[k]; W.dM[c]+=W.cM[k];
       W.cAlive[k]=0; W.cFree.push(k); continue;
     }
-    const d = P.corpseDecay;
+    const d = P.corpseDecay*W.qD[c]; // corpses rot faster in warm water (7.H)
     W.dE[c]+=W.cE[k]*d; W.dP[c]+=W.cP[k]*d; W.dM[c]+=W.cM[k]*d;
     W.flows.corpseToDet += W.cM[k]*d;
     W.cE[k]*=(1-d); W.cP[k]*=(1-d); W.cM[k]*=(1-d);

@@ -26,6 +26,7 @@ const TRAIT_DEFAULTS = {
   cyst: null, escape: null, detritivore: null, corpsivore: null, locus: null,
   flee: null, alarmEmit: 0, burst: null,
   live: true, apex: false, mat: false,
+  topt: 7, ctmax: 12,   // thermal performance (7.H): gains hold to topt (warmth above ambient), fall to 0 at ctmax; costs never fall
 };
 const CYST_DEFAULTS = { scMin: 0.03 };
 const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };

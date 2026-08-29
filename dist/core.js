@@ -17,6 +17,9 @@ const P = {
   sunSigma: 210, sunI: 1.0, ambient: 0.03,   // defaults for the shipped sun and for every sun the player adds (7.L)
   maxSources: 4,    // energy sources (W.sources): light i and warmth a per source; the shipped world has one sun, centred
   tempAmb: 0,       // ambient warmth (Phase 7 H; the global press is deferred) -- every Q10 factor is exactly 1 at dT = 0
+  // Q10 per process (7.H, phase7-heat-plan.md §3): maintenance steeper than photosynthesis (E 0.65 vs 0.32 eV),
+  // decomposition in between, handling time shortens, pursuit speed rises less than cost. The separation is the content.
+  q10: { resp: 2.5, photo: 1.6, decomp: 2.0, handling: 0.65, pursuit: 1.3 },
   divPlank: 70, divBenth: 150, shadeMax: 0.95,
   moveCost: 0.003, capMul: 10, invest: 0.5,
   mutSigma: 0.08,  // (settleLimit moved to per-trait rows in 3.0b)
@@ -72,7 +75,9 @@ const SPECIES_ROWS = [
       "loWord": "sun-loving",
       "hiTrait": "shade tolerance",
       "loTrait": "sun tolerance"
-    }
+    },
+    "topt": 7,
+    "ctmax": 12
   },
   {
     "name": "Drifta",
@@ -108,7 +113,9 @@ const SPECIES_ROWS = [
       "loWord": "faster-growing",
       "hiTrait": "grazing resistance",
       "loTrait": "growth rate"
-    }
+    },
+    "topt": 9,
+    "ctmax": 14
   },
   {
     "name": "Cilio",
@@ -176,7 +183,9 @@ const SPECIES_ROWS = [
       "loWord": "thriftier",
       "hiTrait": "catch chance",
       "loTrait": "energy thrift"
-    }
+    },
+    "topt": 5,
+    "ctmax": 10
   },
   {
     "name": "Bacillus",
@@ -214,7 +223,9 @@ const SPECIES_ROWS = [
       "loWord": "frugal",
       "hiTrait": "feeding rate",
       "loTrait": "yield"
-    }
+    },
+    "topt": 12,
+    "ctmax": 18
   },
   {
     "name": "Mycora",
@@ -345,7 +356,9 @@ const SPECIES_ROWS = [
       "p": 0.02,
       "grace": 120
     },
-    "cystDrainMul": 0.3
+    "cystDrainMul": 0.3,
+    "topt": 3,
+    "ctmax": 8
   }
 ];
 // ---------- trait schema ----------
@@ -376,6 +389,7 @@ const TRAIT_DEFAULTS = {
   cyst: null, escape: null, detritivore: null, corpsivore: null, locus: null,
   flee: null, alarmEmit: 0, burst: null,
   live: true, apex: false, mat: false,
+  topt: 7, ctmax: 12,   // thermal performance (7.H): gains hold to topt (warmth above ambient), fall to 0 at ctmax; costs never fall
 };
 const CYST_DEFAULTS = { scMin: 0.03 };
 const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
@@ -443,7 +457,7 @@ const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
 // Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
 // Lives here because W.rec is sized from it; changing CH is a declared rebaseline.
-const REC = { N: 900, STRIDE: 20, CH: 58 };  // 56-57: genotype-light correlation (7.L)
+const REC = { N: 900, STRIDE: 20, CH: 65 };  // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species (7.H)
 
 // ---------- world state (module singletons; one artifact instance) ----------
 const W = {
@@ -462,7 +476,10 @@ const W = {
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
   events: [], eventLog: [], lightDirty: false,
   sources: [{ x: P.WORLD / 2, y: P.WORLD / 2, i: P.sunI, a: 0, sigma: P.sunSigma }],  // energy sources (7.L/7.H): light i, warmth a
-  temp: new Float32Array(P.GRID * P.GRID),   // warmth above ambient per cell (7.H); exactly 0 without a warm source; suns[0] is the shipped sun
+  temp: new Float32Array(P.GRID * P.GRID),   // warmth above ambient per cell (7.H); exactly 0 without a warm source
+  // per-cell Q10 factors, all exactly 1 where temp is 0 (7.H): maintenance, photosynthesis, decomposition, handling, pursuit
+  qR: new Float32Array(P.GRID * P.GRID).fill(1), qP: new Float32Array(P.GRID * P.GRID).fill(1), qD: new Float32Array(P.GRID * P.GRID).fill(1),
+  qH: new Float32Array(P.GRID * P.GRID).fill(1), qS: new Float32Array(P.GRID * P.GRID).fill(1),
   light: new Float32Array(P.GRID * P.GRID),
   pB: new Float32Array(P.GRID * P.GRID), bB: new Float32Array(P.GRID * P.GRID),
   M: new Float32Array(P.GRID * P.GRID), Mtmp: new Float32Array(P.GRID * P.GRID),
@@ -671,9 +688,9 @@ function diffuseM(){
     }
   }
   M.set(T);
-  const dE=W.dE, dP=W.dP, dM=W.dM, keep=1-P.dLeach;
+  const dE=W.dE, dP=W.dP, dM=W.dM, qD=W.qD;
   for(let c=0;c<G*G;c++){
-    const back=dM[c]*P.dLeach;
+    const back=dM[c]*P.dLeach*qD[c], keep=1-P.dLeach*qD[c]; // abiotic breakdown warms with the cell (7.H)
     if(back>0){ M[c]+=back; W.flows.leachM+=back; }
     dM[c]*=keep; dE[c]*=keep; dP[c]*=keep;  // organic fractions dissipate
   }
@@ -724,7 +741,10 @@ function computeTemp(){
       const dx=wd(cx-s.x), dy=wd(cyy-s.y);
       v += s.a * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
     }
-    W.temp[gy*P.GRID+gx] = v;
+    const c = gy*P.GRID+gx; W.temp[c] = v;
+    const Q = P.q10, e = v/10; // Math.pow(q, 0) is exactly 1: the certified world's factors stay 1
+    W.qR[c] = Math.pow(Q.resp, e); W.qP[c] = Math.pow(Q.photo, e); W.qD[c] = Math.pow(Q.decomp, e);
+    W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e);
   }
 }
 
@@ -951,6 +971,10 @@ function record(){
   // 7.L local adaptation: the locus spread between light patches for the mat (56) and the plankton (57);
   // exactly 0 with one sun. (Measured first as a genotype-light correlation: the wrong instrument -- Solara's
   // locus reads shaded light, which mat density equalises across patches; the patch difference is what moved.)
+  // 7.H: mean warmth experienced per species (58-64); exactly 0 without a warm source
+  { const st = [0,0,0,0,0,0,0], sn = [0,0,0,0,0,0,0];
+    for (let i=0;i<W.n;i++) if (W.alive[i]){ st[W.sp[i]] += W.temp[cellOf(i)]; sn[W.sp[i]]++; }
+    for (let sp=0;sp<7;sp++) B[r+58+sp] = sn[sp] ? st[sp]/sn[sp] : 0; }
   B[r+56] = W.sources.length > 1 && TRAITS[SPECIES.MAT].locus ? patchMeans(SPECIES.MAT).spread : 0;
   B[r+57] = W.sources.length > 1 && TRAITS[SPECIES.PREY].locus ? patchMeans(SPECIES.PREY).spread : 0;
   let fM=0, dM=0;
@@ -1144,8 +1168,10 @@ function step(){
     if(!W.alive[i]) continue;
     const T = TRAITS[W.sp[i]];
     const cap = P.capMul*W.sz[i];
+    const cT = cellOf(i), dT = W.temp[cT]; // 7.H: warmth here; tpc = the falling limb of the thermal performance curve
+    const tpc = dT <= T.topt ? 1 : Math.max(0, 1 - (dT - T.topt)/(T.ctmax - T.topt));
     if(W.cy[i]){ // dormant cyst
-      W.en[i]-=0.002*W.sz[i]*T.cystDrainMul;
+      W.en[i]-=0.002*W.sz[i]*T.cystDrainMul*W.qR[cT];
       if(W.en[i]<=0){ killOrg(i); continue; }
       if(T.cyst && T.cyst.wake==="light"){
         const c=(Math.floor(W.y[i]/CELL)&(P.GRID-1))*P.GRID+(Math.floor(W.x[i]/CELL)&(P.GRID-1));
@@ -1165,7 +1191,7 @@ function step(){
       W.cy[i]=1; W.vx[i]=0; W.vy[i]=0; continue;
     }
     const gd = T.locus ? W.g[i]-T.locus.g0 : 0, gq = T.locus ? T.locus.curve*gd*gd : 0; // locus deviation and its curvature penalty (exactly 0 at g0)
-    let cost = T.kb*(T.locus ? 1 + T.locus.kbSlope*gd - gq : 1)*Math.pow(W.sz[i],0.75);
+    let cost = T.kb*(T.locus ? 1 + T.locus.kbSlope*gd - gq : 1)*Math.pow(W.sz[i],0.75)*W.qR[cT]; // maintenance: Q10 2.5
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -1177,7 +1203,7 @@ function step(){
       const sat = Math.min(1, W.mn[i]/mQ); // Liebig: mineral-starved cells photosynthesize weakly
       const Lc = cellLight(i);
       const kpG = T.locus ? (1 + T.locus.kpSlope*(-gd) - gq) * (1 + T.locus.lightSlope*gd*(1 - 2*Lc) - gq) : 1;
-      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat;
+      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat*W.qP[cT]*tpc; // photosynthesis: Q10 1.6, cut off past ctmax
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
       if (W.pr[i] < pQ && W.en[i] > 0.6*cap){
@@ -1252,7 +1278,7 @@ function step(){
         const ta=Math.atan2(ty,tx);
         let da=ta-W.hd[i]; while(da>Math.PI)da-=6.283; while(da<-Math.PI)da+=6.283;
         W.hd[i]+=Math.max(-T.turnRate,Math.min(T.turnRate,da));
-        speed=T.speed*(torpid?0.75:1);
+        speed=T.speed*(torpid?0.75:1)*W.qS[cT]; // pursuit quickens with warmth (Q10 1.3), its quadratic cost with it
         if(best<W.sz[i]+6 && target>=0){
           const TJ = TRAITS[W.sp[target]];
           const tgd = TJ.locus ? W.g[target]-TJ.locus.g0 : 0;
@@ -1268,7 +1294,7 @@ function step(){
             if(bite>0){
               if(TJ.alarmEmit) W.al[cellOf(target)] += TJ.alarmEmit; // Schreckstoff: injury broadcasts alarm
               const yieldMul = W.cy[target] ? TJ.cystYield : 1;
-              const effE2 = T.digest[W.sp[target]]*yieldMul, effP2 = T.digestP[W.sp[target]]*yieldMul;
+              const effE2 = T.digest[W.sp[target]]*yieldMul*tpc, effP2 = T.digestP[W.sp[target]]*yieldMul*tpc; // past ctmax the meal is wasted, not eaten
               const frac = W.en[target] > 0 ? bite/W.en[target] : 0;
               const mShare = W.mn[target]*frac, pShare = W.pr[target]*frac;
               const cHere = cellOf(i);
@@ -1292,7 +1318,7 @@ function step(){
                 const spill = mShare-kept;
                 if (spill>0){ W.M[cellOf(i)]+=spill; W.flows.excrete+=spill; }
               }
-              if(W.en[target]<=0.5){ killOrg(target); W.handle[i]=T.handling; }
+              if(W.en[target]<=0.5){ killOrg(target); W.handle[i]=T.handling*W.qH[cT]; } // handling shortens with warmth (Q10 0.65)
             }
           }
         }
@@ -1312,10 +1338,10 @@ function step(){
     if(T.detritivore){
       const c0=cellOf(i), D=T.detritivore;
       const rateG = T.locus ? 1 + T.locus.rateSlope*gd - gq : 1, effG = T.locus ? 1 - T.locus.effSlope*gd - gq : 1; // rate-yield locus; both exactly 1 at g0
-      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]);
+      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]*W.qD[c0]*tpc); // decomposition: Q10 2.0
       if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE*effG); }
       const pQ3=P.pQuota*W.sz[i];
-      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i], Math.max(0,(pQ3-W.pr[i])/D.effP));
+      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i]*W.qD[c0]*tpc, Math.max(0,(pQ3-W.pr[i])/D.effP));
       if(eatP>0){ W.dP[c0]-=eatP; W.pr[i]+=eatP*D.effP; }
       const minz=Math.min(W.dM[c0], D.minRate*W.sz[i]);
       if(minz>0){
@@ -1397,7 +1423,7 @@ function step(){
       W.dE[c]+=W.cE[k]; W.dP[c]+=W.cP[k]; W.dM[c]+=W.cM[k];
       W.cAlive[k]=0; W.cFree.push(k); continue;
     }
-    const d = P.corpseDecay;
+    const d = P.corpseDecay*W.qD[c]; // corpses rot faster in warm water (7.H)
     W.dE[c]+=W.cE[k]*d; W.dP[c]+=W.cP[k]*d; W.dM[c]+=W.cM[k]*d;
     W.flows.corpseToDet += W.cM[k]*d;
     W.cE[k]*=(1-d); W.cP[k]*=(1-d); W.cM[k]*=(1-d);

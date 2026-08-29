@@ -2,7 +2,7 @@ const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
 // Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
 // Lives here because W.rec is sized from it; changing CH is a declared rebaseline.
-const REC = { N: 900, STRIDE: 20, CH: 58 };  // 56-57: genotype-light correlation (7.L)
+const REC = { N: 900, STRIDE: 20, CH: 65 };  // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species (7.H)
 
 // ---------- world state (module singletons; one artifact instance) ----------
 const W = {
@@ -21,7 +21,10 @@ const W = {
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
   events: [], eventLog: [], lightDirty: false,
   sources: [{ x: P.WORLD / 2, y: P.WORLD / 2, i: P.sunI, a: 0, sigma: P.sunSigma }],  // energy sources (7.L/7.H): light i, warmth a
-  temp: new Float32Array(P.GRID * P.GRID),   // warmth above ambient per cell (7.H); exactly 0 without a warm source; suns[0] is the shipped sun
+  temp: new Float32Array(P.GRID * P.GRID),   // warmth above ambient per cell (7.H); exactly 0 without a warm source
+  // per-cell Q10 factors, all exactly 1 where temp is 0 (7.H): maintenance, photosynthesis, decomposition, handling, pursuit
+  qR: new Float32Array(P.GRID * P.GRID).fill(1), qP: new Float32Array(P.GRID * P.GRID).fill(1), qD: new Float32Array(P.GRID * P.GRID).fill(1),
+  qH: new Float32Array(P.GRID * P.GRID).fill(1), qS: new Float32Array(P.GRID * P.GRID).fill(1),
   light: new Float32Array(P.GRID * P.GRID),
   pB: new Float32Array(P.GRID * P.GRID), bB: new Float32Array(P.GRID * P.GRID),
   M: new Float32Array(P.GRID * P.GRID), Mtmp: new Float32Array(P.GRID * P.GRID),

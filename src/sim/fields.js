@@ -9,9 +9,9 @@ function diffuseM(){
     }
   }
   M.set(T);
-  const dE=W.dE, dP=W.dP, dM=W.dM, keep=1-P.dLeach;
+  const dE=W.dE, dP=W.dP, dM=W.dM, qD=W.qD;
   for(let c=0;c<G*G;c++){
-    const back=dM[c]*P.dLeach;
+    const back=dM[c]*P.dLeach*qD[c], keep=1-P.dLeach*qD[c]; // abiotic breakdown warms with the cell (7.H)
     if(back>0){ M[c]+=back; W.flows.leachM+=back; }
     dM[c]*=keep; dE[c]*=keep; dP[c]*=keep;  // organic fractions dissipate
   }
@@ -62,7 +62,10 @@ function computeTemp(){
       const dx=wd(cx-s.x), dy=wd(cyy-s.y);
       v += s.a * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
     }
-    W.temp[gy*P.GRID+gx] = v;
+    const c = gy*P.GRID+gx; W.temp[c] = v;
+    const Q = P.q10, e = v/10; // Math.pow(q, 0) is exactly 1: the certified world's factors stay 1
+    W.qR[c] = Math.pow(Q.resp, e); W.qP[c] = Math.pow(Q.photo, e); W.qD[c] = Math.pow(Q.decomp, e);
+    W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e);
   }
 }
 
