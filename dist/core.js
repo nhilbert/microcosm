@@ -115,7 +115,8 @@ const SPECIES_ROWS = [
       "loTrait": "growth rate"
     },
     "topt": 9,
-    "ctmax": 14
+    "ctmax": 14,
+    "thermo": 0.6
   },
   {
     "name": "Cilio",
@@ -185,7 +186,8 @@ const SPECIES_ROWS = [
       "loTrait": "energy thrift"
     },
     "topt": 5,
-    "ctmax": 10
+    "ctmax": 10,
+    "thermo": 1
   },
   {
     "name": "Bacillus",
@@ -225,7 +227,8 @@ const SPECIES_ROWS = [
       "loTrait": "yield"
     },
     "topt": 12,
-    "ctmax": 18
+    "ctmax": 18,
+    "thermo": 0.25
   },
   {
     "name": "Mycora",
@@ -358,7 +361,8 @@ const SPECIES_ROWS = [
     },
     "cystDrainMul": 0.3,
     "topt": 3,
-    "ctmax": 8
+    "ctmax": 8,
+    "thermo": 1
   }
 ];
 // ---------- trait schema ----------
@@ -390,6 +394,7 @@ const TRAIT_DEFAULTS = {
   flee: null, alarmEmit: 0, burst: null,
   live: true, apex: false, mat: false,
   topt: 7, ctmax: 12,   // thermal performance (7.H): gains hold to topt (warmth above ambient), fall to 0 at ctmax; costs never fall
+  thermo: 0,            // thermotaxis gain (7.H.2): how strongly this species moves toward its preferred warmth (tpref = topt); 0 = blind to it
 };
 const CYST_DEFAULTS = { scMin: 0.03 };
 const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
@@ -480,6 +485,7 @@ const W = {
   // per-cell Q10 factors, all exactly 1 where temp is 0 (7.H): maintenance, photosynthesis, decomposition, handling, pursuit
   qR: new Float32Array(P.GRID * P.GRID).fill(1), qP: new Float32Array(P.GRID * P.GRID).fill(1), qD: new Float32Array(P.GRID * P.GRID).fill(1),
   qH: new Float32Array(P.GRID * P.GRID).fill(1), qS: new Float32Array(P.GRID * P.GRID).fill(1),
+  tgx: new Float32Array(P.GRID * P.GRID), tgy: new Float32Array(P.GRID * P.GRID),   // warmth gradient per cell (7.H.2), exactly 0 when flat
   light: new Float32Array(P.GRID * P.GRID),
   pB: new Float32Array(P.GRID * P.GRID), bB: new Float32Array(P.GRID * P.GRID),
   M: new Float32Array(P.GRID * P.GRID), Mtmp: new Float32Array(P.GRID * P.GRID),
@@ -745,6 +751,13 @@ function computeTemp(){
     const Q = P.q10, e = v/10; // Math.pow(q, 0) is exactly 1: the certified world's factors stay 1
     W.qR[c] = Math.pow(Q.resp, e); W.qP[c] = Math.pow(Q.photo, e); W.qD[c] = Math.pow(Q.decomp, e);
     W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e);
+  }
+  // the gradient the organisms sense (7.H.2): central differences on the torus, degrees per world unit
+  const G = P.GRID, Tm = W.temp;
+  for (let gy = 0; gy < G; gy++) for (let gx = 0; gx < G; gx++){
+    const c = gy*G+gx;
+    W.tgx[c] = (Tm[gy*G+((gx+1)&(G-1))] - Tm[gy*G+((gx-1+G)&(G-1))]) / (2*CELL);
+    W.tgy[c] = (Tm[((gy+1)&(G-1))*G+gx] - Tm[((gy-1+G)&(G-1))*G+gx]) / (2*CELL);
   }
 }
 
@@ -1223,6 +1236,9 @@ function step(){
       const sd=Math.hypot(sdx,sdy)+1;
       W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + T.phototaxis*deficit*sdx/sd;
       W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + T.phototaxis*deficit*sdy/sd;
+      if (T.thermo && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2 thermotaxis: down the discomfort gradient |dT - tpref| (draw-free; skipped in a flat field)
+        const sgn = dT > T.topt ? -1 : dT < T.topt ? 1 : 0;
+        W.vx[i] += T.thermo*sgn*W.tgx[cT]; W.vy[i] += T.thermo*sgn*W.tgy[cT]; }
       const s=Math.hypot(W.vx[i],W.vy[i]);
       if(s>T.driftSpeed){ W.vx[i]*=T.driftSpeed/s; W.vy[i]*=T.driftSpeed/s; }
       W.x[i]=wrap(W.x[i]+W.vx[i]); W.y[i]=wrap(W.y[i]+W.vy[i]);
@@ -1230,7 +1246,8 @@ function step(){
     }
     else if(T.movement==="tumble"){ // run-and-tumble chemotaxis along the detritus gradient
       const c0=cellOf(i);
-      const here = T.tumbleField==="scent" ? W.sc[c0]*40 : W.dE[c0]+W.dP[c0]+W.dM[c0];
+      let here = T.tumbleField==="scent" ? W.sc[c0]*40 : W.dE[c0]+W.dP[c0]+W.dM[c0];
+      if (T.thermo && dT !== T.topt && (W.tgx[c0] !== 0 || W.tgy[c0] !== 0)) here -= T.thermo*Math.abs(dT - T.topt); // 7.H.2 klinokinesis: discomfort reads as "worse", raising tumbling (Berg & Brown)
       const pT = here > W.mem[i]+0.01 ? T.tumbleLow : T.tumbleHigh;
       W.mem[i]=here;
       if(R()<pT) W.hd[i]=R()*6.283;
@@ -1324,6 +1341,10 @@ function step(){
         }
       } else {
         W.hd[i]+=(R()-0.5)*0.5;
+        if (T.thermo && !hungry && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2: an idle, fed hunter turns toward its preferred warmth; hunger overrides (Hedgecock)
+          const sgn = dT > T.topt ? -1 : 1, ta = Math.atan2(sgn*W.tgy[cT], sgn*W.tgx[cT]);
+          let da=ta-W.hd[i]; while(da>Math.PI)da-=6.283; while(da<-Math.PI)da+=6.283;
+          W.hd[i]+=Math.max(-T.turnRate*0.5, Math.min(T.turnRate*0.5, da)); }
         speed=(hungry? T.speed*0.7 : T.speed*0.3)*(torpid?0.75:1);
       }
       if(T.burst && !fleeing){ // jet burst: brief straight-line speed spike, quadratic cost, long cooldown

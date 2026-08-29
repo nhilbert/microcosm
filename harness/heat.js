@@ -3,6 +3,7 @@
 //   node harness/heat.js --spot  [--a 8] [--at 3000]   a warm source ON the shipped sun ("Hot sun") vs the untouched world
 //   node harness/heat.js --heater [--a 10] [--at 3000]  a dark heater at the far corner (seeded, like Block L)
 //   node harness/heat.js --press [--amb 6]              global warming: P.tempAmb raised at --at (the deferred lever, as an experiment)
+//   --nothermo                                          H-P6 control: species blind to warmth (thermotaxis off), metabolism unchanged
 //
 // Every configuration: 8 seeds, evolving world, horizon 18,000. Reported per species: population, mean warmth
 // experienced (recorder 58+sp), mean distance from the warm source (H-P2 rings), and for the mat the realised
@@ -33,7 +34,10 @@ function chemistry(){ // detritus and dissolved mineral per cell, warm cells vs 
     if (W.temp[c] > 3){ wD+=D; wM+=W.M[c]; wN++; } else { aD+=D; aM+=W.M[c]; aN++; } }
   return { warmD: wN? wD/wN : NaN, warmM: wN? wM/wN : NaN, ambD: aD/aN, ambM: aM/aN, warmCells: wN };
 }
+const NOTHERMO = flag("--nothermo");   // H-P6 control: every species blind to warmth (TRAITS.thermo = 0), metabolism unchanged
+const THERMO0 = TRAITS.map(T => T.thermo);
 function run(seed, setup){
+  TRAITS.forEach((T, sp) => { T.thermo = NOTHERMO ? 0 : THERMO0[sp]; });
   P.tempAmb = 0; L.start(seed, true); // ambient is a harness-level switch: reset per run (the press sets it at --at)
   let gppWarm=0, gppAmb=0, respWarm=0, respAmb=0, samples=0, apexLost=-1, coreLost=-1;
   const cyc = [];

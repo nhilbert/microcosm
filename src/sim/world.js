@@ -25,6 +25,7 @@ const W = {
   // per-cell Q10 factors, all exactly 1 where temp is 0 (7.H): maintenance, photosynthesis, decomposition, handling, pursuit
   qR: new Float32Array(P.GRID * P.GRID).fill(1), qP: new Float32Array(P.GRID * P.GRID).fill(1), qD: new Float32Array(P.GRID * P.GRID).fill(1),
   qH: new Float32Array(P.GRID * P.GRID).fill(1), qS: new Float32Array(P.GRID * P.GRID).fill(1),
+  tgx: new Float32Array(P.GRID * P.GRID), tgy: new Float32Array(P.GRID * P.GRID),   // warmth gradient per cell (7.H.2), exactly 0 when flat
   light: new Float32Array(P.GRID * P.GRID),
   pB: new Float32Array(P.GRID * P.GRID), bB: new Float32Array(P.GRID * P.GRID),
   M: new Float32Array(P.GRID * P.GRID), Mtmp: new Float32Array(P.GRID * P.GRID),

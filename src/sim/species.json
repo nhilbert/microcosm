@@ -65,7 +65,8 @@
       "loTrait": "growth rate"
     },
     "topt": 9,
-    "ctmax": 14
+    "ctmax": 14,
+    "thermo": 0.6
   },
   {
     "name": "Cilio",
@@ -135,7 +136,8 @@
       "loTrait": "energy thrift"
     },
     "topt": 5,
-    "ctmax": 10
+    "ctmax": 10,
+    "thermo": 1
   },
   {
     "name": "Bacillus",
@@ -175,7 +177,8 @@
       "loTrait": "yield"
     },
     "topt": 12,
-    "ctmax": 18
+    "ctmax": 18,
+    "thermo": 0.25
   },
   {
     "name": "Mycora",
@@ -308,6 +311,7 @@
     },
     "cystDrainMul": 0.3,
     "topt": 3,
-    "ctmax": 8
+    "ctmax": 8,
+    "thermo": 1
   }
 ]

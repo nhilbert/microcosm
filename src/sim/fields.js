@@ -67,6 +67,13 @@ function computeTemp(){
     W.qR[c] = Math.pow(Q.resp, e); W.qP[c] = Math.pow(Q.photo, e); W.qD[c] = Math.pow(Q.decomp, e);
     W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e);
   }
+  // the gradient the organisms sense (7.H.2): central differences on the torus, degrees per world unit
+  const G = P.GRID, Tm = W.temp;
+  for (let gy = 0; gy < G; gy++) for (let gx = 0; gx < G; gx++){
+    const c = gy*G+gx;
+    W.tgx[c] = (Tm[gy*G+((gx+1)&(G-1))] - Tm[gy*G+((gx-1+G)&(G-1))]) / (2*CELL);
+    W.tgy[c] = (Tm[((gy+1)&(G-1))*G+gx] - Tm[((gy-1+G)&(G-1))*G+gx]) / (2*CELL);
+  }
 }
 
 function rebuild(){
