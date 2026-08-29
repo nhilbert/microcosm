@@ -167,17 +167,25 @@ function makeWorldLayers(){
     lg.fillStyle = COL.abyss; lg.fillRect(0,0,512,512);
     const k = 512 / P.WORLD;
     lg.globalCompositeOperation = "lighter";
+    // the layer is one torus tile: a glow near a tile edge must continue on the far side, so each
+    // sun is painted at every wrapped offset its radius reaches (the field itself wraps in computeLight)
     for (const s of W.suns){
-      const a = Math.min(1, s.i);
-      const gr2 = lg.createRadialGradient(s.x*k, s.y*k, 4, s.x*k, s.y*k, s.sigma*2.2*k);
-      gr2.addColorStop(0, `rgba(214,238,255,${(0.30*a).toFixed(3)})`);
-      gr2.addColorStop(0.4, `rgba(140,190,225,${(0.12*a).toFixed(3)})`);
-      gr2.addColorStop(1, "rgba(140,190,225,0)");
-      lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
+      const a = Math.min(1, s.i), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
+      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
+        const x = cx+ox, y = cy+oy;
+        if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
+        const gr2 = lg.createRadialGradient(x, y, 4, x, y, r);
+        gr2.addColorStop(0, `rgba(214,238,255,${(0.30*a).toFixed(3)})`);
+        gr2.addColorStop(0.4, `rgba(140,190,225,${(0.12*a).toFixed(3)})`);
+        gr2.addColorStop(1, "rgba(140,190,225,0)");
+        lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
+      }
     }
     lg.globalCompositeOperation = "source-over";
     lg.fillStyle = "rgba(240,250,255,0.9)";
-    for (const s of W.suns){ lg.beginPath(); lg.arc(s.x*k, s.y*k, 5, 0, 6.283); lg.fill(); }
+    for (const s of W.suns){ const cx = s.x*k, cy = s.y*k;
+      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
+        lg.beginPath(); lg.arc(cx+ox, cy+oy, 5, 0, 6.283); lg.fill(); } }
   };
   drawLight();
 

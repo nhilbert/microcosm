@@ -11,7 +11,8 @@ const PAGE_TITLES = [
   ["Traits", "what is being inherited · mean and spread over time, the population now"],
 ];
 const IV_LABEL = { pour:"You poured mineral", kill:"You killed a specimen", feed:"You fed a specimen", seed:"You introduced organisms",
-  sun:"You moved the sun", sunlight:"You changed the sunlight", undo:"You undid the last action",
+  sun:"You moved a sun", sunlight:"You changed the sunlight", undo:"You undid the last action",
+  sunAdd:"You added a sun", sunRemove:"You removed a sun", sunSet:"You changed a sun", sunLayout:"You changed the light layout",
   mutation:"You switched mutation", evolution:"You changed an evolution setting", preset:"You applied an evolution preset" };
 function ImpactLine({ ev }){
   const r = typeof impact === "function" ? impact(ev) : null;

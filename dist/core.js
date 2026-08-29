@@ -1013,8 +1013,10 @@ function indicators(){ // labels follow the naming rule: functional first, scien
 const IMPACT_CHS = [[0,"Solara"],[1,"Drifta"],[2,"Cilio"],[3,"Bacillus"],[6,"Venator"],[14,"dissolved mineral"],[19,"production"]];
 // natural-variability floors (measured: mats barely move, plankton blooms 2.5x unprovoked)
 const IMPACT_NOISE = { 0:12, 1:170, 2:55, 3:20, 6:25, 14:15, 19:30 };
+// presses: interventions that change the regime rather than poke it once (a changed sky, changed evolution settings)
+const IMPACT_PRESS = new Set(["sun","sunlight","sunAdd","sunRemove","sunSet","sunLayout","mutation","evolution","preset"]);
 function impact(entry){
-  const isPress = entry.type==="sun" || entry.type==="sunlight" || entry.type==="mutation" || entry.type==="evolution" || entry.type==="preset";
+  const isPress = IMPACT_PRESS.has(entry.type);
   const i0 = W.recCount-1 - Math.floor((W.tick - entry.tick)/REC.STRIDE);
   if (i0 < 15) return { status:"rolled" };
   const avail = W.recCount-1 - i0, need = isPress ? 45 : 30;
@@ -1062,7 +1064,7 @@ function impact(entry){
   const mixed = W.evLog.some(e => e !== entry && e.type !== "undo" &&
     e.tick > entry.tick - 600 && e.tick < entry.tick + win*REC.STRIDE);
   const pressBackdrop = !isPress && W.evLog.some(e => e !== entry &&
-    (e.type === "sun" || e.type === "sunlight" || e.type === "mutation" || e.type === "evolution" || e.type === "preset") && e.tick < entry.tick);
+    IMPACT_PRESS.has(e.type) && e.tick < entry.tick);
   return { status:"done", isPress, notable, recoveredS, mixed, pressBackdrop, complete: win >= need };
 }
 // ============================================================
