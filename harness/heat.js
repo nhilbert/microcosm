@@ -35,9 +35,10 @@ function chemistry(){ // detritus and dissolved mineral per cell, warm cells vs 
   return { warmD: wN? wD/wN : NaN, warmM: wN? wM/wN : NaN, ambD: aD/aN, ambM: aM/aN, warmCells: wN };
 }
 const NOTHERMO = flag("--nothermo");   // H-P6 control: every species blind to warmth (TRAITS.thermo = 0), metabolism unchanged
+const BLIND = new Set((args.includes("--blind") ? args[args.indexOf("--blind")+1] : "").split(",").filter(Boolean).map(Number)); // --blind 2,6: these species blind
 const THERMO0 = TRAITS.map(T => T.thermo);
 function run(seed, setup){
-  TRAITS.forEach((T, sp) => { T.thermo = NOTHERMO ? 0 : THERMO0[sp]; });
+  TRAITS.forEach((T, sp) => { T.thermo = (NOTHERMO || BLIND.has(sp)) ? 0 : THERMO0[sp]; });
   P.tempAmb = 0; L.start(seed, true); // ambient is a harness-level switch: reset per run (the press sets it at --at)
   let gppWarm=0, gppAmb=0, respWarm=0, respAmb=0, samples=0, apexLost=-1, coreLost=-1;
   const cyc = [];
@@ -75,7 +76,7 @@ if (flag("--spot")){ const a = num("--a", 8);
   report(`hot sun: warmth +${a} on the shipped sun`, () => C.applyEvent({ type:"sourceSet", k:0, a }));
 }
 if (flag("--heater")){ const a = num("--a", 10);
-  report("seeded second sun (Block L reference)", () => { C.applyEvent({ type:"sourceAdd", x:0, y:0, i:1, a:0, sigma:130 }); seedKit(0,0); });
+  if (!flag("--only-heated")) report("seeded second sun (Block L reference)", () => { C.applyEvent({ type:"sourceAdd", x:0, y:0, i:1, a:0, sigma:130 }); seedKit(0,0); });
   report(`seeded second sun + heater +${a}`, () => { C.applyEvent({ type:"sourceAdd", x:0, y:0, i:1, a, sigma:130 }); seedKit(0,0); });
 }
 if (flag("--press")){ const amb = num("--amb", 6);

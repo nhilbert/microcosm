@@ -187,7 +187,7 @@ const SPECIES_ROWS = [
     },
     "topt": 5,
     "ctmax": 10,
-    "thermo": 1
+    "thermo": 0
   },
   {
     "name": "Bacillus",
@@ -362,7 +362,7 @@ const SPECIES_ROWS = [
     "cystDrainMul": 0.3,
     "topt": 3,
     "ctmax": 8,
-    "thermo": 1
+    "thermo": 0
   }
 ];
 // ---------- trait schema ----------

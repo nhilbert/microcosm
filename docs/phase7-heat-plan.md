@@ -158,3 +158,33 @@ Reference = Block L's seeded second sun (mat 405–562, plankton 575–678 in th
 - Dissolved mineral in the warm core is not depleted (0.05–0.18, same as ambient).
 
 Consequence for the design: the interesting thermal biology is not the cut-off but the **gain–cost separation per species**; a heritable thermal trait should therefore act on that separation (Padfield: down-regulate respiration's Q10), not on `ctmax`. Recorded for H.5 / multi-locus.
+
+### 10.4 The same heater with thermotaxis ON (H.2 core; reference half bit-identical to 10.3's, as it must be)
+
+| in / around the warm core at 18k | thermotaxis off (10.3) | thermotaxis on |
+|---|---|---|
+| Drifta in the core | 639–823 | **269–299** |
+| warmth felt by Drifta | 5.6–7.2 | **1.4–2.1** |
+| Solara in the core | 0–199 | **375–420** |
+| Drifta, whole world | 868–1,175 | 1,253–1,800 |
+| Cilio, whole world | 17–51 | **0–26** |
+| core lost | 0/8 | **3/8** (grazer extinct at 12.5–13.8k) |
+| detritus per warm cell | 3.4–9.2 | 13–15 |
+| Drifta CV | 0.12 | 0.18 |
+
+- **H-P6 confirmed**: with the drifters steering toward their set-point (`tpref = topt = 9`, i.e. the +9 contour ≈ 60 units from the heater's centre), their density in the +6.5 core falls by ~60 % and they stop crowding the mat, which recovers (0–199 → 375–420). The crowd on the +9 ring self-shades (`divPlank`) — the drifters that reach their thermal optimum starve of light; detritus in the core rises to 13–15.
+- **The hunters' set-point is harmful as shipped**: an idle, fed Cilio turning toward *its* preferred warmth (+5 ring around a far heater) walks away from where its prey is; the grazer goes extinct on 3/8 seeds and the core is lost. A naive "seek your optimum" rule is a bad controller for a predator whose food is elsewhere — exactly the kind of thing the movement genome should later be allowed to discover rather than have hard-coded. Decision pending on the numbers below: hunters blind to warmth (thermo 0 for Cilio and Venator) is being measured.
+
+### 10.5 Hunters blind to warmth (Cilio, Venator `thermo = 0`) — the shipped H.2 default
+
+Same heater, plankton and decomposer steering, hunters not: **core held 8/8**, Cilio 34–52 (vs 0–26 with hunters steering, 17–51 with nobody steering), Drifta in the core 272–309 (the H-P6 effect kept), Solara in the core 393–451 (the mat's recovery kept), whole-world mat 1,940–2,365, apex lost 7/8 (1 held). Detritus in the warm core 13–14 per cell (the self-shaded drifters' remains), mineral not depleted.
+
+**Decision (shipped)**: thermotaxis for the drifter (gain 0.6) and the decomposer (0.25); the hunters stay blind until the movement genome can price a set-point for them. `species.json` carries it; a flat field skips every branch, so the certified world is unchanged.
+
+### 10.6 Where this leaves the block
+
+- Shipped H.0–H.2: energy sources with light and warmth, Q10 metabolism with per-species limits, one gradient primitive, thermotaxis for two species, heat layer + toggles, source card, specimen-card warmth line, `harness/heat.js`.
+- Confirmed: H-P1 (mat loses first), H-P3 (apex first, then the decomposer, under uniform warming), H-P6 (thermotaxis moves the plankton out of the core and the mat back in).
+- Overturned: H-P2 rings — tolerance never binds; budgets do. H-P4 — the warm core piles detritus up instead of draining mineral. Uniform warming *destabilises* the plankton–grazer cycle (CV 0.41 vs 0.25) because the grazer's intake carries no Q10 yet.
+- Design consequence: the heritable thermal trait (H.5, after multi-locus) must act on the gain–cost separation (respiration Q10 down, Padfield), not on `ctmax`; and a hunter's thermal set-point belongs to the movement genome.
+- Not done: H.3 (phototaxis by ∇light, a declared change), a grazer attack-rate Q10, the global press lever (deferred by owner), Observatory narration for heat (channels 58–64 exist; detectors wait for calibration against these tables).
