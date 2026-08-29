@@ -1,7 +1,10 @@
 // 5.5 PHASE GATE: the Observatory must narrate the evolution unprompted.
 //
 // Eight seeds, the shipped (evolving) world against the reference (silent) control:
-//   1. sweep narrated   -- a "sweep" event fires within 18,000 ticks on >= 6/8 evolving seeds
+//   1. evolution narrated -- within 18,000 ticks, >= 7/8 evolving seeds get either a "sweep"
+//                          event (a line taking over) or a "diverse" event (standing variation
+//                          established, neither line winning). A balanced world does not sweep;
+//                          the instrument must be able to say that too.
 //   2. grounded         -- at the tick it fires, the locus-mean channel is >= g0 + 0.10 and
 //                          the population majority sits on that side (the event is read off the
 //                          instrument, not off the sim)
@@ -28,31 +31,32 @@ function run(seed, mutation){
     if (sweepTick < 0){
       const ev = W.sysEvents.find(e => e.type === "sweep" && e.sp === 1);
       if (ev){ sweepTick = ev.tick; sweepMeanAtFire = chan(1, 42+1);
-        let hi=0,n=0; for (let i=0;i<W.n;i++) if (W.alive[i]&&W.sp[i]===1){ n++; if (W.g[i]>L.g0+0.05) hi++; }
-        sweepShareAtFire = hi/Math.max(1,n); }
+        let hi=0,lo=0,n=0; for (let i=0;i<W.n;i++) if (W.alive[i]&&W.sp[i]===1){ n++; if (W.g[i]>L.g0+0.05) hi++; else if (W.g[i]<L.g0-0.05) lo++; }
+        sweepShareAtFire = Math.max(hi,lo)/Math.max(1,n); }
     }
   }
-  const hered = W.sysEvents.filter(e => e.type==="sweep" || e.type==="uniform");
-  return { sweepTick, sweepMeanAtFire, sweepShareAtFire, sd2k, sd18k: chan(1, 49+1), mean18k: chan(1, 42+1), hered };
+  const hered = W.sysEvents.filter(e => e.type==="sweep" || e.type==="uniform" || e.type==="diverse");
+  const diverseTick = (W.sysEvents.find(e => e.type==="diverse" && e.sp===1) || { tick:-1 }).tick;
+  return { sweepTick, diverseTick, sweepMeanAtFire, sweepShareAtFire, sd2k, sd18k: chan(1, 49+1), mean18k: chan(1, 42+1), hered };
 }
 
 console.log("=== evolving world (P.mutation=true) ===");
 const ev = {}, ref = {};
 for (const s of SEEDS){ ev[s] = run(s, true);
   const r = ev[s];
-  console.log(`seed ${s}: sweep ${r.sweepTick>0 ? "t="+r.sweepTick+" (mean "+r.sweepMeanAtFire.toFixed(2)+", "+Math.round(100*r.sweepShareAtFire)+"% tougher)" : "none"} | sd 2k ${r.sd2k.toFixed(3)} -> 18k ${r.sd18k.toFixed(3)} | mean 18k ${r.mean18k.toFixed(2)} | events: ${r.hered.map(e=>e.type+"@"+e.tick).join(" ")||"-"}`); }
+  console.log(`seed ${s}: sweep ${r.sweepTick>0 ? "t="+r.sweepTick+" (mean "+r.sweepMeanAtFire.toFixed(2)+", "+Math.round(100*r.sweepShareAtFire)+"%)" : "none"} diverse ${r.diverseTick>0 ? "t="+r.diverseTick : "none"} | sd 2k ${r.sd2k.toFixed(3)} -> 18k ${r.sd18k.toFixed(3)} | mean 18k ${r.mean18k.toFixed(2)} | events: ${r.hered.map(e=>e.type+"@"+e.tick).join(" ")||"-"}`); }
 console.log("\n=== reference world (P.mutation=false) ===");
 for (const s of SEEDS){ ref[s] = run(s, false);
   const r = ref[s];
   console.log(`seed ${s}: heredity events ${r.hered.length} | sd 18k ${r.sd18k} | mean 18k ${r.mean18k.toFixed(2)}`); }
 
-const c1n = SEEDS.filter(s => ev[s].sweepTick > 0).length, c1 = c1n >= 6;
-const c2 = SEEDS.every(s => ev[s].sweepTick < 0 || (ev[s].sweepMeanAtFire >= L.g0 + 0.10 && ev[s].sweepShareAtFire >= 0.6));
+const c1n = SEEDS.filter(s => ev[s].sweepTick > 0 || ev[s].diverseTick > 0).length, c1 = c1n >= 7;
+const c2 = SEEDS.every(s => ev[s].sweepTick < 0 || (Math.abs(ev[s].sweepMeanAtFire - L.g0) >= 0.10 && ev[s].sweepShareAtFire >= 0.6));
 const c3 = SEEDS.every(s => ev[s].sd18k > ev[s].sd2k);
 const c4 = SEEDS.every(s => ref[s].hered.length === 0 && ref[s].sd18k === 0);
 
 // 5. reproduce the 5.2 measurement on seed 22 with this build (numbers recorded from harness/yoshida.js)
-const RECORDED = { seed: 22, pOff: 6420, pOn: 1600, phOff: 0.04, phOn: 0.00, gEnd: 0.77 }; // 5.6 coevolving world
+const RECORDED = { seed: 22, pOff: 6420, pOn: 5260, phOff: 0.04, phOn: 0.37, gEnd: 0.36 }; // 5.7 balanced world
 const STRIDE = 20, SKIP = 150;
 function series(seed, mutation){ P.mutation = mutation; C.resetWorld(); C.initWorld(seed);
   const D=[], G=[]; let gEnd=0;
@@ -71,8 +75,8 @@ const got = { pOff, pOn, phOff:+phOff.toFixed(2), phOn:+phOn.toFixed(2), gEnd:+o
 const c5 = got.pOff===RECORDED.pOff && got.pOn===RECORDED.pOn && got.phOff===RECORDED.phOff && got.phOn===RECORDED.phOn && got.gEnd===RECORDED.gEnd;
 
 console.log("\n=== gate criteria ===");
-console.log(`1. sweep narrated on >= 6/8 evolving seeds: ${c1?"PASS":"FAIL"} (${c1n}/8)`);
-console.log(`2. every sweep grounded in the instrument (mean >= g0+0.10, majority >= 60%): ${c2?"PASS":"FAIL"}`);
+console.log(`1. evolution narrated (sweep or diversifying) on >= 7/8 evolving seeds: ${c1?"PASS":"FAIL"} (${c1n}/8)`);
+console.log(`2. every sweep grounded in the instrument (|mean - g0| >= 0.10, majority >= 60%): ${c2?"PASS":"FAIL"}`);
 console.log(`3. variance channel rises 2k -> 18k on 8/8: ${c3?"PASS":"FAIL"}`);
 console.log(`4. control silent (0 heredity events, sd channel exactly 0) on 8/8: ${c4?"PASS":"FAIL"}`);
 console.log(`5. 5.2 measurement reproduced on this build (seed 22): ${c5?"PASS":"FAIL"} got ${JSON.stringify(got)} recorded ${JSON.stringify(RECORDED)}`);

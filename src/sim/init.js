@@ -10,7 +10,7 @@ function initWorld(seed){
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
-  det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0);
+  det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0);
   recPrev.uptake=recPrev.gpp=recPrev.resp=recPrev.bacRelease=recPrev.corpseToDet=recPrev.egestE=recPrev.deaths=0;
   recPrev.deathsBy.fill(0);
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);

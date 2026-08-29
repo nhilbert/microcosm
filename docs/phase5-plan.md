@@ -89,7 +89,7 @@ Ensemble: period 5698 ± 2009 → 5163 ± 845 ticks (longer on 3/8); phase 0.17 
 | 0.50 | 75% | 0.31–0.60 | **balanced polymorphism mid-corridor** |
 | 0.75 | 62.5% | 0.09–0.18 | sweeps to the growth rail |
 
-A clean dose–response. At 0.5 the population holds standing variation (sd 0.08–0.25) instead of consuming it — the precondition Yoshida's transformation requires. Not shipped: the corridor policy permits re-tuning only if the certified baseline breaks, and it does not. Recommendation: re-run 5.2 at kpSlope 0.5 as a declared ecology change if the eco-evolutionary cycling is wanted. Caveat on the apex: Venator dies late (t ≈ 24–45k) at *every* slope tested, and the silent world has not been run past 18k — so late apex loss cannot yet be attributed to evolution.
+A clean dose–response. At 0.5 the population holds standing variation (sd 0.08–0.25) instead of consuming it — the precondition Yoshida's transformation requires. Not shipped: the corridor policy permits re-tuning only if the certified baseline breaks, and it does not. Recommendation: re-run 5.2 at kpSlope 0.5 as a declared ecology change if the eco-evolutionary cycling is wanted. Caveat on the apex, since resolved by the control: the **silent world holds the apex to 54,000 ticks on 6/8 seeds** (lost on 22 at t=14,500 and 77 at t=16,000 — the same two seeds, at the same times, as at the 18k horizon). Under evolution the apex was lost on every seed tested by t = 21–45k. Late apex loss is therefore attributable to evolution: a tougher prey starves the grazer's predator. This is the R5 one-sided-evolution cost, now measured against its control.
 
 ### 5.5 — phase gate (`npm run gate5`)
 
@@ -133,3 +133,27 @@ Cilio's pursuit does not rise; it drifts slightly *thriftier*. At this price the
 | `gate5` | **ALL CRITERIA PASS** on the coevolving world: sweep narrated 8/8 (t = 5,180–14,660), each grounded, variance rising 8/8, control silent 8/8, seed-22 measurement reproduced bit-exactly |
 
 **What this tells the next cut.** Both loci sweep monotonically. The world as tuned selects *directionally* on every heritable knob tried; balanced polymorphism appeared only when the trade-off was made steep (kpSlope 0.5, informational run). If coevolutionary cycling is the goal, the next lever is the *price* of keenness and defense, decided by the owner — not another species.
+
+---
+
+## 5.7 — Pricing by measurement: the balanced world (2026-08-29)
+
+Owner decision: set the price of defense and keenness so that neither locus sweeps. Both prices from the measured surfaces (3 seeds × 36k per point):
+
+| Drifta `kpSlope` | 0.25 | 0.40 | 0.45 | **0.50** | 0.55 | 0.75 |
+|---|---|---|---|---|---|---|
+| mean g at 36k | 0.91–0.94 | 0.72–0.87 | 0.56–0.79 | **0.50–0.68** | 0.53–0.66 | 0.09–0.18 |
+
+| Cilio `kbSlope` | 0.30 | **0.15** | 0.08 | 0 |
+|---|---|---|---|---|
+| mean g at 36k | 0.41–0.52 | **0.49–0.60** | 0.59–0.73 | 0.59–0.74 |
+
+Shipped: `kpSlope 0.5`, `kbSlope 0.15`. Declared evolving change; silent fingerprint identical to the 5.6 baseline on both seeds. Drifta's `hiTrait` reads "grazing resistance" — the mechanism is an escape roll, but for plankton the word is resistance.
+
+**The world is balanced.** 8 seeds × 18k: Drifta 0.39–0.60, Cilio 0.42–0.52, sd 0.10–0.17. Sweeps fire on 4/8 seeds, in *both* directions (tougher on 44; faster-growing on 22, 66, 77). Because a balanced world does not sweep, the Observatory gained a third heredity detector — **diversifying**: "Drifta is diversifying — tougher and faster-growing lines coexist, neither winning" (sd ≥ 0.10 sustained, mean within 0.15 of g₀, ≥ 20% on each side). Observer-only, bit-identical; fires on the four non-sweeping seeds at t = 5,120–15,280; silent world emits nothing. The gate's first criterion now reads "sweep *or* diversifying on ≥ 7/8".
+
+**Yoshida on the balanced world:** period 5698 → 5460 (longer on 4/8), phase 0.17 → 0.13 (farther on 4/8), CV 0.34 → 0.33. Per seed it is a coin toss; the ensemble does not move. Standing polymorphism is necessary for the transformation but, here, not sufficient: the defended and undefended lines coexist without *cycling* against each other. The honest next question is whether the grazing pressure itself oscillates enough to drive genotype turnover — a measurement, not a knob.
+
+**Re-acceptance:** `tune2` 8/8 ecosystem (apex held 3/8). `corridor` **CERTIFIED at all 4 corners**, 8/8 each. `gate5` **ALL CRITERIA PASS**: evolution narrated 8/8 (diversifying on every seed, sweeps on four), sweeps grounded, variance rising 8/8, control silent 8/8, seed-22 measurement reproduced bit-exactly.
+
+**Apex control (step 3):** the silent world holds the apex to 54k on 6/8 seeds; late apex loss under evolution is real and attributable.

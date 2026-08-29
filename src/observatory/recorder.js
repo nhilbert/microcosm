@@ -20,7 +20,8 @@ const DET_ESTAB = [40, 40, 20, 80, 10, 4, 4]; // establishment thresholds per sp
 const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0], crash:[0,0,0,0,0,0,0],
   packAwake:false, depleted:false, lockedWarn:false,
   sweep:[0,0,0,0,0,0,0],   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
-  uniform:[0,0,0,0,0,0,0] };
+  uniform:[0,0,0,0,0,0,0],
+  diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0] }; // standing polymorphism: both ends coexist
 function pushEvent(type, sp, text){
   W.sysEvents.push({ tick: W.tick, type, sp, text });
   if (W.sysEvents.length > 200) W.sysEvents.shift();
@@ -75,6 +76,14 @@ function detect(r, awake){
     else if (Math.abs(det.sweep[sp]) === 1 && dir === det.sweep[sp] && share >= 0.85){ det.sweep[sp] *= 2;
       pushEvent("sweep", sp, "The "+word+" "+name+" line has taken over — "+Math.round(share*100)+"% of the population."); }
     else if (det.sweep[sp] !== 0 && Math.max(shareHi, shareLo) < 0.45) det.sweep[sp] = 0;
+    // diversifying: standing variation established with no line winning -- both strategies coexist.
+    // Measured on the balanced (5.7) world: sd climbs 0.02 -> 0.10-0.17 while the mean stays near g0;
+    // a sweep instead carries the mean away. The two events are mutually exclusive by construction.
+    if (det.sweep[sp] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[sp]++;
+    else det.diverseRun[sp] = 0;
+    if (!det.diverse[sp] && det.diverseRun[sp] >= 10){ det.diverse[sp] = 1;
+      pushEvent("diverse", sp, name+" is diversifying — "+L.hiWord+" and "+L.loWord+" lines coexist, neither winning."); }
+    else if (det.diverse[sp] && (sd < 0.06 || det.sweep[sp] !== 0)) det.diverse[sp] = 0;
     // diversity collapse: variation falls to well under half of what it was 270 samples ago.
     // Selection consuming variation is the normal end of a sweep; the event names the cost.
     if (W.recCount >= 271){

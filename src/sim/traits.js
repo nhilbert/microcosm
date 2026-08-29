@@ -62,11 +62,11 @@ const TRAITS = normalizeTraits([
     // falls. At g = g0 both expressions collapse to the bare trait, so a silent genome
     // (P.mutation=false) is bit-identical to the Phase 4 reference world.
     // Mutation kernel: one uniform draw in [-sigma, sigma] per division (a Gaussian would cost
-    // two draws); the corridor clamp bounds it. kpSlope 0.10 -> 0.25 by measurement: cheap
-    // defense swept to the rail and starved the apex.
-    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25,
+    // two draws); the corridor clamp bounds it. Price by measurement (5.7): kpSlope 0.25 swept
+    // to the defense rail, 0.75 to the growth rail; 0.5 holds a balanced polymorphism.
+    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.5,
              label: "Defense", hiWord: "tougher", loWord: "faster-growing",  // functional names for the two ends
-             hiTrait: "escape chance", loTrait: "growth rate" },
+             hiTrait: "grazing resistance", loTrait: "growth rate" },  // the mechanism is an escape roll; for plankton it reads as resistance
   },
   { // 2 — Cilio: steering grazer
     name: "Cilio", bodyTag: TAG.CILIO, layer: "none",
@@ -85,7 +85,8 @@ const TRAITS = normalizeTraits([
     escape: { p: 0.30, kick: 22 },
     // Phase 5.6 heredity: pursuit, the coevolutionary counterweight to Drifta's defense (R5).
     // A keener grazer cuts its prey's escape chance; it pays in basal upkeep every tick.
-    locus: { g0: 0.5, sigma: 0.03, catchSlope: 0.4, kbSlope: 0.3,
+    // Price by measurement (5.7): kbSlope 0.3 drifted thriftier, 0 swept keener; 0.15 holds mid-corridor.
+    locus: { g0: 0.5, sigma: 0.03, catchSlope: 0.4, kbSlope: 0.15,
              label: "Pursuit", hiWord: "keener", loWord: "thriftier",
              hiTrait: "catch chance", loTrait: "energy thrift" },
   },

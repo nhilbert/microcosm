@@ -134,11 +134,11 @@ const TRAITS = normalizeTraits([
     // falls. At g = g0 both expressions collapse to the bare trait, so a silent genome
     // (P.mutation=false) is bit-identical to the Phase 4 reference world.
     // Mutation kernel: one uniform draw in [-sigma, sigma] per division (a Gaussian would cost
-    // two draws); the corridor clamp bounds it. kpSlope 0.10 -> 0.25 by measurement: cheap
-    // defense swept to the rail and starved the apex.
-    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.25,
+    // two draws); the corridor clamp bounds it. Price by measurement (5.7): kpSlope 0.25 swept
+    // to the defense rail, 0.75 to the growth rail; 0.5 holds a balanced polymorphism.
+    locus: { g0: 0.5, sigma: 0.03, escSlope: 0.22, kpSlope: 0.5,
              label: "Defense", hiWord: "tougher", loWord: "faster-growing",  // functional names for the two ends
-             hiTrait: "escape chance", loTrait: "growth rate" },
+             hiTrait: "grazing resistance", loTrait: "growth rate" },  // the mechanism is an escape roll; for plankton it reads as resistance
   },
   { // 2 — Cilio: steering grazer
     name: "Cilio", bodyTag: TAG.CILIO, layer: "none",
@@ -157,7 +157,8 @@ const TRAITS = normalizeTraits([
     escape: { p: 0.30, kick: 22 },
     // Phase 5.6 heredity: pursuit, the coevolutionary counterweight to Drifta's defense (R5).
     // A keener grazer cuts its prey's escape chance; it pays in basal upkeep every tick.
-    locus: { g0: 0.5, sigma: 0.03, catchSlope: 0.4, kbSlope: 0.3,
+    // Price by measurement (5.7): kbSlope 0.3 drifted thriftier, 0 swept keener; 0.15 holds mid-corridor.
+    locus: { g0: 0.5, sigma: 0.03, catchSlope: 0.4, kbSlope: 0.15,
              label: "Pursuit", hiWord: "keener", loWord: "thriftier",
              hiTrait: "catch chance", loTrait: "energy thrift" },
   },
@@ -507,7 +508,8 @@ const DET_ESTAB = [40, 40, 20, 80, 10, 4, 4]; // establishment thresholds per sp
 const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0], crash:[0,0,0,0,0,0,0],
   packAwake:false, depleted:false, lockedWarn:false,
   sweep:[0,0,0,0,0,0,0],   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
-  uniform:[0,0,0,0,0,0,0] };
+  uniform:[0,0,0,0,0,0,0],
+  diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0] }; // standing polymorphism: both ends coexist
 function pushEvent(type, sp, text){
   W.sysEvents.push({ tick: W.tick, type, sp, text });
   if (W.sysEvents.length > 200) W.sysEvents.shift();
@@ -562,6 +564,14 @@ function detect(r, awake){
     else if (Math.abs(det.sweep[sp]) === 1 && dir === det.sweep[sp] && share >= 0.85){ det.sweep[sp] *= 2;
       pushEvent("sweep", sp, "The "+word+" "+name+" line has taken over — "+Math.round(share*100)+"% of the population."); }
     else if (det.sweep[sp] !== 0 && Math.max(shareHi, shareLo) < 0.45) det.sweep[sp] = 0;
+    // diversifying: standing variation established with no line winning -- both strategies coexist.
+    // Measured on the balanced (5.7) world: sd climbs 0.02 -> 0.10-0.17 while the mean stays near g0;
+    // a sweep instead carries the mean away. The two events are mutually exclusive by construction.
+    if (det.sweep[sp] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[sp]++;
+    else det.diverseRun[sp] = 0;
+    if (!det.diverse[sp] && det.diverseRun[sp] >= 10){ det.diverse[sp] = 1;
+      pushEvent("diverse", sp, name+" is diversifying — "+L.hiWord+" and "+L.loWord+" lines coexist, neither winning."); }
+    else if (det.diverse[sp] && (sd < 0.06 || det.sweep[sp] !== 0)) det.diverse[sp] = 0;
     // diversity collapse: variation falls to well under half of what it was 270 samples ago.
     // Selection consuming variation is the normal end of a sweep; the event names the cost.
     if (W.recCount >= 271){
@@ -1064,7 +1074,7 @@ function initWorld(seed){
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
-  det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0);
+  det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0);
   recPrev.uptake=recPrev.gpp=recPrev.resp=recPrev.bacRelease=recPrev.corpseToDet=recPrev.egestE=recPrev.deaths=0;
   recPrev.deathsBy.fill(0);
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);
