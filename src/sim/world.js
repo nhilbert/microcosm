@@ -20,7 +20,7 @@ const W = {
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
   events: [], eventLog: [], lightDirty: false,
-  sun: { x: P.WORLD / 2, y: P.WORLD / 2 },
+  suns: [{ x: P.WORLD / 2, y: P.WORLD / 2, i: P.sunI, sigma: P.sunSigma }],  // light sources (7.L); suns[0] is the shipped sun
   light: new Float32Array(P.GRID * P.GRID),
   pB: new Float32Array(P.GRID * P.GRID), bB: new Float32Array(P.GRID * P.GRID),
   M: new Float32Array(P.GRID * P.GRID), Mtmp: new Float32Array(P.GRID * P.GRID),

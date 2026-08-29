@@ -19,9 +19,10 @@ function initWorld(seed){
   recPrev.deathsBy.fill(0);
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);
   for (const k in W.flows) W.flows[k] = (k==="deathsBy") ? [0,0,0,0,0,0,0] : 0;
+  W.suns.length = 0; W.suns.push({ x: P.WORLD/2, y: P.WORLD/2, i: P.sunI, sigma: P.sunSigma }); // one sun, centred (like P.lightMul)
   computeLight();
   const nearSun = rad => { const a=R()*6.283, r=Math.sqrt(R())*rad;
-    return [wrap(W.sun.x+Math.cos(a)*r), wrap(W.sun.y+Math.sin(a)*r)]; };
+    return [wrap(W.suns[0].x+Math.cos(a)*r), wrap(W.suns[0].y+Math.sin(a)*r)]; };
   const endow = endowFounder; { // (hoisted to module scope in the tweaks batch; alias kept)
     void 0;
   };

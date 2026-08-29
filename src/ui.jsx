@@ -18,7 +18,7 @@ export default function Microcosm(){
     const ctx = canvas.getContext("2d");
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     let vw = 0, vh = 0;
-    const cam = { x: W.sun.x, y: W.sun.y, z: Math.max(1, Math.min(window.innerWidth, window.innerHeight) / 620) };
+    const cam = { x: W.suns[0].x, y: W.suns[0].y, z: Math.max(1, Math.min(window.innerWidth, window.innerHeight) / 620) };
     const minZ = () => Math.max(vw, vh) / P.WORLD;
     const clampZ = z => Math.max(minZ(), Math.min(6, z));
     const resize = () => {
@@ -165,7 +165,7 @@ export default function Microcosm(){
         P.mutation = true; // a fresh world starts with the shipped settings (locus settings are restored by initWorld)
         resetWorld(); initWorld((Math.random()*1e9)|0);
         sel.i = -1; follow = false; undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
-        cam.x = W.sun.x; cam.y = W.sun.y;
+        cam.x = W.suns[0].x; cam.y = W.suns[0].y;
         setUi(us => ({ ...us, card: null, chips: [], spawnPick: null, tick: 0,
           mineral: { b:0, f:0, l:0, add:0 }, lightMul: 1 }));
       },
@@ -188,7 +188,7 @@ export default function Microcosm(){
         t: performance.now(), moved: false, louping: false, lt: null };
       pointers.set(e.pointerId, pp);
       if (mode === "intervene" && pointers.size === 1)
-        sunDrag = { x: W.sun.x, y: W.sun.y, ox: W.sun.x, oy: W.sun.y };
+        sunDrag = { k: 0, x: W.suns[0].x, y: W.suns[0].y, ox: W.suns[0].x, oy: W.suns[0].y };
       if (mode === "observe" && pointers.size === 1){
         pp.lt = setTimeout(() => { pp.lt = null;
           if (pointers.size === 1 && !pp.moved){ pp.louping = true; loupe = { x: pp.x, y: pp.y }; }
@@ -216,7 +216,7 @@ export default function Microcosm(){
           if (mode === "intervene" && sunDrag){
             // indirect sun drag: move by the finger's delta, from anywhere on screen
             sunDrag.x += (nx - p.x) / cam.z; sunDrag.y += (ny - p.y) / cam.z;
-            queueEvent({ type:"sun", x: sunDrag.x, y: sunDrag.y });
+            queueEvent({ type:"sun", k: sunDrag.k, x: sunDrag.x, y: sunDrag.y });
           } else if (mode === "observe"){
             follow = false;
             cam.x = wrap(cam.x - (nx - p.x) / cam.z); cam.y = wrap(cam.y - (ny - p.y) / cam.z);
@@ -240,7 +240,8 @@ export default function Microcosm(){
         if (p && p.moved && sunDrag && pointers.size === 0){
           const { ox, oy } = sunDrag;
           logIv("sun");
-          pushUndo("Moved the sun · Undo", () => { logIv("undo"); queueEvent({ type:"sun", x: ox, y: oy }); });
+          const k = sunDrag.k;
+          pushUndo("Moved the sun · Undo", () => { logIv("undo"); queueEvent({ type:"sun", k, x: ox, y: oy }); });
         } else if (p && !p.moved && !wasPinch && pointers.size === 0 && performance.now() - p.t >= 350){
           const wx2 = wrap(cam.x + (p.sx - vw/2)/cam.z), wy2 = wrap(cam.y + (p.sy - vh/2)/cam.z);
           setUi(us => ({ ...us, spawnPick: { sx: p.sx, sy: p.sy, x: wx2, y: wy2 } }));

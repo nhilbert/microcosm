@@ -14,7 +14,8 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a
 
 const P = {
   WORLD: 1024, GRID: 64,
-  sunSigma: 210, sunI: 1.0, ambient: 0.03,
+  sunSigma: 210, sunI: 1.0, ambient: 0.03,   // defaults for the shipped sun and for every sun the player adds (7.L)
+  maxSuns: 4,       // light sources are a small array (W.suns); the shipped world has one, at the centre
   divPlank: 70, divBenth: 150, shadeMax: 0.95,
   moveCost: 0.003, capMul: 10, invest: 0.5,
   mutSigma: 0.08,  // (settleLimit moved to per-trait rows in 3.0b)
@@ -459,7 +460,7 @@ const W = {
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
   events: [], eventLog: [], lightDirty: false,
-  sun: { x: P.WORLD / 2, y: P.WORLD / 2 },
+  suns: [{ x: P.WORLD / 2, y: P.WORLD / 2, i: P.sunI, sigma: P.sunSigma }],  // light sources (7.L); suns[0] is the shipped sun
   light: new Float32Array(P.GRID * P.GRID),
   pB: new Float32Array(P.GRID * P.GRID), bB: new Float32Array(P.GRID * P.GRID),
   M: new Float32Array(P.GRID * P.GRID), Mtmp: new Float32Array(P.GRID * P.GRID),
@@ -591,9 +592,30 @@ function applyEvent(ev){
       const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : [0, 1.5]; // slopes are prices: bounded too
       Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));
       done && done({ prev }); break; }
-    case "sun":
-      W.sun.x = wrap(ev.x); W.sun.y = wrap(ev.y);
-      computeLight(); W.lightDirty = true; break;
+    // Suns (7.L): a small array of light sources. Never fewer than one (decision 2); at most P.maxSuns.
+    // None of these draw; they change the future stream only through ecology, like moving the sun always has.
+    case "sun": {
+      const s = W.suns[ev.k|0]; if (!s) break;
+      s.x = wrap(ev.x); s.y = wrap(ev.y);
+      computeLight(); W.lightDirty = true; break; }
+    case "sunAdd": {
+      if (W.suns.length >= P.maxSuns) break;
+      const s = { x: wrap(ev.x), y: wrap(ev.y),
+        i: Math.max(0.1, Math.min(1.5, ev.i === undefined ? P.sunI : +ev.i)),
+        sigma: Math.max(90, Math.min(300, ev.sigma === undefined ? P.sunSigma : +ev.sigma)) };
+      const k = ev.at === undefined ? W.suns.length : Math.max(0, Math.min(W.suns.length, ev.at|0)); // `at` restores an undone removal at its old index
+      W.suns.splice(k, 0, s);
+      computeLight(); W.lightDirty = true; done && done({ k }); break; }
+    case "sunRemove": {
+      const k = ev.k|0; if (W.suns.length <= 1 || !W.suns[k]) break;
+      const snap = W.suns.splice(k, 1)[0];
+      computeLight(); W.lightDirty = true; done && done({ k, snap }); break; }
+    case "sunSet": {
+      const s = W.suns[ev.k|0]; if (!s) break;
+      const prev = { i: s.i, sigma: s.sigma };
+      if (ev.i !== undefined) s.i = Math.max(0.1, Math.min(1.5, +ev.i));
+      if (ev.sigma !== undefined) s.sigma = Math.max(90, Math.min(300, +ev.sigma));
+      computeLight(); W.lightDirty = true; done && done({ prev }); break; }
     case "feed": {
       const i = ev.i; if (!(W.alive[i] && W.gen[i] === ev.gen)) break;
       const cap = P.capMul*W.sz[i], before = W.en[i];
@@ -626,8 +648,8 @@ function applyEvent(ev){
 }
 function drainEvents(){ while (W.events.length) applyEvent(W.events.shift()); }
 function queueEvent(ev){
-  if (ev.type === "sun"){ // coalesce: only the latest sun position matters
-    const k = W.events.findIndex(e => e.type === "sun");
+  if (ev.type === "sun"){ // coalesce: only the latest position of that sun matters
+    const k = W.events.findIndex(e => e.type === "sun" && (e.k|0) === (ev.k|0));
     if (k >= 0){ W.events[k] = ev; return; }
   }
   W.events.push(ev);
@@ -672,12 +694,17 @@ function diffuseM(){
   }
   A.set(AT);
 }
+// Irradiance adds: the field is the ambient floor plus one toroidal Gaussian per sun. Draw-free.
 function computeLight(){
-  const s2 = 2 * P.sunSigma * P.sunSigma;
+  const S = W.suns;
   for (let gy = 0; gy < P.GRID; gy++) for (let gx = 0; gx < P.GRID; gx++){
     const cx=(gx+0.5)*CELL, cyy=(gy+0.5)*CELL;
-    const dx=wd(cx-W.sun.x), dy=wd(cyy-W.sun.y);
-    W.light[gy*P.GRID+gx] = (P.ambient + P.sunI * Math.exp(-(dx*dx+dy*dy)/s2)) * P.lightMul;
+    let v = P.ambient;
+    for (let k = 0; k < S.length; k++){
+      const s = S[k], dx=wd(cx-s.x), dy=wd(cyy-s.y);
+      v += s.i * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+    }
+    W.light[gy*P.GRID+gx] = v * P.lightMul;
   }
 }
 
@@ -892,7 +919,7 @@ function record(){
   B[r+22]=F.corpseToDet-recPrev.corpseToDet; recPrev.corpseToDet=F.corpseToDet;
   B[r+23]=F.egestE-recPrev.egestE;       recPrev.egestE=F.egestE;
   B[r+24]=F.deaths-recPrev.deaths;       recPrev.deaths=F.deaths;
-  B[r+33]=W.sun.x; B[r+34]=W.sun.y;
+  B[r+33]=W.suns[0].x; B[r+34]=W.suns[0].y;
   for (let sp=0;sp<7;sp++){ B[r+35+sp]=F.deathsBy[sp]-recPrev.deathsBy[sp]; recPrev.deathsBy[sp]=F.deathsBy[sp]; }
   detect(r, awake);
   W.recHead=(W.recHead+1)%REC.N;
@@ -1111,7 +1138,12 @@ function step(){
     if(T.movement==="drift"){ // damped random walk + light-deficit-scaled phototaxis
       const gx1=Math.floor(W.x[i]/CELL)&(P.GRID-1), gy1=Math.floor(W.y[i]/CELL)&(P.GRID-1);
       const deficit=Math.max(0, 0.9-W.light[gy1*P.GRID+gx1]);
-      const sdx=wd(W.sun.x-W.x[i]), sdy=wd(W.sun.y-W.y[i]); const sd=Math.hypot(sdx,sdy)+1;
+      // steer toward the NEAREST sun (7.L decision 1): with one sun this is the Phase 1 arithmetic exactly;
+      // with several, a drifter commits to the closest — the limited-migration condition patches need
+      let sdx=wd(W.suns[0].x-W.x[i]), sdy=wd(W.suns[0].y-W.y[i]), sd2=sdx*sdx+sdy*sdy;
+      for (let k=1;k<W.suns.length;k++){ const ex=wd(W.suns[k].x-W.x[i]), ey=wd(W.suns[k].y-W.y[i]), e2=ex*ex+ey*ey;
+        if (e2 < sd2){ sdx=ex; sdy=ey; sd2=e2; } }
+      const sd=Math.hypot(sdx,sdy)+1;
       W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + T.phototaxis*deficit*sdx/sd;
       W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + T.phototaxis*deficit*sdy/sd;
       const s=Math.hypot(W.vx[i],W.vy[i]);
@@ -1345,9 +1377,10 @@ function initWorld(seed){
   recPrev.deathsBy.fill(0);
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);
   for (const k in W.flows) W.flows[k] = (k==="deathsBy") ? [0,0,0,0,0,0,0] : 0;
+  W.suns.length = 0; W.suns.push({ x: P.WORLD/2, y: P.WORLD/2, i: P.sunI, sigma: P.sunSigma }); // one sun, centred (like P.lightMul)
   computeLight();
   const nearSun = rad => { const a=R()*6.283, r=Math.sqrt(R())*rad;
-    return [wrap(W.sun.x+Math.cos(a)*r), wrap(W.sun.y+Math.sin(a)*r)]; };
+    return [wrap(W.suns[0].x+Math.cos(a)*r), wrap(W.suns[0].y+Math.sin(a)*r)]; };
   const endow = endowFounder; { // (hoisted to module scope in the tweaks batch; alias kept)
     void 0;
   };

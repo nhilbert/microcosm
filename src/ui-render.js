@@ -159,19 +159,25 @@ function drawGhostRay(ctx, sx, sy, hd, r, striking, trail){
 // World layers: light (redrawn when the sun moves), dissolved mineral, mat carpet, corpse pall.
 // Everything reads the module-singleton W; the returned closures own their offscreen canvases.
 function makeWorldLayers(){
-  // light layer (world-space, redrawn only when the sun moves — static in this increment)
+  // light layer (world-space, redrawn only when a sun moves or changes): one glow per sun,
+  // radius from its spread, alpha from its intensity; the glows add like the field they depict
   const LB = document.createElement("canvas"); LB.width = 512; LB.height = 512;
   const lg = LB.getContext("2d");
   const drawLight = () => {
     lg.fillStyle = COL.abyss; lg.fillRect(0,0,512,512);
     const k = 512 / P.WORLD;
-    const gr2 = lg.createRadialGradient(W.sun.x*k, W.sun.y*k, 4, W.sun.x*k, W.sun.y*k, P.sunSigma*2.2*k);
-    gr2.addColorStop(0, "rgba(214,238,255,0.30)");
-    gr2.addColorStop(0.4, "rgba(140,190,225,0.12)");
-    gr2.addColorStop(1, "rgba(140,190,225,0)");
-    lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
+    lg.globalCompositeOperation = "lighter";
+    for (const s of W.suns){
+      const a = Math.min(1, s.i);
+      const gr2 = lg.createRadialGradient(s.x*k, s.y*k, 4, s.x*k, s.y*k, s.sigma*2.2*k);
+      gr2.addColorStop(0, `rgba(214,238,255,${(0.30*a).toFixed(3)})`);
+      gr2.addColorStop(0.4, `rgba(140,190,225,${(0.12*a).toFixed(3)})`);
+      gr2.addColorStop(1, "rgba(140,190,225,0)");
+      lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
+    }
+    lg.globalCompositeOperation = "source-over";
     lg.fillStyle = "rgba(240,250,255,0.9)";
-    lg.beginPath(); lg.arc(W.sun.x*k, W.sun.y*k, 5, 0, 6.283); lg.fill();
+    for (const s of W.suns){ lg.beginPath(); lg.arc(s.x*k, s.y*k, 5, 0, 6.283); lg.fill(); }
   };
   drawLight();
 
@@ -320,15 +326,15 @@ function drawCorpses(ctx, view, hiddenDebris){
     ctx.beginPath(); ctx.arc(sx, sy, r*0.55, 0, 6.283); ctx.stroke();
   }
 }
-function drawSunAffordance(ctx, view){
+function drawSunAffordance(ctx, view, selSun){
   const { cam, z, hw, hh } = view;
-  {
-    const ssx = hw + wd(W.sun.x - cam.x)*z, ssy = hh + wd(W.sun.y - cam.y)*z;
-    ctx.strokeStyle = "rgba(242,178,74,0.9)"; ctx.lineWidth = 1.5;
+  W.suns.forEach((s, k) => {
+    const ssx = hw + wd(s.x - cam.x)*z, ssy = hh + wd(s.y - cam.y)*z, on = k === selSun;
+    ctx.strokeStyle = on ? "rgba(242,178,74,1)" : "rgba(242,178,74,0.9)"; ctx.lineWidth = on ? 2.5 : 1.5;
     ctx.beginPath(); ctx.arc(ssx, ssy, 16, 0, 6.283); ctx.stroke();
-    ctx.strokeStyle = "rgba(242,178,74,0.3)"; ctx.lineWidth = 6;
+    ctx.strokeStyle = on ? "rgba(242,178,74,0.5)" : "rgba(242,178,74,0.3)"; ctx.lineWidth = 6;
     ctx.beginPath(); ctx.arc(ssx, ssy, 22, 0, 6.283); ctx.stroke();
-  }
+  });
 }
 function drawSelectionRing(ctx, view, si){
   const { cam, z, hw, hh, alpha } = view;

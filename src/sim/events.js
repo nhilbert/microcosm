@@ -61,9 +61,30 @@ function applyEvent(ev){
       const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : [0, 1.5]; // slopes are prices: bounded too
       Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));
       done && done({ prev }); break; }
-    case "sun":
-      W.sun.x = wrap(ev.x); W.sun.y = wrap(ev.y);
-      computeLight(); W.lightDirty = true; break;
+    // Suns (7.L): a small array of light sources. Never fewer than one (decision 2); at most P.maxSuns.
+    // None of these draw; they change the future stream only through ecology, like moving the sun always has.
+    case "sun": {
+      const s = W.suns[ev.k|0]; if (!s) break;
+      s.x = wrap(ev.x); s.y = wrap(ev.y);
+      computeLight(); W.lightDirty = true; break; }
+    case "sunAdd": {
+      if (W.suns.length >= P.maxSuns) break;
+      const s = { x: wrap(ev.x), y: wrap(ev.y),
+        i: Math.max(0.1, Math.min(1.5, ev.i === undefined ? P.sunI : +ev.i)),
+        sigma: Math.max(90, Math.min(300, ev.sigma === undefined ? P.sunSigma : +ev.sigma)) };
+      const k = ev.at === undefined ? W.suns.length : Math.max(0, Math.min(W.suns.length, ev.at|0)); // `at` restores an undone removal at its old index
+      W.suns.splice(k, 0, s);
+      computeLight(); W.lightDirty = true; done && done({ k }); break; }
+    case "sunRemove": {
+      const k = ev.k|0; if (W.suns.length <= 1 || !W.suns[k]) break;
+      const snap = W.suns.splice(k, 1)[0];
+      computeLight(); W.lightDirty = true; done && done({ k, snap }); break; }
+    case "sunSet": {
+      const s = W.suns[ev.k|0]; if (!s) break;
+      const prev = { i: s.i, sigma: s.sigma };
+      if (ev.i !== undefined) s.i = Math.max(0.1, Math.min(1.5, +ev.i));
+      if (ev.sigma !== undefined) s.sigma = Math.max(90, Math.min(300, +ev.sigma));
+      computeLight(); W.lightDirty = true; done && done({ prev }); break; }
     case "feed": {
       const i = ev.i; if (!(W.alive[i] && W.gen[i] === ev.gen)) break;
       const cap = P.capMul*W.sz[i], before = W.en[i];
@@ -96,8 +117,8 @@ function applyEvent(ev){
 }
 function drainEvents(){ while (W.events.length) applyEvent(W.events.shift()); }
 function queueEvent(ev){
-  if (ev.type === "sun"){ // coalesce: only the latest sun position matters
-    const k = W.events.findIndex(e => e.type === "sun");
+  if (ev.type === "sun"){ // coalesce: only the latest position of that sun matters
+    const k = W.events.findIndex(e => e.type === "sun" && (e.k|0) === (ev.k|0));
     if (k >= 0){ W.events[k] = ev; return; }
   }
   W.events.push(ev);

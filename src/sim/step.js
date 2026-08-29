@@ -71,7 +71,12 @@ function step(){
     if(T.movement==="drift"){ // damped random walk + light-deficit-scaled phototaxis
       const gx1=Math.floor(W.x[i]/CELL)&(P.GRID-1), gy1=Math.floor(W.y[i]/CELL)&(P.GRID-1);
       const deficit=Math.max(0, 0.9-W.light[gy1*P.GRID+gx1]);
-      const sdx=wd(W.sun.x-W.x[i]), sdy=wd(W.sun.y-W.y[i]); const sd=Math.hypot(sdx,sdy)+1;
+      // steer toward the NEAREST sun (7.L decision 1): with one sun this is the Phase 1 arithmetic exactly;
+      // with several, a drifter commits to the closest — the limited-migration condition patches need
+      let sdx=wd(W.suns[0].x-W.x[i]), sdy=wd(W.suns[0].y-W.y[i]), sd2=sdx*sdx+sdy*sdy;
+      for (let k=1;k<W.suns.length;k++){ const ex=wd(W.suns[k].x-W.x[i]), ey=wd(W.suns[k].y-W.y[i]), e2=ex*ex+ey*ey;
+        if (e2 < sd2){ sdx=ex; sdy=ey; sd2=e2; } }
+      const sd=Math.hypot(sdx,sdy)+1;
       W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + T.phototaxis*deficit*sdx/sd;
       W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + T.phototaxis*deficit*sdy/sd;
       const s=Math.hypot(W.vx[i],W.vy[i]);

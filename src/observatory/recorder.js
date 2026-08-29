@@ -171,7 +171,7 @@ function record(){
   B[r+22]=F.corpseToDet-recPrev.corpseToDet; recPrev.corpseToDet=F.corpseToDet;
   B[r+23]=F.egestE-recPrev.egestE;       recPrev.egestE=F.egestE;
   B[r+24]=F.deaths-recPrev.deaths;       recPrev.deaths=F.deaths;
-  B[r+33]=W.sun.x; B[r+34]=W.sun.y;
+  B[r+33]=W.suns[0].x; B[r+34]=W.suns[0].y;
   for (let sp=0;sp<7;sp++){ B[r+35+sp]=F.deathsBy[sp]-recPrev.deathsBy[sp]; recPrev.deathsBy[sp]=F.deathsBy[sp]; }
   detect(r, awake);
   W.recHead=(W.recHead+1)%REC.N;

@@ -37,12 +37,17 @@ function diffuseM(){
   }
   A.set(AT);
 }
+// Irradiance adds: the field is the ambient floor plus one toroidal Gaussian per sun. Draw-free.
 function computeLight(){
-  const s2 = 2 * P.sunSigma * P.sunSigma;
+  const S = W.suns;
   for (let gy = 0; gy < P.GRID; gy++) for (let gx = 0; gx < P.GRID; gx++){
     const cx=(gx+0.5)*CELL, cyy=(gy+0.5)*CELL;
-    const dx=wd(cx-W.sun.x), dy=wd(cyy-W.sun.y);
-    W.light[gy*P.GRID+gx] = (P.ambient + P.sunI * Math.exp(-(dx*dx+dy*dy)/s2)) * P.lightMul;
+    let v = P.ambient;
+    for (let k = 0; k < S.length; k++){
+      const s = S[k], dx=wd(cx-s.x), dy=wd(cyy-s.y);
+      v += s.i * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+    }
+    W.light[gy*P.GRID+gx] = v * P.lightMul;
   }
 }
 
