@@ -166,7 +166,7 @@ export default function Microcosm(){
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
         age: Math.floor((W.tick - W.birth[i]) / 10), state: stateOf(i),
         en: W.en[i], cap, pr: W.pr[i], pQ, mn: W.mn[i], mQ, size: W.sz[i],
-        badge, bind, lineage: W.lg[i], heredity };
+        badge, bind, lineage: W.lg[i], heredity, sp: W.sp[i] };
     };
     const clearChips = () => { clearTimeout(chipTimer); setUi(u => (u.chips ? { ...u, chips: null } : u)); };
     const selectIndex = i => {
@@ -896,6 +896,21 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
               color:"#0B131E", fontSize:14, fontWeight:600 }}>Kill</button>
         </div>
       )}
+      {detail === 2 && SPECIES_PROFILE[card.sp] && (() => { const pf = SPECIES_PROFILE[card.sp]; return (
+        <div style={{ marginTop:18, fontSize:12, lineHeight:1.5 }}>
+          <div style={{ fontSize:11, color:COL.silt, letterSpacing:1.2 }}>PROFILE</div>
+          <img src={`assets/species/${pf.key}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; }}
+            style={{ display:"block", width:"100%", maxHeight:220, objectFit:"cover", borderRadius:12, marginTop:8,
+              border:"1px solid rgba(94,115,134,0.3)" }} />
+          <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"5px 12px", marginTop:10 }}>
+            {[["habitat", pf.habitat], ["behaviour", pf.behaviour], ["food", pf.food], ["eaten by", pf.eatenBy],
+              ["size", pf.size], ["lifecycle", pf.lifecycle]].map(([k, v]) => (
+              <React.Fragment key={k}>
+                <span style={{ color:COL.silt, fontSize:10, textTransform:"uppercase", letterSpacing:0.8, paddingTop:2 }}>{k}</span>
+                <span>{v}</span>
+              </React.Fragment>))}
+          </div>
+        </div> ); })()}
       {detail === 2 && (
         <div style={{ marginTop:18, fontSize:12, color:COL.silt, lineHeight:1.5 }}>
           Amber marks your hand: everything you do to the world, as opposed to what

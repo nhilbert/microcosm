@@ -1142,6 +1142,31 @@ const SPECIES_META = [
   { name:"Necro",    role:"Scavenger",             rgb: COL.necro },    // dormant until 3.3
   { name:"Venator",  role:"Predator · pursuit",    rgb: COL.venator },
 ];
+// Species profiles ("Steckbrief"), from the same TRAITS rows the sim runs on. Shown on the
+// specimen card. Image: assets/species/<key>.png, optional -- the card hides the slot if missing.
+const SPECIES_PROFILE = [
+  { key:"solara", habitat:"the lit floor near the sun; a carpet, thickest where light is strongest",
+    behaviour:"sessile; photosynthesises; divides into the neighbouring floor until the mat is crowded",
+    food:"light and dissolved mineral", eatenBy:"Cilio — poor food; the lowest 35 units of every mat are ungrazeable refugia",
+    size:"7–9 units at founding", lifecycle:"small constant hazard; no cyst" },
+  { key:"drifta", habitat:"open water wherever the light reaches; drifts toward brightness",
+    behaviour:"damped random walk with weak phototaxis; encysts when starved, wakes when light returns",
+    food:"light and dissolved mineral — the fastest grower in the world", eatenBy:"Cilio — its best food; a 35% escape jink breaks contact",
+    size:"3.4 units", lifecycle:"cyst at 18% reserve, wakes on light" },
+  { key:"cilio", habitat:"the productive core, following its food",
+    behaviour:"steering forager; pursues the nearest edible target; flees down the alarm gradient when neighbours are injured",
+    food:"Drifta (best), Bacillus (survival food), Solara (poor)", eatenBy:"Venator — with a 30% escape jink of its own",
+    size:"6 units", lifecycle:"matures 200 ticks after division, divides at most every 160; encysts when starved, wakes on prey" },
+  { key:"bacillus", habitat:"wherever dead matter settles; follows detritus gradients",
+    behaviour:"run-and-tumble; eats detritus and mineralises — returns bound mineral to the water. The recycling guild.",
+    food:"detritus energy and protein", eatenBy:"Cilio — survival food; cysts edible at half yield",
+    size:"2 units; colonies, not cells", lifecycle:"encysts when starved; wakes on detritus or death-scent" },
+  null, null,
+  { key:"venator", habitat:"the hunting grounds around the core; a pack founds together as cysts",
+    behaviour:"fast straight-line pursuit with a jet burst; outturned by its prey; territorial; finishes the carcasses of its own kills",
+    food:"Cilio only", eatenBy:"nothing",
+    size:"9 units", lifecycle:"the slowest breeder (700-tick cooldown); a knife-edged apex — reported, never required" },
+];
 const SHAPES = ["nucleus","dot","tri","square","dot","dot","tri"]; // sprite shape per species (Venator is drawn as paths)
 // Genotype tint (Phase 5.3): a bounded shift WITHIN the species hue. t=0 (the loWord end) leans
 // paler and warmer, t=1 (the hiWord end) deeper and cooler; the midpoint is the species color
@@ -1961,7 +1986,7 @@ export default function Microcosm(){
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
         age: Math.floor((W.tick - W.birth[i]) / 10), state: stateOf(i),
         en: W.en[i], cap, pr: W.pr[i], pQ, mn: W.mn[i], mQ, size: W.sz[i],
-        badge, bind, lineage: W.lg[i], heredity };
+        badge, bind, lineage: W.lg[i], heredity, sp: W.sp[i] };
     };
     const clearChips = () => { clearTimeout(chipTimer); setUi(u => (u.chips ? { ...u, chips: null } : u)); };
     const selectIndex = i => {
@@ -2691,6 +2716,21 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
               color:"#0B131E", fontSize:14, fontWeight:600 }}>Kill</button>
         </div>
       )}
+      {detail === 2 && SPECIES_PROFILE[card.sp] && (() => { const pf = SPECIES_PROFILE[card.sp]; return (
+        <div style={{ marginTop:18, fontSize:12, lineHeight:1.5 }}>
+          <div style={{ fontSize:11, color:COL.silt, letterSpacing:1.2 }}>PROFILE</div>
+          <img src={`assets/species/${pf.key}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; }}
+            style={{ display:"block", width:"100%", maxHeight:220, objectFit:"cover", borderRadius:12, marginTop:8,
+              border:"1px solid rgba(94,115,134,0.3)" }} />
+          <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"5px 12px", marginTop:10 }}>
+            {[["habitat", pf.habitat], ["behaviour", pf.behaviour], ["food", pf.food], ["eaten by", pf.eatenBy],
+              ["size", pf.size], ["lifecycle", pf.lifecycle]].map(([k, v]) => (
+              <React.Fragment key={k}>
+                <span style={{ color:COL.silt, fontSize:10, textTransform:"uppercase", letterSpacing:0.8, paddingTop:2 }}>{k}</span>
+                <span>{v}</span>
+              </React.Fragment>))}
+          </div>
+        </div> ); })()}
       {detail === 2 && (
         <div style={{ marginTop:18, fontSize:12, color:COL.silt, lineHeight:1.5 }}>
           Amber marks your hand: everything you do to the world, as opposed to what
