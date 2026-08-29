@@ -105,3 +105,35 @@ The questions as asked:
 1. Per-species `ctmax` ordering as proposed (Bacillus most tolerant, Venator least) — agree as the first hypothesis?
 2. The global warming press (`tempAmb`) in this block, or deferred?
 3. Generalise the sun card into one "source card" for suns and heat (recommended: less UI, one grammar) — or a separate heat card?
+
+## 10. H.1 measurement record (2026-08-29)
+
+**Harness**: `harness/heat.js --spot [--a 8] | --heater [--a 10] | --press [--amb 6]`, 8 seeds, evolving world, the change applied to an established world at t=3000. Metabolism only — nothing senses or avoids warmth yet (H.2), so these are the pure accounting effects.
+
+### 10.1 Hot sun (+8 on the shipped sun, σ 210) vs untouched control
+
+| | control (8 seeds) | hot sun (8 seeds) |
+|---|---|---|
+| Solara at 18k | 1,587–2,013 | **614–1,059** |
+| Drifta | 260–404 | **809–1,175** |
+| Cilio | 71–112 | 122–169 |
+| Bacillus | 865–1,002 | 942–1,078 |
+| apex lost | 5/8 (t 4,695–6,819) | 8/8 (t 4,689–7,094) |
+| core lost | 0/8 | 0/8 |
+| detritus per warm cell / ambient cell | — / 2.0–2.4 | **8.7–9.7 / 0.01–0.05** |
+| dissolved mineral warm / ambient | — / 0.36–0.55 | 0.60–0.89 / 0.69–0.87 |
+| Drifta CV | 0.25 | 0.19 |
+
+- **H-P1 confirmed**: the mat halves; the plankton doubles. Upkeep (Q10 2.5) outruns photosynthesis (1.6) for the mat, whose budget is tight; the plankton is light-limited rather than upkeep-limited and inherits the mat's mineral.
+- **H-P4 inverted**: detritus *piles up* in the warm core (×4 the ambient stock) — corpse flux from the dying mat rises faster than decomposition (Q10 2.0) can eat it. The literature's "warming drains the labile pool" holds for a steady state; this world's warm core is a mass-mortality event first. Dissolved mineral in the warm core is not depleted (0.6–0.9 vs 0.4–0.5 control).
+- **H-P3 (spot)**: apex lost 8/8 vs 5/8, at similar times — weak at +8 because the control already loses the apex on most seeds; the press is the cleaner test.
+- **H-P2 (rings)** untestable at σ 210 — the warm core covers the whole populated area. The heater run (σ 130, dark) tests it.
+- Drifta CV falls (0.25 → 0.19): a mild Fussmann stabilisation under a *local* hot spot.
+
+### 10.2 Global warming press (ambient +6 from t=3000)
+
+Solara 1,038–1,346 (one seed 401), Drifta 497–668 (one seed 2,330), Cilio 124–163 (one seed 16), **Bacillus 659–795** (one seed 134; control 865–1,002), apex lost **8/8, earlier** (t 4,168–5,488 vs 4,695–6,819 with 3 held), core lost 0/8, **Drifta CV 0.41** (control 0.25). Seed 88 is a near-collapse: the grazer almost gone, the plankton at 2,330.
+
+- **H-P3 confirmed**: the apex goes first and sooner on every seed; the decomposer is the second loser — its upkeep (2.5) rises faster than its feeding (2.0), Rall's mismatch in the decomposer's ledger.
+- **Uniform warming destabilises** (CV 0.41 vs 0.25), the opposite of the local hot spot. Fussmann's stabilisation assumes the consumer's energetic efficiency falls; here the grazer's intake is *not* Q10-scaled while its cost is — the grazer is squeezed, control on the plankton loosens, and the cycle widens. Worth revisiting when the hunting rates get their own Q10 (attack rate E ≈ 0.45 eV is not yet in the model; only pursuit speed and handling are).
+- Prices to revisit before shipping a warming lever: Bacillus's margin; a grazer attack-rate Q10. Not changed now — H.2 (sensing) may redistribute everyone first.
