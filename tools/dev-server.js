@@ -20,8 +20,14 @@ function buildArtifact(){
   return r.status === 0;
 }
 
+function copyAssets(){ // dev/assets is a real copy (not a symlink: Windows checkouts turn symlinks into text files)
+  const from = path.join(ROOT, "assets"), to = path.join(ROOT, "dev", "assets");
+  if (fs.existsSync(from)) fs.cpSync(from, to, { recursive: true, filter: p => !/[\\/]full([\\/]|$)/.test(p) });
+}
+
 (async () => {
   buildArtifact();
+  copyAssets();
 
   let timer = null;
   fs.watch(path.join(ROOT, "src"), { persistent: true }, (_e, file) => {

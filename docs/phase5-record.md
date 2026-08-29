@@ -1,4 +1,8 @@
-# MICROCOSM — Phase 5 Plan: Heredity (Drifta First)
+# MICROCOSM — Phase 5 Record: Heredity
+
+*Originally the Phase 5 plan; the plan is kept as written, and the closure records for 5.0–5.9 follow it. The Yoshida tables in the early sections were produced by a defective estimator and are superseded by the corrected tables near the end (see "Corrected Yoshida tables").*
+
+## The plan as written (v1.0)
 
 v1.0 · 2026-08-28 · Built on genetics-research.md. Decisions recorded: **(1)** Drifta-only first cut, other species later, one at a time with their own before/after runs; **(2)** genotype tint bounded within each species' hue; **(3)** Venator excluded from heredity this phase (drift-dominated at N≈25; stated honestly in-product); **(4)** corridor policy — traits evolve freely inside harness-certified bounds, evolution-driven collapses inside the corridor are documented findings narrated by the Observatory, re-tuning only if the certified 8-seed baseline breaks.
 

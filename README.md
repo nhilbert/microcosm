@@ -201,7 +201,7 @@ periods, a self-test caught it, and the records were re-measured on the
 historical builds and corrected rather than footnoted. Prices are now set by
 measured surfaces (a balanced polymorphism ships), Cilio evolves its pursuit,
 Solara its light adaptation, and the loci carry a curvature term because linear
-trade-offs turned out to be knife-edges. All of it is in `docs/phase5-plan.md`
+trade-offs turned out to be knife-edges. All of it is in `docs/phase5-record.md`
 and `docs/genetics-scaling.md`, numbers included.
 
 ## License

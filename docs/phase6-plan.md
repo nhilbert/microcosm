@@ -13,7 +13,7 @@ Changing a setting changes the world's future PRNG stream (a mutation-rate chang
 | # | Increment | Acceptance |
 |---|---|---|
 | 6.0 ✅ | **Evolution panel** in Intervene mode: mutation on/off (`P.mutation`); per species with a locus: mutation rate σ (0–0.08) and trade-off curvature (−0.4 … +0.6). Event types `mutation` and `locus`; undo; Events-feed labels; impact lines | Settings round-trip through the queue (log entry, undo restores the previous value); conformance with the default settings bit-identical on both fingerprints; the Traits legend reflects the switch |
-| 6.1 ✅ | Price sliders (the effect slopes) per locus, with the measured surfaces from Phase 5 as marked "balance" ticks on the slider | Slider positions correspond to the surfaces in `phase5-plan.md`; the sweep/diversifying detectors still fire correctly at the extremes (headless check) |
+| 6.1 ✅ | Price sliders (the effect slopes) per locus, with the measured surfaces from Phase 5 as marked "balance" ticks on the slider | Slider positions correspond to the surfaces in `phase5-record.md`; the sweep/diversifying detectors still fire correctly at the extremes (headless check) |
 | 6.2 ✅ | Observatory feedback for settings: a `rail` event ("Drifta has reached the limit of its defense — 34% at the corridor edge") and an *Adaptability* vital (mean heritable variation across loci) on the Health page | Rail event fires within 10 samples of ≥ 30% rail occupancy on a pinned world; silent on the balanced default |
 | 6.3 ✅ | Presets: "settled" (curvature 0.3 all), "wild" (linear, σ ×2), "frozen" (mutation off) as one-tap event bundles, logged as one intervention | Each preset is one undoable log entry; conformance unaffected |
 

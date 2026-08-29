@@ -58,16 +58,14 @@ def read(part):
 
 
 def strip_exports(text):
-    """Drop the marker line and the export block it introduces, up to the
-    first line that is a bare closing brace at column 0."""
+    """Drop the marker and everything after it -- the marker's own contract says
+    'everything below is stripped', so the export block must stay the file's tail."""
     if MARKER not in text:
         return text
     head, _, tail = text.partition(MARKER)
-    rest = tail.split("\n")
-    i = 0
-    while i < len(rest) and rest[i].rstrip() != "}":
-        i += 1
-    return head + "\n".join(rest[i + 1:])
+    if "module.exports" not in tail:
+        sys.exit("build.py: nothing to strip after the marker -- has the export block moved?")
+    return head
 
 
 def write(rel, text):

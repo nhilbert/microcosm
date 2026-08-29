@@ -23,3 +23,6 @@ dev/.build/
 
 # full-size species art stays local (10+ MB); the app uses the 640px versions
 assets/species/full/
+
+# dev/assets is copied from assets/ by the dev server (no symlink: Windows)
+dev/assets/
