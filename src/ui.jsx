@@ -32,93 +32,11 @@ export default function Microcosm(){
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
     if (ro) ro.observe(canvas);
 
-    // light layer (world-space, redrawn only when the sun moves — static in this increment)
-    const LB = document.createElement("canvas"); LB.width = 512; LB.height = 512;
-    const lg = LB.getContext("2d");
-    const drawLight = () => {
-      lg.fillStyle = COL.abyss; lg.fillRect(0,0,512,512);
-      const k = 512 / P.WORLD;
-      const gr2 = lg.createRadialGradient(W.sun.x*k, W.sun.y*k, 4, W.sun.x*k, W.sun.y*k, P.sunSigma*2.2*k);
-      gr2.addColorStop(0, "rgba(214,238,255,0.30)");
-      gr2.addColorStop(0.4, "rgba(140,190,225,0.12)");
-      gr2.addColorStop(1, "rgba(140,190,225,0)");
-      lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
-      lg.fillStyle = "rgba(240,250,255,0.9)";
-      lg.beginPath(); lg.arc(W.sun.x*k, W.sun.y*k, 5, 0, 6.283); lg.fill();
-    };
+
+    const S = makeSpriteSet();
+
+    const { LB, MC, MN, CC, LOD_Z, drawLight, updateCarpet } = makeWorldLayers();
     drawLight();
-
-    const sprites = [makeSprite(COL.solara,"nucleus"), makeSprite(COL.drifta,"dot"), makeSprite(COL.cilio,"tri"), makeSprite(COL.bacillus,"square"),
-      makeSprite(COL.mycora,"dot"), makeSprite(COL.necro,"dot"), makeSprite(COL.venator,"tri")];
-    // one sprite per genotype bin for every species that carries a locus (7 bins across [0,1])
-    const TINT_BINS = 7;
-    const tints = TRAITS.map((T, sp) => T.locus && SHAPES[sp] !== "ray"
-      ? Array.from({ length: TINT_BINS }, (_, b) => makeSprite(tintRgb(SPECIES_META[sp].rgb, b/(TINT_BINS-1)), SHAPES[sp]))
-      : null);
-
-    // mat carpet: density field for sessile producers (Splatterplots-style aggregation).
-    // Denser mats render DARKER, saturated green — thick algae absorb light; brightness stays reserved.
-    const MC = document.createElement("canvas"); MC.width = P.GRID; MC.height = P.GRID;
-    const mcx = MC.getContext("2d");
-    const mcImg = mcx.createImageData(P.GRID, P.GRID);
-    // dissolved-mineral layer: faint blue nutrient water, dark where depleted
-    const MN = document.createElement("canvas"); MN.width = P.GRID; MN.height = P.GRID;
-    const mnx = MN.getContext("2d");
-    const mnImg = mnx.createImageData(P.GRID, P.GRID);
-    // corpse aggregation layer (zoomed out, husks merge into a gray pall)
-    const CC = document.createElement("canvas"); CC.width = P.GRID; CC.height = P.GRID;
-    const ccx = CC.getContext("2d");
-    const ccImg = ccx.createImageData(P.GRID, P.GRID);
-    const corpseMass = new Float32Array(P.GRID * P.GRID);
-    // per-cell mean genotype of the mat species, so a heritable Solara trait shows in the carpet itself
-    const cellG = new Float32Array(P.GRID * P.GRID), cellGn = new Uint16Array(P.GRID * P.GRID);
-    const LOD_Z = 0.9; // below this zoom: aggregate corpses, draw bacteria as dots
-    let carpetTick = -1;
-    const updateCarpet = () => {
-      if (W.tick === carpetTick) return; carpetTick = W.tick;
-      const d = mcImg.data, dm = mnImg.data;
-      const matLocus = SPECIES.MAT >= 0 && TRAITS[SPECIES.MAT].locus;
-      if (matLocus){
-        cellG.fill(0); cellGn.fill(0);
-        for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === SPECIES.MAT){ const c = cellOf(i); cellG[c] += W.g[i]; cellGn[c]++; }
-      }
-      for (let c = 0; c < P.GRID*P.GRID; c++){
-        const o = c*4;
-        const m = Math.min(1, W.M[c] / 3.2);
-        dm[o] = 64; dm[o+1] = 138; dm[o+2] = 205;
-        dm[o+3] = Math.round(82 * m);
-        const dens = Math.min(1, W.bB[c] / 200);
-        if (dens <= 0.01){ d[o+3] = 0; continue; }
-        const t = Math.sqrt(dens); // fast rise, then saturate
-        if (matLocus && cellGn[c]){ // sparse [96,205,150] -> dense [34,123,78], both turned by the cell's mean genotype
-          const gm = cellG[c] / cellGn[c];
-          const lo = tintRgb([96,205,150], gm), hi = tintRgb([34,123,78], gm);
-          d[o]   = Math.round(lo[0] + (hi[0]-lo[0])*t);
-          d[o+1] = Math.round(lo[1] + (hi[1]-lo[1])*t);
-          d[o+2] = Math.round(lo[2] + (hi[2]-lo[2])*t);
-        } else {
-          d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
-          d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
-          d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
-        }
-        d[o+3] = Math.round(70 + 150*t);  // alpha: sparse faint -> dense solid
-      }
-      mcx.putImageData(mcImg, 0, 0);
-      mnx.putImageData(mnImg, 0, 0);
-      corpseMass.fill(0);
-      for (let k = 0; k < W.cN; k++){
-        if (!W.cAlive[k]) continue;
-        const cc = (Math.floor(W.cY[k]/(P.WORLD/P.GRID))&(P.GRID-1))*P.GRID + (Math.floor(W.cX[k]/(P.WORLD/P.GRID))&(P.GRID-1));
-        corpseMass[cc] += W.cE[k] + W.cP[k] + W.cM[k];
-      }
-      const dc = ccImg.data;
-      for (let c = 0; c < P.GRID*P.GRID; c++){
-        const o = c*4;
-        dc[o]=158; dc[o+1]=168; dc[o+2]=178;
-        dc[o+3] = Math.min(150, Math.round(corpseMass[c] * 4));
-      }
-      ccx.putImageData(ccImg, 0, 0);
-    };
 
     // selection + follow-cam
     const sel = { i: -1, gen: 0 };
@@ -376,6 +294,7 @@ export default function Microcosm(){
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = COL.abyss; ctx.fillRect(0, 0, vw, vh);
       const z = cam.z, hw = vw/2, hh = vh/2, k = P.WORLD/512;
+      const view = { cam, vw, vh, z, hw, hh, alpha, dpr, LOD_Z };
       // tiled light layer
       const tlx = cam.x - hw/z, tly = cam.y - hh/z;
       for (let ky = Math.floor(tly/P.WORLD); (ky*P.WORLD) < tly + vh/z; ky++)
@@ -392,107 +311,20 @@ export default function Microcosm(){
           if (z < LOD_Z && !hiddenRef.current[7]) ctx.drawImage(CC, dx0, dy0, P.WORLD*z, P.WORLD*z);
         }
       // organisms: saturating "screen" composition instead of unbounded addition
-      ctx.globalCompositeOperation = "screen";
-      const cull = 40;
-      const pops = [0,0,0,0,0,0,0];
-      let mnBound = 0;
-      for (let i=0;i<W.n;i++){
-        if (!W.alive[i]) continue;
-        pops[W.sp[i]]++;
-        mnBound += W.mn[i];
-        if (hiddenRef.current[W.sp[i]]) continue; // hidden from view, still counted
-        const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
-        const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
-        const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
-        if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
-        if (W.cy[i]){ // dormant cyst: dim ember, no glow
-          ctx.globalCompositeOperation = "source-over";
-          ctx.fillStyle = "rgba(120,135,150,0.5)";
-          ctx.beginPath(); ctx.arc(sx, sy, Math.max(1, W.sz[i]*0.5*z), 0, 6.283); ctx.fill();
-          ctx.globalCompositeOperation = "screen";
-          continue;
-        }
-        const spb = W.sp[i];
-        if (SHAPES[spb] === "square" && z < LOD_Z){ // bacteria dot-LOD: batched rects instead of sprite blits
-          ctx.fillStyle = "rgba(196,206,150,0.8)";
-          ctx.fillRect(sx-1.1, sy-1.1, 2.2, 2.2);
-          continue;
-        }
-        const r = W.sz[i] * SPRITE_SCALE[spb] * z;
-        const spr = tints[spb] ? tints[spb][Math.max(0, Math.min(TINT_BINS-1, Math.round(W.g[i]*(TINT_BINS-1))))] : sprites[spb];
-        if (SHAPES[spb] === "tri"){
-          ctx.save(); ctx.translate(sx, sy); ctx.rotate(W.hd[i]);
-          ctx.drawImage(spr, -r, -r, r*2, r*2); ctx.restore();
-        } else if (SHAPES[spb] === "ray"){
-          drawGhostRay(ctx, sx, sy, W.hd[i], r, W.bst[i] > 0, null);
-        } else {
-          ctx.drawImage(spr, sx-r, sy-r, r*2, r*2);
-        }
-      }
-      ctx.globalCompositeOperation = "source-over";
-      // amber pour rings: the hand's touch, fading
-      const nowT = performance.now();
-      for (let q = pours.length-1; q >= 0; q--){
-        const age = (nowT - pours[q].t) / 700;
-        if (age >= 1){ pours.splice(q,1); continue; }
-        ctx.strokeStyle = `rgba(242,178,74,${(0.7*(1-age)).toFixed(3)})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(pours[q].sx, pours[q].sy, 10 + age*34, 0, 6.283); ctx.stroke();
-      }
-      // corpses: pale husks when zoomed in; the aggregate layer covers zoomed-out
-      if (z >= LOD_Z && !hiddenRef.current[7]) for (let k = 0; k < W.cN; k++){
-        if (!W.cAlive[k]) continue;
-        const sx = hw + wd(W.cX[k] - cam.x)*z, sy = hh + wd(W.cY[k] - cam.y)*z;
-        if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
-        const mass = W.cE[k] + W.cP[k] + W.cM[k];
-        const a = Math.min(0.55, 0.12 + 0.05*mass/W.cSz[k]);
-        const r = Math.max(1.5, W.cSz[k]*1.0*z);
-        ctx.fillStyle = `rgba(158,168,178,${a.toFixed(3)})`;
-        ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill();
-        ctx.strokeStyle = `rgba(110,120,130,${(a*0.8).toFixed(3)})`; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.arc(sx, sy, r*0.55, 0, 6.283); ctx.stroke();
-      }
+      const { pops, mnBound } = drawOrganisms(ctx, view, hiddenRef.current, S);
+      drawPours(ctx, pours, performance.now());
+      drawCorpses(ctx, view, hiddenRef.current[7]);
       W.pops = pops;
 
-      // sun affordance while the sun tool is armed
-      if (mode === "intervene"){
-        const ssx = hw + wd(W.sun.x - cam.x)*z, ssy = hh + wd(W.sun.y - cam.y)*z;
-        ctx.strokeStyle = "rgba(242,178,74,0.9)"; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(ssx, ssy, 16, 0, 6.283); ctx.stroke();
-        ctx.strokeStyle = "rgba(242,178,74,0.3)"; ctx.lineWidth = 6;
-        ctx.beginPath(); ctx.arc(ssx, ssy, 22, 0, 6.283); ctx.stroke();
-      }
+      if (mode === "intervene") drawSunAffordance(ctx, view);
       // selection ring (non-additive, drawn above organisms)
       if (selValid()){
-        const si = sel.i;
-        const ix = W.px[si] + wd(W.x[si]-W.px[si])*alpha, iy = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
-        const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
-        const rr = Math.max(14, W.sz[si]*2.6*z);
-        ctx.strokeStyle = "rgba(201,215,227,0.95)"; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(sx, sy, rr, 0, 6.283); ctx.stroke();
-        ctx.strokeStyle = "rgba(201,215,227,0.25)"; ctx.lineWidth = 5;
-        ctx.beginPath(); ctx.arc(sx, sy, rr + 4, 0, 6.283); ctx.stroke();
+        drawSelectionRing(ctx, view, sel.i);
       } else if (sel.i >= 0){ // selected organism died or slot was recycled
         sel.i = -1; follow = false; setUi(u => ({ ...u, card: null }));
       }
 
-      if (loupe){
-        const R = 64, m = 2.5, sr = R/m;
-        const cxL = Math.min(vw - R - 8, Math.max(R + 8, loupe.x));
-        const cyL = Math.max(R + 72, loupe.y - 112);
-        lpx.clearRect(0, 0, LP.width, LP.height);
-        lpx.drawImage(canvas, (loupe.x - sr)*dpr, (loupe.y - sr)*dpr, sr*2*dpr, sr*2*dpr, 0, 0, LP.width, LP.height);
-        ctx.strokeStyle = "rgba(201,215,227,0.25)"; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(loupe.x, loupe.y - 12); ctx.lineTo(cxL, cyL + R); ctx.stroke();
-        ctx.save();
-        ctx.beginPath(); ctx.arc(cxL, cyL, R, 0, 6.283); ctx.clip();
-        ctx.drawImage(LP, cxL - R, cyL - R, R*2, R*2);
-        ctx.restore();
-        ctx.strokeStyle = "rgba(201,215,227,0.8)"; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(cxL, cyL, R, 0, 6.283); ctx.stroke();
-        ctx.fillStyle = "rgba(242,178,74,0.95)";
-        ctx.beginPath(); ctx.arc(cxL, cyL, 2.2, 0, 6.283); ctx.fill();
-      }
+      if (loupe) drawLoupe(ctx, canvas, LP, lpx, view, loupe);
 
       frames++;
       if (now - fpsT > 500){ fps = Math.round(frames*1000/(now-fpsT)); frames = 0; fpsT = now; }
