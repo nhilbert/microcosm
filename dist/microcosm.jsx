@@ -1116,11 +1116,80 @@ function drawGhostRay(ctx, sx, sy, hd, r, striking, trail){
   ctx.restore();
 }
 // ============================================================
+// LAYOUT LAYER — viewport breakpoints, desktop chrome, hover CSS.
+// Browser-specific, like the render layer; never imported by the sim core.
+//
+// The app is mobile-first and stays that way: every desktop affordance here is
+// ADDITIVE. Pointer Events already unify mouse and touch, so nothing below
+// replaces a touch path — it only widens the layout and adds keyboard and hover,
+// which a touch device simply never triggers.
+// ============================================================
+
+const LAYOUT = {
+  wide: 900,      // px viewport width at which the desktop layout takes over
+  panelCard: 372, // right panel width showing a specimen
+  panelData: 460, // right panel width showing the Observatory (charts need room)
+  readable: 1180, // max content width, so charts never smear across an ultrawide
+};
+
+// Viewport observer. `fine` is true for mouse/trackpad, false for touch — used
+// only to decide whether to advertise keyboard shortcuts, never to gate input.
+function useViewport(){
+  const read = () => ({
+    vw: typeof window === "undefined" ? 1024 : window.innerWidth,
+    vh: typeof window === "undefined" ? 768 : window.innerHeight,
+    fine: typeof window !== "undefined" && !!window.matchMedia
+      && window.matchMedia("(hover: hover) and (pointer: fine)").matches,
+  });
+  const [v, setV] = React.useState(read);
+  React.useEffect(() => {
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setV(read()));
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+  return { ...v, desktop: v.vw >= LAYOUT.wide };
+}
+
+// Inline styles win over stylesheets, so hover/focus rules need !important.
+// Keeping them in one place beats scattering onMouseEnter handlers everywhere.
+const UI_CSS = `
+.mc-hit{ transition: background .13s ease, border-color .13s ease, color .13s ease, transform .13s ease; }
+@media (hover: hover) and (pointer: fine){
+  .mc-hit:hover{ background: rgba(201,215,227,0.16) !important; color:#E6F0FA !important; }
+  .mc-hit-amber:hover{ background: rgba(242,178,74,0.24) !important; }
+  .mc-hit-solid:hover{ filter: brightness(1.08); }
+  .mc-fab:hover{ background: rgba(31,48,70,0.95) !important; transform: translateY(-1px); }
+  .mc-tab:hover{ color:#E6F0FA !important; }
+}
+.mc-hit:active{ transform: translateY(1px); }
+.mc-hit:focus-visible, .mc-fab:focus-visible, .mc-tab:focus-visible{
+  outline: 2px solid rgba(242,178,74,0.8); outline-offset: 2px;
+}
+.mc-scroll{ scrollbar-width: thin; scrollbar-color: rgba(94,115,134,0.5) transparent; }
+.mc-scroll::-webkit-scrollbar{ width: 9px; height: 9px; }
+.mc-scroll::-webkit-scrollbar-thumb{ background: rgba(94,115,134,0.45); border-radius: 5px; }
+.mc-scroll::-webkit-scrollbar-thumb:hover{ background: rgba(94,115,134,0.7); }
+.mc-scroll::-webkit-scrollbar-track{ background: transparent; }
+.mc-kbd{ display:inline-block; min-width:15px; padding:1px 5px; border-radius:4px; text-align:center;
+  background:rgba(201,215,227,0.10); border:1px solid rgba(94,115,134,0.38); font-size:10px; }
+`;
+
+function UiStyles(){ return <style dangerouslySetInnerHTML={{ __html: UI_CSS }} />; }
+// ============================================================
 // DATA MODE (4.3/4.4) — the Observatory's screen. Own module by decision.
 // Pages: Populations · Chemistry · Metabolism · Health
 // ============================================================
 const PAGE_TITLES = [
-  ["Populations", "every line a species · amber = your interventions · touch to scrub"],
+  ["Populations", "every line a species · amber = your interventions · drag across to scrub"],
   ["Chemistry", "where every unit of mineral sits · the top edge is the world's total"],
   ["Metabolism", "what the world produces and burns"],
   ["Health", "vitals against species reference ranges, like blood work"],
@@ -1374,7 +1443,7 @@ function HealthPage(){
   );
 }
 
-function DataMode(){
+function DataMode({ docked }){
   const cRef = React.useRef(null);
   const [page, setPage] = React.useState(0);
   const [scrub, setScrub] = React.useState(null);
@@ -1416,18 +1485,21 @@ function DataMode(){
   const at2 = sp => n>0 ? Math.round(W.rec[((W.recHead-n+k+REC.N)%REC.N)*REC.CH + sp]) : 0;
   const ago = n>0 ? Math.round((n-1-k)*REC.STRIDE/10) : 0;
   return (
-    <div style={{ position:"absolute", inset:0, background:"rgba(11,19,30,0.97)",
-      zIndex:4, display:"flex", flexDirection:"column", paddingTop:88,
-      fontFamily:"ui-monospace, Menlo, monospace", color:"#B8C5D1" }}
-      onPointerDown={swDown} onPointerUp={swUp}>
+    <div style={docked
+      ? { position:"relative", flex:1, minHeight:0, display:"flex", flexDirection:"column",
+          paddingTop:12, fontFamily:"ui-monospace, Menlo, monospace", color:"#B8C5D1" }
+      : { position:"absolute", inset:0, background:"rgba(11,19,30,0.97)",
+          zIndex:4, display:"flex", flexDirection:"column", paddingTop:88,
+          fontFamily:"ui-monospace, Menlo, monospace", color:"#B8C5D1" }}
+      onPointerDown={docked ? undefined : swDown} onPointerUp={docked ? undefined : swUp}>
       <div style={{ padding:"0 16px 6px", display:"flex", alignItems:"flex-start" }}>
         <div>
           <div style={{ fontSize:15, fontWeight:600, color:"#E6F0FA" }}>{PAGE_TITLES[page][0]}</div>
           <div style={{ fontSize:11, color:"#5E7386" }}>{PAGE_TITLES[page][1]}</div>
         </div>
         {page === 0 && (
-          <button onClick={() => setLogScale(v => !v)}
-            style={{ marginLeft:"auto", padding:"4px 10px", borderRadius:10, fontSize:11,
+          <button className="mc-hit" onClick={() => setLogScale(v => !v)}
+            style={{ marginLeft:"auto", padding:"4px 10px", borderRadius:10, fontSize:11, cursor:"pointer",
               background:"rgba(20,31,44,0.9)", border:"1px solid rgba(94,115,134,0.4)",
               color:"#B8C5D1", fontFamily:"inherit" }}>{logScale ? "log" : "lin"}</button>
         )}
@@ -1436,7 +1508,8 @@ function DataMode(){
         <canvas ref={cRef} onPointerDown={e => { e.stopPropagation(); swDown(e); onScrub(e); }}
           onPointerMove={e => e.buttons && onScrub(e)}
           onPointerUp={e => { swUp(e); setScrub(null); }}
-          style={{ width:"100%", height:"46%", touchAction:"none" }} />
+          style={{ width:"100%", height: docked ? "38%" : "46%", minHeight:170,
+            touchAction:"none", cursor: page===0 ? "col-resize" : "default" }} />
       )}
       {page === 0 && (
         <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
@@ -1461,13 +1534,28 @@ function DataMode(){
           <span style={{color:"rgba(91,200,232,0.85)"}}>● recycling (own scale)</span>
         </div>
       )}
-      <div style={{ textAlign:"center", color:"#5E7386", fontSize:13, marginTop:"auto", paddingBottom:96,
-        letterSpacing:4 }}>
-        {[0,1,2,3,4].map(i => (
-          <span key={i} onClick={() => setPage(i)}
-            style={{ cursor:"pointer", color: i===page ? "#E6F0FA" : "#42566A" }}>●</span>
-        ))}
-      </div>
+      {docked ? (
+        <div className="mc-scroll" style={{ marginTop:"auto", flexShrink:0, display:"flex", flexWrap:"wrap",
+          gap:4, padding:"10px 12px 14px", borderTop:"1px solid rgba(94,115,134,0.22)" }}>
+          {[0,1,2,3,4].map(i => (
+            <button key={i} className="mc-tab" onClick={() => setPage(i)}
+              style={{ padding:"5px 10px", borderRadius:8, cursor:"pointer", fontFamily:"inherit", fontSize:11.5,
+                border:"1px solid " + (i===page ? "rgba(94,115,134,0.5)" : "transparent"),
+                background: i===page ? "rgba(201,215,227,0.12)" : "transparent",
+                color: i===page ? "#E6F0FA" : "#5E7386" }}>
+              {PAGE_TITLES[i][0]}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ textAlign:"center", color:"#5E7386", fontSize:13, marginTop:"auto", paddingBottom:96,
+          letterSpacing:4 }}>
+          {[0,1,2,3,4].map(i => (
+            <span key={i} onClick={() => setPage(i)}
+              style={{ cursor:"pointer", color: i===page ? "#E6F0FA" : "#42566A" }}>●</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1522,6 +1610,9 @@ export default function Microcosm(){
     };
     resize();
     window.addEventListener("resize", resize);
+    // the side panel opening changes the canvas box without a window resize
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
+    if (ro) ro.observe(canvas);
 
     // light layer (world-space, redrawn only when the sun moves — static in this increment)
     const LB = document.createElement("canvas"); LB.width = 512; LB.height = 512;
@@ -1959,6 +2050,7 @@ export default function Microcosm(){
     };
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); clearTimeout(undoTimer); clearTimeout(chipTimer); window.removeEventListener("resize", resize);
+      if (ro) ro.disconnect();
       canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointercancel", onUp);
       canvas.removeEventListener("wheel", onWheel); };
@@ -1984,12 +2076,55 @@ export default function Microcosm(){
   };
 
   const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
+  const vp = useViewport();
+  const desktop = vp.desktop;
+  // On desktop the world keeps the stage and detail docks beside it, so you can
+  // watch the pond and read the instruments at the same time — the whole point
+  // of an observatory. On mobile nothing changes: sheet over world, as before.
+  const panelKind = !desktop ? null : uiMode === "data" ? "data" : ui.card ? "card" : null;
+  const panelW = panelKind === "data" ? LAYOUT.panelData
+               : panelKind === "card" ? LAYOUT.panelCard : 0;
+
+  // Keyboard: desktop affordance only. Touch never fires these, and every action
+  // remains reachable by pointer, so this adds reach without removing any.
+  React.useEffect(() => {
+    const onKey = e => {
+      const el = e.target;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const setSpeed = v => { speedRef.current = v; setUi(u => ({ ...u, speed: v })); };
+      const k = e.key;
+      if (k === " "){ e.preventDefault(); setSpeed(speedRef.current === 0 ? 1 : 0); }
+      else if (k === "1") setSpeed(1);
+      else if (k === "2") setSpeed(4);
+      else if (k === "3") setSpeed(16);
+      else if (k === "." ){ setSpeed(0); actionsRef.current.stepOnce && actionsRef.current.stepOnce(); }
+      else if (k === "o" || k === "O"){ setUiMode("observe"); actionsRef.current.setMode && actionsRef.current.setMode("observe"); }
+      else if (k === "i" || k === "I"){ setUiMode("intervene"); actionsRef.current.setMode && actionsRef.current.setMode("intervene"); }
+      else if (k === "d" || k === "D"){ setUiMode(m => { const n = m === "data" ? "observe" : "data"; actionsRef.current.setMode && actionsRef.current.setMode(n); return n; }); }
+      else if (k === "z" || k === "Z"){ actionsRef.current.undo && actionsRef.current.undo(); }
+      else if (k === "Escape"){
+        setUi(u => u.spawnPick ? { ...u, spawnPick: null } : { ...u, card: null });
+        setUiMode(m => { if (m === "data"){ actionsRef.current.setMode && actionsRef.current.setMode("observe"); return "observe"; } return m; });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div onContextMenu={e => e.preventDefault()}
       style={{ position:"fixed", inset:0, background:COL.abyss, overflow:"hidden",
       fontFamily:"system-ui, -apple-system, sans-serif", userSelect:"none", WebkitUserSelect:"none",
       WebkitTouchCallout:"none" }}>
-      <canvas ref={canvasRef} style={{ width:"100%", height:"100%", display:"block", touchAction:"none" }} />
+      <UiStyles />
+      {/* stage: the world and everything overlaid on it. Insetting this by the
+          panel width is what keeps every absolutely-placed control correct — no
+          per-element offset maths anywhere below. */}
+      <div style={{ position:"absolute", top:0, left:0, bottom:0, right:panelW,
+        transition:"right 0.2s ease" }}>
+      <canvas ref={canvasRef} style={{ width:"100%", height:"100%", display:"block",
+        touchAction:"none", cursor: uiMode === "intervene" ? "crosshair" : "grab" }} />
       {/* passive status strip */}
       <div style={{ position:"absolute", top:0, left:0, right:0, padding:"calc(env(safe-area-inset-top, 0px) + 10px) 14px 8px",
         display:"flex", justifyContent:"space-between", alignItems:"baseline", pointerEvents:"none", paddingRight:18,
@@ -2027,7 +2162,7 @@ export default function Microcosm(){
       )}
       {/* mode switch + tool hint */}
       <div style={{ position:"absolute", left:16, zIndex:6,
-        bottom: ui.card ? 194 : "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+        bottom: (ui.card && !desktop) ? 194 : "calc(env(safe-area-inset-bottom, 0px) + 20px)",
         transition:"bottom 0.25s",
         display:"flex", flexDirection:"column", gap:8, alignItems:"flex-start" }}>
 
@@ -2049,8 +2184,8 @@ export default function Microcosm(){
           ))}
         </div>
       </div>
-      {uiMode === "data" && <DataMode />}
-      <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()} card={!!ui.card} />
+      {uiMode === "data" && !desktop && <DataMode />}
+      <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()} card={!!ui.card && !desktop} />
       {/* sun-intensity press lever (intervene mode) */}
       {uiMode === "intervene" && (
         <div style={{ position:"absolute", top:64, left:"50%", transform:"translateX(-50%)",
@@ -2077,7 +2212,7 @@ export default function Microcosm(){
       )}
       {ui.spawnPick && (
         <div style={{ position:"absolute", zIndex:7,
-          left: Math.min(Math.max(8, ui.spawnPick.sx - 130), (typeof window!=="undefined"?window.innerWidth:400) - 268),
+          left: Math.min(Math.max(8, ui.spawnPick.sx - 130), Math.max(8, vp.vw - panelW - 268)),
           top: Math.max(96, ui.spawnPick.sy - 76),
           display:"flex", gap:6, padding:8, borderRadius:14,
           background:"rgba(11,19,30,0.94)", border:"1px solid rgba(242,178,74,0.45)" }}>
@@ -2117,7 +2252,7 @@ export default function Microcosm(){
       {undoChip && (
         <button onClick={() => actionsRef.current.undo && actionsRef.current.undo()}
           style={{ position:"absolute", left:"50%", transform:"translateX(-50%)",
-            bottom: ui.card ? (detent===0 ? 194 : detent===1 ? "48vh" : "82vh")
+            bottom: (ui.card && !desktop) ? (detent===0 ? 194 : detent===1 ? "48vh" : "82vh")
                             : "calc(env(safe-area-inset-bottom, 0px) + 88px)",
             padding:"10px 18px", borderRadius:20, cursor:"pointer",
             border:"1px solid rgba(242,178,74,0.7)", background:"rgba(21,34,51,0.95)",
@@ -2126,8 +2261,8 @@ export default function Microcosm(){
           {undoChip}
         </button>
       )}
-      {/* specimen card */}
-      {ui.card && (
+      {/* specimen card — bottom sheet on mobile, docked panel on desktop */}
+      {ui.card && !desktop && (
         <div style={{ position:"absolute", left:0, right:0, bottom:0,
           height: detent===0 ? 178 : detent===1 ? "46vh" : "80vh",
           background:"rgba(21,34,51,0.92)", backdropFilter:"blur(10px)",
@@ -2145,84 +2280,144 @@ export default function Microcosm(){
             style={{ padding:"16px 0 14px", cursor:"grab", touchAction:"none", flexShrink:0 }}>
             <div style={{ width:40, height:4, borderRadius:2, background:"rgba(94,115,134,0.7)", margin:"0 auto" }} />
           </div>
-          <div style={{ padding:"0 18px calc(env(safe-area-inset-bottom, 0px) + 14px)", overflowY: detent===2 ? "auto" : "hidden", flex:1 }}>
-            <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
-              <span style={{ width:10, height:10, borderRadius:5, flexShrink:0, alignSelf:"center",
-                background:`rgb(${ui.card.rgb[0]},${ui.card.rgb[1]},${ui.card.rgb[2]})`,
-                boxShadow:`0 0 8px rgb(${ui.card.rgb[0]},${ui.card.rgb[1]},${ui.card.rgb[2]})` }} />
-              <span style={{ fontSize:17, fontWeight:600 }}>{ui.card.name}</span>
-              <span style={{ fontSize:12, color:COL.silt }}>{ui.card.role}</span>
-              <span style={{ marginLeft:"auto", fontSize:11, color:COL.silt,
-                fontFamily:"ui-monospace, Menlo, monospace" }}>#{ui.card.id}</span>
-            </div>
-            <div style={{ display:"flex", gap:16, marginTop:8, fontSize:13, alignItems:"center" }}>
-              <span>{ui.card.state}</span>
-              <span style={{ color:COL.silt }}>age {Math.floor(ui.card.age/60)}:{String(ui.card.age%60).padStart(2,"0")}</span>
-              <span style={{ marginLeft:"auto", fontSize:11, fontWeight:600, padding:"3px 9px", borderRadius:9,
-                background: ui.card.badge==="Ready to divide" ? "rgba(70,214,140,0.15)" : "rgba(94,115,134,0.22)",
-                color: ui.card.badge==="Ready to divide" ? "rgb(70,214,140)" : COL.plankTxt }}>
-                {ui.card.badge}</span>
-            </div>
-            <div style={{ marginTop:10, display:"grid", gap:5 }}>
-              {[["E", ui.card.en, ui.card.cap, `rgb(${ui.card.rgb[0]},${ui.card.rgb[1]},${ui.card.rgb[2]})`],
-                ["P", ui.card.pr, ui.card.pQ, "rgb(226,170,150)"],
-                ["M", ui.card.mn, ui.card.mQ, "rgb(91,200,232)"]].map(([lb, v, mx, col]) => (
-                <div key={lb} style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <span style={{ fontSize:10, color:COL.silt, width:10,
-                    fontFamily:"ui-monospace, Menlo, monospace" }}>{lb}</span>
-                  <div style={{ flex:1, height:4, borderRadius:2, background:"rgba(11,19,30,0.8)" }}>
-                    <div style={{ height:4, borderRadius:2,
-                      width:`${Math.min(100, Math.round(100*v/Math.max(0.001, mx)))}%`,
-                      background:col, transition:"width 0.4s" }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            {detent >= 1 && (
-              <div style={{ marginTop:16, fontSize:13, display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px 16px" }}>
-                <div><div style={{fontSize:11,color:COL.silt}}>SIZE</div>{ui.card.size.toFixed(1)}</div>
-                <div><div style={{fontSize:11,color:COL.silt}}>ENERGY</div>{ui.card.en.toFixed(1)} / {ui.card.cap.toFixed(0)}</div>
-                <div><div style={{fontSize:11,color:COL.silt}}>PROTEIN</div>{ui.card.pr.toFixed(1)} / {ui.card.pQ.toFixed(1)}</div>
-                <div><div style={{fontSize:11,color:COL.silt}}>MINERAL</div>{ui.card.mn.toFixed(2)} / {ui.card.mQ.toFixed(2)}</div>
-                <div><div style={{fontSize:11,color:COL.silt}}>DIVISION GATE</div>{Math.round(100*ui.card.bind)}%</div>
-                <div><div style={{fontSize:11,color:COL.silt}}>SIM TIME / TICK</div>{ui.tick}</div>
-              </div>
-            )}
-            {detent >= 1 && (
-              <div style={{ display:"flex", gap:10, marginTop:18 }}>
-                <button onClick={() => actionsRef.current.feed && actionsRef.current.feed()}
-                  style={{ flex:1, height:44, borderRadius:10, cursor:"pointer",
-                    border:"1px solid rgba(242,178,74,0.6)", background:"rgba(242,178,74,0.12)",
-                    color:"#F2B24A", fontSize:14, fontWeight:600 }}>Feed</button>
-                <button onClick={() => actionsRef.current.kill && actionsRef.current.kill()}
-                  style={{ flex:1, height:44, borderRadius:10, cursor:"pointer",
-                    border:"1px solid rgba(242,178,74,0.9)", background:"rgba(242,178,74,0.85)",
-                    color:"#0B131E", fontSize:14, fontWeight:600 }}>Kill</button>
-              </div>
-            )}
-            {detent === 2 && (
-              <div style={{ marginTop:18, fontSize:12, color:COL.silt, lineHeight:1.5 }}>
-                Genome detail, subsystem health, and lineage arrive with the chemistry and
-                reliability engines in Phases 2–4. Amber marks your hand: everything you
-                do to the world, as opposed to what nature does, is shown in this color.
-              </div>
-            )}
+          <div className="mc-scroll" style={{ padding:"0 18px calc(env(safe-area-inset-bottom, 0px) + 14px)",
+            overflowY: detent===2 ? "auto" : "hidden", flex:1 }}>
+            <SpecimenBody card={ui.card} tick={ui.tick} detail={detent}
+              onFeed={() => actionsRef.current.feed && actionsRef.current.feed()}
+              onKill={() => actionsRef.current.kill && actionsRef.current.kill()} />
           </div>
         </div>
       )}
-      {/* speed FAB (pause/play only in this increment) */}
-      {(!ui.card || detent === 0) && (
-      <button onPointerDown={fabDown} onPointerUp={fabUp} onPointerCancel={fabUp}
+      {/* speed control */}
+      {(!ui.card || detent === 0 || desktop) && (
+      <button className="mc-fab" onPointerDown={fabDown} onPointerUp={fabUp} onPointerCancel={fabUp}
+        title={vp.fine ? "Space play/pause · 1 2 3 speed · . step" : undefined}
         aria-label={ui.speed === 0 ? "Play (long-press: step one tick)" : `Speed ${ui.speed}x (long-press: step one tick)`}
-        style={{ position:"absolute", right:16, zIndex:6, bottom: ui.card ? 194 : "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+        style={{ position:"absolute", right:16, zIndex:6,
+        bottom: (ui.card && !desktop) ? 194 : "calc(env(safe-area-inset-bottom, 0px) + 20px)",
         width:52, height:52, borderRadius:26, border:"1px solid rgba(201,215,227,0.25)",
         background:"rgba(21,34,51,0.85)", color:COL.plankTxt, fontSize:18, cursor:"pointer",
         backdropFilter:"blur(6px)" }}>
         <span style={{ fontFamily:"ui-monospace, Menlo, monospace", fontSize: ui.speed===0?18:15 }}>
-          {ui.speed === 0 ? "▶" : `${ui.speed}×`}
+          {ui.speed === 0 ? "\u25B6" : `${ui.speed}\u00D7`}
         </span>
       </button>
       )}
+      {/* keyboard legend: only where a keyboard exists, and only with room for it
+          between the mode switch and the speed control */}
+      {desktop && vp.fine && (vp.vw - panelW) > 1020 && (
+        <div style={{ position:"absolute", left:"50%", transform:"translateX(-50%)",
+          bottom:"calc(env(safe-area-inset-bottom, 0px) + 26px)", pointerEvents:"none",
+          display:"flex", gap:10, alignItems:"center",
+          padding:"7px 12px", borderRadius:12,
+          background:"rgba(21,34,51,0.72)", border:"1px solid rgba(94,115,134,0.22)",
+          backdropFilter:"blur(6px)",
+          color:COL.silt, fontSize:10.5, fontFamily:mono, whiteSpace:"nowrap" }}>
+          <span><span className="mc-kbd">space</span> play</span>
+          <span><span className="mc-kbd">1</span><span className="mc-kbd">2</span><span className="mc-kbd">3</span> speed</span>
+          <span><span className="mc-kbd">.</span> step</span>
+          <span><span className="mc-kbd">o</span><span className="mc-kbd">i</span><span className="mc-kbd">d</span> mode</span>
+          <span><span className="mc-kbd">z</span> undo</span>
+        </div>
+      )}
+      </div>{/* /stage */}
+
+      {/* desktop dock: instruments beside the world instead of on top of it */}
+      {desktop && panelKind && (
+        <aside style={{ position:"absolute", top:0, right:0, bottom:0, width:panelW,
+          background:"rgba(16,26,40,0.97)", borderLeft:"1px solid rgba(94,115,134,0.32)",
+          color:COL.plankTxt, display:"flex", flexDirection:"column", overflow:"hidden", zIndex:8 }}>
+          {panelKind === "card" ? (
+            <>
+              <div style={{ display:"flex", alignItems:"center", padding:"14px 16px 10px", flexShrink:0 }}>
+                <span style={{ fontSize:11, letterSpacing:1.4, color:COL.silt, fontFamily:mono }}>SPECIMEN</span>
+                <button className="mc-hit" onClick={() => setUi(u => ({ ...u, card: null }))}
+                  title="Close (Esc)"
+                  style={{ marginLeft:"auto", width:28, height:28, borderRadius:8, cursor:"pointer",
+                    border:"1px solid rgba(94,115,134,0.3)", background:"transparent",
+                    color:COL.silt, fontSize:13, lineHeight:1 }}>\u2715</button>
+              </div>
+              <div className="mc-scroll" style={{ padding:"0 16px 18px", overflowY:"auto", flex:1 }}>
+                <SpecimenBody card={ui.card} tick={ui.tick} detail={2}
+                  onFeed={() => actionsRef.current.feed && actionsRef.current.feed()}
+                  onKill={() => actionsRef.current.kill && actionsRef.current.kill()} />
+              </div>
+            </>
+          ) : (
+            <DataMode docked />
+          )}
+        </aside>
+      )}
     </div>
+  );
+}
+
+// Specimen detail. One implementation for both layouts: the mobile sheet passes
+// its detent, the desktop dock passes 2 (everything visible, nothing to drag).
+function SpecimenBody({ card, tick, detail, onFeed, onKill }){
+  const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
+  if (!card) return null;
+  return (
+    <>
+      <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
+        <span style={{ width:10, height:10, borderRadius:5, flexShrink:0, alignSelf:"center",
+          background:`rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})`,
+          boxShadow:`0 0 8px rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})` }} />
+        <span style={{ fontSize:17, fontWeight:600 }}>{card.name}</span>
+        <span style={{ fontSize:12, color:COL.silt }}>{card.role}</span>
+        <span style={{ marginLeft:"auto", fontSize:11, color:COL.silt, fontFamily:mono }}>#{card.id}</span>
+      </div>
+      <div style={{ display:"flex", gap:16, marginTop:8, fontSize:13, alignItems:"center", flexWrap:"wrap" }}>
+        <span>{card.state}</span>
+        <span style={{ color:COL.silt }}>age {Math.floor(card.age/60)}:{String(card.age%60).padStart(2,"0")}</span>
+        <span style={{ marginLeft:"auto", fontSize:11, fontWeight:600, padding:"3px 9px", borderRadius:9,
+          background: card.badge==="Ready to divide" ? "rgba(70,214,140,0.15)" : "rgba(94,115,134,0.22)",
+          color: card.badge==="Ready to divide" ? "rgb(70,214,140)" : COL.plankTxt }}>
+          {card.badge}</span>
+      </div>
+      <div style={{ marginTop:10, display:"grid", gap:5 }}>
+        {[["E", card.en, card.cap, `rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})`],
+          ["P", card.pr, card.pQ, "rgb(226,170,150)"],
+          ["M", card.mn, card.mQ, "rgb(91,200,232)"]].map(([lb, v, mx, col]) => (
+          <div key={lb} style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontSize:10, color:COL.silt, width:10, fontFamily:mono }}>{lb}</span>
+            <div style={{ flex:1, height:4, borderRadius:2, background:"rgba(11,19,30,0.8)" }}>
+              <div style={{ height:4, borderRadius:2,
+                width:`${Math.min(100, Math.round(100*v/Math.max(0.001, mx)))}%`,
+                background:col, transition:"width 0.4s" }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {detail >= 1 && (
+        <div style={{ marginTop:16, fontSize:13, display:"grid",
+          gridTemplateColumns:"repeat(auto-fit, minmax(128px, 1fr))", gap:"10px 16px" }}>
+          <div><div style={{fontSize:11,color:COL.silt}}>SIZE</div>{card.size.toFixed(1)}</div>
+          <div><div style={{fontSize:11,color:COL.silt}}>ENERGY</div>{card.en.toFixed(1)} / {card.cap.toFixed(0)}</div>
+          <div><div style={{fontSize:11,color:COL.silt}}>PROTEIN</div>{card.pr.toFixed(1)} / {card.pQ.toFixed(1)}</div>
+          <div><div style={{fontSize:11,color:COL.silt}}>MINERAL</div>{card.mn.toFixed(2)} / {card.mQ.toFixed(2)}</div>
+          <div><div style={{fontSize:11,color:COL.silt}}>DIVISION GATE</div>{Math.round(100*card.bind)}%</div>
+          <div><div style={{fontSize:11,color:COL.silt}}>SIM TIME / TICK</div>{tick}</div>
+        </div>
+      )}
+      {detail >= 1 && (
+        <div style={{ display:"flex", gap:10, marginTop:18 }}>
+          <button className="mc-hit mc-hit-amber" onClick={onFeed}
+            style={{ flex:1, height:44, borderRadius:10, cursor:"pointer",
+              border:"1px solid rgba(242,178,74,0.6)", background:"rgba(242,178,74,0.12)",
+              color:"#F2B24A", fontSize:14, fontWeight:600 }}>Feed</button>
+          <button className="mc-hit-solid" onClick={onKill}
+            style={{ flex:1, height:44, borderRadius:10, cursor:"pointer",
+              border:"1px solid rgba(242,178,74,0.9)", background:"rgba(242,178,74,0.85)",
+              color:"#0B131E", fontSize:14, fontWeight:600 }}>Kill</button>
+        </div>
+      )}
+      {detail === 2 && (
+        <div style={{ marginTop:18, fontSize:12, color:COL.silt, lineHeight:1.5 }}>
+          Amber marks your hand: everything you do to the world, as opposed to what
+          nature does, is shown in this color.
+        </div>
+      )}
+    </>
   );
 }

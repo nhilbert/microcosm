@@ -12,6 +12,7 @@ PARTS = [
     "src/header.jsx",     # React import + banner
     "src/core.js",        # PORTABILITY BOUNDARY: sim + observatory analytics
     "src/ui-render.js",   # canvas draw helpers
+    "src/ui-layout.js",   # viewport breakpoints, desktop chrome, hover CSS
     "src/ui-data.jsx",    # Data mode (the Observatory's screen)
     "src/ui-reset.jsx",   # reset control
     "src/ui.jsx",         # the Microcosm component

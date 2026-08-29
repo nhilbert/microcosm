@@ -3,7 +3,7 @@
 // Pages: Populations · Chemistry · Metabolism · Health
 // ============================================================
 const PAGE_TITLES = [
-  ["Populations", "every line a species · amber = your interventions · touch to scrub"],
+  ["Populations", "every line a species · amber = your interventions · drag across to scrub"],
   ["Chemistry", "where every unit of mineral sits · the top edge is the world's total"],
   ["Metabolism", "what the world produces and burns"],
   ["Health", "vitals against species reference ranges, like blood work"],
@@ -257,7 +257,7 @@ function HealthPage(){
   );
 }
 
-function DataMode(){
+function DataMode({ docked }){
   const cRef = React.useRef(null);
   const [page, setPage] = React.useState(0);
   const [scrub, setScrub] = React.useState(null);
@@ -299,18 +299,21 @@ function DataMode(){
   const at2 = sp => n>0 ? Math.round(W.rec[((W.recHead-n+k+REC.N)%REC.N)*REC.CH + sp]) : 0;
   const ago = n>0 ? Math.round((n-1-k)*REC.STRIDE/10) : 0;
   return (
-    <div style={{ position:"absolute", inset:0, background:"rgba(11,19,30,0.97)",
-      zIndex:4, display:"flex", flexDirection:"column", paddingTop:88,
-      fontFamily:"ui-monospace, Menlo, monospace", color:"#B8C5D1" }}
-      onPointerDown={swDown} onPointerUp={swUp}>
+    <div style={docked
+      ? { position:"relative", flex:1, minHeight:0, display:"flex", flexDirection:"column",
+          paddingTop:12, fontFamily:"ui-monospace, Menlo, monospace", color:"#B8C5D1" }
+      : { position:"absolute", inset:0, background:"rgba(11,19,30,0.97)",
+          zIndex:4, display:"flex", flexDirection:"column", paddingTop:88,
+          fontFamily:"ui-monospace, Menlo, monospace", color:"#B8C5D1" }}
+      onPointerDown={docked ? undefined : swDown} onPointerUp={docked ? undefined : swUp}>
       <div style={{ padding:"0 16px 6px", display:"flex", alignItems:"flex-start" }}>
         <div>
           <div style={{ fontSize:15, fontWeight:600, color:"#E6F0FA" }}>{PAGE_TITLES[page][0]}</div>
           <div style={{ fontSize:11, color:"#5E7386" }}>{PAGE_TITLES[page][1]}</div>
         </div>
         {page === 0 && (
-          <button onClick={() => setLogScale(v => !v)}
-            style={{ marginLeft:"auto", padding:"4px 10px", borderRadius:10, fontSize:11,
+          <button className="mc-hit" onClick={() => setLogScale(v => !v)}
+            style={{ marginLeft:"auto", padding:"4px 10px", borderRadius:10, fontSize:11, cursor:"pointer",
               background:"rgba(20,31,44,0.9)", border:"1px solid rgba(94,115,134,0.4)",
               color:"#B8C5D1", fontFamily:"inherit" }}>{logScale ? "log" : "lin"}</button>
         )}
@@ -319,7 +322,8 @@ function DataMode(){
         <canvas ref={cRef} onPointerDown={e => { e.stopPropagation(); swDown(e); onScrub(e); }}
           onPointerMove={e => e.buttons && onScrub(e)}
           onPointerUp={e => { swUp(e); setScrub(null); }}
-          style={{ width:"100%", height:"46%", touchAction:"none" }} />
+          style={{ width:"100%", height: docked ? "38%" : "46%", minHeight:170,
+            touchAction:"none", cursor: page===0 ? "col-resize" : "default" }} />
       )}
       {page === 0 && (
         <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
@@ -344,13 +348,28 @@ function DataMode(){
           <span style={{color:"rgba(91,200,232,0.85)"}}>● recycling (own scale)</span>
         </div>
       )}
-      <div style={{ textAlign:"center", color:"#5E7386", fontSize:13, marginTop:"auto", paddingBottom:96,
-        letterSpacing:4 }}>
-        {[0,1,2,3,4].map(i => (
-          <span key={i} onClick={() => setPage(i)}
-            style={{ cursor:"pointer", color: i===page ? "#E6F0FA" : "#42566A" }}>●</span>
-        ))}
-      </div>
+      {docked ? (
+        <div className="mc-scroll" style={{ marginTop:"auto", flexShrink:0, display:"flex", flexWrap:"wrap",
+          gap:4, padding:"10px 12px 14px", borderTop:"1px solid rgba(94,115,134,0.22)" }}>
+          {[0,1,2,3,4].map(i => (
+            <button key={i} className="mc-tab" onClick={() => setPage(i)}
+              style={{ padding:"5px 10px", borderRadius:8, cursor:"pointer", fontFamily:"inherit", fontSize:11.5,
+                border:"1px solid " + (i===page ? "rgba(94,115,134,0.5)" : "transparent"),
+                background: i===page ? "rgba(201,215,227,0.12)" : "transparent",
+                color: i===page ? "#E6F0FA" : "#5E7386" }}>
+              {PAGE_TITLES[i][0]}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ textAlign:"center", color:"#5E7386", fontSize:13, marginTop:"auto", paddingBottom:96,
+          letterSpacing:4 }}>
+          {[0,1,2,3,4].map(i => (
+            <span key={i} onClick={() => setPage(i)}
+              style={{ cursor:"pointer", color: i===page ? "#E6F0FA" : "#42566A" }}>●</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
