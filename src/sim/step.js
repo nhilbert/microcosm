@@ -47,7 +47,8 @@ function step(){
     if(T.cyst && W.gr[i]<=0 && W.en[i]<T.cyst.enter*cap){
       W.cy[i]=1; W.vx[i]=0; W.vy[i]=0; continue;
     }
-    let cost = T.kb*(T.locus ? 1 + T.locus.kbSlope*(W.g[i]-T.locus.g0) : 1)*Math.pow(W.sz[i],0.75);
+    const gd = T.locus ? W.g[i]-T.locus.g0 : 0, gq = T.locus ? T.locus.curve*gd*gd : 0; // locus deviation and its curvature penalty (exactly 0 at g0)
+    let cost = T.kb*(T.locus ? 1 + T.locus.kbSlope*gd - gq : 1)*Math.pow(W.sz[i],0.75);
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -58,7 +59,7 @@ function step(){
       }
       const sat = Math.min(1, W.mn[i]/mQ); // Liebig: mineral-starved cells photosynthesize weakly
       const Lc = cellLight(i);
-      const kpG = T.locus ? (1 + T.locus.kpSlope*(T.locus.g0 - W.g[i])) * (1 + T.locus.lightSlope*(W.g[i] - T.locus.g0)*(1 - 2*Lc)) : 1;
+      const kpG = T.locus ? (1 + T.locus.kpSlope*(-gd) - gq) * (1 + T.locus.lightSlope*gd*(1 - 2*Lc) - gq) : 1;
       const gppGain = T.kp*kpG*Lc*W.sz[i]*sat;
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
@@ -131,8 +132,9 @@ function step(){
         speed=T.speed*(torpid?0.75:1);
         if(best<W.sz[i]+6 && target>=0){
           const TJ = TRAITS[W.sp[target]];
-          const escP = TJ.escape ? (TJ.locus ? TJ.escape.p + TJ.locus.escSlope*(W.g[target]-TJ.locus.g0) : TJ.escape.p)
-                                   * (T.locus ? 1 + T.locus.catchSlope*(T.locus.g0-W.g[i]) : 1) : 0;
+          const tgd = TJ.locus ? W.g[target]-TJ.locus.g0 : 0;
+          const escP = TJ.escape ? (TJ.locus ? TJ.escape.p + TJ.locus.escSlope*tgd - TJ.escape.p*TJ.locus.curve*tgd*tgd : TJ.escape.p)
+                                   * (T.locus ? 1 + T.locus.catchSlope*(-gd) - gq : 1) : 0;
           if(TJ.escape && R()<escP){ // escape jink: prey darts away, contact broken
             const ja=R()*6.283;
             W.x[target]=wrap(W.x[target]+Math.cos(ja)*TJ.escape.kick);

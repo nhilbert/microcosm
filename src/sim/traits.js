@@ -32,7 +32,11 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //   kbSlope    basal cost kb * (1 + kbSlope*(g-g0))     (the price of keenness)
 //   lightSlope photosynthesis x (1 + lightSlope*(g-g0)*(1-2L)), L = cell light: shade-adapted (g>g0)
 //              gains in the dark and loses in the sun -- priced by the light field itself
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0 };
+//   curve      diminishing returns: EVERY expressed effect of the locus is reduced by curve*(g-g0)^2.
+//              A linear trade-off is a knife-edge (the population sweeps to whichever rail has the
+//              larger marginal value); concavity gives an interior optimum whose position the
+//              ecology sets. See docs/genetics-scaling.md. 0 = the original linear form.
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, curve: 0 };
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
