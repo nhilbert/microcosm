@@ -19,7 +19,9 @@
     "yoshida": "npm run build && node harness/yoshida.js",
     "corridor": "npm run build && node harness/corridor.js",
     "gate5": "npm run build && node harness/gate5.js",
-    "test": "npm run build && npm run syntax && node harness/conform.js",
+    "selftest": "node harness/selftest.js",
+    "yoshida:capture": "npm run build && node harness/yoshida.js --capture",
+    "test": "npm run build && npm run syntax && node harness/selftest.js && node harness/conform.js",
     "test:full": "npm run test && npm run tune && npm run gate"
   },
   "devDependencies": {

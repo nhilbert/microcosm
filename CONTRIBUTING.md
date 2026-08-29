@@ -80,9 +80,23 @@ request is not complete while `conform.js` prints a NOTE.
 ## The longer checks
 
 ```bash
-npm run tune      # 8 seeds x 18,000 ticks; ecology acceptance (~90 s)
+npm run tune      # 8 seeds x 18,000 ticks; ecology acceptance (~3 min)
 npm run gate      # the K6 experiment: can the Observatory narrate a collapse?
+npm run corridor  # every locus pinned at both rails, all combinations, 8 seeds
+npm run yoshida   # the controlled evolution experiment (npm run yoshida:capture after a declared change)
+npm run gate5     # the Phase 5 gate: does the Observatory narrate the evolution?
 ```
+
+All of them build on `harness/lib.js`; add new measurements there rather than
+copying loops between scripts, and give any new estimator a case in
+`harness/selftest.js` — that file runs inside `npm test`.
+
+**Heredity changes.** A locus expression may only scale a rate or a probability,
+never a stock, and must reduce to exactly the bare trait at `g0` (that identity is
+what keeps the silent genome bit-identical). After any change to a locus:
+`npm run conform` must show the *silent* fingerprints identical and only the
+*evolving* ones changed; recapture both `conform` and `yoshida` baselines with the
+declared reason; then `tune`, `corridor` and `gate5`.
 
 Both are known to fail on the current tree — see **Status** in the README for
 the measured numbers and why. If you are working on ecology, they are the

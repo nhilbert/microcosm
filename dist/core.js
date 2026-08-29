@@ -75,7 +75,9 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //   escSlope   prey escape.p  + escSlope*(g-g0)         kpSlope   kp * (1 + kpSlope*(g0-g))
 //   catchSlope prey's escape chance against THIS hunter x (1 + catchSlope*(g0-g))
 //   kbSlope    basal cost kb * (1 + kbSlope*(g-g0))     (the price of keenness)
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0 };
+//   lightSlope photosynthesis x (1 + lightSlope*(g-g0)*(1-2L)), L = cell light: shade-adapted (g>g0)
+//              gains in the dark and loses in the sun -- priced by the light field itself
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0 };
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
@@ -92,6 +94,12 @@ const TRAITS = normalizeTraits([
     hazard: 0.0012, grazeFloor: 35, pursuitPenalty: 1.8,
     reproFrac: 0.70, spread: 70, settleLimited: true, settleLimit: 90,
     reproCooldown: 0, matureCd: 0, diet: 0, cyst: null, escape: null,
+    // Phase 5.8 heredity: light adaptation, the sessile producer's classic trade-off.
+    // Shade-tolerant mats photosynthesize better in dim light and worse in bright; the sun
+    // lever (drag, intensity press) therefore sets a selection pressure the mat answers.
+    locus: { g0: 0.5, sigma: 0.03, lightSlope: 0.5,
+             label: "Light", hiWord: "shade-tolerant", loWord: "sun-loving",
+             hiTrait: "shade tolerance", loTrait: "sun tolerance" },
   },
   { // 1 — Drifta: drifting planktonic producer
     name: "Drifta", bodyTag: TAG.DRIFTA, layer: "plankton",
@@ -488,6 +496,12 @@ function pushEvent(type, sp, text){
   if (W.sysEvents.length > 200) W.sysEvents.shift();
 }
 function detect(r, awake){
+  detectEcology(r, awake);
+  detectHeredity(r);
+  detectChemistry(r);
+}
+// ---- ecology: establishment, wake, extinction, blooms and crashes per species ----
+function detectEcology(r, awake){
   const B = W.rec, N = REC.N, CH = REC.CH;
   const winSec = (10*REC.STRIDE)/10; // the 10-sample window in seconds at 1x speed (200 ticks = 20 s)
   const havePrev = W.recCount >= 1, have10 = W.recCount >= 10;
@@ -519,7 +533,10 @@ function detect(r, awake){
       else if (det.crash[sp]===1 && growth > 0.9) det.crash[sp]=0;
     }
   }
-  // ---- heredity detectors (Phase 5.1): sweeps and diversity collapse, per species with a locus ----
+}
+// ---- heredity (Phase 5.1/5.7): sweeps, diversifying, diversity collapse, per species with a locus ----
+function detectHeredity(r){
+  const B = W.rec, N = REC.N, CH = REC.CH;
   // Calibrated on the 8-seed evolving ensemble: founders sit within +-0.05 of g0 for the first
   // ~2,000 ticks (sd 0.02-0.05), so the dead zone silences the founding; a real sweep carries the
   // mean >= 0.10 from g0 with a 60% majority on that side, reached at t ~ 8,000-12,000.
@@ -554,6 +571,10 @@ function detect(r, awake){
       else if (det.uniform[sp] && sd > 0.7*sdAgo) det.uniform[sp] = 0;
     }
   }
+}
+// ---- chemistry: mineral depletion trend and lock-up level (the K6 detectors) ----
+function detectChemistry(r){
+  const B = W.rec, N = REC.N, CH = REC.CH;
   const total = B[r+14]+B[r+15]+B[r+16]+B[r+17];
   const dissolvedFrac = B[r+14]/Math.max(1,total), lockedFrac = (B[r+16]+B[r+17])/Math.max(1,total);
   // Depletion is a trend, not a level (calibrated: healthy worlds DIP to 17% and recover;
@@ -812,8 +833,9 @@ function step(){
         if (got > 0){ W.M[c0]-=got; W.mn[i]+=got; W.flows.uptake+=got; }
       }
       const sat = Math.min(1, W.mn[i]/mQ); // Liebig: mineral-starved cells photosynthesize weakly
-      const kpG = T.locus ? (1 + T.locus.kpSlope*(T.locus.g0 - W.g[i])) : 1;
-      const gppGain = T.kp*kpG*cellLight(i)*W.sz[i]*sat;
+      const Lc = cellLight(i);
+      const kpG = T.locus ? (1 + T.locus.kpSlope*(T.locus.g0 - W.g[i])) * (1 + T.locus.lightSlope*(W.g[i] - T.locus.g0)*(1 - 2*Lc)) : 1;
+      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat;
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
       if (W.pr[i] < pQ && W.en[i] > 0.6*cap){

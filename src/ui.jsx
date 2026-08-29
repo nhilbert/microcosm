@@ -9,6 +9,8 @@ export default function Microcosm(){
   const speedRef = useRef(1); // 0 = paused, 1, 4, 16
   const fabLong = useRef(null);
   const dragRef = useRef(null);
+  const [hidden, setHidden] = useState([false,false,false,false,false,false,false,false]); // per-species show/hide (view only); slot 7 = debris (corpses)
+  const hiddenRef = useRef(hidden); hiddenRef.current = hidden;
 
   useEffect(() => {
     initWorld();
@@ -68,11 +70,18 @@ export default function Microcosm(){
     const ccx = CC.getContext("2d");
     const ccImg = ccx.createImageData(P.GRID, P.GRID);
     const corpseMass = new Float32Array(P.GRID * P.GRID);
+    // per-cell mean genotype of the mat species, so a heritable Solara trait shows in the carpet itself
+    const cellG = new Float32Array(P.GRID * P.GRID), cellGn = new Uint16Array(P.GRID * P.GRID);
     const LOD_Z = 0.9; // below this zoom: aggregate corpses, draw bacteria as dots
     let carpetTick = -1;
     const updateCarpet = () => {
       if (W.tick === carpetTick) return; carpetTick = W.tick;
       const d = mcImg.data, dm = mnImg.data;
+      const matLocus = TRAITS[0].locus;
+      if (matLocus){
+        cellG.fill(0); cellGn.fill(0);
+        for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === 0){ const c = cellOf(i); cellG[c] += W.g[i]; cellGn[c]++; }
+      }
       for (let c = 0; c < P.GRID*P.GRID; c++){
         const o = c*4;
         const m = Math.min(1, W.M[c] / 3.2);
@@ -81,9 +90,17 @@ export default function Microcosm(){
         const dens = Math.min(1, W.bB[c] / 200);
         if (dens <= 0.01){ d[o+3] = 0; continue; }
         const t = Math.sqrt(dens); // fast rise, then saturate
-        d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
-        d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
-        d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
+        if (matLocus && cellGn[c]){ // sparse [96,205,150] -> dense [34,123,78], both turned by the cell's mean genotype
+          const gm = cellG[c] / cellGn[c];
+          const lo = tintRgb([96,205,150], gm), hi = tintRgb([34,123,78], gm);
+          d[o]   = Math.round(lo[0] + (hi[0]-lo[0])*t);
+          d[o+1] = Math.round(lo[1] + (hi[1]-lo[1])*t);
+          d[o+2] = Math.round(lo[2] + (hi[2]-lo[2])*t);
+        } else {
+          d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
+          d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
+          d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
+        }
         d[o+3] = Math.round(70 + 150*t);  // alpha: sparse faint -> dense solid
       }
       mcx.putImageData(mcImg, 0, 0);
@@ -142,6 +159,8 @@ export default function Microcosm(){
         if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
         if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
         if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
+        if (L.lightSlope){ parts.push([L.hiTrait, Math.round(100 * L.lightSlope*(g - L.g0))]);
+                           parts.push([L.loTrait, Math.round(-100 * L.lightSlope*(g - L.g0))]); }
         heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
       }
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
@@ -366,8 +385,8 @@ export default function Microcosm(){
         for (let kx = Math.floor(tlx/P.WORLD); (kx*P.WORLD) < tlx + vw/z; kx++){
           const dx0 = (kx*P.WORLD - cam.x)*z + hw, dy0 = (ky*P.WORLD - cam.y)*z + hh;
           ctx.drawImage(MN, dx0, dy0, P.WORLD*z, P.WORLD*z);
-          ctx.drawImage(MC, dx0, dy0, P.WORLD*z, P.WORLD*z);
-          if (z < LOD_Z) ctx.drawImage(CC, dx0, dy0, P.WORLD*z, P.WORLD*z);
+          if (!hiddenRef.current[0]) ctx.drawImage(MC, dx0, dy0, P.WORLD*z, P.WORLD*z);
+          if (z < LOD_Z && !hiddenRef.current[7]) ctx.drawImage(CC, dx0, dy0, P.WORLD*z, P.WORLD*z);
         }
       // organisms: saturating "screen" composition instead of unbounded addition
       ctx.globalCompositeOperation = "screen";
@@ -378,6 +397,7 @@ export default function Microcosm(){
         if (!W.alive[i]) continue;
         pops[W.sp[i]]++;
         mnBound += W.mn[i];
+        if (hiddenRef.current[W.sp[i]]) continue; // hidden from view, still counted
         const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
         const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
         const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
@@ -417,7 +437,7 @@ export default function Microcosm(){
         ctx.beginPath(); ctx.arc(pours[q].sx, pours[q].sy, 10 + age*34, 0, 6.283); ctx.stroke();
       }
       // corpses: pale husks when zoomed in; the aggregate layer covers zoomed-out
-      if (z >= LOD_Z) for (let k = 0; k < W.cN; k++){
+      if (z >= LOD_Z && !hiddenRef.current[7]) for (let k = 0; k < W.cN; k++){
         if (!W.cAlive[k]) continue;
         const sx = hw + wd(W.cX[k] - cam.x)*z, sy = hh + wd(W.cY[k] - cam.y)*z;
         if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
@@ -476,8 +496,9 @@ export default function Microcosm(){
       if (now - uiT > 500){ uiT = now;
         let mFree = 0, mLocked = 0; const MF = W.M, DM = W.dM;
         for (let c = 0; c < MF.length; c++){ mFree += MF[c]; mLocked += DM[c]; }
-        for (let k = 0; k < W.cN; k++) if (W.cAlive[k]) mLocked += W.cM[k];
-        setUi(u => ({ ...u, tick: W.tick, fps, pops: [...pops], card: buildCard(),
+        let corpses = 0;
+        for (let k = 0; k < W.cN; k++) if (W.cAlive[k]){ mLocked += W.cM[k]; corpses++; }
+        setUi(u => ({ ...u, tick: W.tick, fps, pops: [...pops], corpses, card: buildCard(),
           mineral: { b: mnBound, f: mFree, l: mLocked, add: W.addedM }, lightMul: P.lightMul }));
       }
     };
@@ -563,12 +584,20 @@ export default function Microcosm(){
         display:"flex", justifyContent:"space-between", alignItems:"baseline", pointerEvents:"none", paddingRight:18,
         color:COL.silt, fontSize:12, fontFamily:mono, textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
         <span>t {String(ui.tick).padStart(6," ")}  ·  {ui.fps} fps</span>
-        <span>
-          <span style={{color:"rgb(70,214,140)"}}>● {ui.pops[0]}</span>{"  "}
-          <span style={{color:"rgb(91,200,232)"}}>● {ui.pops[1]}</span>{"  "}
-          <span style={{color:"rgb(215,166,232)"}}>▲ {ui.pops[2]}</span>{"  "}
-          <span style={{color:"rgb(158,168,104)"}}>▪ {ui.pops[3]}</span>{"  "}
-          <span style={{color:"rgb(230,240,250)"}}>△ {ui.pops[6]}</span>
+        {/* species counts double as view toggles: click to hide a species from the world, click again to show */}
+        <span style={{ pointerEvents:"auto", display:"inline-flex", gap:10 }}>
+          {[[0,"●"],[1,"●"],[2,"▲"],[3,"▪"],[6,"△"],[7,"◌"]].map(([sp, glyph]) => {
+            const debris = sp === 7, c = debris ? [158,168,178] : SPECIES_META[sp].rgb, name = debris ? "debris" : SPECIES_META[sp].name;
+            return (
+            <button key={sp} className="mc-tab"
+              onClick={() => setHidden(h => h.map((v, k) => k === sp ? !v : v))}
+              title={(hidden[sp] ? "Show " : "Hide ") + name}
+              style={{ background:"transparent", border:"none", padding:"2px 3px", cursor:"pointer", font:"inherit",
+                color: sp === 6 ? "rgb(230,240,250)" : `rgb(${c[0]},${c[1]},${c[2]})`,
+                opacity: hidden[sp] ? 0.32 : 1, textDecoration: hidden[sp] ? "line-through" : "none",
+                textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
+              {glyph} {debris ? (ui.corpses || 0) : ui.pops[sp]}
+            </button> ); })}
         </span>
       </div>
       {/* mineral audit: bound (in biomass) vs free (dissolved) — the sum is conserved */}

@@ -30,7 +30,9 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //   escSlope   prey escape.p  + escSlope*(g-g0)         kpSlope   kp * (1 + kpSlope*(g0-g))
 //   catchSlope prey's escape chance against THIS hunter x (1 + catchSlope*(g0-g))
 //   kbSlope    basal cost kb * (1 + kbSlope*(g-g0))     (the price of keenness)
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0 };
+//   lightSlope photosynthesis x (1 + lightSlope*(g-g0)*(1-2L)), L = cell light: shade-adapted (g>g0)
+//              gains in the dark and loses in the sun -- priced by the light field itself
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0 };
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
@@ -47,6 +49,12 @@ const TRAITS = normalizeTraits([
     hazard: 0.0012, grazeFloor: 35, pursuitPenalty: 1.8,
     reproFrac: 0.70, spread: 70, settleLimited: true, settleLimit: 90,
     reproCooldown: 0, matureCd: 0, diet: 0, cyst: null, escape: null,
+    // Phase 5.8 heredity: light adaptation, the sessile producer's classic trade-off.
+    // Shade-tolerant mats photosynthesize better in dim light and worse in bright; the sun
+    // lever (drag, intensity press) therefore sets a selection pressure the mat answers.
+    locus: { g0: 0.5, sigma: 0.03, lightSlope: 0.5,
+             label: "Light", hiWord: "shade-tolerant", loWord: "sun-loving",
+             hiTrait: "shade tolerance", loTrait: "sun tolerance" },
   },
   { // 1 — Drifta: drifting planktonic producer
     name: "Drifta", bodyTag: TAG.DRIFTA, layer: "plankton",

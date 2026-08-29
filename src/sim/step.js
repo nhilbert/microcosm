@@ -57,8 +57,9 @@ function step(){
         if (got > 0){ W.M[c0]-=got; W.mn[i]+=got; W.flows.uptake+=got; }
       }
       const sat = Math.min(1, W.mn[i]/mQ); // Liebig: mineral-starved cells photosynthesize weakly
-      const kpG = T.locus ? (1 + T.locus.kpSlope*(T.locus.g0 - W.g[i])) : 1;
-      const gppGain = T.kp*kpG*cellLight(i)*W.sz[i]*sat;
+      const Lc = cellLight(i);
+      const kpG = T.locus ? (1 + T.locus.kpSlope*(T.locus.g0 - W.g[i])) * (1 + T.locus.lightSlope*(W.g[i] - T.locus.g0)*(1 - 2*Lc)) : 1;
+      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat;
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
       if (W.pr[i] < pQ && W.en[i] > 0.6*cap){

@@ -102,7 +102,9 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //   escSlope   prey escape.p  + escSlope*(g-g0)         kpSlope   kp * (1 + kpSlope*(g0-g))
 //   catchSlope prey's escape chance against THIS hunter x (1 + catchSlope*(g0-g))
 //   kbSlope    basal cost kb * (1 + kbSlope*(g-g0))     (the price of keenness)
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0 };
+//   lightSlope photosynthesis x (1 + lightSlope*(g-g0)*(1-2L)), L = cell light: shade-adapted (g>g0)
+//              gains in the dark and loses in the sun -- priced by the light field itself
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0 };
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
@@ -119,6 +121,12 @@ const TRAITS = normalizeTraits([
     hazard: 0.0012, grazeFloor: 35, pursuitPenalty: 1.8,
     reproFrac: 0.70, spread: 70, settleLimited: true, settleLimit: 90,
     reproCooldown: 0, matureCd: 0, diet: 0, cyst: null, escape: null,
+    // Phase 5.8 heredity: light adaptation, the sessile producer's classic trade-off.
+    // Shade-tolerant mats photosynthesize better in dim light and worse in bright; the sun
+    // lever (drag, intensity press) therefore sets a selection pressure the mat answers.
+    locus: { g0: 0.5, sigma: 0.03, lightSlope: 0.5,
+             label: "Light", hiWord: "shade-tolerant", loWord: "sun-loving",
+             hiTrait: "shade tolerance", loTrait: "sun tolerance" },
   },
   { // 1 — Drifta: drifting planktonic producer
     name: "Drifta", bodyTag: TAG.DRIFTA, layer: "plankton",
@@ -515,6 +523,12 @@ function pushEvent(type, sp, text){
   if (W.sysEvents.length > 200) W.sysEvents.shift();
 }
 function detect(r, awake){
+  detectEcology(r, awake);
+  detectHeredity(r);
+  detectChemistry(r);
+}
+// ---- ecology: establishment, wake, extinction, blooms and crashes per species ----
+function detectEcology(r, awake){
   const B = W.rec, N = REC.N, CH = REC.CH;
   const winSec = (10*REC.STRIDE)/10; // the 10-sample window in seconds at 1x speed (200 ticks = 20 s)
   const havePrev = W.recCount >= 1, have10 = W.recCount >= 10;
@@ -546,7 +560,10 @@ function detect(r, awake){
       else if (det.crash[sp]===1 && growth > 0.9) det.crash[sp]=0;
     }
   }
-  // ---- heredity detectors (Phase 5.1): sweeps and diversity collapse, per species with a locus ----
+}
+// ---- heredity (Phase 5.1/5.7): sweeps, diversifying, diversity collapse, per species with a locus ----
+function detectHeredity(r){
+  const B = W.rec, N = REC.N, CH = REC.CH;
   // Calibrated on the 8-seed evolving ensemble: founders sit within +-0.05 of g0 for the first
   // ~2,000 ticks (sd 0.02-0.05), so the dead zone silences the founding; a real sweep carries the
   // mean >= 0.10 from g0 with a 60% majority on that side, reached at t ~ 8,000-12,000.
@@ -581,6 +598,10 @@ function detect(r, awake){
       else if (det.uniform[sp] && sd > 0.7*sdAgo) det.uniform[sp] = 0;
     }
   }
+}
+// ---- chemistry: mineral depletion trend and lock-up level (the K6 detectors) ----
+function detectChemistry(r){
+  const B = W.rec, N = REC.N, CH = REC.CH;
   const total = B[r+14]+B[r+15]+B[r+16]+B[r+17];
   const dissolvedFrac = B[r+14]/Math.max(1,total), lockedFrac = (B[r+16]+B[r+17])/Math.max(1,total);
   // Depletion is a trend, not a level (calibrated: healthy worlds DIP to 17% and recover;
@@ -839,8 +860,9 @@ function step(){
         if (got > 0){ W.M[c0]-=got; W.mn[i]+=got; W.flows.uptake+=got; }
       }
       const sat = Math.min(1, W.mn[i]/mQ); // Liebig: mineral-starved cells photosynthesize weakly
-      const kpG = T.locus ? (1 + T.locus.kpSlope*(T.locus.g0 - W.g[i])) : 1;
-      const gppGain = T.kp*kpG*cellLight(i)*W.sz[i]*sat;
+      const Lc = cellLight(i);
+      const kpG = T.locus ? (1 + T.locus.kpSlope*(T.locus.g0 - W.g[i])) * (1 + T.locus.lightSlope*(W.g[i] - T.locus.g0)*(1 - 2*Lc)) : 1;
+      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat;
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
       if (W.pr[i] < pQ && W.en[i] > 0.6*cap){
@@ -1119,12 +1141,29 @@ const SHAPES = ["nucleus","dot","tri","square","dot","dot","tri"]; // sprite sha
 // paler and warmer, t=1 (the hiWord end) deeper and cooler; the midpoint is the species color
 // exactly, so a silent genome renders precisely as before. Species identity stays legible at
 // overview; the shift is meant to be read at loupe zoom and on the Traits histogram.
+// Implemented as a hue rotation of +-TINT_HUE degrees plus a lightness tilt, in HSL: a channel
+// nudge disappears under the glow composite; a hue turn survives it. t=0 turns warm and light,
+// t=1 turns cool and deep.
+const TINT_HUE = 52, TINT_LIGHT = 0.14;
+function rgbToHsl(r, g, b){
+  r/=255; g/=255; b/=255;
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), l = (mx+mn)/2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx-mn, s = l > 0.5 ? d/(2-mx-mn) : d/(mx+mn);
+  let h = mx===r ? (g-b)/d + (g<b ? 6 : 0) : mx===g ? (b-r)/d + 2 : (r-g)/d + 4;
+  return [h*60, s, l];
+}
+function hslToRgb(h, s, l){
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2*l - 1)) * s, x = c * (1 - Math.abs((h/60) % 2 - 1)), m = l - c/2;
+  const [r,g,b] = h < 60 ? [c,x,0] : h < 120 ? [x,c,0] : h < 180 ? [0,c,x] : h < 240 ? [0,x,c] : h < 300 ? [x,0,c] : [c,0,x];
+  return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
 function tintRgb(rgb, t){
   const k = (t - 0.5) * 2; // -1..1
-  const [r,g,b] = rgb;
-  return k >= 0
-    ? [Math.round(r - 22*k), Math.round(g - 34*k), Math.round(Math.min(255, b + 12*k))]
-    : [Math.round(Math.min(255, r - 30*k)), Math.round(Math.min(255, g + 16*(-k))), Math.round(b + 18*k)];
+  if (k === 0) return rgb.slice();
+  const [h, s, l] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+  return hslToRgb(h - TINT_HUE*k, Math.min(1, s + 0.10*Math.abs(k)), Math.max(0.15, Math.min(0.85, l - TINT_LIGHT*k)));
 }
 function makeSprite(rgb, shape){
   const s = 64, c = document.createElement("canvas"); c.width = s; c.height = s;
@@ -1151,14 +1190,16 @@ function makeSprite(rgb, shape){
     grad.addColorStop(0.4, `rgba(${r},${gg},${b},0.4)`);
     grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
     g.fillStyle = grad; g.fillRect(0, 0, s, s);
-    g.fillStyle = "rgba(255,255,255,0.9)";
+    // the mark carries the color: a pure white triangle washed every tint out under the screen composite
+    g.fillStyle = `rgba(${Math.min(255,r+55)},${Math.min(255,gg+55)},${Math.min(255,b+55)},0.95)`;
     g.beginPath(); g.moveTo(s*0.72, s*0.5); g.lineTo(s*0.38, s*0.36); g.lineTo(s*0.38, s*0.64); g.closePath(); g.fill();
+    g.strokeStyle = "rgba(255,255,255,0.55)"; g.lineWidth = 1.2; g.stroke();
   } else { // Drifta: soft glow, colored (not white) center, modest alpha
     grad.addColorStop(0, `rgba(${r},${gg},${b},0.6)`);
     grad.addColorStop(0.4, `rgba(${r},${gg},${b},0.22)`);
     grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
     g.fillStyle = grad; g.fillRect(0, 0, s, s);
-    g.fillStyle = `rgba(${Math.min(255,r+90)},${Math.min(255,gg+70)},${Math.min(255,b+50)},0.8)`;
+    g.fillStyle = `rgba(${Math.min(255,r+40)},${Math.min(255,gg+35)},${Math.min(255,b+30)},0.9)`;
     g.beginPath(); g.arc(s/2, s/2, 3.6, 0, 6.283); g.fill();
   }
   return c;
@@ -1757,6 +1798,8 @@ export default function Microcosm(){
   const speedRef = useRef(1); // 0 = paused, 1, 4, 16
   const fabLong = useRef(null);
   const dragRef = useRef(null);
+  const [hidden, setHidden] = useState([false,false,false,false,false,false,false,false]); // per-species show/hide (view only); slot 7 = debris (corpses)
+  const hiddenRef = useRef(hidden); hiddenRef.current = hidden;
 
   useEffect(() => {
     initWorld();
@@ -1816,11 +1859,18 @@ export default function Microcosm(){
     const ccx = CC.getContext("2d");
     const ccImg = ccx.createImageData(P.GRID, P.GRID);
     const corpseMass = new Float32Array(P.GRID * P.GRID);
+    // per-cell mean genotype of the mat species, so a heritable Solara trait shows in the carpet itself
+    const cellG = new Float32Array(P.GRID * P.GRID), cellGn = new Uint16Array(P.GRID * P.GRID);
     const LOD_Z = 0.9; // below this zoom: aggregate corpses, draw bacteria as dots
     let carpetTick = -1;
     const updateCarpet = () => {
       if (W.tick === carpetTick) return; carpetTick = W.tick;
       const d = mcImg.data, dm = mnImg.data;
+      const matLocus = TRAITS[0].locus;
+      if (matLocus){
+        cellG.fill(0); cellGn.fill(0);
+        for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === 0){ const c = cellOf(i); cellG[c] += W.g[i]; cellGn[c]++; }
+      }
       for (let c = 0; c < P.GRID*P.GRID; c++){
         const o = c*4;
         const m = Math.min(1, W.M[c] / 3.2);
@@ -1829,9 +1879,17 @@ export default function Microcosm(){
         const dens = Math.min(1, W.bB[c] / 200);
         if (dens <= 0.01){ d[o+3] = 0; continue; }
         const t = Math.sqrt(dens); // fast rise, then saturate
-        d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
-        d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
-        d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
+        if (matLocus && cellGn[c]){ // sparse [96,205,150] -> dense [34,123,78], both turned by the cell's mean genotype
+          const gm = cellG[c] / cellGn[c];
+          const lo = tintRgb([96,205,150], gm), hi = tintRgb([34,123,78], gm);
+          d[o]   = Math.round(lo[0] + (hi[0]-lo[0])*t);
+          d[o+1] = Math.round(lo[1] + (hi[1]-lo[1])*t);
+          d[o+2] = Math.round(lo[2] + (hi[2]-lo[2])*t);
+        } else {
+          d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
+          d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
+          d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
+        }
         d[o+3] = Math.round(70 + 150*t);  // alpha: sparse faint -> dense solid
       }
       mcx.putImageData(mcImg, 0, 0);
@@ -1890,6 +1948,8 @@ export default function Microcosm(){
         if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
         if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
         if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
+        if (L.lightSlope){ parts.push([L.hiTrait, Math.round(100 * L.lightSlope*(g - L.g0))]);
+                           parts.push([L.loTrait, Math.round(-100 * L.lightSlope*(g - L.g0))]); }
         heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
       }
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
@@ -2114,8 +2174,8 @@ export default function Microcosm(){
         for (let kx = Math.floor(tlx/P.WORLD); (kx*P.WORLD) < tlx + vw/z; kx++){
           const dx0 = (kx*P.WORLD - cam.x)*z + hw, dy0 = (ky*P.WORLD - cam.y)*z + hh;
           ctx.drawImage(MN, dx0, dy0, P.WORLD*z, P.WORLD*z);
-          ctx.drawImage(MC, dx0, dy0, P.WORLD*z, P.WORLD*z);
-          if (z < LOD_Z) ctx.drawImage(CC, dx0, dy0, P.WORLD*z, P.WORLD*z);
+          if (!hiddenRef.current[0]) ctx.drawImage(MC, dx0, dy0, P.WORLD*z, P.WORLD*z);
+          if (z < LOD_Z && !hiddenRef.current[7]) ctx.drawImage(CC, dx0, dy0, P.WORLD*z, P.WORLD*z);
         }
       // organisms: saturating "screen" composition instead of unbounded addition
       ctx.globalCompositeOperation = "screen";
@@ -2126,6 +2186,7 @@ export default function Microcosm(){
         if (!W.alive[i]) continue;
         pops[W.sp[i]]++;
         mnBound += W.mn[i];
+        if (hiddenRef.current[W.sp[i]]) continue; // hidden from view, still counted
         const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
         const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
         const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
@@ -2165,7 +2226,7 @@ export default function Microcosm(){
         ctx.beginPath(); ctx.arc(pours[q].sx, pours[q].sy, 10 + age*34, 0, 6.283); ctx.stroke();
       }
       // corpses: pale husks when zoomed in; the aggregate layer covers zoomed-out
-      if (z >= LOD_Z) for (let k = 0; k < W.cN; k++){
+      if (z >= LOD_Z && !hiddenRef.current[7]) for (let k = 0; k < W.cN; k++){
         if (!W.cAlive[k]) continue;
         const sx = hw + wd(W.cX[k] - cam.x)*z, sy = hh + wd(W.cY[k] - cam.y)*z;
         if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
@@ -2224,8 +2285,9 @@ export default function Microcosm(){
       if (now - uiT > 500){ uiT = now;
         let mFree = 0, mLocked = 0; const MF = W.M, DM = W.dM;
         for (let c = 0; c < MF.length; c++){ mFree += MF[c]; mLocked += DM[c]; }
-        for (let k = 0; k < W.cN; k++) if (W.cAlive[k]) mLocked += W.cM[k];
-        setUi(u => ({ ...u, tick: W.tick, fps, pops: [...pops], card: buildCard(),
+        let corpses = 0;
+        for (let k = 0; k < W.cN; k++) if (W.cAlive[k]){ mLocked += W.cM[k]; corpses++; }
+        setUi(u => ({ ...u, tick: W.tick, fps, pops: [...pops], corpses, card: buildCard(),
           mineral: { b: mnBound, f: mFree, l: mLocked, add: W.addedM }, lightMul: P.lightMul }));
       }
     };
@@ -2311,12 +2373,20 @@ export default function Microcosm(){
         display:"flex", justifyContent:"space-between", alignItems:"baseline", pointerEvents:"none", paddingRight:18,
         color:COL.silt, fontSize:12, fontFamily:mono, textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
         <span>t {String(ui.tick).padStart(6," ")}  ·  {ui.fps} fps</span>
-        <span>
-          <span style={{color:"rgb(70,214,140)"}}>● {ui.pops[0]}</span>{"  "}
-          <span style={{color:"rgb(91,200,232)"}}>● {ui.pops[1]}</span>{"  "}
-          <span style={{color:"rgb(215,166,232)"}}>▲ {ui.pops[2]}</span>{"  "}
-          <span style={{color:"rgb(158,168,104)"}}>▪ {ui.pops[3]}</span>{"  "}
-          <span style={{color:"rgb(230,240,250)"}}>△ {ui.pops[6]}</span>
+        {/* species counts double as view toggles: click to hide a species from the world, click again to show */}
+        <span style={{ pointerEvents:"auto", display:"inline-flex", gap:10 }}>
+          {[[0,"●"],[1,"●"],[2,"▲"],[3,"▪"],[6,"△"],[7,"◌"]].map(([sp, glyph]) => {
+            const debris = sp === 7, c = debris ? [158,168,178] : SPECIES_META[sp].rgb, name = debris ? "debris" : SPECIES_META[sp].name;
+            return (
+            <button key={sp} className="mc-tab"
+              onClick={() => setHidden(h => h.map((v, k) => k === sp ? !v : v))}
+              title={(hidden[sp] ? "Show " : "Hide ") + name}
+              style={{ background:"transparent", border:"none", padding:"2px 3px", cursor:"pointer", font:"inherit",
+                color: sp === 6 ? "rgb(230,240,250)" : `rgb(${c[0]},${c[1]},${c[2]})`,
+                opacity: hidden[sp] ? 0.32 : 1, textDecoration: hidden[sp] ? "line-through" : "none",
+                textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
+              {glyph} {debris ? (ui.corpses || 0) : ui.pops[sp]}
+            </button> ); })}
         </span>
       </div>
       {/* mineral audit: bound (in biomass) vs free (dissolved) — the sum is conserved */}

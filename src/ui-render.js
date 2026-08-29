@@ -21,12 +21,29 @@ const SHAPES = ["nucleus","dot","tri","square","dot","dot","tri"]; // sprite sha
 // paler and warmer, t=1 (the hiWord end) deeper and cooler; the midpoint is the species color
 // exactly, so a silent genome renders precisely as before. Species identity stays legible at
 // overview; the shift is meant to be read at loupe zoom and on the Traits histogram.
+// Implemented as a hue rotation of +-TINT_HUE degrees plus a lightness tilt, in HSL: a channel
+// nudge disappears under the glow composite; a hue turn survives it. t=0 turns warm and light,
+// t=1 turns cool and deep.
+const TINT_HUE = 52, TINT_LIGHT = 0.14;
+function rgbToHsl(r, g, b){
+  r/=255; g/=255; b/=255;
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), l = (mx+mn)/2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx-mn, s = l > 0.5 ? d/(2-mx-mn) : d/(mx+mn);
+  let h = mx===r ? (g-b)/d + (g<b ? 6 : 0) : mx===g ? (b-r)/d + 2 : (r-g)/d + 4;
+  return [h*60, s, l];
+}
+function hslToRgb(h, s, l){
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2*l - 1)) * s, x = c * (1 - Math.abs((h/60) % 2 - 1)), m = l - c/2;
+  const [r,g,b] = h < 60 ? [c,x,0] : h < 120 ? [x,c,0] : h < 180 ? [0,c,x] : h < 240 ? [0,x,c] : h < 300 ? [x,0,c] : [c,0,x];
+  return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
 function tintRgb(rgb, t){
   const k = (t - 0.5) * 2; // -1..1
-  const [r,g,b] = rgb;
-  return k >= 0
-    ? [Math.round(r - 22*k), Math.round(g - 34*k), Math.round(Math.min(255, b + 12*k))]
-    : [Math.round(Math.min(255, r - 30*k)), Math.round(Math.min(255, g + 16*(-k))), Math.round(b + 18*k)];
+  if (k === 0) return rgb.slice();
+  const [h, s, l] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+  return hslToRgb(h - TINT_HUE*k, Math.min(1, s + 0.10*Math.abs(k)), Math.max(0.15, Math.min(0.85, l - TINT_LIGHT*k)));
 }
 function makeSprite(rgb, shape){
   const s = 64, c = document.createElement("canvas"); c.width = s; c.height = s;
@@ -53,14 +70,16 @@ function makeSprite(rgb, shape){
     grad.addColorStop(0.4, `rgba(${r},${gg},${b},0.4)`);
     grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
     g.fillStyle = grad; g.fillRect(0, 0, s, s);
-    g.fillStyle = "rgba(255,255,255,0.9)";
+    // the mark carries the color: a pure white triangle washed every tint out under the screen composite
+    g.fillStyle = `rgba(${Math.min(255,r+55)},${Math.min(255,gg+55)},${Math.min(255,b+55)},0.95)`;
     g.beginPath(); g.moveTo(s*0.72, s*0.5); g.lineTo(s*0.38, s*0.36); g.lineTo(s*0.38, s*0.64); g.closePath(); g.fill();
+    g.strokeStyle = "rgba(255,255,255,0.55)"; g.lineWidth = 1.2; g.stroke();
   } else { // Drifta: soft glow, colored (not white) center, modest alpha
     grad.addColorStop(0, `rgba(${r},${gg},${b},0.6)`);
     grad.addColorStop(0.4, `rgba(${r},${gg},${b},0.22)`);
     grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
     g.fillStyle = grad; g.fillRect(0, 0, s, s);
-    g.fillStyle = `rgba(${Math.min(255,r+90)},${Math.min(255,gg+70)},${Math.min(255,b+50)},0.8)`;
+    g.fillStyle = `rgba(${Math.min(255,r+40)},${Math.min(255,gg+35)},${Math.min(255,b+30)},0.9)`;
     g.beginPath(); g.arc(s/2, s/2, 3.6, 0, 6.283); g.fill();
   }
   return c;

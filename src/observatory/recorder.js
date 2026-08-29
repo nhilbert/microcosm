@@ -27,6 +27,12 @@ function pushEvent(type, sp, text){
   if (W.sysEvents.length > 200) W.sysEvents.shift();
 }
 function detect(r, awake){
+  detectEcology(r, awake);
+  detectHeredity(r);
+  detectChemistry(r);
+}
+// ---- ecology: establishment, wake, extinction, blooms and crashes per species ----
+function detectEcology(r, awake){
   const B = W.rec, N = REC.N, CH = REC.CH;
   const winSec = (10*REC.STRIDE)/10; // the 10-sample window in seconds at 1x speed (200 ticks = 20 s)
   const havePrev = W.recCount >= 1, have10 = W.recCount >= 10;
@@ -58,7 +64,10 @@ function detect(r, awake){
       else if (det.crash[sp]===1 && growth > 0.9) det.crash[sp]=0;
     }
   }
-  // ---- heredity detectors (Phase 5.1): sweeps and diversity collapse, per species with a locus ----
+}
+// ---- heredity (Phase 5.1/5.7): sweeps, diversifying, diversity collapse, per species with a locus ----
+function detectHeredity(r){
+  const B = W.rec, N = REC.N, CH = REC.CH;
   // Calibrated on the 8-seed evolving ensemble: founders sit within +-0.05 of g0 for the first
   // ~2,000 ticks (sd 0.02-0.05), so the dead zone silences the founding; a real sweep carries the
   // mean >= 0.10 from g0 with a 60% majority on that side, reached at t ~ 8,000-12,000.
@@ -93,6 +102,10 @@ function detect(r, awake){
       else if (det.uniform[sp] && sd > 0.7*sdAgo) det.uniform[sp] = 0;
     }
   }
+}
+// ---- chemistry: mineral depletion trend and lock-up level (the K6 detectors) ----
+function detectChemistry(r){
+  const B = W.rec, N = REC.N, CH = REC.CH;
   const total = B[r+14]+B[r+15]+B[r+16]+B[r+17];
   const dissolvedFrac = B[r+14]/Math.max(1,total), lockedFrac = (B[r+16]+B[r+17])/Math.max(1,total);
   // Depletion is a trend, not a level (calibrated: healthy worlds DIP to 17% and recover;

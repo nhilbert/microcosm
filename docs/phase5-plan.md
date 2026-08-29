@@ -157,3 +157,31 @@ Shipped: `kpSlope 0.5`, `kbSlope 0.15`. Declared evolving change; silent fingerp
 **Re-acceptance:** `tune2` 8/8 ecosystem (apex held 3/8). `corridor` **CERTIFIED at all 4 corners**, 8/8 each. `gate5` **ALL CRITERIA PASS**: evolution narrated 8/8 (diversifying on every seed, sweeps on four), sweeps grounded, variance rising 8/8, control silent 8/8, seed-22 measurement reproduced bit-exactly.
 
 **Apex control (step 3):** the silent world holds the apex to 54k on 6/8 seeds; late apex loss under evolution is real and attributable.
+
+---
+
+## 5.8 — Solara light-adaptation locus, and what the sun lever did (2026-08-29)
+
+**Design.** One locus on Solara, *Light* (shade-tolerant ↔ sun-loving), expressed inside the photosynthesis block as `kp × (1 + s·(g−g₀)·(1−2L))`, L = cell light. Shade-tolerant mats gain in dim water and lose in bright; the trade-off is priced by the light field itself, so the sun lever should set a selection pressure the mat answers. Draw-free; silent fingerprint identical to the 5.7 baseline. Chosen for biological grounding over the first proposal (dispersal): light adaptation is *the* algal trade-off; dispersal–competition is spatial ecology.
+
+**Price surface** (normal sun, 3 seeds × 36k): `lightSlope` 0.3 → 0.46–0.57; 0.5 → 0.51–0.60; 0.8 → 0.61–0.68. Mild shade-ward drift at every value — the mat mostly sits in water below L = 0.5. Shipped 0.5.
+
+**The lever test, done as a player does it** (establish 6,000 ticks, then press the sun; 3 seeds × 42k):
+
+| sun | Solara g at 36k | ecology |
+|---|---|---|
+| 1.0× | 0.51, 0.51, 0.60 | baseline |
+| 0.7× | 0.57, 0.66, 0.47 | Drifta 1,062 → 56, Cilio 69 → 18, apex dies |
+| 1.4× | 0.55, 0.50, 0.55 | Solara 914 → 3,200, Drifta recovers |
+
+**Honest reading: at this effect size the locus is nearly neutral.** Brightening the sun does not select sun-loving mats (no movement); dimming it moves two seeds shade-ward and one the other way — drift with a slight bias, not selection. The reason is in the populations: Solara's division is gated by mat crowding (`settleLimit`) and by mineral (Liebig), not by photosynthesis rate, so a growth multiplier barely reaches fitness. Meanwhile the *ecological* response to the press is enormous. A first-founding dim at 0.5× killed every world outright — a harness artifact, corrected, but also a statement about how hard the sun lever bites.
+
+Recorded as found; not re-priced. The scaling note (`genetics-scaling.md`) explains why linear pricing is the wrong tool here and what replaces it. The locus stays: it is safe, it is visible on the Traits page, and when Solara's fitness *is* growth-limited (a sparse mat after a crash, or a thinned one after the kill tool) it will move.
+
+**Also in this increment (UI):** genotype tint reworked as a hue rotation (±52°, lightness tilt) after the channel nudge proved invisible under the screen composite; Cilio's mark now carries its color instead of a white triangle; the mat carpet is tinted by each cell's mean Solara genotype; per-species and debris show/hide toggles in the status strip.
+
+**Re-acceptance:** `tune2` 8/8 ecosystem (apex held 5/8). `corridor` **CERTIFIED at all 8 corners** (three loci × both rails), 8/8 each. `gate5` **ALL CRITERIA PASS** (evolution narrated 8/8, control silent 8/8, seed-22 reproduction bit-exact against the captured baseline).
+
+**Yoshida on the 5.8 world, corrected estimator** (see the estimator note below): period 3340 ± 1383 (n=7) → 4090 ± 1923 ticks (n=6); phase 0.28 ± 0.11 → 0.14 ± 0.26; Drifta CV 0.34 → 0.32. Of the 6 seeds with a dominant cycle in both worlds, the period lengthens on 3 and the phase moves farther from zero on 4. Seed 22 alone shows the textbook transformation — period 5300 → 6100, phase 0.05 → 0.41 — and is the captured reproduction baseline. Ensemble verdict unchanged: no systematic transformation; the polymorphic world holds two lines without cycling them.
+
+**Estimator correction (applies to every Yoshida table above).** A self-test on synthetic series (`harness/selftest.js`, added with the harness library) showed the period estimator stopping inside the autocorrelation's descending trough and returning roughly a *quarter* period; series with a founding trend then had no recoverable cycle at all. Fixed: linear detrend before the ACF, and the peak search waits for the ACF to go negative and come back. The 5.2, 5.6 and 5.7 tables were measured with the faulty estimator; their period and phase columns are re-measured on the historical builds and corrected in the section that follows. The qualitative verdicts survive the correction; the numbers did not, and are replaced rather than footnoted.
