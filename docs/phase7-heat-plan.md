@@ -137,3 +137,24 @@ Solara 1,038–1,346 (one seed 401), Drifta 497–668 (one seed 2,330), Cilio 12
 - **H-P3 confirmed**: the apex goes first and sooner on every seed; the decomposer is the second loser — its upkeep (2.5) rises faster than its feeding (2.0), Rall's mismatch in the decomposer's ledger.
 - **Uniform warming destabilises** (CV 0.41 vs 0.25), the opposite of the local hot spot. Fussmann's stabilisation assumes the consumer's energetic efficiency falls; here the grazer's intake is *not* Q10-scaled while its cost is — the grazer is squeezed, control on the plankton loosens, and the cycle widens. Worth revisiting when the hunting rates get their own Q10 (attack rate E ≈ 0.45 eV is not yet in the model; only pursuit speed and handling are).
 - Prices to revisit before shipping a warming lever: Bacillus's margin; a grazer attack-rate Q10. Not changed now — H.2 (sensing) may redistribute everyone first.
+
+### 10.3 Heater at the far patch (seeded second sun, warmth +10, σ 130) — thermotaxis OFF (pre-H.2 core)
+
+Reference = Block L's seeded second sun (mat 405–562, plankton 575–678 in the far patch). With the same sun warmed by +10 (core ≈ +6.5 where the organisms sit):
+
+| in the warm core at 18k | reference far patch | heated far patch |
+|---|---|---|
+| Solara | 405–562 | **0–199** (0 on 4/8) |
+| Drifta | 575–678 | **639–823** |
+| Cilio | 16–47 (whole world) | **0** in the core |
+| Bacillus | seeded kit | **0** in the core |
+| detritus per warm cell | ≈ 2.3 (ambient) | **3.4–9.2** |
+| apex lost | 8/8 by ~7k | 8/8, but 3 seeds only at 12–17k |
+| Drifta CV | 0.30–0.47 | **0.08–0.16** |
+
+- **The warm patch becomes a plankton monoculture.** The plankton (topt 9) sits below its optimum and its photosynthesis × 1.6^0.65 ≈ 1.36 beats its upkeep only because it is light-limited to begin with; the mat, the grazer and the decomposer all leave their budgets in the red and vanish from the core.
+- **H-P2 (rings) fails in an instructive way**: Bacillus (ctmax 18) should have held the core by tolerance, but its *budget* fails first — upkeep 2.5^1 = 2.5× against feeding 2.0^1 = 2.0× at +10, with detritus piling up uneaten (3.4–9.2 per cell). Brock's decomposer core needs thermophiles whose gains scale with their costs; tolerance alone (the `ctmax` limb) never binds here. The ordering that *does* emerge is by budget margin: plankton > everyone.
+- Plankton refuge without grazers → the world's Drifta–Cilio cycle is damped (CV 0.12 vs 0.30–0.47) and the apex sometimes survives much longer (3/8 past 12k): a warm, grazer-free plankton patch feeds the rest of the world with drifters.
+- Dissolved mineral in the warm core is not depleted (0.05–0.18, same as ambient).
+
+Consequence for the design: the interesting thermal biology is not the cut-off but the **gain–cost separation per species**; a heritable thermal trait should therefore act on that separation (Padfield: down-regulate respiration's Q10), not on `ctmax`. Recorded for H.5 / multi-locus.
