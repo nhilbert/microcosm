@@ -970,12 +970,14 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
 // 7.L — the sun card: the selected light source. Intensity and spread are levers (events, logged,
 // undoable, one drag = one undo); a layout is one intervention; and the light budget says plainly what
 // the sky now delivers relative to the shipped world — adding a sun is never energy-neutral.
-// Layouts: tight suns (sigma 130) so the gap between them is actually dark (phase7-light-plan.md §2).
+// Layouts are ADDITIVE (L.2 finding, phase7-light-plan.md §11): the shipped sun stays where and what it
+// is; extra suns are tight (sigma 130) and far away, so the water between is actually dark. Moving and
+// shrinking the shipped sun collapsed the core on 5/8 seeds and a dim sun below I=0.6 grows no mat.
 const SUN_LAYOUTS = [
-  { key:"one",   label:"One sun",      suns:[{ x:512, y:512, i:1.0, sigma:210 }] },
-  { key:"twin",  label:"Twin suns",    suns:[{ x:256, y:256, i:1.0, sigma:130 }, { x:768, y:768, i:1.0, sigma:130 }] },
-  { key:"dim",   label:"Bright & dim", suns:[{ x:256, y:256, i:1.0, sigma:130 }, { x:768, y:768, i:0.5, sigma:130 }] },
-  { key:"isles", label:"Archipelago",  suns:[{ x:512, y:170, i:0.8, sigma:110 }, { x:215, y:690, i:0.8, sigma:110 }, { x:809, y:690, i:0.8, sigma:110 }] },
+  { key:"one",   label:"One sun",     suns:[{ x:512, y:512, i:1.0, sigma:210 }] },
+  { key:"twin",  label:"Second sun",  suns:[{ x:512, y:512, i:1.0, sigma:210 }, { x:0, y:0, i:1.0, sigma:130 }] },
+  { key:"dim",   label:"Dim sun",     suns:[{ x:512, y:512, i:1.0, sigma:210 }, { x:0, y:0, i:0.7, sigma:130 }] },
+  { key:"isles", label:"Archipelago", suns:[{ x:512, y:512, i:1.0, sigma:210 }, { x:0, y:0, i:0.8, sigma:110 }, { x:0, y:512, i:0.8, sigma:110 }] },
 ];
 function SunCard({ k, desktop, mono, actions, lightMul, onClose, onLog }){
   const amber = "#F2B24A";

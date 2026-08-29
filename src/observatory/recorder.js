@@ -22,7 +22,20 @@ const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0],
   sweep:[0,0,0,0,0,0,0],   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
   uniform:[0,0,0,0,0,0,0],
   diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0],   // standing polymorphism: both ends coexist
-  rail:[0,0,0,0,0,0,0], railRun:[0,0,0,0,0,0,0] };         // corridor contact: a locus pinned at its edge (6.2)
+  rail:[0,0,0,0,0,0,0], railRun:[0,0,0,0,0,0,0],           // corridor contact: a locus pinned at its edge (6.2)
+  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0] };         // local adaptation (7.L): the locus differs between light patches
+// 7.L patch statistics: nearest sun by toroidal distance (the phototaxis rule), locus mean per patch for one
+// species. Pure reads; `spread` = max - min over patches holding >= 20 individuals (0 with one sun).
+const PATCH_MIN = 20;
+function patchMeans(sp){
+  const K = W.suns.length, n = new Array(K).fill(0), m = new Array(K).fill(0);
+  for (let i=0;i<W.n;i++){ if (!W.alive[i] || W.sp[i]!==sp) continue;
+    let best=0, bd=Infinity; for (let k=0;k<K;k++){ const dx=wd(W.suns[k].x-W.x[i]), dy=wd(W.suns[k].y-W.y[i]), d=dx*dx+dy*dy; if (d<bd){ bd=d; best=k; } }
+    n[best]++; m[best]+=W.g[i]; }
+  let hi=-1, lo=-1;
+  for (let k=0;k<K;k++){ if (n[k] < PATCH_MIN) continue; m[k]/=n[k]; if (hi<0 || m[k]>m[hi]) hi=k; if (lo<0 || m[k]<m[lo]) lo=k; }
+  return { n, mean: m, hi, lo, spread: hi>=0 && lo>=0 ? m[hi]-m[lo] : 0 };
+}
 function pushEvent(type, sp, text){
   W.sysEvents.push({ tick: W.tick, type, sp, text });
   if (W.sysEvents.length > 200) W.sysEvents.shift();
@@ -102,6 +115,16 @@ function detectHeredity(r){
     if (!det.diverse[sp] && det.diverseRun[sp] >= 10){ det.diverse[sp] = 1;
       pushEvent("diverse", sp, name+" is diversifying — "+L.hiWord+" and "+L.loWord+" lines coexist, neither winning."); }
     else if (det.diverse[sp] && (sd < 0.06 || det.sweep[sp] !== 0)) det.diverse[sp] = 0;
+    // local adaptation (7.L): with two or more suns, the locus mean differs between patches by >= 0.10 for
+    // 10 samples (each patch holding >= 20). Calibrated on the seeded twin/dim layouts: the plankton's defense
+    // locus separated by 0.10-0.18 where the grazers stayed in one patch; the mat's light locus by <= 0.04.
+    if (W.suns.length > 1){
+      const pm = patchMeans(sp);
+      det.adaptRun[sp] = pm.spread >= 0.10 ? det.adaptRun[sp]+1 : 0;
+      if (!det.adapt[sp] && det.adaptRun[sp] >= 10){ det.adapt[sp] = 1;
+        pushEvent("adapt", sp, name+" differs by patch — "+L.hiWord+" near sun "+(pm.hi+1)+", "+L.loWord+" near sun "+(pm.lo+1)+"."); }
+      else if (det.adapt[sp] && pm.spread < 0.05) det.adapt[sp] = 0;
+    } else { det.adapt[sp] = 0; det.adaptRun[sp] = 0; }
     // diversity collapse: variation falls to well under half of what it was 270 samples ago.
     // Selection consuming variation is the normal end of a sweep; the event names the cost.
     if (W.recCount >= 271){
@@ -157,6 +180,11 @@ function record(){
     const n=B[r+sp], mean=m/n, varr=Math.max(0, m2/n - mean*mean);
     B[r+42+sp]=mean; B[r+49+sp]=Math.sqrt(varr);
   }
+  // 7.L local adaptation: the locus spread between light patches for the mat (56) and the plankton (57);
+  // exactly 0 with one sun. (Measured first as a genotype-light correlation: the wrong instrument -- Solara's
+  // locus reads shaded light, which mat density equalises across patches; the patch difference is what moved.)
+  B[r+56] = W.suns.length > 1 && TRAITS[SPECIES.MAT].locus ? patchMeans(SPECIES.MAT).spread : 0;
+  B[r+57] = W.suns.length > 1 && TRAITS[SPECIES.PREY].locus ? patchMeans(SPECIES.PREY).spread : 0;
   let fM=0, dM=0;
   for (let c=0;c<P.GRID*P.GRID;c++){ fM+=W.M[c]; dM+=W.dM[c]; }
   let bM=0; for (let i=0;i<W.n;i++) if (W.alive[i]) bM+=W.mn[i];

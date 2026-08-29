@@ -115,3 +115,43 @@ The questions as asked:
 1. Phototaxis (a) nearest-sun now, (b) field gradient in the heat block — agree?
 2. Minimum one sun (darkness stays a `lightMul` experiment) — or allow zero suns?
 3. Sun card as the selected-sun UI (mirrors the specimen card), presets inside it — or a permanent tray row?
+
+## 11. L.2 measurement record (2026-08-29)
+
+**Harness**: `harness/light.js --viability | --patches [--layouts a,b] [--at 3000] [--silent]`. Layouts are applied to an established world at t=3000 through the same events the UI sends; patch = nearest sun; light at an organism = the field.
+
+### 11.1 First design — moved-and-shrunk suns (rejected)
+
+The §2 layouts put two σ=130 suns at (256,256)/(768,768), i.e. they **moved the shipped sun 362 units and shrank it**. Measured:
+
+- **P0 viability** (silent, seeds 11/22/33/44, dim sun I ∈ 0.3…0.7): Solara in the dim patch at 18k — 0/4 seeds at I ≤ 0.5, 2/4 at 0.6 and at 0.7. No threshold reached in range. The dim patch below I≈0.6 is a desert for mats; the light locus's crossover (L=0.5) lies *below* the mat's viability floor, so no viable patch selects for shade tolerance.
+- **The layout itself was the harmful press**: core collapsed (Cilio lost, Drifta 1,000–2,100) on 5/8 seeds under `dim` (input ×0.63), 1/8 under `twin` (×0.81), 0/8 under a single matched sun at ×0.81 — so the displacement plus shrink, not the energy alone, does the damage.
+- **P1** twin: Solara |Δpatch| median 0.03 (4/8 within 0.05) — symmetric, as predicted. **P2** failed: Solara Δ ≈ 0, corr ≈ 0 (mostly no mats in the dim patch). **P3 inverted**: Drifta, not Solara, differed between patches (median |Δ| 0.19) — reported only with per-patch counts, below. **P4** 0/8. **P5**: apex at 18k 3/8 (one) → 0/8 (twin, dim).
+
+Consequence: **layouts are additive from here on** — the shipped sun is never moved or shrunk; extra suns are tight (σ 130) and placed at the far corner (724 away; the shipped sun contributes 0.003 there). Light input rises (×1.27 dim, ×1.38 twin); a matched single sun (I=1.27) is the attribution control. The L.1 presets were changed accordingly (One sun / Second sun / Dim sun / Archipelago).
+
+### 11.2 Additive layouts — safe, but an added sun is inert until seeded
+
+`twin` (shipped sun + I=1 σ=130 at the far corner, input ×1.35) and `dim` (+ I=0.7, ×1.25), applied at t=3000, evolving world, 8 seeds each: **core persists 8/8 on both** (apex at 18k 2/8 each, vs 3/8 one-sun, 0/8 matched single sun at ×1.24). So the additive presets are safe to ship. But the far patch held **zero Solara and zero Drifta at 18k on 16/16 runs**: mats disperse only by settling next to the parent, and the plankton steers toward the *nearest* sun, so nothing ever crosses the dark 362-unit midline. The world has no long-range dispersal — an added sun is an empty stage until the player seeds it (the long-press seeding gesture, which the harness reproduces with `--seed`). Attribution note: the matched single sun (×1.24) grew a larger mat (Solara median 2,332) than either additive layout (1,690–1,801) — light delivered to an empty corner is light not delivered to the living patch.
+
+### 11.3 Seeded additive layouts — colonisation works; the light locus still does not respond; the defense locus does
+
+`--seed` reproduces the player's colonisation kit (four Solara and four Drifta packs, one Cilio pack, one Bacillus pack around the new sun) at t=3000. Evolving world, 8 seeds each.
+
+- **Colonisation**: the far patch holds 405–562 Solara at 18k on 16/16 runs; Drifta 575–678 under the I=1 second sun, but only 21–25 under the I=0.7 dim sun (and 0 on 2/8) — a dim sun carries a mat but barely any plankton. Core persists 8/8 in both layouts. **Cost**: under the seeded second sun the grazer falls to 16–47 (from ~100) and the apex is gone on 8/8 by 18k — the plankton in the far patch is out of the grazers' reach, so the trophic chain above it thins. Reported per Decision B, not a failure.
+- **P1** (twin, symmetry): Solara |Δpatch| median 0.03, 7/8 within 0.05 — as predicted.
+- **P2 fails again, now with mats living under the dim sun**: Solara dim−bright patch mean median +0.02 (0/8 ≥ 0.15); corr(g, field light) median −0.07. **Reading**: the light locus is expressed on *shaded* light (`cellLight`), and mat density equalises realised light across patches — inside any dense mat every cell is "shade". The between-patch contrast never reaches the locus. Re-pricing (the §3 kill criterion) would not change that; expressing the locus on the field light would, and is a declared behaviour change for a later increment, if wanted at all.
+- **P3 inverted, and it is the real finding**: **Drifta's defense locus separates by patch** — seeded twin: |Δ| 0.01–0.17 (median 0.08), tougher near the shipped sun (where the grazers stayed) on 5/8; seeded dim: median 0.06 with the far patch too small (n ≈ 22) to read. Local adaptation to *grazer pressure*, not to light — the environment axis that differs between the patches is predation, because Cilio does not follow the plankton across the dark gap.
+- **P4**: 0/8. **P5**: above.
+
+**Instrument consequence**: genotype–light correlation was the wrong instrument (it measures the within-mat shading cline). Recorder channels 56–57 now carry the **locus spread between patches** (max − min of patch means over patches holding ≥ 20; exactly 0 with one sun) for the mat and the plankton, and the `adapt` detector fires on a spread ≥ 0.10 held for 10 samples: "Drifta differs by patch — tougher near sun 1, faster-growing near sun 2."
+
+### 11.4 L.3 gate (`node harness/light.js --gate`)
+
+Seeded second sun at t=3000, evolving world, 8 seeds: **`adapt` narrated on 6/8** (Drifta on 5/8 at t=12,960–17,720; Bacillus on 3/8 — the decomposer's metabolism locus separates by patch too, unpredicted and worth a look); plankton patch-spread peak 0.075–0.174, mat 0.024–0.062 (never narrated, correctly). **One-sun control: 0 adapt events, channels 56/57 exactly 0 on 8/8.** Gate criteria adopted: (1) adaptation narrated on ≥ 5/8 seeded-twin seeds; (2) control silent with channels exactly 0 on 8/8. Both PASS.
+
+### 11.5 Where this leaves the block
+
+- Shipped: additive sun layouts (safe 8/8), sun card, seeding-based colonisation, patch marks on the Traits page, the `adapt` narration.
+- Not achieved: Solara light-locus local adaptation. The cause is structural (the locus reads shaded light), not a price. Candidate declared change for later: express `lightSlope` on the field light. Not done in this block.
+- Found instead: patches select on *predation*, because the grazer does not cross dark water — Drifta's defense locus and Bacillus's metabolism locus separate between patches. The far patch is also a grazer- and apex-poor refuge (Cilio 16–47, apex 0/8 under a seeded second sun): a second sun is a trophic intervention, and the light budget line on the sun card understates that. Worth a sentence in the sun card once the heat block's field-sensing movement lands (that is what would let the grazer follow).

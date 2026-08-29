@@ -223,7 +223,9 @@ function drawTraits(g, wpx, hpx){
   loci.forEach((sp, bi) => {
     const L = TRAITS[sp].locus, c = SPECIES_META[sp].rgb, col = "rgb("+c[0]+","+c[1]+","+c[2]+")";
     const top = bi*bandH, padL = 34, padR = 10;
-    const ribT = top + 22, ribH = Math.max(40, bandH*0.52), histT = ribT + ribH + 18, histH = Math.max(28, bandH - (ribT - top) - ribH - 40);
+    // vertical budget per band: header 22, ribbon, 24 for the patch marks, histogram, 26 for its labels
+    const histH = Math.max(20, Math.round(bandH*0.28)), ribH = Math.max(30, bandH - 22 - 24 - histH - 26);
+    const ribT = top + 22, histT = ribT + ribH + 24;
     const cw = wpx - padL - padR;
     g.font = "11px ui-monospace, Menlo, monospace";
     g.fillStyle = col; g.fillText(SPECIES_META[sp].name + " · " + L.label.toLowerCase(), padL, top + 14);
@@ -249,7 +251,10 @@ function drawTraits(g, wpx, hpx){
       g.fillStyle = "#5E7386"; g.font = "10px ui-monospace, Menlo, monospace";
       g.fillText("-"+Math.round((n-1)*REC.STRIDE/10)+"s", padL, ribT+ribH+11); g.fillText("now", padL+cw-24, ribT+ribH+11);
       const last = at(n-1,42+sp), lsd = at(n-1,49+sp);
-      const lab = "mean "+last.toFixed(2)+" · spread ±"+lsd.toFixed(2);
+      let lab = "mean "+last.toFixed(2)+" · spread ±"+lsd.toFixed(2);
+      if (W.suns.length > 1){ const pm = patchMeans(sp); // 7.L: by patch, only when there is more than one sun
+        const parts = pm.n.map((k, j) => k >= PATCH_MIN ? pm.mean[j].toFixed(2) : null).filter(Boolean);
+        if (parts.length > 1) lab += " · by sun " + parts.join(" | "); }
       g.fillStyle = "#B8C5D1"; g.fillText(lab, padL+cw-g.measureText(lab).width, top+14);
     } else { g.fillStyle="#5E7386"; g.fillText("gathering history…", padL+6, ribT+ribH/2); }
     // histogram of the living population
@@ -264,6 +269,10 @@ function drawTraits(g, wpx, hpx){
     }
     g.strokeStyle = "rgba(201,215,227,0.35)"; g.setLineDash([3,4]);
     g.beginPath(); g.moveTo(padL + cw*L.g0, histT); g.lineTo(padL + cw*L.g0, histT+histH); g.stroke(); g.setLineDash([]);
+    if (W.suns.length > 1){ // 7.L: one small sun mark per patch at that patch's mean -- the split, if any, read off the bars
+      const pm = patchMeans(sp); g.font = "9px ui-monospace, Menlo, monospace"; g.fillStyle = "#B8C5D1";
+      pm.n.forEach((k, j) => { if (k < PATCH_MIN) return; const x = padL + cw*Math.max(0, Math.min(1, pm.mean[j]));
+        g.fillRect(x-0.5, histT-6, 1, 6); g.fillText("☀"+(j+1), x-6, histT-8); }); }
     g.fillStyle = "#5E7386"; g.font = "10px ui-monospace, Menlo, monospace";
     g.fillText(L.loWord, padL, histT+histH+11);
     g.fillText(L.hiWord, padL+cw-g.measureText(L.hiWord).width, histT+histH+11);

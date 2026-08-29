@@ -23,7 +23,7 @@ const SPECIES_PROFILE = [
     behaviour:"sessile; photosynthesises; divides into the neighbouring floor until the mat is crowded",
     food:"light and dissolved mineral", eatenBy:"Cilio — poor food; the lowest 35 units of every mat are ungrazeable refugia",
     size:"7–9 units at founding", lifecycle:"small constant hazard; no cyst" },
-  { key:"drifta", habitat:"open water wherever the light reaches; drifts toward brightness",
+  { key:"drifta", habitat:"open water wherever the light reaches; drifts toward the nearest sun — it will not cross dark water to reach a farther one",
     behaviour:"damped random walk with weak phototaxis; encysts when starved, wakes when light returns",
     food:"light and dissolved mineral — the fastest grower in the world", eatenBy:"Cilio — its best food; a 35% escape jink breaks contact",
     size:"3.4 units", lifecycle:"cyst at 18% reserve, wakes on light" },

@@ -31,7 +31,7 @@ colour grammar is strict (amber is reserved for the human hand).
 
 ## Drifta — producer · plankton
 
-**Habitat** open water, wherever the light reaches; drifts toward brightness.
+**Habitat** open water, wherever the light reaches; drifts toward the nearest sun — it will not cross dark water to reach a farther one (measured, Phase 7 L.2).
 **Behaviour** a damped random walk with weak phototaxis (drift speed 0.5); encysts when starved (18% reserve) and wakes when light returns.
 **Food** light and dissolved mineral — the fastest grower in the world (kp 0.30). **Eaten by** Cilio — its best food (50% yield).
 **Defense** an escape jink: 35% chance to break contact on each grazing attempt; heritably tougher or faster-growing.

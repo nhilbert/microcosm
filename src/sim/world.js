@@ -2,7 +2,7 @@ const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
 // Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
 // Lives here because W.rec is sized from it; changing CH is a declared rebaseline.
-const REC = { N: 900, STRIDE: 20, CH: 56 };
+const REC = { N: 900, STRIDE: 20, CH: 58 };  // 56-57: genotype-light correlation (7.L)
 
 // ---------- world state (module singletons; one artifact instance) ----------
 const W = {

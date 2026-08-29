@@ -57,7 +57,10 @@ World state `W` (`src/sim/world.js`) is structure-of-arrays over typed arrays,
 sized `MAXN = 6000`: parallel `Float32Array`/`Int32Array` columns (`x`, `y`,
 `vx`, `en`, `sp`, `mn`, …) indexed by organism slot, plus grid fields (`M`,
 `dE`, `dM`, `sc`, `light`) over a `GRID × GRID` torus and a corpse pool with its
-own parallel columns.
+own parallel columns. Light sources are a small array `W.suns` of
+`{x, y, i, sigma}` (Phase 7 L; one to `P.maxSuns`); the `light` field is the
+ambient floor plus one toroidal Gaussian per sun, and the plankton's phototaxis
+steers toward the *nearest* sun by toroidal distance.
 
 This maps directly onto `FloatArray`/`IntArray` in Kotlin or flat arrays in
 C/Rust, and it should stay that way. It was chosen for cache behaviour and for
@@ -96,7 +99,9 @@ do not change `locus.g0`, which is the expression reference, not the initial
 value.
 
 Recorder channels 42–48 (locus mean per species) and 49–55 (standard deviation)
-are pure reads over `W.g`. The sweep and diversity detectors in
+are pure reads over `W.g`; 56–57 (Phase 7 L) hold the locus spread between light
+patches (patch = nearest sun; max − min of patch means over patches holding ≥ 20;
+exactly 0 with one sun) for the mat and the plankton. The sweep and diversity detectors in
 `src/observatory/recorder.js` read those channels plus a share computed
 directly from `W.g`; both are observers and may be reimplemented freely.
 
@@ -110,7 +115,9 @@ directly will desynchronise from the event log and break replay. The evolution
 settings (Phase 6) are events too — `mutation` (`P.mutation`) and `locus`
 (`{sp, key, v}` for `sigma`, `curve` and the price slopes) — and a changed
 `sigma` changes the future PRNG stream exactly as the sun lever does; replay
-must apply them at their ticks.
+must apply them at their ticks. The suns (Phase 7 L) are events as well —
+`sun {k,x,y}`, `sunAdd {x,y,i?,sigma?,at?}`, `sunRemove {k}`, `sunSet {k,i?,sigma?}`
+— none of them draws; they change the stream only through ecology.
 
 ## Proving a port correct
 
