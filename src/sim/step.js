@@ -71,17 +71,14 @@ function step(){
       }
     }
     if(T.movement==="drift"){ // damped random walk + light-deficit-scaled phototaxis
-      const gx1=Math.floor(W.x[i]/CELL)&(P.GRID-1), gy1=Math.floor(W.y[i]/CELL)&(P.GRID-1);
-      const deficit=Math.max(0, 0.9-W.light[gy1*P.GRID+gx1]);
-      // steer toward the NEAREST light-emitting source (7.L decision 1; 7.H: a dark heater is not a target):
-      // with one sun this is the Phase 1 arithmetic exactly; with several, a drifter commits to the closest
-      let sdx=0, sdy=0, sd2=Infinity;
-      for (let k=0;k<W.sources.length;k++){ if (W.sources[k].i <= 0) continue;
-        const ex=wd(W.sources[k].x-W.x[i]), ey=wd(W.sources[k].y-W.y[i]), e2=ex*ex+ey*ey;
-        if (e2 < sd2){ sdx=ex; sdy=ey; sd2=e2; } }
-      const sd=Math.hypot(sdx,sdy)+1;
-      W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + T.phototaxis*deficit*sdx/sd;
-      W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + T.phototaxis*deficit*sdy/sd;
+      const deficit=Math.max(0, 0.9-W.light[cT]);
+      // 7.H.3 (declared change, replaces the nearest-sun vector of 7.L): the drifter climbs the LOCAL light
+      // gradient -- what a cell can actually sense (Chlamydomonas klinotaxis) -- scaled by its light deficit.
+      // Unit direction of the gradient; in a flat cell there is nothing to steer by. Same two draws as before.
+      const lgx=W.lgx[cT], lgy=W.lgy[cT], lg=Math.hypot(lgx,lgy);
+      const px = lg > 0 ? T.phototaxis*deficit*lgx/lg : 0, py = lg > 0 ? T.phototaxis*deficit*lgy/lg : 0;
+      W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + px;
+      W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + py;
       if (T.thermo && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2 thermotaxis: down the discomfort gradient |dT - tpref| (draw-free; skipped in a flat field)
         const sgn = dT > T.topt ? -1 : dT < T.topt ? 1 : 0;
         W.vx[i] += T.thermo*sgn*W.tgx[cT]; W.vy[i] += T.thermo*sgn*W.tgy[cT]; }

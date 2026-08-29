@@ -49,6 +49,13 @@ function computeLight(){
     }
     W.light[gy*P.GRID+gx] = v * P.lightMul;
   }
+  // the gradient the drifter senses (7.H.3, declared change): central differences on the torus, light per world unit
+  const G = P.GRID, Lt = W.light;
+  for (let gy = 0; gy < G; gy++) for (let gx = 0; gx < G; gx++){
+    const c = gy*G+gx;
+    W.lgx[c] = (Lt[gy*G+((gx+1)&(G-1))] - Lt[gy*G+((gx-1+G)&(G-1))]) / (2*CELL);
+    W.lgy[c] = (Lt[((gy+1)&(G-1))*G+gx] - Lt[((gy-1+G)&(G-1))*G+gx]) / (2*CELL);
+  }
 }
 // Warmth above ambient (7.H): the same Gaussians, each source's `a` (negative = a cold source). Static like
 // light, recomputed on events only. Sources with a = 0 are skipped so the shipped world's field is exactly 0.

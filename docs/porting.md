@@ -59,8 +59,11 @@ sized `MAXN = 6000`: parallel `Float32Array`/`Int32Array` columns (`x`, `y`,
 `dE`, `dM`, `sc`, `light`) over a `GRID × GRID` torus and a corpse pool with its
 own parallel columns. Light sources are a small array `W.sources` of
 `{x, y, i, sigma}` (Phase 7 L; one to `P.maxSources`); the `light` field is the
-ambient floor plus one toroidal Gaussian per sun, and the plankton's phototaxis
-steers toward the *nearest* sun by toroidal distance.
+ambient floor plus one toroidal Gaussian per source's light; `temp` is the same
+for warmth (Phase 7 H). Both fields carry per-cell central-difference gradients
+(`lgx/lgy`, `tgx/tgy`), and the plankton's phototaxis climbs the *local light
+gradient* (Phase 7 H.3, a declared change from the nearest-sun rule of 7 L) — a
+port must reproduce the gradient arithmetic, not the sun position.
 
 This maps directly onto `FloatArray`/`IntArray` in Kotlin or flat arrays in
 C/Rust, and it should stay that way. It was chosen for cache behaviour and for
