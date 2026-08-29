@@ -17,7 +17,7 @@ const SPECIES_META = [
   { name:"Venator",  role:"Predator · pursuit",    rgb: COL.venator },
 ];
 // Species profiles ("Steckbrief"), from the same TRAITS rows the sim runs on. Shown on the
-// specimen card. Image: assets/species/<key>.png, optional -- the card hides the slot if missing.
+// specimen card. Image: assets/species/<key>.jpg (640px), optional -- the card hides the slot if missing.
 const SPECIES_PROFILE = [
   { key:"solara", habitat:"the lit floor near the sun; a carpet, thickest where light is strongest",
     behaviour:"sessile; photosynthesises; divides into the neighbouring floor until the mat is crowded",

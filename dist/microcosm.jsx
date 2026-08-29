@@ -1143,7 +1143,7 @@ const SPECIES_META = [
   { name:"Venator",  role:"Predator · pursuit",    rgb: COL.venator },
 ];
 // Species profiles ("Steckbrief"), from the same TRAITS rows the sim runs on. Shown on the
-// specimen card. Image: assets/species/<key>.png, optional -- the card hides the slot if missing.
+// specimen card. Image: assets/species/<key>.jpg (640px), optional -- the card hides the slot if missing.
 const SPECIES_PROFILE = [
   { key:"solara", habitat:"the lit floor near the sun; a carpet, thickest where light is strongest",
     behaviour:"sessile; photosynthesises; divides into the neighbouring floor until the mat is crowded",
@@ -2657,6 +2657,11 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
           color: card.badge==="Ready to divide" ? "rgb(70,214,140)" : COL.plankTxt }}>
           {card.badge}</span>
       </div>
+      {detail >= 1 && SPECIES_PROFILE[card.sp] && (
+        <img src={`assets/species/${SPECIES_PROFILE[card.sp].key}.jpg`} alt="" onError={e => { e.currentTarget.style.display = "none"; }}
+          style={{ display:"block", width:"100%", maxHeight:200, objectFit:"cover", borderRadius:12, marginTop:12,
+            border:"1px solid rgba(94,115,134,0.3)" }} />
+      )}
       <div style={{ marginTop:10, display:"grid", gap:5 }}>
         {[["E", card.en, card.cap, `rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})`],
           ["P", card.pr, card.pQ, "rgb(226,170,150)"],
@@ -2719,10 +2724,7 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
       {detail === 2 && SPECIES_PROFILE[card.sp] && (() => { const pf = SPECIES_PROFILE[card.sp]; return (
         <div style={{ marginTop:18, fontSize:12, lineHeight:1.5 }}>
           <div style={{ fontSize:11, color:COL.silt, letterSpacing:1.2 }}>PROFILE</div>
-          <img src={`assets/species/${pf.key}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; }}
-            style={{ display:"block", width:"100%", maxHeight:220, objectFit:"cover", borderRadius:12, marginTop:8,
-              border:"1px solid rgba(94,115,134,0.3)" }} />
-          <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"5px 12px", marginTop:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"5px 12px", marginTop:8 }}>
             {[["habitat", pf.habitat], ["behaviour", pf.behaviour], ["food", pf.food], ["eaten by", pf.eatenBy],
               ["size", pf.size], ["lifecycle", pf.lifecycle]].map(([k, v]) => (
               <React.Fragment key={k}>

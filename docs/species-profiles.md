@@ -3,7 +3,7 @@
 The specimen card shows a profile ("Steckbrief") per species, drawn from the same
 `TRAITS` rows the simulation runs on — the numbers below are the sim's, in the
 sim's units (world = 1024 units across; a tick = 0.1 s at 1×). Images live in
-`assets/species/<key>.png`, square, and are optional: the card hides the slot
+`assets/species/<key>.jpg` (640px square; full-size originals stay local under `full/`) and are optional: the card hides the slot
 when a file is missing.
 
 ## Shared style prompt

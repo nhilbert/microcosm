@@ -20,3 +20,6 @@ Thumbs.db
 
 # dev server bundle output
 dev/.build/
+
+# full-size species art stays local (10+ MB); the app uses the 640px versions
+assets/species/full/
