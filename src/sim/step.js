@@ -80,7 +80,7 @@ function step(){
       W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + px;
       W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + py;
       if (T.thermo && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2 thermotaxis: down the discomfort gradient |dT - tpref| (draw-free; skipped in a flat field)
-        const sgn = dT > T.topt ? -1 : dT < T.topt ? 1 : 0;
+        const tp = T.tpref === null ? T.topt : T.tpref, sgn = dT > tp ? -1 : dT < tp ? 1 : 0;
         W.vx[i] += T.thermo*sgn*W.tgx[cT]; W.vy[i] += T.thermo*sgn*W.tgy[cT]; }
       const s=Math.hypot(W.vx[i],W.vy[i]);
       if(s>T.driftSpeed){ W.vx[i]*=T.driftSpeed/s; W.vy[i]*=T.driftSpeed/s; }
@@ -90,7 +90,8 @@ function step(){
     else if(T.movement==="tumble"){ // run-and-tumble chemotaxis along the detritus gradient
       const c0=cellOf(i);
       let here = T.tumbleField==="scent" ? W.sc[c0]*40 : W.dE[c0]+W.dP[c0]+W.dM[c0];
-      if (T.thermo && dT !== T.topt && (W.tgx[c0] !== 0 || W.tgy[c0] !== 0)) here -= T.thermo*Math.abs(dT - T.topt); // 7.H.2 klinokinesis: discomfort reads as "worse", raising tumbling (Berg & Brown)
+      { const tp = T.tpref === null ? T.topt : T.tpref;
+        if (T.thermo && dT !== tp && (W.tgx[c0] !== 0 || W.tgy[c0] !== 0)) here -= T.thermo*Math.abs(dT - tp); } // 7.H.2 klinokinesis: discomfort reads as "worse", raising tumbling (Berg & Brown)
       const pT = here > W.mem[i]+0.01 ? T.tumbleLow : T.tumbleHigh;
       W.mem[i]=here;
       if(R()<pT) W.hd[i]=R()*6.283;
@@ -150,7 +151,7 @@ function step(){
             W.y[target]=wrap(W.y[target]+Math.sin(ja)*TJ.escape.kick);
             W.vx[target]=Math.cos(ja)*0.5; W.vy[target]=Math.sin(ja)*0.5;
           } else {
-            const bite=Math.min(T.bite, W.en[target] - (TJ.grazeFloor? TJ.grazeFloor*0.99 : 0));
+            const bite=Math.min(T.bite*W.qA[cT], W.en[target] - (TJ.grazeFloor? TJ.grazeFloor*0.99 : 0)); // intake per contact rises with warmth (Q10 1.6), less than upkeep (2.5)
             if(bite>0){
               if(TJ.alarmEmit) W.al[cellOf(target)] += TJ.alarmEmit; // Schreckstoff: injury broadcasts alarm
               const yieldMul = W.cy[target] ? TJ.cystYield : 1;
@@ -185,7 +186,7 @@ function step(){
       } else {
         W.hd[i]+=(R()-0.5)*0.5;
         if (T.thermo && !hungry && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2: an idle, fed hunter turns toward its preferred warmth; hunger overrides (Hedgecock)
-          const sgn = dT > T.topt ? -1 : 1, ta = Math.atan2(sgn*W.tgy[cT], sgn*W.tgx[cT]);
+          const tp = T.tpref === null ? T.topt : T.tpref, sgn = dT > tp ? -1 : 1, ta = Math.atan2(sgn*W.tgy[cT], sgn*W.tgx[cT]);
           let da=ta-W.hd[i]; while(da>Math.PI)da-=6.283; while(da<-Math.PI)da+=6.283;
           W.hd[i]+=Math.max(-T.turnRate*0.5, Math.min(T.turnRate*0.5, da)); }
         speed=(hungry? T.speed*0.7 : T.speed*0.3)*(torpid?0.75:1);

@@ -37,7 +37,10 @@ function chemistry(){ // detritus and dissolved mineral per cell, warm cells vs 
 const NOTHERMO = flag("--nothermo");   // H-P6 control: every species blind to warmth (TRAITS.thermo = 0), metabolism unchanged
 const BLIND = new Set((args.includes("--blind") ? args[args.indexOf("--blind")+1] : "").split(",").filter(Boolean).map(Number)); // --blind 2,6: these species blind
 const THERMO0 = TRAITS.map(T => T.thermo);
+const ATTACK0 = P.q10.attack;
+const NOATTACK = flag("--noattack");   // attack Q10 off (P.q10.attack = 1), to attribute a change to it
 function run(seed, setup){
+  P.q10.attack = NOATTACK ? 1 : ATTACK0;
   TRAITS.forEach((T, sp) => { T.thermo = (NOTHERMO || BLIND.has(sp)) ? 0 : THERMO0[sp]; });
   P.tempAmb = 0; L.start(seed, true); // ambient is a harness-level switch: reset per run (the press sets it at --at)
   let gppWarm=0, gppAmb=0, respWarm=0, respAmb=0, samples=0, apexLost=-1, coreLost=-1;
@@ -54,7 +57,8 @@ function run(seed, setup){
   const warmth = LIVE.map(sp => chan(58+sp));
   // realised mat production now: photosynthesis gain per mat cell, warm vs ambient (one tick, read off flows by a probe step)
   const g0 = W.flows.gpp; C.step(); const dg = W.flows.gpp - g0; // (probe tick; the fingerprint is not compared here)
-  return { pops: p, apexLost, coreLost, warmth, rad: radial(src), chem: chemistry(), driftaCV: L.cv(cyc), gppTick: dg };
+  return { pops: p, apexLost, coreLost, warmth, rad: radial(src), chem: chemistry(), driftaCV: L.cv(cyc), gppTick: dg,
+    heatEvents: W.sysEvents.filter(e => e.type === "heat" || e.type === "pile").map(e => (e.type === "pile" ? "pile" : e.sp >= 0 ? TRAITS[e.sp].name.slice(0,3) : "world")+"@"+e.tick) };
 }
 const f = (v, d=2) => isNaN(v) ? "  -  " : v.toFixed(d);
 function report(title, setup){
@@ -69,10 +73,11 @@ function report(title, setup){
   const med = xs => { const a = xs.filter(v => !isNaN(v)).sort((x,y)=>x-y); return a.length ? a[Math.floor(a.length/2)] : NaN; };
   console.log(`median dist from source: ${LIVE.map(k => TRAITS[k].name.slice(0,3)+" "+f(med(rows.map(r=>r.rad.dist[k])),0)).join(" · ")}  (H-P2: Venator > Cilio > Solara ≈ Drifta > Bacillus)`);
   console.log(`apex lost on ${rows.filter(r=>r.apexLost>0).length}/8 · core lost on ${rows.filter(r=>r.coreLost>0).length}/8 · Drifta CV median ${f(med(rows.map(r=>r.driftaCV)))}`);
+  console.log(`heat narration: ${rows.map((r,k)=>SEEDS[k]+": "+(r.heatEvents.join(" ")||"-")).join(" | ")}`);
   return rows;
 }
 if (flag("--spot")){ const a = num("--a", 8);
-  report("control: untouched world", () => {});
+  if (!flag("--only-heated")) report("control: untouched world", () => {});
   report(`hot sun: warmth +${a} on the shipped sun`, () => C.applyEvent({ type:"sourceSet", k:0, a }));
 }
 if (flag("--heater")){ const a = num("--a", 10);

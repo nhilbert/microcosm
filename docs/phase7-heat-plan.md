@@ -202,3 +202,12 @@ Same heater, plankton and decomposer steering, hunters not: **core held 8/8**, C
 **Mechanism (diagnosed, old vs new core on the same corners).** The gradient rule packs the plankton tighter around the sun: mean distance from the sun 91–113 (was 108–140), no drifters in dark water in either rule. A denser plankton core concentrates the grazers, and the pack hunts them more efficiently — Venator rises to 30–47 (was 22–28) and eats the grazer out. It is a trophic cascade at the genome extremes (faster-growing prey with a thrifty grazer; or tougher prey with a keen grazer and a voracious decomposer), and the same mechanism shows benignly in the shipped world as the apex holding on more seeds. Not an artefact: drifters at the peak cell (gradient exactly 0) and in the dark behave as intended.
 
 **Decision (owner, 2026-08-29): H.3 accepted** with the two extreme-corner grazer extinctions as a documented in-corridor finding, consistent with the Phase 5.9 corner decision (rails + fuzz are the operative guarantee). Conformance recaptured with this reason; Yoshida baseline recaptured above.
+
+## 12. Checkpoint (2026-08-29, evening) — measurement pending
+
+Built, bit-identical at ambient, **not yet accepted**:
+- **Attack-rate Q10 1.6** on intake per contact (`P.q10.attack`, `W.qA`). Measured under the +6 press: grazer no longer squeezed (Cilio 97–201), Drifta CV 0.41 → 0.28 — the Fussmann stabilisation appears once intake scales with warmth. Keep.
+- **Heat narration** (`heat`, `pile` events; channel 65 = detritus warm/ambient ratio): "X is paying more for the warmth than it gains — upkeep ×1.73 against photosynthesis ×1.33", aggregated to one world sentence when ≥3 species fire; "Dead matter is piling up in the warm water — 4.2× the ambient stock". Silent at ambient by construction.
+- **`tpref` trait** (preferred warmth, default = optimum; **Drifta 4**). Cause: under a +8 hot sun the H.3 light gradient and Drifta's thermotaxis toward its optimum (+9) pointed at the same spot — plankton packed onto the peak (mean distance 48, was 122) and the pack ate the grazer out: core lost 8/8. Attribution runs: attack Q10 off → still lost 8/8; thermotaxis off → held 8/8. So the set-point, not the Q10.
+
+**Pending**: hot sun, heater and press with `tpref = 4` (outputs in the scratchpad: `heat-spot-tpref.txt`, `heat-heater-tpref.txt`, `heat-press-tpref.txt`). Acceptance = hot sun core held 8/8, heater keeps the H-P6 effect (drifters leave the +6.5 core), press unchanged. Then record here, update CLAUDE.md, commit.

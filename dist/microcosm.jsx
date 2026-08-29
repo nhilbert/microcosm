@@ -46,7 +46,7 @@ const P = {
   tempAmb: 0,       // ambient warmth (Phase 7 H; the global press is deferred) -- every Q10 factor is exactly 1 at dT = 0
   // Q10 per process (7.H, phase7-heat-plan.md §3): maintenance steeper than photosynthesis (E 0.65 vs 0.32 eV),
   // decomposition in between, handling time shortens, pursuit speed rises less than cost. The separation is the content.
-  q10: { resp: 2.5, photo: 1.6, decomp: 2.0, handling: 0.65, pursuit: 1.3 },
+  q10: { resp: 2.5, photo: 1.6, decomp: 2.0, handling: 0.65, pursuit: 1.3, attack: 1.6 },  // attack: intake per contact (Rall et al. E ~0.45 eV), flatter than upkeep
   divPlank: 70, divBenth: 150, shadeMax: 0.95,
   moveCost: 0.003, capMul: 10, invest: 0.5,
   mutSigma: 0.08,  // (settleLimit moved to per-trait rows in 3.0b)
@@ -143,7 +143,8 @@ const SPECIES_ROWS = [
     },
     "topt": 9,
     "ctmax": 14,
-    "thermo": 0.6
+    "thermo": 0.6,
+    "tpref": 4
   },
   {
     "name": "Cilio",
@@ -421,7 +422,8 @@ const TRAIT_DEFAULTS = {
   flee: null, alarmEmit: 0, burst: null,
   live: true, apex: false, mat: false,
   topt: 7, ctmax: 12,   // thermal performance (7.H): gains hold to topt (warmth above ambient), fall to 0 at ctmax; costs never fall
-  thermo: 0,            // thermotaxis gain (7.H.2): how strongly this species moves toward its preferred warmth (tpref = topt); 0 = blind to it
+  thermo: 0,            // thermotaxis gain (7.H.2): how strongly this species moves toward its preferred warmth; 0 = blind to it
+  tpref: null,          // preferred warmth (7.H.2); null = its optimum. Drifta prefers cooler water than it tolerates: seeking its optimum under a hot sun packed it onto the light peak and the grazer was eaten out (measured)
 };
 const CYST_DEFAULTS = { scMin: 0.03 };
 const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
@@ -489,7 +491,7 @@ const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
 // Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
 // Lives here because W.rec is sized from it; changing CH is a declared rebaseline.
-const REC = { N: 900, STRIDE: 20, CH: 65 };  // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species (7.H)
+const REC = { N: 900, STRIDE: 20, CH: 66 };  // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species; 65: detritus warm/ambient ratio (7.H)
 
 // ---------- world state (module singletons; one artifact instance) ----------
 const W = {
@@ -511,7 +513,7 @@ const W = {
   temp: new Float32Array(P.GRID * P.GRID),   // warmth above ambient per cell (7.H); exactly 0 without a warm source
   // per-cell Q10 factors, all exactly 1 where temp is 0 (7.H): maintenance, photosynthesis, decomposition, handling, pursuit
   qR: new Float32Array(P.GRID * P.GRID).fill(1), qP: new Float32Array(P.GRID * P.GRID).fill(1), qD: new Float32Array(P.GRID * P.GRID).fill(1),
-  qH: new Float32Array(P.GRID * P.GRID).fill(1), qS: new Float32Array(P.GRID * P.GRID).fill(1),
+  qH: new Float32Array(P.GRID * P.GRID).fill(1), qS: new Float32Array(P.GRID * P.GRID).fill(1), qA: new Float32Array(P.GRID * P.GRID).fill(1),
   tgx: new Float32Array(P.GRID * P.GRID), tgy: new Float32Array(P.GRID * P.GRID),   // warmth gradient per cell (7.H.2), exactly 0 when flat
   lgx: new Float32Array(P.GRID * P.GRID), lgy: new Float32Array(P.GRID * P.GRID),   // light gradient per cell (7.H.3): what the drifter steers by
   light: new Float32Array(P.GRID * P.GRID),
@@ -785,7 +787,7 @@ function computeTemp(){
     const c = gy*P.GRID+gx; W.temp[c] = v;
     const Q = P.q10, e = v/10; // Math.pow(q, 0) is exactly 1: the certified world's factors stay 1
     W.qR[c] = Math.pow(Q.resp, e); W.qP[c] = Math.pow(Q.photo, e); W.qD[c] = Math.pow(Q.decomp, e);
-    W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e);
+    W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e); W.qA[c] = Math.pow(Q.attack, e);
   }
   // the gradient the organisms sense (7.H.2): central differences on the torus, degrees per world unit
   const G = P.GRID, Tm = W.temp;
@@ -859,7 +861,8 @@ const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0],
   uniform:[0,0,0,0,0,0,0],
   diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0],   // standing polymorphism: both ends coexist
   rail:[0,0,0,0,0,0,0], railRun:[0,0,0,0,0,0,0],           // corridor contact: a locus pinned at its edge (6.2)
-  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0] };         // local adaptation (7.L): the locus differs between light patches
+  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0],           // local adaptation (7.L): the locus differs between light patches
+  heat:[0,0,0,0,0,0,0], heatRun:[0,0,0,0,0,0,0], pile:0, pileRun:0 }; // warmth (7.H): a species paying more for warmth than it gains; dead matter piling up in warm water
 // 7.L patch statistics: nearest sun by toroidal distance (the phototaxis rule), locus mean per patch for one
 // species. Pure reads; `spread` = max - min over patches holding >= 20 individuals (0 with one sun).
 const PATCH_MIN = 20;
@@ -880,6 +883,36 @@ function detect(r, awake){
   detectEcology(r, awake);
   detectHeredity(r);
   detectChemistry(r);
+  detectHeat(r);
+}
+// ---- warmth (7.H): read off the model's own factors, exactly silent when nothing is warm ----
+// A species "pays more than it gains" when, at the warmth it actually experiences (channel 58+sp), its upkeep
+// factor exceeds its gain factor by 15% for 10 samples: upkeep Q10 2.5 against photosynthesis 1.6 (producers),
+// decomposition 2.0 (detritivores) or intake 1.6 (hunters). Calibrated on the §10 tables: under the +6 press the
+// apex (lost first, 8/8) and the decomposer (down a third) read 1.73/1.52 and 1.31; the plankton reads 1.31 too but
+// was light-limited, so the wording states the factors, never a prognosis. Dead matter "piles up" when the warm
+// cells hold >= 3x the ambient detritus stock for 10 samples (measured 3.4-9.7x under a hot sun, 1x otherwise).
+function detectHeat(r){
+  const B = W.rec, Q = P.q10, fired = [];
+  for (let sp=0; sp<7; sp++){
+    const T = TRAITS[sp]; if (!T.live || B[r+sp] < (T.apex ? 5 : 20)){ det.heat[sp] = 0; det.heatRun[sp] = 0; continue; }
+    const felt = B[r+58+sp];
+    const gainQ = T.photosynth ? Q.photo : T.detritivore ? Q.decomp : T.diet ? Q.attack : Q.resp;
+    const up = Math.pow(Q.resp, felt/10), gain = Math.pow(gainQ, felt/10), ratio = gain > 0 ? up/gain : 1;
+    det.heatRun[sp] = (felt > 0.5 && ratio >= 1.15) ? det.heatRun[sp]+1 : 0;
+    if (!det.heat[sp] && det.heatRun[sp] >= 10){ det.heat[sp] = 1; fired.push({ sp, T, up, gain, felt }); }
+    else if (det.heat[sp] && (felt <= 0.5 || ratio < 1.05)) det.heat[sp] = 0;
+  }
+  const gainWord = T => T.photosynth ? "photosynthesis" : T.detritivore ? "decomposition" : "intake";
+  if (fired.length >= 3){ // a uniform warming hits everyone at once: one sentence, not a wall
+    const ups = fired.map(f => f.up), gs = fired.map(f => f.gain);
+    pushEvent("heat", -1, "The whole world is paying more for the warmth than it gains — upkeep ×"+Math.min(...ups).toFixed(2)+(Math.max(...ups)-Math.min(...ups) > 0.02 ? "–"+Math.max(...ups).toFixed(2) : "")+" against gains ×"+Math.min(...gs).toFixed(2)+(Math.max(...gs)-Math.min(...gs) > 0.02 ? "–"+Math.max(...gs).toFixed(2) : "")+" ("+fired.map(f => f.T.name).join(", ")+")."); }
+  else for (const f of fired)
+    pushEvent("heat", f.sp, f.T.name+" is paying more for the warmth than it gains — upkeep ×"+f.up.toFixed(2)+" against "+gainWord(f.T)+" ×"+f.gain.toFixed(2)+(f.felt > f.T.topt ? ", and it is past its optimum" : "")+".");
+  const pile = B[r+65];
+  det.pileRun = pile >= 3 ? det.pileRun+1 : 0;
+  if (!det.pile && det.pileRun >= 10){ det.pile = 1; pushEvent("pile", -1, "Dead matter is piling up in the warm water — "+pile.toFixed(1)+"× the ambient stock; the decomposers are not keeping up."); }
+  else if (det.pile && pile < 2) det.pile = 0;
 }
 // ---- ecology: establishment, wake, extinction, blooms and crashes per species ----
 function detectEcology(r, awake){
@@ -1023,6 +1056,9 @@ function record(){
   { const st = [0,0,0,0,0,0,0], sn = [0,0,0,0,0,0,0];
     for (let i=0;i<W.n;i++) if (W.alive[i]){ st[W.sp[i]] += W.temp[cellOf(i)]; sn[W.sp[i]]++; }
     for (let sp=0;sp<7;sp++) B[r+58+sp] = sn[sp] ? st[sp]/sn[sp] : 0; }
+  { let wD=0, wN=0, aD=0, aN=0; // 65: detritus per warm cell (dT > 3) over per ambient cell; 0 when nothing is warm
+    for (let c=0;c<P.GRID*P.GRID;c++){ const D=W.dE[c]+W.dP[c]+W.dM[c]; if (W.temp[c] > 3){ wD+=D; wN++; } else { aD+=D; aN++; } }
+    B[r+65] = (wN && aN && aD > 0) ? (wD/wN)/(aD/aN) : 0; }
   B[r+56] = W.sources.length > 1 && TRAITS[SPECIES.MAT].locus ? patchMeans(SPECIES.MAT).spread : 0;
   B[r+57] = W.sources.length > 1 && TRAITS[SPECIES.PREY].locus ? patchMeans(SPECIES.PREY).spread : 0;
   let fM=0, dM=0;
@@ -1269,7 +1305,7 @@ function step(){
       W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + px;
       W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + py;
       if (T.thermo && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2 thermotaxis: down the discomfort gradient |dT - tpref| (draw-free; skipped in a flat field)
-        const sgn = dT > T.topt ? -1 : dT < T.topt ? 1 : 0;
+        const tp = T.tpref === null ? T.topt : T.tpref, sgn = dT > tp ? -1 : dT < tp ? 1 : 0;
         W.vx[i] += T.thermo*sgn*W.tgx[cT]; W.vy[i] += T.thermo*sgn*W.tgy[cT]; }
       const s=Math.hypot(W.vx[i],W.vy[i]);
       if(s>T.driftSpeed){ W.vx[i]*=T.driftSpeed/s; W.vy[i]*=T.driftSpeed/s; }
@@ -1279,7 +1315,8 @@ function step(){
     else if(T.movement==="tumble"){ // run-and-tumble chemotaxis along the detritus gradient
       const c0=cellOf(i);
       let here = T.tumbleField==="scent" ? W.sc[c0]*40 : W.dE[c0]+W.dP[c0]+W.dM[c0];
-      if (T.thermo && dT !== T.topt && (W.tgx[c0] !== 0 || W.tgy[c0] !== 0)) here -= T.thermo*Math.abs(dT - T.topt); // 7.H.2 klinokinesis: discomfort reads as "worse", raising tumbling (Berg & Brown)
+      { const tp = T.tpref === null ? T.topt : T.tpref;
+        if (T.thermo && dT !== tp && (W.tgx[c0] !== 0 || W.tgy[c0] !== 0)) here -= T.thermo*Math.abs(dT - tp); } // 7.H.2 klinokinesis: discomfort reads as "worse", raising tumbling (Berg & Brown)
       const pT = here > W.mem[i]+0.01 ? T.tumbleLow : T.tumbleHigh;
       W.mem[i]=here;
       if(R()<pT) W.hd[i]=R()*6.283;
@@ -1339,7 +1376,7 @@ function step(){
             W.y[target]=wrap(W.y[target]+Math.sin(ja)*TJ.escape.kick);
             W.vx[target]=Math.cos(ja)*0.5; W.vy[target]=Math.sin(ja)*0.5;
           } else {
-            const bite=Math.min(T.bite, W.en[target] - (TJ.grazeFloor? TJ.grazeFloor*0.99 : 0));
+            const bite=Math.min(T.bite*W.qA[cT], W.en[target] - (TJ.grazeFloor? TJ.grazeFloor*0.99 : 0)); // intake per contact rises with warmth (Q10 1.6), less than upkeep (2.5)
             if(bite>0){
               if(TJ.alarmEmit) W.al[cellOf(target)] += TJ.alarmEmit; // Schreckstoff: injury broadcasts alarm
               const yieldMul = W.cy[target] ? TJ.cystYield : 1;
@@ -1374,7 +1411,7 @@ function step(){
       } else {
         W.hd[i]+=(R()-0.5)*0.5;
         if (T.thermo && !hungry && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2: an idle, fed hunter turns toward its preferred warmth; hunger overrides (Hedgecock)
-          const sgn = dT > T.topt ? -1 : 1, ta = Math.atan2(sgn*W.tgy[cT], sgn*W.tgx[cT]);
+          const tp = T.tpref === null ? T.topt : T.tpref, sgn = dT > tp ? -1 : 1, ta = Math.atan2(sgn*W.tgy[cT], sgn*W.tgx[cT]);
           let da=ta-W.hd[i]; while(da>Math.PI)da-=6.283; while(da<-Math.PI)da+=6.283;
           W.hd[i]+=Math.max(-T.turnRate*0.5, Math.min(T.turnRate*0.5, da)); }
         speed=(hungry? T.speed*0.7 : T.speed*0.3)*(torpid?0.75:1);
@@ -1502,7 +1539,7 @@ function initWorld(seed){
   // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
   TRAITS.forEach((T, sp) => { if (T.locus){ T.locus.sigma = LOCUS_SHIPPED[sp].sigma; T.locus.curve = LOCUS_SHIPPED[sp].curve; } });
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
-  det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0); det.adapt.fill(0); det.adaptRun.fill(0);
+  det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0); det.adapt.fill(0); det.adaptRun.fill(0); det.heat.fill(0); det.heatRun.fill(0); det.pile=0; det.pileRun=0;
   recPrev.uptake=recPrev.gpp=recPrev.resp=recPrev.bacRelease=recPrev.corpseToDet=recPrev.egestE=recPrev.deaths=0;
   recPrev.deathsBy.fill(0);
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);

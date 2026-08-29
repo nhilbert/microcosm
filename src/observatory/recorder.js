@@ -23,7 +23,8 @@ const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0],
   uniform:[0,0,0,0,0,0,0],
   diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0],   // standing polymorphism: both ends coexist
   rail:[0,0,0,0,0,0,0], railRun:[0,0,0,0,0,0,0],           // corridor contact: a locus pinned at its edge (6.2)
-  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0] };         // local adaptation (7.L): the locus differs between light patches
+  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0],           // local adaptation (7.L): the locus differs between light patches
+  heat:[0,0,0,0,0,0,0], heatRun:[0,0,0,0,0,0,0], pile:0, pileRun:0 }; // warmth (7.H): a species paying more for warmth than it gains; dead matter piling up in warm water
 // 7.L patch statistics: nearest sun by toroidal distance (the phototaxis rule), locus mean per patch for one
 // species. Pure reads; `spread` = max - min over patches holding >= 20 individuals (0 with one sun).
 const PATCH_MIN = 20;
@@ -44,6 +45,36 @@ function detect(r, awake){
   detectEcology(r, awake);
   detectHeredity(r);
   detectChemistry(r);
+  detectHeat(r);
+}
+// ---- warmth (7.H): read off the model's own factors, exactly silent when nothing is warm ----
+// A species "pays more than it gains" when, at the warmth it actually experiences (channel 58+sp), its upkeep
+// factor exceeds its gain factor by 15% for 10 samples: upkeep Q10 2.5 against photosynthesis 1.6 (producers),
+// decomposition 2.0 (detritivores) or intake 1.6 (hunters). Calibrated on the §10 tables: under the +6 press the
+// apex (lost first, 8/8) and the decomposer (down a third) read 1.73/1.52 and 1.31; the plankton reads 1.31 too but
+// was light-limited, so the wording states the factors, never a prognosis. Dead matter "piles up" when the warm
+// cells hold >= 3x the ambient detritus stock for 10 samples (measured 3.4-9.7x under a hot sun, 1x otherwise).
+function detectHeat(r){
+  const B = W.rec, Q = P.q10, fired = [];
+  for (let sp=0; sp<7; sp++){
+    const T = TRAITS[sp]; if (!T.live || B[r+sp] < (T.apex ? 5 : 20)){ det.heat[sp] = 0; det.heatRun[sp] = 0; continue; }
+    const felt = B[r+58+sp];
+    const gainQ = T.photosynth ? Q.photo : T.detritivore ? Q.decomp : T.diet ? Q.attack : Q.resp;
+    const up = Math.pow(Q.resp, felt/10), gain = Math.pow(gainQ, felt/10), ratio = gain > 0 ? up/gain : 1;
+    det.heatRun[sp] = (felt > 0.5 && ratio >= 1.15) ? det.heatRun[sp]+1 : 0;
+    if (!det.heat[sp] && det.heatRun[sp] >= 10){ det.heat[sp] = 1; fired.push({ sp, T, up, gain, felt }); }
+    else if (det.heat[sp] && (felt <= 0.5 || ratio < 1.05)) det.heat[sp] = 0;
+  }
+  const gainWord = T => T.photosynth ? "photosynthesis" : T.detritivore ? "decomposition" : "intake";
+  if (fired.length >= 3){ // a uniform warming hits everyone at once: one sentence, not a wall
+    const ups = fired.map(f => f.up), gs = fired.map(f => f.gain);
+    pushEvent("heat", -1, "The whole world is paying more for the warmth than it gains — upkeep ×"+Math.min(...ups).toFixed(2)+(Math.max(...ups)-Math.min(...ups) > 0.02 ? "–"+Math.max(...ups).toFixed(2) : "")+" against gains ×"+Math.min(...gs).toFixed(2)+(Math.max(...gs)-Math.min(...gs) > 0.02 ? "–"+Math.max(...gs).toFixed(2) : "")+" ("+fired.map(f => f.T.name).join(", ")+")."); }
+  else for (const f of fired)
+    pushEvent("heat", f.sp, f.T.name+" is paying more for the warmth than it gains — upkeep ×"+f.up.toFixed(2)+" against "+gainWord(f.T)+" ×"+f.gain.toFixed(2)+(f.felt > f.T.topt ? ", and it is past its optimum" : "")+".");
+  const pile = B[r+65];
+  det.pileRun = pile >= 3 ? det.pileRun+1 : 0;
+  if (!det.pile && det.pileRun >= 10){ det.pile = 1; pushEvent("pile", -1, "Dead matter is piling up in the warm water — "+pile.toFixed(1)+"× the ambient stock; the decomposers are not keeping up."); }
+  else if (det.pile && pile < 2) det.pile = 0;
 }
 // ---- ecology: establishment, wake, extinction, blooms and crashes per species ----
 function detectEcology(r, awake){
@@ -187,6 +218,9 @@ function record(){
   { const st = [0,0,0,0,0,0,0], sn = [0,0,0,0,0,0,0];
     for (let i=0;i<W.n;i++) if (W.alive[i]){ st[W.sp[i]] += W.temp[cellOf(i)]; sn[W.sp[i]]++; }
     for (let sp=0;sp<7;sp++) B[r+58+sp] = sn[sp] ? st[sp]/sn[sp] : 0; }
+  { let wD=0, wN=0, aD=0, aN=0; // 65: detritus per warm cell (dT > 3) over per ambient cell; 0 when nothing is warm
+    for (let c=0;c<P.GRID*P.GRID;c++){ const D=W.dE[c]+W.dP[c]+W.dM[c]; if (W.temp[c] > 3){ wD+=D; wN++; } else { aD+=D; aN++; } }
+    B[r+65] = (wN && aN && aD > 0) ? (wD/wN)/(aD/aN) : 0; }
   B[r+56] = W.sources.length > 1 && TRAITS[SPECIES.MAT].locus ? patchMeans(SPECIES.MAT).spread : 0;
   B[r+57] = W.sources.length > 1 && TRAITS[SPECIES.PREY].locus ? patchMeans(SPECIES.PREY).spread : 0;
   let fM=0, dM=0;

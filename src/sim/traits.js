@@ -27,7 +27,8 @@ const TRAIT_DEFAULTS = {
   flee: null, alarmEmit: 0, burst: null,
   live: true, apex: false, mat: false,
   topt: 7, ctmax: 12,   // thermal performance (7.H): gains hold to topt (warmth above ambient), fall to 0 at ctmax; costs never fall
-  thermo: 0,            // thermotaxis gain (7.H.2): how strongly this species moves toward its preferred warmth (tpref = topt); 0 = blind to it
+  thermo: 0,            // thermotaxis gain (7.H.2): how strongly this species moves toward its preferred warmth; 0 = blind to it
+  tpref: null,          // preferred warmth (7.H.2); null = its optimum. Drifta prefers cooler water than it tolerates: seeking its optimum under a hot sun packed it onto the light peak and the grazer was eaten out (measured)
 };
 const CYST_DEFAULTS = { scMin: 0.03 };
 const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };

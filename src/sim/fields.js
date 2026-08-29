@@ -72,7 +72,7 @@ function computeTemp(){
     const c = gy*P.GRID+gx; W.temp[c] = v;
     const Q = P.q10, e = v/10; // Math.pow(q, 0) is exactly 1: the certified world's factors stay 1
     W.qR[c] = Math.pow(Q.resp, e); W.qP[c] = Math.pow(Q.photo, e); W.qD[c] = Math.pow(Q.decomp, e);
-    W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e);
+    W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e); W.qA[c] = Math.pow(Q.attack, e);
   }
   // the gradient the organisms sense (7.H.2): central differences on the torus, degrees per world unit
   const G = P.GRID, Tm = W.temp;
