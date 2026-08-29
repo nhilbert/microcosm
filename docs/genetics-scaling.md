@@ -79,3 +79,16 @@ The claim in §1, tested. Same price ranges that swept to a rail under the linea
 | Cilio kbSlope 0.30 | 0.41–0.52 | 0.43–0.67 | 0.40–0.63 |
 
 Existence of an interior equilibrium is set by curvature; its position still moves with price (and therefore with the ecology), which is what the levers should do. The cost, measured: standing sd narrows from 0.10–0.17 (linear) to 0.06–0.12 (curve 0.3) — concavity is stabilizing selection, and it suppresses exactly the two-line splitting the owner had watched under the linear form. **Decision (owner):** the linear form ships; `curve` stays 0 and becomes a Phase 6 slider, so the player chooses between a world that sweeps and splits and one that settles.
+
+## Appendix B — measured (2026-08-29): a convex light locus does not split the mat
+
+The §1 corollary, tested: Solara's light locus (the one trait with a spatial niche axis — the sun gradient) at four curvatures, defense and pursuit concave at 0.3; 3 seeds × 36k. Sarle's bimodality coefficient on the living population (> 0.555 suggests two modes); the genotype–light correlation is reported as measured (the run's r was scaled by √n by a bug in the script, corrected here).
+
+| Solara curve | mean g at 36k | sd | bimodality | r(g, local light) |
+|---|---|---|---|---|
+| +0.3 concave | 0.54–0.58 | 0.07–0.10 | 0.35–0.36 | −0.07 … +0.23 |
+| 0 linear | 0.55–0.59 | 0.10–0.13 | 0.30–0.47 | −0.12 … +0.13 |
+| −0.2 convex | 0.59–0.68 | 0.12–0.13 | 0.35–0.38 | −0.19 … −0.07 |
+| −0.4 convex | 0.66–0.79 | 0.12–0.15 | 0.43–0.49 | −0.18 … −0.04 |
+
+**No split.** Convexity widens the distribution and pushes the mean shade-ward (the convex bonus rewards leaving g₀, and the mat mostly sits in dim water), but the histogram stays unimodal and genotype barely tracks local light. The light gradient is not a strong enough niche axis at this effect size: a mat cell's fitness is set by crowding and mineral before it is set by light (the 5.8 lever finding again). Branching needs the trade-off to bite; here it does not. The Drifta splitting the owner watched under the linear form is therefore the better lead — it is the grazing interaction, not the light field, that produces the frequency dependence. A "two lines have separated" detector waits until a split is observed in a shipped world.
