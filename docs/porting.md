@@ -67,6 +67,39 @@ allocating nothing per tick. Turning organisms into objects is the one
 Slots are recycled. An organism is identified by `(index, gen)` — index alone is
 not stable, and code that holds a reference across ticks must re-check `gen`.
 
+## Heredity (Phase 5)
+
+`W.g` is one `Float32Array` column: the heritable locus value in [0,1] for any
+species whose `TRAITS` row carries a `locus`, else 0. `W.lg` is the lineage
+generation (founders 0, child = parent + 1), pure bookkeeping. Expression is
+inline in `step()` and must be translated exactly as written, because it is
+constructed so that at `g == g0` both expressions collapse to the bare trait:
+
+    escape probability   escape.p + escSlope * (g - g0)
+    photosynthesis       kp * (1 + kpSlope * (g0 - g))
+
+That identity is what makes the silent genome bit-identical to the pre-heredity
+world, and it depends on `g0 - g0` being exactly zero in floating point — keep
+the arithmetic in this form; do not pre-multiply or rearrange.
+
+Inheritance at division: child `g` = parent `g`, plus ONE uniform draw
+`(R() - 0.5) * 2 * sigma` clamped to [0,1] — but only when `sigma > 0 &&
+P.mutation`. That conditional is part of the RNG contract: with mutation off, no
+draw is made, and the stream is identical to a world with no genome at all. A
+port must reproduce that short-circuit, including its order relative to the
+other draws in the reproduction block.
+
+`P.mutation = false` is the reference configuration for conformance
+(`conform.js` fingerprints both). To pin a population at a rail for an
+experiment, set `W.g[i]` on the founders after `initWorld()` with mutation off —
+do not change `locus.g0`, which is the expression reference, not the initial
+value.
+
+Recorder channels 42–48 (locus mean per species) and 49–55 (standard deviation)
+are pure reads over `W.g`. The sweep and diversity detectors in
+`src/observatory/recorder.js` read those channels plus a share computed
+directly from `W.g`; both are observers and may be reimplemented freely.
+
 ## The write API
 
 `applyEvent` / `queueEvent` / `drainEvents` (`src/sim/events.js`) are the only

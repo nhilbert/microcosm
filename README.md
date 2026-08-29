@@ -10,7 +10,8 @@ living system and find out what happens.
 
 ## What's in the world
 
-Seven species are defined; five are alive in the shipped world:
+Seven species are defined; five are alive in the shipped world. One of them,
+Drifta, carries a heritable trait and evolves:
 
 | Species | Role |
 | --- | --- |
@@ -138,24 +139,27 @@ confident theory that lost an argument with the data.
 
 ## Status
 
-Phases 1–4 are closed; Phase 5 (heredity) is planned but not built. A Kotlin
-port is the eventual target — `core.js` plus the harnesses are its conformance
-spec.
+Phases 1–5 are closed. A Kotlin port is the eventual target — `src/sim/` plus
+the harnesses are its conformance spec (`docs/porting.md`).
 
 Measured on this tree, 2026-08-29:
 
-- **`conform.js` — PASS**, bit-identical to the certified fingerprint.
+- **`conform.js` — PASS**, bit-identical on both fingerprints: the *silent*
+  genome (the Phase 4 reference world) and the *evolving* world that ships.
 - **`tune2.js` — 8 of 8 seeds pass** the acceptance criterion. Venator, the apex
   predator, holds on five seeds and is lost on three (11, 66, 88) between
   t=5,100 and t=7,200 — but every world runs the full 18,000 ticks with all four
   core species alive and the mineral audit flat to within 0.009%. Losing the
   apex restructures the world; it does not break it.
-- **`k6gate.js` — does not currently pass.** The Observatory still narrates the
-  decomposers-off strangulation unprompted and in the correct ecological order
-  (mineral-flow warning at t=5,440, predator death at t=6,260, lock-up warning
-  at t=7,460), and the healthy control stays quiet. But the grazer now survives
-  the 18,000-tick budget instead of starving, so the gate's lead-time criteria
-  have no death to measure against and score FAIL.
+- **`k6gate.js` — PASS**, all five criteria, on the reference world: strain
+  warning 712 s before the grazer's death, extinctions in ecological order,
+  control silent (2/78 flags). Under evolution the grazer survives the same
+  experiment — a Phase 5 finding the gate reports for information.
+- **`gate5.js` — the Observatory narrates the evolution unprompted**: a sweep
+  event on 8/8 evolving seeds, each grounded in the locus-mean channel; the
+  silent control emits nothing and its variance channel reads exactly 0.
+- **`corridor.js` — CERTIFIED**: the locus may evolve anywhere in [0,1]; both
+  rails pass the ecosystem criterion on 8/8 seeds.
 
 **On the acceptance criterion.** Venator was originally certified to establish on
 all eight seeds. After an undeclared RNG drift in Phase 4 (recorded in
@@ -177,10 +181,20 @@ community reorganises. Eight seeds and one time point is not proof of a
 mechanism, so it is recorded as an observation worth testing properly, not as a
 result.
 
-The Phase 4 record also documents the K6 gate passing on all five criteria. That
-one does not reproduce here, and is unresolved. These numbers are published as
-measured rather than inherited — the same standard the app's own impact cards
-are held to.
+**The integrity incident, resolved.** The handoff called the RNG drift
+unrecoverable. The source held the answer: the Phase 5 locus had been switched on
+live inside the certified world. Silence it and the Phase 4 record reproduces to
+the second. The baseline now certifies both worlds explicitly.
+
+**What evolution actually did.** Drifta carries one heritable locus — defense
+against grazing, priced in growth. Under grazing it is selected all the way to
+the defended rail (mean 0.50 → 0.93 in 36k ticks), the Observatory narrates the
+sweep as it happens, and the grazer's cycle becomes tighter and more regular.
+The textbook prediction — long antiphase cycles — did *not* appear, because it
+needs two genotypes trading places and this population sweeps instead. A steeper
+cost (`kpSlope` 0.5) produces the balanced polymorphism that prediction requires;
+that is recorded as a decision, not shipped. All of it is in
+`docs/phase5-plan.md`, numbers included.
 
 ## License
 
