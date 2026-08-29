@@ -16,6 +16,18 @@ const SPECIES_META = [
   { name:"Necro",    role:"Scavenger",             rgb: COL.necro },    // dormant until 3.3
   { name:"Venator",  role:"Predator · pursuit",    rgb: COL.venator },
 ];
+const SHAPES = ["nucleus","dot","tri","square","dot","dot","tri"]; // sprite shape per species (Venator is drawn as paths)
+// Genotype tint (Phase 5.3): a bounded shift WITHIN the species hue. t=0 (the loWord end) leans
+// paler and warmer, t=1 (the hiWord end) deeper and cooler; the midpoint is the species color
+// exactly, so a silent genome renders precisely as before. Species identity stays legible at
+// overview; the shift is meant to be read at loupe zoom and on the Traits histogram.
+function tintRgb(rgb, t){
+  const k = (t - 0.5) * 2; // -1..1
+  const [r,g,b] = rgb;
+  return k >= 0
+    ? [Math.round(r - 22*k), Math.round(g - 34*k), Math.round(Math.min(255, b + 12*k))]
+    : [Math.round(Math.min(255, r - 30*k)), Math.round(Math.min(255, g + 16*(-k))), Math.round(b + 18*k)];
+}
 function makeSprite(rgb, shape){
   const s = 64, c = document.createElement("canvas"); c.width = s; c.height = s;
   const g = c.getContext("2d"); const [r, gg, b] = rgb;

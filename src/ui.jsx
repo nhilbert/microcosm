@@ -48,6 +48,11 @@ export default function Microcosm(){
 
     const sprites = [makeSprite(COL.solara,"nucleus"), makeSprite(COL.drifta,"dot"), makeSprite(COL.cilio,"tri"), makeSprite(COL.bacillus,"square"),
       makeSprite(COL.mycora,"dot"), makeSprite(COL.necro,"dot"), makeSprite(COL.venator,"tri")];
+    // one sprite per genotype bin for every species that carries a locus (7 bins across [0,1])
+    const TINT_BINS = 7;
+    const tints = TRAITS.map((T, sp) => T.locus && sp !== 6
+      ? Array.from({ length: TINT_BINS }, (_, b) => makeSprite(tintRgb(SPECIES_META[sp].rgb, b/(TINT_BINS-1)), SHAPES[sp]))
+      : null);
 
     // mat carpet: density field for sessile producers (Splatterplots-style aggregation).
     // Denser mats render DARKER, saturated green — thick algae absorb light; brightness stays reserved.
@@ -128,10 +133,19 @@ export default function Microcosm(){
           ? ((T.reproCooldown && W.cd[i] > 0) ? "Maturing" : "Ready to divide")
           : gates[0][0];
       }
+      // ancestry line (5.3): lineage generation, and the locus expressed as % change vs the founder
+      let heredity = null;
+      if (T.locus){
+        const L = T.locus, g = W.g[i];
+        const escPct = T.escape ? Math.round(100 * L.escSlope*(g - L.g0) / T.escape.p) : 0;
+        const kpPct = Math.round(100 * L.kpSlope*(L.g0 - g));
+        heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord,
+          parts: [[L.hiTrait, escPct], [L.loTrait, kpPct]] };
+      }
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
         age: Math.floor((W.tick - W.birth[i]) / 10), state: stateOf(i),
         en: W.en[i], cap, pr: W.pr[i], pQ, mn: W.mn[i], mQ, size: W.sz[i],
-        badge, bind };
+        badge, bind, lineage: W.lg[i], heredity };
     };
     const clearChips = () => { clearTimeout(chipTimer); setUi(u => (u.chips ? { ...u, chips: null } : u)); };
     const selectIndex = i => {
@@ -380,13 +394,14 @@ export default function Microcosm(){
           continue;
         }
         const r = (spb===0 ? W.sz[i]*1.1 : spb===1 ? W.sz[i]*1.9 : spb===3 ? W.sz[i]*1.6 : spb===6 ? W.sz[i]*1.0 : W.sz[i]*2.2) * z;
+        const spr = tints[spb] ? tints[spb][Math.max(0, Math.min(TINT_BINS-1, Math.round(W.g[i]*(TINT_BINS-1))))] : sprites[spb];
         if (spb === 2){
           ctx.save(); ctx.translate(sx, sy); ctx.rotate(W.hd[i]);
-          ctx.drawImage(sprites[2], -r, -r, r*2, r*2); ctx.restore();
+          ctx.drawImage(spr, -r, -r, r*2, r*2); ctx.restore();
         } else if (spb === 6){
           drawGhostRay(ctx, sx, sy, W.hd[i], r, W.bst[i] > 0, null);
         } else {
-          ctx.drawImage(sprites[spb], sx-r, sy-r, r*2, r*2);
+          ctx.drawImage(spr, sx-r, sy-r, r*2, r*2);
         }
       }
       ctx.globalCompositeOperation = "source-over";
@@ -751,7 +766,7 @@ export default function Microcosm(){
                   title="Close (Esc)"
                   style={{ marginLeft:"auto", width:28, height:28, borderRadius:8, cursor:"pointer",
                     border:"1px solid rgba(94,115,134,0.3)", background:"transparent",
-                    color:COL.silt, fontSize:13, lineHeight:1 }}>\u2715</button>
+                    color:COL.silt, fontSize:13, lineHeight:1 }}>✕</button>
               </div>
               <div className="mc-scroll" style={{ padding:"0 16px 18px", overflowY:"auto", flex:1 }}>
                 <SpecimenBody card={ui.card} tick={ui.tick} detail={2}
@@ -814,6 +829,28 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
           <div><div style={{fontSize:11,color:COL.silt}}>MINERAL</div>{card.mn.toFixed(2)} / {card.mQ.toFixed(2)}</div>
           <div><div style={{fontSize:11,color:COL.silt}}>DIVISION GATE</div>{Math.round(100*card.bind)}%</div>
           <div><div style={{fontSize:11,color:COL.silt}}>SIM TIME / TICK</div>{tick}</div>
+          <div><div style={{fontSize:11,color:COL.silt}}>GENERATION</div>{card.lineage}</div>
+        </div>
+      )}
+      {detail >= 1 && card.heredity && (
+        <div style={{ marginTop:14, fontSize:12, lineHeight:1.5 }}>
+          <div style={{ fontSize:11, color:COL.silt }}>{card.heredity.label.toUpperCase()} · heritable</div>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:4 }}>
+            <span style={{ fontFamily:mono, fontSize:12 }}>{card.heredity.g.toFixed(2)}</span>
+            <div style={{ flex:1, height:4, borderRadius:2, background:"rgba(11,19,30,0.8)", position:"relative" }}>
+              <div style={{ position:"absolute", left:`${card.heredity.g0*100}%`, top:-3, width:1, height:10, background:"rgba(201,215,227,0.45)" }} />
+              <div style={{ position:"absolute", left:`calc(${card.heredity.g*100}% - 3px)`, top:-1, width:6, height:6, borderRadius:3,
+                background:`rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})` }} />
+            </div>
+          </div>
+          <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:COL.silt, marginTop:2 }}>
+            <span>{card.heredity.loWord}</span><span>{card.heredity.hiWord}</span>
+          </div>
+          <div style={{ marginTop:4, color:COL.silt }}>
+            vs founder: {card.heredity.parts.map(([nm, pct], k) => (
+              <span key={nm}>{k ? " · " : ""}<span style={{ color: pct === 0 ? COL.silt : pct > 0 ? "rgb(140,230,170)" : "rgb(226,170,150)" }}>
+                {pct > 0 ? "+" : ""}{pct}%</span> {nm}</span>))}
+          </div>
         </div>
       )}
       {detail >= 1 && (

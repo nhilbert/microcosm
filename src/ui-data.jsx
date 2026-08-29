@@ -8,6 +8,7 @@ const PAGE_TITLES = [
   ["Metabolism", "what the world produces and burns"],
   ["Health", "vitals against species reference ranges, like blood work"],
   ["Events", "the world's story, oldest at the bottom · since ≠ because"],
+  ["Traits", "what is being inherited · mean and spread over time, the population now"],
 ];
 const IV_LABEL = { pour:"You poured mineral", kill:"You killed a specimen", feed:"You fed a specimen", seed:"You introduced organisms",
   sun:"You moved the sun", sunlight:"You changed the sunlight", undo:"You undid the last action" };
@@ -207,6 +208,79 @@ function drawMetabolism(g, wpx, hpx){
   line(minz, m2*1.15, "rgba(91,200,232,0.7)", 1.2); // recycling (own scale)
 }
 
+// Traits page (5.3): one band per species with a locus. Left/top: mean ± one standard deviation
+// over time, the founder value as a dashed line, amber intervention markers. Bottom: histogram
+// of the living population now, bars in the genotype tint. Variance is drawn deliberately large:
+// it is the fuel gauge of evolution, and a sweep is visible as the ribbon narrowing while it moves.
+function drawTraits(g, wpx, hpx){
+  g.fillStyle = "#0B131E"; g.fillRect(0, 0, wpx, hpx);
+  const loci = []; for (let sp=0;sp<7;sp++) if (TRAITS[sp].locus && sp !== 6) loci.push(sp);
+  const n = W.recCount;
+  if (!loci.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
+  const bandH = hpx / loci.length;
+  loci.forEach((sp, bi) => {
+    const L = TRAITS[sp].locus, c = SPECIES_META[sp].rgb, col = "rgb("+c[0]+","+c[1]+","+c[2]+")";
+    const top = bi*bandH, padL = 34, padR = 10;
+    const ribT = top + 22, ribH = Math.max(40, bandH*0.52), histT = ribT + ribH + 18, histH = Math.max(28, bandH - (ribT - top) - ribH - 40);
+    const cw = wpx - padL - padR;
+    g.font = "11px ui-monospace, Menlo, monospace";
+    g.fillStyle = col; g.fillText(SPECIES_META[sp].name + " · " + L.label.toLowerCase(), padL, top + 14);
+    // ribbon
+    g.strokeStyle = "rgba(94,115,134,0.25)"; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(padL, ribT); g.lineTo(padL, ribT+ribH); g.lineTo(padL+cw, ribT+ribH); g.stroke();
+    g.fillStyle = "#5E7386"; g.font = "10px ui-monospace, Menlo, monospace";
+    g.fillText("1", padL-12, ribT+8); g.fillText("0", padL-12, ribT+ribH);
+    const yOf = v => ribT + ribH*(1 - Math.max(0, Math.min(1, v)));
+    g.setLineDash([3,4]); g.strokeStyle = "rgba(201,215,227,0.35)";
+    g.beginPath(); g.moveTo(padL, yOf(L.g0)); g.lineTo(padL+cw, yOf(L.g0)); g.stroke(); g.setLineDash([]);
+    if (n >= 5){
+      const at = seriesAt(n);
+      const F = { padL, padT: ribT, ch: ribH, cw };
+      drawMarkers(g, F, n, W.tick);
+      g.beginPath();
+      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1); const y = yOf(at(k,42+sp)+at(k,49+sp)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
+      for (let k=n-1;k>=0;k--){ const x = padL + cw*k/Math.max(1,n-1); g.lineTo(x, yOf(at(k,42+sp)-at(k,49+sp))); }
+      g.closePath(); g.fillStyle = "rgba("+c[0]+","+c[1]+","+c[2]+",0.22)"; g.fill();
+      g.strokeStyle = col; g.lineWidth = 1.6; g.beginPath();
+      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1), y = yOf(at(k,42+sp)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
+      g.stroke();
+      g.fillStyle = "#5E7386"; g.font = "10px ui-monospace, Menlo, monospace";
+      g.fillText("-"+Math.round((n-1)*REC.STRIDE/10)+"s", padL, ribT+ribH+11); g.fillText("now", padL+cw-24, ribT+ribH+11);
+      const last = at(n-1,42+sp), lsd = at(n-1,49+sp);
+      const lab = "mean "+last.toFixed(2)+" · spread ±"+lsd.toFixed(2);
+      g.fillStyle = "#B8C5D1"; g.fillText(lab, padL+cw-g.measureText(lab).width, top+14);
+    } else { g.fillStyle="#5E7386"; g.fillText("gathering history…", padL+6, ribT+ribH/2); }
+    // histogram of the living population
+    const BINS = 24, hist = new Float32Array(BINS); let tot=0;
+    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ hist[Math.min(BINS-1, Math.floor(W.g[i]*BINS))]++; tot++; }
+    let hmax = 1; for (let b=0;b<BINS;b++) hmax = Math.max(hmax, hist[b]);
+    const bw = cw/BINS;
+    for (let b=0;b<BINS;b++){
+      const t = tintRgb(c, (b+0.5)/BINS), h = histH*hist[b]/hmax;
+      g.fillStyle = "rgba("+t[0]+","+t[1]+","+t[2]+",0.85)";
+      g.fillRect(padL + b*bw + 0.5, histT + histH - h, Math.max(1, bw-1), h);
+    }
+    g.strokeStyle = "rgba(201,215,227,0.35)"; g.setLineDash([3,4]);
+    g.beginPath(); g.moveTo(padL + cw*L.g0, histT); g.lineTo(padL + cw*L.g0, histT+histH); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "#5E7386"; g.font = "10px ui-monospace, Menlo, monospace";
+    g.fillText(L.loWord, padL, histT+histH+11);
+    g.fillText(L.hiWord, padL+cw-g.measureText(L.hiWord).width, histT+histH+11);
+    const nl = tot+" alive now"; g.fillText(nl, padL+cw/2-g.measureText(nl).width/2, histT+histH+11);
+  });
+}
+function TraitsLegend(){
+  const n = W.recCount; if (n < 1) return null;
+  const r = ((W.recHead-1+REC.N)%REC.N)*REC.CH;
+  const rows = [];
+  for (let sp=0;sp<7;sp++){ const L = TRAITS[sp].locus; if (!L || sp===6) continue;
+    const c = SPECIES_META[sp].rgb, mean = W.rec[r+42+sp], sd = W.rec[r+49+sp];
+    let hi=0, tot=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ tot++; if (W.g[i] > L.g0+0.05) hi++; }
+    rows.push(<span key={sp} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
+      ● {SPECIES_META[sp].name} {L.label.toLowerCase()} {mean.toFixed(2)} ±{sd.toFixed(2)} · {L.hiWord} {tot ? Math.round(100*hi/tot) : 0}%</span>);
+  }
+  return <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
+    {rows}<span style={{ color:"#5E7386", marginLeft:"auto" }}>{P.mutation ? "mutation on" : "mutation off"}</span></div>;
+}
 function HealthPage(){
   const ind = typeof indicators === "function" ? indicators() : null;
   if (!ind) return <div style={{ padding:24, color:"#5E7386", fontSize:12 }}>gathering history…</div>;
@@ -269,7 +343,7 @@ function DataMode({ docked }){
     return () => clearInterval(iv);
   }, []);
   React.useEffect(() => {
-    if (page >= 3) return; // Health and Events are DOM, not canvas
+    if (page === 3 || page === 4) return; // Health and Events are DOM, not canvas
     const cv = cRef.current; if (!cv) return;
     const dpr = window.devicePixelRatio || 1;
     const wpx = cv.clientWidth, hpx = cv.clientHeight;
@@ -278,6 +352,7 @@ function DataMode({ docked }){
     if (page === 0) drawPopulations(g, wpx, hpx, scrub, logScale);
     else if (page === 1) drawChemistry(g, wpx, hpx);
     else if (page === 2) drawMetabolism(g, wpx, hpx);
+    else if (page === 5) drawTraits(g, wpx, hpx);
   });
   const onScrub = e => {
     if (page !== 0) return;
@@ -322,7 +397,7 @@ function DataMode({ docked }){
         <canvas ref={cRef} onPointerDown={e => { e.stopPropagation(); swDown(e); onScrub(e); }}
           onPointerMove={e => e.buttons && onScrub(e)}
           onPointerUp={e => { swUp(e); setScrub(null); }}
-          style={{ width:"100%", height: docked ? "38%" : "46%", minHeight:170,
+          style={{ width:"100%", height: page===5 ? (docked ? "62%" : "58%") : docked ? "38%" : "46%", minHeight:170,
             touchAction:"none", cursor: page===0 ? "col-resize" : "default" }} />
       )}
       {page === 0 && (
@@ -341,6 +416,7 @@ function DataMode({ docked }){
           <span style={{color:"rgb(91,200,232)"}}>● dissolved</span>
         </div>
       )}
+      {page === 5 && <TraitsLegend />}
       {page === 2 && (
         <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
           <span style={{color:"rgb(140,230,170)"}}>● production (GPP)</span>
@@ -351,7 +427,7 @@ function DataMode({ docked }){
       {docked ? (
         <div className="mc-scroll" style={{ marginTop:"auto", flexShrink:0, display:"flex", flexWrap:"wrap",
           gap:4, padding:"10px 12px 14px", borderTop:"1px solid rgba(94,115,134,0.22)" }}>
-          {[0,1,2,3,4].map(i => (
+          {[0,1,2,3,4,5].map(i => (
             <button key={i} className="mc-tab" onClick={() => setPage(i)}
               style={{ padding:"5px 10px", borderRadius:8, cursor:"pointer", fontFamily:"inherit", fontSize:11.5,
                 border:"1px solid " + (i===page ? "rgba(94,115,134,0.5)" : "transparent"),
@@ -364,7 +440,7 @@ function DataMode({ docked }){
       ) : (
         <div style={{ textAlign:"center", color:"#5E7386", fontSize:13, marginTop:"auto", paddingBottom:96,
           letterSpacing:4 }}>
-          {[0,1,2,3,4].map(i => (
+          {[0,1,2,3,4,5].map(i => (
             <span key={i} onClick={() => setPage(i)}
               style={{ cursor:"pointer", color: i===page ? "#E6F0FA" : "#42566A" }}>●</span>
           ))}
