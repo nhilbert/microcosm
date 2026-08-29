@@ -1,0 +1,732 @@
+// (render helpers live in src/ui-render.js; concatenated by build.py)
+export default function Microcosm(){
+  const canvasRef = useRef(null);
+  const [ui, setUi] = useState({ tick: 0, fps: 0, pops: [0,0,0,0,0,0,0], speed: 1, card: null, mineral: { b: 0, f: 0, l: 0, add: 0 }, lightMul: 1, spawnPick: null });
+  const [detent, setDetent] = useState(0); // 0 peek, 1 half, 2 full
+  const [undoChip, setUndoChip] = useState(null);
+  const [uiMode, setUiMode] = useState("observe");
+  const actionsRef = useRef({});
+  const speedRef = useRef(1); // 0 = paused, 1, 4, 16
+  const fabLong = useRef(null);
+  const dragRef = useRef(null);
+
+  useEffect(() => {
+    initWorld();
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    let vw = 0, vh = 0;
+    const cam = { x: W.sun.x, y: W.sun.y, z: Math.max(1, Math.min(window.innerWidth, window.innerHeight) / 620) };
+    const minZ = () => Math.max(vw, vh) / P.WORLD;
+    const clampZ = z => Math.max(minZ(), Math.min(6, z));
+    const resize = () => {
+      vw = canvas.clientWidth; vh = canvas.clientHeight;
+      canvas.width = vw * dpr; canvas.height = vh * dpr;
+      cam.z = clampZ(cam.z); // rotation / viewport change must re-clamp zoom
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    // light layer (world-space, redrawn only when the sun moves — static in this increment)
+    const LB = document.createElement("canvas"); LB.width = 512; LB.height = 512;
+    const lg = LB.getContext("2d");
+    const drawLight = () => {
+      lg.fillStyle = COL.abyss; lg.fillRect(0,0,512,512);
+      const k = 512 / P.WORLD;
+      const gr2 = lg.createRadialGradient(W.sun.x*k, W.sun.y*k, 4, W.sun.x*k, W.sun.y*k, P.sunSigma*2.2*k);
+      gr2.addColorStop(0, "rgba(214,238,255,0.30)");
+      gr2.addColorStop(0.4, "rgba(140,190,225,0.12)");
+      gr2.addColorStop(1, "rgba(140,190,225,0)");
+      lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
+      lg.fillStyle = "rgba(240,250,255,0.9)";
+      lg.beginPath(); lg.arc(W.sun.x*k, W.sun.y*k, 5, 0, 6.283); lg.fill();
+    };
+    drawLight();
+
+    const sprites = [makeSprite(COL.solara,"nucleus"), makeSprite(COL.drifta,"dot"), makeSprite(COL.cilio,"tri"), makeSprite(COL.bacillus,"square"),
+      makeSprite(COL.mycora,"dot"), makeSprite(COL.necro,"dot"), makeSprite(COL.venator,"tri")];
+
+    // mat carpet: density field for sessile producers (Splatterplots-style aggregation).
+    // Denser mats render DARKER, saturated green — thick algae absorb light; brightness stays reserved.
+    const MC = document.createElement("canvas"); MC.width = P.GRID; MC.height = P.GRID;
+    const mcx = MC.getContext("2d");
+    const mcImg = mcx.createImageData(P.GRID, P.GRID);
+    // dissolved-mineral layer: faint blue nutrient water, dark where depleted
+    const MN = document.createElement("canvas"); MN.width = P.GRID; MN.height = P.GRID;
+    const mnx = MN.getContext("2d");
+    const mnImg = mnx.createImageData(P.GRID, P.GRID);
+    // corpse aggregation layer (zoomed out, husks merge into a gray pall)
+    const CC = document.createElement("canvas"); CC.width = P.GRID; CC.height = P.GRID;
+    const ccx = CC.getContext("2d");
+    const ccImg = ccx.createImageData(P.GRID, P.GRID);
+    const corpseMass = new Float32Array(P.GRID * P.GRID);
+    const LOD_Z = 0.9; // below this zoom: aggregate corpses, draw bacteria as dots
+    let carpetTick = -1;
+    const updateCarpet = () => {
+      if (W.tick === carpetTick) return; carpetTick = W.tick;
+      const d = mcImg.data, dm = mnImg.data;
+      for (let c = 0; c < P.GRID*P.GRID; c++){
+        const o = c*4;
+        const m = Math.min(1, W.M[c] / 3.2);
+        dm[o] = 64; dm[o+1] = 138; dm[o+2] = 205;
+        dm[o+3] = Math.round(82 * m);
+        const dens = Math.min(1, W.bB[c] / 200);
+        if (dens <= 0.01){ d[o+3] = 0; continue; }
+        const t = Math.sqrt(dens); // fast rise, then saturate
+        d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
+        d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
+        d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
+        d[o+3] = Math.round(70 + 150*t);  // alpha: sparse faint -> dense solid
+      }
+      mcx.putImageData(mcImg, 0, 0);
+      mnx.putImageData(mnImg, 0, 0);
+      corpseMass.fill(0);
+      for (let k = 0; k < W.cN; k++){
+        if (!W.cAlive[k]) continue;
+        const cc = (Math.floor(W.cY[k]/(P.WORLD/P.GRID))&(P.GRID-1))*P.GRID + (Math.floor(W.cX[k]/(P.WORLD/P.GRID))&(P.GRID-1));
+        corpseMass[cc] += W.cE[k] + W.cP[k] + W.cM[k];
+      }
+      const dc = ccImg.data;
+      for (let c = 0; c < P.GRID*P.GRID; c++){
+        const o = c*4;
+        dc[o]=158; dc[o+1]=168; dc[o+2]=178;
+        dc[o+3] = Math.min(150, Math.round(corpseMass[c] * 4));
+      }
+      ccx.putImageData(ccImg, 0, 0);
+    };
+
+    // selection + follow-cam
+    const sel = { i: -1, gen: 0 };
+    const selValid = () => sel.i >= 0 && W.alive[sel.i] && W.gen[sel.i] === sel.gen;
+    let follow = false;
+    const SPECIES = SPECIES_META;
+    const stateOf = i => W.cy[i] ? "Dormant (cyst)"
+      : W.sp[i]===0 ? "Photosynthesizing"
+      : W.bst[i]>0 ? "Striking"
+      : W.sp[i]===3 ? "Decomposing"
+      : W.sp[i]===1 ? "Drifting"
+      : W.handle[i]>0 ? "Digesting"
+      : W.en[i] < TRAITS[W.sp[i]].torpor*P.capMul*W.sz[i] ? "Torpid" : "Foraging";
+    const buildCard = () => {
+      if (!selValid()) return null;
+      const i = sel.i, spc = SPECIES[W.sp[i]], T = TRAITS[W.sp[i]];
+      const cap = P.capMul*W.sz[i], pQ = P.pQuota*W.sz[i], mQ = P.mQuota*T.mQm*W.sz[i];
+      // Liebig analysis: which division gate binds right now?
+      const fE = W.en[i] / (T.reproFrac*cap);
+      const fP = W.pr[i] / (P.pReproMin*pQ);
+      const fM = W.mn[i] / (P.mReproMin*mQ);
+      let badge, bind;
+      if (W.cy[i]){ badge = "Dormant"; bind = 0; }
+      else {
+        const gates = [["Energy-limited", fE], ["Protein-limited", fP], ["Mineral-limited", fM]];
+        gates.sort((a,b) => a[1]-b[1]);
+        bind = Math.min(1, gates[0][1]);
+        badge = gates[0][1] >= 1
+          ? ((T.reproCooldown && W.cd[i] > 0) ? "Maturing" : "Ready to divide")
+          : gates[0][0];
+      }
+      return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
+        age: Math.floor((W.tick - W.birth[i]) / 10), state: stateOf(i),
+        en: W.en[i], cap, pr: W.pr[i], pQ, mn: W.mn[i], mQ, size: W.sz[i],
+        badge, bind };
+    };
+    const clearChips = () => { clearTimeout(chipTimer); setUi(u => (u.chips ? { ...u, chips: null } : u)); };
+    const selectIndex = i => {
+      sel.i = i; sel.gen = W.gen[i]; follow = true;
+      clearTimeout(chipTimer);
+      setUi(u => ({ ...u, card: buildCard(), chips: null })); setDetent(0);
+    };
+    const doSelect = (cxp, cyp, tight) => {
+      const wxp = wrap(cam.x + (cxp - vw/2)/cam.z), wyp = wrap(cam.y + (cyp - vh/2)/cam.z);
+      const rad = tight ? Math.max(10/cam.z, 7) : Math.max(24/cam.z, 14);
+      const cand = [];
+      for (let i=0;i<W.n;i++){
+        if (!W.alive[i]) continue;
+        const dx = wd(W.x[i]-wxp), dy = wd(W.y[i]-wyp), d2 = dx*dx+dy*dy;
+        if (d2 < rad*rad) cand.push([d2, i]);
+      }
+      if (!cand.length){ sel.i = -1; follow = false;
+        clearTimeout(chipTimer); setUi(u => ({ ...u, card: null, chips: null })); return; }
+      cand.sort((a,b) => a[0]-b[0]);
+      const species = new Set(cand.map(c => W.sp[c[1]]));
+      // Same-species neighbors are interchangeable for inspection -> take nearest.
+      // Chips appear only for true ambiguity: multiple SPECIES under the thumb.
+      if (tight || species.size === 1){ selectIndex(cand[0][1]); return; }
+      const opts = [];
+      for (const s2 of species){
+        const first = cand.find(c => W.sp[c[1]] === s2);
+        opts.push({ i: first[1], gen: W.gen[first[1]], sp: s2 });
+        if (opts.length === 3) break;
+      }
+      clearTimeout(chipTimer);
+      chipTimer = setTimeout(clearChips, 4000);
+      setUi(u => ({ ...u, chips: { x: cxp, y: cyp, opts } }));
+    };
+
+    let mode = "observe";      // gesture routing: observe = pan/select, intervene = tool
+    let sunDrag = null;         // indirect sun drag accumulator + undo origin
+    let loupe = null;           // magnifier: {x,y} in screen coords while long-pressing
+    let chipTimer = 0;
+    const LP = document.createElement("canvas"); LP.width = LP.height = Math.round(128 * dpr);
+    const lpx = LP.getContext("2d");
+    // interventions: feed / kill on the selected specimen, each with 5 s undo
+    let undoAction = null, undoTimer = 0;
+    const pours = []; // transient amber rings marking mineral pours
+    const logIv = (type) => { W.evLog.push({ tick: W.tick, type }); if (W.evLog.length > 300) W.evLog.shift(); };
+    const pushUndo = (label, fn) => {
+      clearTimeout(undoTimer); undoAction = fn; setUndoChip(label);
+      undoTimer = setTimeout(() => { undoAction = null; setUndoChip(null); }, 5000);
+    };
+    actionsRef.current = {
+      stepOnce: () => { W.px.set(W.x); W.py.set(W.y); step(); },
+      feed: () => {
+        if (!selValid()) return;
+        const i = sel.i, g = W.gen[i], nm = SPECIES[W.sp[i]].name;
+        logIv("feed");
+        queueEvent({ type:"feed", i, gen:g, frac:0.35, done: delta => {
+          pushUndo(`Fed ${nm} · Undo`, () => { logIv("undo"); queueEvent({ type:"unfeed", i, gen:g, delta }); });
+        }});
+      },
+      kill: () => {
+        if (!selValid()) return;
+        const i = sel.i, g = W.gen[i], nm = SPECIES[W.sp[i]].name;
+        sel.i = -1; follow = false; setUi(u => ({ ...u, card: null }));
+        logIv("kill");
+        queueEvent({ type:"kill", i, gen:g, done: snap => {
+          pushUndo(`Killed ${nm} · Undo`, () => { logIv("undo"); queueEvent({ type:"revive", snap }); });
+        }});
+      },
+      setMode: m => { mode = m; if (m === "intervene") follow = false; },
+      pick: (i, g) => { if (W.alive[i] && W.gen[i] === g) selectIndex(i); else clearChips(); },
+      undo: () => {
+        if (undoAction){ undoAction(); undoAction = null; }
+        clearTimeout(undoTimer); setUndoChip(null);
+      },
+      pushUndoExt: (label, fn) => pushUndo(label, fn),
+      reset: () => {
+        resetWorld(); initWorld((Math.random()*1e9)|0);
+        sel.i = -1; follow = false; undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
+        cam.x = W.sun.x; cam.y = W.sun.y;
+        setUi(us => ({ ...us, card: null, chips: [], spawnPick: null, tick: 0,
+          mineral: { b:0, f:0, l:0, add:0 }, lightMul: 1 }));
+      },
+      seedAt: (sp, wx, wy, sx, sy) => {
+        const nm = SPECIES_META[sp].name;
+        pours.push({ sx, sy, t: performance.now() });
+        logIv("seed");
+        queueEvent({ type:"spawnPack", sp, x: wx, y: wy, done: snap => {
+          pushUndo(`Seeded ${nm} · Undo`, () => { logIv("undo"); queueEvent({ type:"unspawnPack", snap }); });
+        }});
+        setUi(us => ({ ...us, spawnPick: null }));
+      },
+    };
+
+    // gestures: tap = select, 1-finger drag = pan, 2-finger pinch = zoom (always), wheel = zoom
+    const pointers = new Map();
+    let pinch = null;
+    const onDown = e => { canvas.setPointerCapture(e.pointerId);
+      const pp = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY,
+        t: performance.now(), moved: false, louping: false, lt: null };
+      pointers.set(e.pointerId, pp);
+      if (mode === "intervene" && pointers.size === 1)
+        sunDrag = { x: W.sun.x, y: W.sun.y, ox: W.sun.x, oy: W.sun.y };
+      if (mode === "observe" && pointers.size === 1){
+        pp.lt = setTimeout(() => { pp.lt = null;
+          if (pointers.size === 1 && !pp.moved){ pp.louping = true; loupe = { x: pp.x, y: pp.y }; }
+        }, 450);
+      }
+      if (pointers.size === 2) {
+        const [a,b]=[...pointers.values()];
+        a.moved = b.moved = true;
+        for (const q of [a,b]){ if (q.lt){ clearTimeout(q.lt); q.lt = null; } q.louping = false; }
+        loupe = null;
+        pinch = { d: Math.hypot(a.x-b.x, a.y-b.y), z: cam.z };
+      } };
+    const onMove = e => {
+      const p = pointers.get(e.pointerId); if (!p) return;
+      const nx = e.clientX, ny = e.clientY;
+      if (!p.moved && Math.hypot(nx-p.sx, ny-p.sy) > 8){
+        p.moved = true;
+        if (p.lt){ clearTimeout(p.lt); p.lt = null; } // movement before 450ms => it's a pan, not a loupe
+        clearChips();
+      }
+      if (pointers.size === 1){
+        if (p.louping){
+          if (loupe){ loupe.x = nx; loupe.y = ny; } // loupe follows the finger; camera stays put
+        } else if (p.moved){
+          if (mode === "intervene" && sunDrag){
+            // indirect sun drag: move by the finger's delta, from anywhere on screen
+            sunDrag.x += (nx - p.x) / cam.z; sunDrag.y += (ny - p.y) / cam.z;
+            queueEvent({ type:"sun", x: sunDrag.x, y: sunDrag.y });
+          } else if (mode === "observe"){
+            follow = false;
+            cam.x = wrap(cam.x - (nx - p.x) / cam.z); cam.y = wrap(cam.y - (ny - p.y) / cam.z);
+          }
+        }
+      } else if (pointers.size === 2 && pinch){
+        p.x = nx; p.y = ny;
+        const [a,b]=[...pointers.values()];
+        cam.z = clampZ(pinch.z * Math.hypot(a.x-b.x, a.y-b.y) / pinch.d);
+      }
+      p.x = nx; p.y = ny;
+    };
+    const onUp = e => {
+      const p = pointers.get(e.pointerId);
+      const wasPinch = pointers.size >= 2;
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (p && p.lt) clearTimeout(p.lt);
+      if (p && p.louping){ loupe = null; doSelect(p.x, p.y, true); return; } // precision pick at loupe center
+      if (mode === "intervene"){
+        if (p && p.moved && sunDrag && pointers.size === 0){
+          const { ox, oy } = sunDrag;
+          logIv("sun");
+          pushUndo("Moved the sun · Undo", () => { logIv("undo"); queueEvent({ type:"sun", x: ox, y: oy }); });
+        } else if (p && !p.moved && !wasPinch && pointers.size === 0 && performance.now() - p.t >= 350){
+          const wx2 = wrap(cam.x + (p.sx - vw/2)/cam.z), wy2 = wrap(cam.y + (p.sy - vh/2)/cam.z);
+          setUi(us => ({ ...us, spawnPick: { sx: p.sx, sy: p.sy, x: wx2, y: wy2 } }));
+        } else if (p && !p.moved && !wasPinch && pointers.size === 0 && performance.now() - p.t < 350){
+          // fertilize pulse: tap open water to pour mineral there
+          const fx = wrap(cam.x + (p.sx - vw/2)/cam.z), fy = wrap(cam.y + (p.sy - vh/2)/cam.z);
+          pours.push({ sx: p.sx, sy: p.sy, t: performance.now() });
+          logIv("pour");
+          queueEvent({ type:"fertilize", x: fx, y: fy, amount: 40, done: snap => {
+            pushUndo("Poured mineral · Undo", () => { logIv("undo"); queueEvent({ type:"unfertilize", snap }); });
+          }});
+        }
+        if (pointers.size === 0) sunDrag = null;
+        return; // no tap-select while a tool is armed
+      }
+      if (p && !p.moved && !wasPinch && performance.now() - p.t < 350) doSelect(p.sx, p.sy);
+    };
+    const onWheel = e => { e.preventDefault(); cam.z = clampZ(cam.z * (e.deltaY < 0 ? 1.12 : 0.89)); };
+    canvas.addEventListener("pointerdown", onDown);
+    canvas.addEventListener("pointermove", onMove);
+    canvas.addEventListener("pointerup", onUp);
+    canvas.addEventListener("pointercancel", onUp);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+
+    // main loop: fixed 10 Hz sim, interpolated render
+    let raf = 0, last = performance.now(), acc = 0, frames = 0, fpsT = last, fps = 0, uiT = 0;
+    const loop = now => {
+      raf = requestAnimationFrame(loop);
+      const dt = Math.min(120, now - last); last = now;
+      const spd = speedRef.current;
+      if (spd > 0) acc += dt * spd;
+      const maxSteps = spd >= 16 ? 9 : spd >= 4 ? 5 : 3;
+      let steps = 0;
+      while (acc >= P.TICK_MS && steps < maxSteps){
+        W.px.set(W.x); W.py.set(W.y);
+        step(); acc -= P.TICK_MS; steps++;
+      }
+      if (steps === maxSteps) acc = 0; // shed backlog: slow-motion, never death-spiral
+      const alpha = spd === 0 ? 1 : Math.min(1, acc / P.TICK_MS);
+      if (spd === 0) drainEvents(); // interventions apply even while paused
+      if (W.lightDirty){ drawLight(); W.lightDirty = false; }
+
+      // follow-cam: ease toward the selected organism
+      if (follow && selValid()){
+        const si = sel.i;
+        const tx = W.px[si] + wd(W.x[si]-W.px[si])*alpha, ty = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
+        cam.x = wrap(cam.x + wd(tx - cam.x)*0.10); cam.y = wrap(cam.y + wd(ty - cam.y)*0.10);
+      }
+
+      // ---- render ----
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = COL.abyss; ctx.fillRect(0, 0, vw, vh);
+      const z = cam.z, hw = vw/2, hh = vh/2, k = P.WORLD/512;
+      // tiled light layer
+      const tlx = cam.x - hw/z, tly = cam.y - hh/z;
+      for (let ky = Math.floor(tly/P.WORLD); (ky*P.WORLD) < tly + vh/z; ky++)
+        for (let kx = Math.floor(tlx/P.WORLD); (kx*P.WORLD) < tlx + vw/z; kx++)
+          ctx.drawImage(LB, (kx*P.WORLD - cam.x)*z + hw, (ky*P.WORLD - cam.y)*z + hh, P.WORLD*z, P.WORLD*z);
+      // dissolved mineral (below life), then mat carpet (aggregate sessile producers)
+      updateCarpet();
+      ctx.imageSmoothingEnabled = true;
+      for (let ky = Math.floor(tly/P.WORLD); (ky*P.WORLD) < tly + vh/z; ky++)
+        for (let kx = Math.floor(tlx/P.WORLD); (kx*P.WORLD) < tlx + vw/z; kx++){
+          const dx0 = (kx*P.WORLD - cam.x)*z + hw, dy0 = (ky*P.WORLD - cam.y)*z + hh;
+          ctx.drawImage(MN, dx0, dy0, P.WORLD*z, P.WORLD*z);
+          ctx.drawImage(MC, dx0, dy0, P.WORLD*z, P.WORLD*z);
+          if (z < LOD_Z) ctx.drawImage(CC, dx0, dy0, P.WORLD*z, P.WORLD*z);
+        }
+      // organisms: saturating "screen" composition instead of unbounded addition
+      ctx.globalCompositeOperation = "screen";
+      const cull = 40;
+      const pops = [0,0,0,0,0,0,0];
+      let mnBound = 0;
+      for (let i=0;i<W.n;i++){
+        if (!W.alive[i]) continue;
+        pops[W.sp[i]]++;
+        mnBound += W.mn[i];
+        const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
+        const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
+        const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
+        if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
+        if (W.cy[i]){ // dormant cyst: dim ember, no glow
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = "rgba(120,135,150,0.5)";
+          ctx.beginPath(); ctx.arc(sx, sy, Math.max(1, W.sz[i]*0.5*z), 0, 6.283); ctx.fill();
+          ctx.globalCompositeOperation = "screen";
+          continue;
+        }
+        const spb = W.sp[i];
+        if (spb === 3 && z < LOD_Z){ // bacteria dot-LOD: batched rects instead of sprite blits
+          ctx.fillStyle = "rgba(196,206,150,0.8)";
+          ctx.fillRect(sx-1.1, sy-1.1, 2.2, 2.2);
+          continue;
+        }
+        const r = (spb===0 ? W.sz[i]*1.1 : spb===1 ? W.sz[i]*1.9 : spb===3 ? W.sz[i]*1.6 : spb===6 ? W.sz[i]*1.0 : W.sz[i]*2.2) * z;
+        if (spb === 2){
+          ctx.save(); ctx.translate(sx, sy); ctx.rotate(W.hd[i]);
+          ctx.drawImage(sprites[2], -r, -r, r*2, r*2); ctx.restore();
+        } else if (spb === 6){
+          drawGhostRay(ctx, sx, sy, W.hd[i], r, W.bst[i] > 0, null);
+        } else {
+          ctx.drawImage(sprites[spb], sx-r, sy-r, r*2, r*2);
+        }
+      }
+      ctx.globalCompositeOperation = "source-over";
+      // amber pour rings: the hand's touch, fading
+      const nowT = performance.now();
+      for (let q = pours.length-1; q >= 0; q--){
+        const age = (nowT - pours[q].t) / 700;
+        if (age >= 1){ pours.splice(q,1); continue; }
+        ctx.strokeStyle = `rgba(242,178,74,${(0.7*(1-age)).toFixed(3)})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(pours[q].sx, pours[q].sy, 10 + age*34, 0, 6.283); ctx.stroke();
+      }
+      // corpses: pale husks when zoomed in; the aggregate layer covers zoomed-out
+      if (z >= LOD_Z) for (let k = 0; k < W.cN; k++){
+        if (!W.cAlive[k]) continue;
+        const sx = hw + wd(W.cX[k] - cam.x)*z, sy = hh + wd(W.cY[k] - cam.y)*z;
+        if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
+        const mass = W.cE[k] + W.cP[k] + W.cM[k];
+        const a = Math.min(0.55, 0.12 + 0.05*mass/W.cSz[k]);
+        const r = Math.max(1.5, W.cSz[k]*1.0*z);
+        ctx.fillStyle = `rgba(158,168,178,${a.toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill();
+        ctx.strokeStyle = `rgba(110,120,130,${(a*0.8).toFixed(3)})`; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(sx, sy, r*0.55, 0, 6.283); ctx.stroke();
+      }
+      W.pops = pops;
+
+      // sun affordance while the sun tool is armed
+      if (mode === "intervene"){
+        const ssx = hw + wd(W.sun.x - cam.x)*z, ssy = hh + wd(W.sun.y - cam.y)*z;
+        ctx.strokeStyle = "rgba(242,178,74,0.9)"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(ssx, ssy, 16, 0, 6.283); ctx.stroke();
+        ctx.strokeStyle = "rgba(242,178,74,0.3)"; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(ssx, ssy, 22, 0, 6.283); ctx.stroke();
+      }
+      // selection ring (non-additive, drawn above organisms)
+      if (selValid()){
+        const si = sel.i;
+        const ix = W.px[si] + wd(W.x[si]-W.px[si])*alpha, iy = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
+        const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
+        const rr = Math.max(14, W.sz[si]*2.6*z);
+        ctx.strokeStyle = "rgba(201,215,227,0.95)"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(sx, sy, rr, 0, 6.283); ctx.stroke();
+        ctx.strokeStyle = "rgba(201,215,227,0.25)"; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.arc(sx, sy, rr + 4, 0, 6.283); ctx.stroke();
+      } else if (sel.i >= 0){ // selected organism died or slot was recycled
+        sel.i = -1; follow = false; setUi(u => ({ ...u, card: null }));
+      }
+
+      if (loupe){
+        const R = 64, m = 2.5, sr = R/m;
+        const cxL = Math.min(vw - R - 8, Math.max(R + 8, loupe.x));
+        const cyL = Math.max(R + 72, loupe.y - 112);
+        lpx.clearRect(0, 0, LP.width, LP.height);
+        lpx.drawImage(canvas, (loupe.x - sr)*dpr, (loupe.y - sr)*dpr, sr*2*dpr, sr*2*dpr, 0, 0, LP.width, LP.height);
+        ctx.strokeStyle = "rgba(201,215,227,0.25)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(loupe.x, loupe.y - 12); ctx.lineTo(cxL, cyL + R); ctx.stroke();
+        ctx.save();
+        ctx.beginPath(); ctx.arc(cxL, cyL, R, 0, 6.283); ctx.clip();
+        ctx.drawImage(LP, cxL - R, cyL - R, R*2, R*2);
+        ctx.restore();
+        ctx.strokeStyle = "rgba(201,215,227,0.8)"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(cxL, cyL, R, 0, 6.283); ctx.stroke();
+        ctx.fillStyle = "rgba(242,178,74,0.95)";
+        ctx.beginPath(); ctx.arc(cxL, cyL, 2.2, 0, 6.283); ctx.fill();
+      }
+
+      frames++;
+      if (now - fpsT > 500){ fps = Math.round(frames*1000/(now-fpsT)); frames = 0; fpsT = now; }
+      if (now - uiT > 500){ uiT = now;
+        let mFree = 0, mLocked = 0; const MF = W.M, DM = W.dM;
+        for (let c = 0; c < MF.length; c++){ mFree += MF[c]; mLocked += DM[c]; }
+        for (let k = 0; k < W.cN; k++) if (W.cAlive[k]) mLocked += W.cM[k];
+        setUi(u => ({ ...u, tick: W.tick, fps, pops: [...pops], card: buildCard(),
+          mineral: { b: mnBound, f: mFree, l: mLocked, add: W.addedM }, lightMul: P.lightMul }));
+      }
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); clearTimeout(undoTimer); clearTimeout(chipTimer); window.removeEventListener("resize", resize);
+      canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onMove);
+      canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointercancel", onUp);
+      canvas.removeEventListener("wheel", onWheel); };
+  }, []);
+
+  // speed FAB: tap cycles 1x -> 4x -> 16x -> paused; long-press = pause + single-tick step
+  const cycleSpeed = () => {
+    const order = [1, 4, 16, 0];
+    const nxt = order[(order.indexOf(speedRef.current) + 1) % order.length];
+    speedRef.current = nxt; setUi(u => ({ ...u, speed: nxt }));
+  };
+  const fabDown = () => {
+    fabLong.current = setTimeout(() => {
+      fabLong.current = "fired";
+      speedRef.current = 0; setUi(u => ({ ...u, speed: 0 }));
+      actionsRef.current.stepOnce && actionsRef.current.stepOnce();
+    }, 450);
+  };
+  const fabUp = () => {
+    if (fabLong.current === "fired"){ fabLong.current = null; return; }
+    clearTimeout(fabLong.current); fabLong.current = null;
+    cycleSpeed();
+  };
+
+  const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
+  return (
+    <div onContextMenu={e => e.preventDefault()}
+      style={{ position:"fixed", inset:0, background:COL.abyss, overflow:"hidden",
+      fontFamily:"system-ui, -apple-system, sans-serif", userSelect:"none", WebkitUserSelect:"none",
+      WebkitTouchCallout:"none" }}>
+      <canvas ref={canvasRef} style={{ width:"100%", height:"100%", display:"block", touchAction:"none" }} />
+      {/* passive status strip */}
+      <div style={{ position:"absolute", top:0, left:0, right:0, padding:"calc(env(safe-area-inset-top, 0px) + 10px) 14px 8px",
+        display:"flex", justifyContent:"space-between", alignItems:"baseline", pointerEvents:"none", paddingRight:18,
+        color:COL.silt, fontSize:12, fontFamily:mono, textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
+        <span>t {String(ui.tick).padStart(6," ")}  ·  {ui.fps} fps</span>
+        <span>
+          <span style={{color:"rgb(70,214,140)"}}>● {ui.pops[0]}</span>{"  "}
+          <span style={{color:"rgb(91,200,232)"}}>● {ui.pops[1]}</span>{"  "}
+          <span style={{color:"rgb(215,166,232)"}}>▲ {ui.pops[2]}</span>{"  "}
+          <span style={{color:"rgb(158,168,104)"}}>▪ {ui.pops[3]}</span>{"  "}
+          <span style={{color:"rgb(230,240,250)"}}>△ {ui.pops[6]}</span>
+        </span>
+      </div>
+      {/* mineral audit: bound (in biomass) vs free (dissolved) — the sum is conserved */}
+      <div style={{ position:"absolute", top:"calc(env(safe-area-inset-top, 0px) + 34px)", right:18,
+        display:"flex", alignItems:"center", gap:8, pointerEvents:"none",
+        color:COL.silt, fontSize:11, fontFamily:"ui-monospace, SFMono-Regular, Menlo, monospace",
+        textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
+        <span>M</span>
+        <span style={{ display:"inline-flex", width:96, height:4, borderRadius:2, overflow:"hidden",
+          background:"rgba(11,19,30,0.7)" }}>
+          <span style={{ width:`${Math.round(100*ui.mineral.b/Math.max(1, ui.mineral.b+ui.mineral.l+ui.mineral.f))}%`,
+            background:"rgba(70,214,140,0.85)" }} />
+          <span style={{ width:`${Math.round(100*ui.mineral.l/Math.max(1, ui.mineral.b+ui.mineral.l+ui.mineral.f))}%`,
+            background:"rgba(158,168,178,0.65)" }} />
+          <span style={{ flex:1, background:"rgba(91,200,232,0.4)" }} />
+        </span>
+        <span>{(ui.mineral.b/1000).toFixed(1)}k bound · {(ui.mineral.l/1000).toFixed(1)}k locked · {(ui.mineral.f/1000).toFixed(1)}k free</span>
+        {ui.mineral.add > 0.5 && <span style={{ color:"#F2B24A" }}> +{ui.mineral.add < 950 ? Math.round(ui.mineral.add) : (ui.mineral.add/1000).toFixed(1)+"k"}</span>}
+      </div>
+      {/* intervene edge tint: unmistakable "you are editing the world" signal */}
+      {uiMode === "intervene" && (
+        <div style={{ position:"absolute", inset:0, pointerEvents:"none",
+          boxShadow:"inset 0 0 46px rgba(242,178,74,0.32)" }} />
+      )}
+      {/* mode switch + tool hint */}
+      <div style={{ position:"absolute", left:16, zIndex:6,
+        bottom: ui.card ? 194 : "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+        transition:"bottom 0.25s",
+        display:"flex", flexDirection:"column", gap:8, alignItems:"flex-start" }}>
+
+        <div style={{ display:"flex", gap:6, padding:4, borderRadius:14,
+          background:"rgba(21,34,51,0.85)", border:"1px solid rgba(94,115,134,0.3)",
+          backdropFilter:"blur(6px)" }}>
+          {["observe","intervene","data"].map(m => (
+            <button key={m}
+              onClick={() => { setUiMode(m); actionsRef.current.setMode && actionsRef.current.setMode(m); }}
+              style={{ height:40, padding:"0 16px", borderRadius:10, cursor:"pointer",
+                fontSize:13, fontWeight:600, textTransform:"capitalize",
+                border: m==="intervene" && uiMode===m ? "1px solid rgba(242,178,74,0.8)" : "1px solid transparent",
+                background: uiMode===m
+                  ? (m==="intervene" ? "rgba(242,178,74,0.18)" : "rgba(201,215,227,0.14)")
+                  : "transparent",
+                color: uiMode===m ? (m==="intervene" ? "#F2B24A" : "#C9D7E3") : "#5E7386" }}>
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+      {uiMode === "data" && <DataMode />}
+      <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()} card={!!ui.card} />
+      {/* sun-intensity press lever (intervene mode) */}
+      {uiMode === "intervene" && (
+        <div style={{ position:"absolute", top:64, left:"50%", transform:"translateX(-50%)",
+          padding:"6px 12px", borderRadius:12,
+          background:"rgba(11,19,30,0.72)", border:"1px solid rgba(242,178,74,0.35)", zIndex:5 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ color:"#F2B24A", fontSize:11, fontFamily:"ui-monospace, Menlo, monospace" }}>
+            ☀ ×{ui.lightMul.toFixed(2)}</span>
+          <input type="range" min="0.4" max="1.6" step="0.05" value={ui.lightMul}
+            onChange={e => { const v = +e.target.value;
+              setUi(u2 => ({ ...u2, lightMul: v }));
+              queueEvent({ type:"lightMul", v, done: s => {
+                if (Math.abs(s.prev - v) > 0.24) W.evLog.push({ tick: W.tick, type: "sunlight" });
+                if (Math.abs(s.prev - v) > 0.24)
+                  actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt("Changed the sun · Undo",
+                    () => queueEvent({ type:"lightMul", v: s.prev }));
+              }});
+            }}
+            style={{ width: 130, accentColor: "#F2B24A" }} />
+          </div>
+          <div style={{ fontSize:10, color:"rgba(242,178,74,0.75)", marginTop:4 }}>
+            drag → sun · tap water → pour · hold → seed organisms</div>
+        </div>
+      )}
+      {ui.spawnPick && (
+        <div style={{ position:"absolute", zIndex:7,
+          left: Math.min(Math.max(8, ui.spawnPick.sx - 130), (typeof window!=="undefined"?window.innerWidth:400) - 268),
+          top: Math.max(96, ui.spawnPick.sy - 76),
+          display:"flex", gap:6, padding:8, borderRadius:14,
+          background:"rgba(11,19,30,0.94)", border:"1px solid rgba(242,178,74,0.45)" }}>
+          {[0,1,2,3,6].map(sp => { const c = SPECIES_META[sp].rgb; return (
+            <button key={sp}
+              onClick={() => actionsRef.current.seedAt(sp, ui.spawnPick.x, ui.spawnPick.y, ui.spawnPick.sx, ui.spawnPick.sy)}
+              style={{ padding:"7px 9px", borderRadius:10, fontSize:11, border:"none",
+                background:"rgba(21,34,51,0.95)", color:`rgb(${c[0]},${c[1]},${c[2]})`,
+                fontFamily:"ui-monospace, Menlo, monospace" }}>
+              ● {SPECIES_META[sp].name}</button> ); })}
+          <button onClick={() => setUi(us => ({ ...us, spawnPick: null }))}
+            style={{ padding:"7px 8px", borderRadius:10, fontSize:11, border:"none",
+              background:"transparent", color:"#5E7386" }}>✕</button>
+        </div>
+      )}
+      {/* species disambiguation chips */}
+      {ui.chips && (
+        <div style={{ position:"absolute", left:0, top:0,
+          transform:`translate(${ui.chips.x}px, ${ui.chips.y - 80}px) translateX(-50%)`,
+          display:"flex", gap:6, padding:5, borderRadius:14,
+          background:"rgba(21,34,51,0.95)", border:"1px solid rgba(94,115,134,0.4)",
+          boxShadow:"0 2px 12px rgba(0,0,0,0.5)" }}>
+          {ui.chips.opts.map(o => { const spc = SPECIES_META[o.sp]; return (
+            <button key={o.sp}
+              onClick={() => actionsRef.current.pick && actionsRef.current.pick(o.i, o.gen)}
+              style={{ height:40, padding:"0 13px", borderRadius:10, cursor:"pointer",
+                display:"flex", alignItems:"center", gap:7, fontSize:13, fontWeight:600,
+                border:"1px solid transparent", background:"rgba(201,215,227,0.08)", color:"#C9D7E3" }}>
+              <span style={{ width:9, height:9, borderRadius:5,
+                background:`rgb(${spc.rgb[0]},${spc.rgb[1]},${spc.rgb[2]})`,
+                boxShadow:`0 0 6px rgb(${spc.rgb[0]},${spc.rgb[1]},${spc.rgb[2]})` }} />
+              {spc.name}
+            </button> ); })}
+        </div>
+      )}
+      {/* undo chip */}
+      {undoChip && (
+        <button onClick={() => actionsRef.current.undo && actionsRef.current.undo()}
+          style={{ position:"absolute", left:"50%", transform:"translateX(-50%)",
+            bottom: ui.card ? (detent===0 ? 194 : detent===1 ? "48vh" : "82vh")
+                            : "calc(env(safe-area-inset-bottom, 0px) + 88px)",
+            padding:"10px 18px", borderRadius:20, cursor:"pointer",
+            border:"1px solid rgba(242,178,74,0.7)", background:"rgba(21,34,51,0.95)",
+            color:"#F2B24A", fontSize:13, fontWeight:600, whiteSpace:"nowrap",
+            boxShadow:"0 2px 12px rgba(0,0,0,0.5)" }}>
+          {undoChip}
+        </button>
+      )}
+      {/* specimen card */}
+      {ui.card && (
+        <div style={{ position:"absolute", left:0, right:0, bottom:0,
+          height: detent===0 ? 178 : detent===1 ? "46vh" : "80vh",
+          background:"rgba(21,34,51,0.92)", backdropFilter:"blur(10px)",
+          borderTop:"1px solid rgba(94,115,134,0.35)", borderRadius:"16px 16px 0 0",
+          color:COL.plankTxt, transition:"height 0.18s ease-out",
+          display:"flex", flexDirection:"column", overflow:"hidden" }}>
+          <div
+            onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = { y: e.clientY }; }}
+            onPointerUp={e => {
+              const d = dragRef.current; dragRef.current = null; if (!d) return;
+              const dy = e.clientY - d.y;
+              if (dy < -40) setDetent(v => Math.min(2, v+1));
+              else if (dy > 40) setDetent(v => { if (v === 0){ setUi(u => ({ ...u, card: null })); return 0; } return v-1; });
+            }}
+            style={{ padding:"16px 0 14px", cursor:"grab", touchAction:"none", flexShrink:0 }}>
+            <div style={{ width:40, height:4, borderRadius:2, background:"rgba(94,115,134,0.7)", margin:"0 auto" }} />
+          </div>
+          <div style={{ padding:"0 18px calc(env(safe-area-inset-bottom, 0px) + 14px)", overflowY: detent===2 ? "auto" : "hidden", flex:1 }}>
+            <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
+              <span style={{ width:10, height:10, borderRadius:5, flexShrink:0, alignSelf:"center",
+                background:`rgb(${ui.card.rgb[0]},${ui.card.rgb[1]},${ui.card.rgb[2]})`,
+                boxShadow:`0 0 8px rgb(${ui.card.rgb[0]},${ui.card.rgb[1]},${ui.card.rgb[2]})` }} />
+              <span style={{ fontSize:17, fontWeight:600 }}>{ui.card.name}</span>
+              <span style={{ fontSize:12, color:COL.silt }}>{ui.card.role}</span>
+              <span style={{ marginLeft:"auto", fontSize:11, color:COL.silt,
+                fontFamily:"ui-monospace, Menlo, monospace" }}>#{ui.card.id}</span>
+            </div>
+            <div style={{ display:"flex", gap:16, marginTop:8, fontSize:13, alignItems:"center" }}>
+              <span>{ui.card.state}</span>
+              <span style={{ color:COL.silt }}>age {Math.floor(ui.card.age/60)}:{String(ui.card.age%60).padStart(2,"0")}</span>
+              <span style={{ marginLeft:"auto", fontSize:11, fontWeight:600, padding:"3px 9px", borderRadius:9,
+                background: ui.card.badge==="Ready to divide" ? "rgba(70,214,140,0.15)" : "rgba(94,115,134,0.22)",
+                color: ui.card.badge==="Ready to divide" ? "rgb(70,214,140)" : COL.plankTxt }}>
+                {ui.card.badge}</span>
+            </div>
+            <div style={{ marginTop:10, display:"grid", gap:5 }}>
+              {[["E", ui.card.en, ui.card.cap, `rgb(${ui.card.rgb[0]},${ui.card.rgb[1]},${ui.card.rgb[2]})`],
+                ["P", ui.card.pr, ui.card.pQ, "rgb(226,170,150)"],
+                ["M", ui.card.mn, ui.card.mQ, "rgb(91,200,232)"]].map(([lb, v, mx, col]) => (
+                <div key={lb} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:10, color:COL.silt, width:10,
+                    fontFamily:"ui-monospace, Menlo, monospace" }}>{lb}</span>
+                  <div style={{ flex:1, height:4, borderRadius:2, background:"rgba(11,19,30,0.8)" }}>
+                    <div style={{ height:4, borderRadius:2,
+                      width:`${Math.min(100, Math.round(100*v/Math.max(0.001, mx)))}%`,
+                      background:col, transition:"width 0.4s" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {detent >= 1 && (
+              <div style={{ marginTop:16, fontSize:13, display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px 16px" }}>
+                <div><div style={{fontSize:11,color:COL.silt}}>SIZE</div>{ui.card.size.toFixed(1)}</div>
+                <div><div style={{fontSize:11,color:COL.silt}}>ENERGY</div>{ui.card.en.toFixed(1)} / {ui.card.cap.toFixed(0)}</div>
+                <div><div style={{fontSize:11,color:COL.silt}}>PROTEIN</div>{ui.card.pr.toFixed(1)} / {ui.card.pQ.toFixed(1)}</div>
+                <div><div style={{fontSize:11,color:COL.silt}}>MINERAL</div>{ui.card.mn.toFixed(2)} / {ui.card.mQ.toFixed(2)}</div>
+                <div><div style={{fontSize:11,color:COL.silt}}>DIVISION GATE</div>{Math.round(100*ui.card.bind)}%</div>
+                <div><div style={{fontSize:11,color:COL.silt}}>SIM TIME / TICK</div>{ui.tick}</div>
+              </div>
+            )}
+            {detent >= 1 && (
+              <div style={{ display:"flex", gap:10, marginTop:18 }}>
+                <button onClick={() => actionsRef.current.feed && actionsRef.current.feed()}
+                  style={{ flex:1, height:44, borderRadius:10, cursor:"pointer",
+                    border:"1px solid rgba(242,178,74,0.6)", background:"rgba(242,178,74,0.12)",
+                    color:"#F2B24A", fontSize:14, fontWeight:600 }}>Feed</button>
+                <button onClick={() => actionsRef.current.kill && actionsRef.current.kill()}
+                  style={{ flex:1, height:44, borderRadius:10, cursor:"pointer",
+                    border:"1px solid rgba(242,178,74,0.9)", background:"rgba(242,178,74,0.85)",
+                    color:"#0B131E", fontSize:14, fontWeight:600 }}>Kill</button>
+              </div>
+            )}
+            {detent === 2 && (
+              <div style={{ marginTop:18, fontSize:12, color:COL.silt, lineHeight:1.5 }}>
+                Genome detail, subsystem health, and lineage arrive with the chemistry and
+                reliability engines in Phases 2–4. Amber marks your hand: everything you
+                do to the world, as opposed to what nature does, is shown in this color.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {/* speed FAB (pause/play only in this increment) */}
+      {(!ui.card || detent === 0) && (
+      <button onPointerDown={fabDown} onPointerUp={fabUp} onPointerCancel={fabUp}
+        aria-label={ui.speed === 0 ? "Play (long-press: step one tick)" : `Speed ${ui.speed}x (long-press: step one tick)`}
+        style={{ position:"absolute", right:16, zIndex:6, bottom: ui.card ? 194 : "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+        width:52, height:52, borderRadius:26, border:"1px solid rgba(201,215,227,0.25)",
+        background:"rgba(21,34,51,0.85)", color:COL.plankTxt, fontSize:18, cursor:"pointer",
+        backdropFilter:"blur(6px)" }}>
+        <span style={{ fontFamily:"ui-monospace, Menlo, monospace", fontSize: ui.speed===0?18:15 }}>
+          {ui.speed === 0 ? "▶" : `${ui.speed}×`}
+        </span>
+      </button>
+      )}
+    </div>
+  );
+}

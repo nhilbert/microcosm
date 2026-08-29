@@ -1,0 +1,19 @@
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# harness scratch output
+*.log
+tune-out/
+runs/
+
+# editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# dist/ is NOT ignored: dist/microcosm.jsx is the deliverable artifact
+# and is committed deliberately. CI checks it matches src/.

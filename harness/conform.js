@@ -1,0 +1,34 @@
+// Fast conformance check: 2 seeds x 3000 ticks, fingerprints world state.
+// Usage:  npm run conform            -> compare against conform-baseline.json
+//         npm run conform:capture    -> (re)write the baseline (declare a reason!)
+const fs = require("fs");
+const crypto = require("crypto");
+const path = require("path");
+const CORE = path.join(__dirname, "..", "src", "core.js");
+const BASELINE = path.join(__dirname, "conform-baseline.json");
+const coreHash = crypto.createHash("sha256").update(fs.readFileSync(CORE)).digest("hex").slice(0,16);
+const C = require(CORE);
+const { W, P } = C;
+function fingerprint(seed){
+  C.resetWorld(); C.initWorld(seed);
+  for (let t=0; t<3000; t++) C.step();
+  const p=[0,0,0,0,0,0,0]; let sx=0, se=0, sm=0;
+  for (let i=0;i<W.n;i++){ if(!W.alive[i]) continue;
+    p[W.sp[i]]++; sx+=W.x[i]+W.y[i]; se+=W.en[i]; sm+=W.mn[i]; }
+  let fM=0; for (let c=0;c<P.GRID*P.GRID;c++) fM+=W.M[c];
+  return { pops:p, posSum:+sx.toFixed(3), enSum:+se.toFixed(3), mnSum:+sm.toFixed(3), fieldM:+fM.toFixed(3) };
+}
+const result = { coreHash, 11: fingerprint(11), 88: fingerprint(88) };
+if (process.argv.includes("--capture")){
+  fs.writeFileSync(BASELINE, JSON.stringify(result, null, 1));
+  console.log("baseline captured:", JSON.stringify(result));
+} else {
+  const base = JSON.parse(fs.readFileSync(BASELINE));
+  if (base.coreHash === undefined)
+    console.log("WARNING: baseline predates hash-binding — recapture required");
+  else if (base.coreHash !== coreHash)
+    console.log("NOTE: core file differs from the one this baseline certifies (hash " + base.coreHash + " vs " + coreHash + ") — a changed fingerprint below means an undeclared behavior change; an identical fingerprint means the edit was behavior-neutral");
+  const same = JSON.stringify(base["11"]) === JSON.stringify(result["11"]) && JSON.stringify(base["88"]) === JSON.stringify(result["88"]);
+  console.log(same ? "CONFORMANCE PASS (bit-identical to baseline)" : "CONFORMANCE FAIL");
+  if (!same){ console.log("expected:", JSON.stringify(base)); console.log("actual:  ", JSON.stringify(result)); process.exit(1); }
+}

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Build & conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: npm install --no-audit --no-fund
+
+      - name: Build the artifact
+        run: npm run build
+
+      - name: dist/ must match src/
+        run: |
+          if ! git diff --exit-code -- dist/; then
+            echo "::error::dist/microcosm.jsx is out of date. Run 'npm run build' and commit the result."
+            exit 1
+          fi
+
+      - name: Syntax check
+        run: npm run syntax
+
+      - name: Conformance (must be bit-identical)
+        run: |
+          out=$(npm run --silent conform)
+          echo "$out"
+          if echo "$out" | grep -q "NOTE:"; then
+            echo "::error::conform.js printed a NOTE — the baseline no longer certifies core.js. Rebind it deliberately; see CONTRIBUTING.md."
+            exit 1
+          fi
+
+  acceptance:
+    name: Ecology acceptance (manual)
+    runs-on: ubuntu-latest
+    # Long-horizon runs. Known to fail on the current tree - see README "Status".
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 8-seed ecology harness
+        run: npm run tune
+      - name: K6 observatory gate
+        run: npm run gate

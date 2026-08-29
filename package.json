@@ -1,0 +1,24 @@
+{
+  "name": "microcosm",
+  "version": "0.4.0",
+  "private": true,
+  "description": "A sandbox for artificial organisms: a conserved-matter ecosystem simulator with an observatory that narrates what it sees.",
+  "license": "GPL-3.0-or-later",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "python3 tools/build.py",
+    "syntax": "esbuild --loader=jsx --log-level=warning < dist/microcosm.jsx > /dev/null",
+    "conform": "node harness/conform.js",
+    "conform:capture": "node harness/conform.js --capture",
+    "tune": "node harness/tune2.js",
+    "gate": "node harness/k6gate.js",
+    "test": "npm run build && npm run syntax && npm run conform",
+    "test:full": "npm run test && npm run tune && npm run gate"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}
