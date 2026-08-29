@@ -1,0 +1,92 @@
+// ---------- intervention events (the ONLY legal way to mutate world state from outside) ----------
+function applyEvent(ev){
+  const { done, ...logged } = ev;
+  W.eventLog.push({ t: W.tick, ...logged });          // payload log: replay substrate (Phase 5)
+  if (W.eventLog.length > 4000) W.eventLog.splice(0, 1000);
+  switch(ev.type){
+    case "spawnPack": {
+      // seed a small founding group of a species at a location (conservation-safe: endow pulls
+      // mineral from the local water; energy and protein are open books, as at world-founding)
+      const KIT = { 0:{n:6,sz:5,en:30}, 1:{n:8,sz:3.4,en:25}, 2:{n:4,sz:6,en:35}, 3:{n:12,sz:2,en:12}, 6:{n:3,sz:9,en:70} };
+      const kit = KIT[ev.sp]; if (!kit) break;
+      const ids = [];
+      for (let k=0;k<kit.n;k++){
+        const j = spawn(ev.sp, wrap(ev.x+(R()-0.5)*70), wrap(ev.y+(R()-0.5)*70), kit.en*(0.8+R()*0.4), kit.sz);
+        if (j>=0){ endowFounder(j); ids.push([j, W.gen[j]]); }
+      }
+      done && done({ ids }); break; }
+    case "unspawnPack": {
+      const sn=ev.snap; if(!sn) break;
+      for (const [j,g] of sn.ids){
+        if (W.alive[j] && W.gen[j]===g){
+          if (W.mn[j] > 0) W.M[cellOf(j)] += W.mn[j]; // quiet removal: mineral back to the water, no corpse
+          W.mn[j]=0; W.pr[j]=0; W.alive[j]=0; W.freeList.push(j);
+        }
+      }
+      break; }
+    case "fertilize": {
+      // pulse lever: a mineral pour — splash over the tapped cell and its neighbours
+      const G=P.GRID, gx=Math.floor(ev.x/CELL)&(G-1), gy=Math.floor(ev.y/CELL)&(G-1);
+      const w=[[0,0,0.4],[1,0,0.15],[-1,0,0.15],[0,1,0.15],[0,-1,0.15]];
+      const cells=[];
+      for (const [dx2,dy2,f] of w){
+        const c=(((gy+dy2+G)%G))*G+(((gx+dx2+G)%G));
+        const amt=ev.amount*f;
+        W.M[c]+=amt; cells.push([c,amt]);
+      }
+      W.addedM += ev.amount;
+      done && done({ cells, amount: ev.amount }); break; }
+    case "unfertilize": {
+      // reclaim only what the water still holds; what life absorbed stays in bodies
+      const sn=ev.snap; if(!sn) break;
+      let reclaimed=0;
+      for (const [c,amt] of sn.cells){ const take=Math.min(W.M[c], amt); W.M[c]-=take; reclaimed+=take; }
+      W.addedM = Math.max(0, W.addedM - reclaimed);
+      break; }
+    case "lightMul": {
+      const prev = P.lightMul;
+      P.lightMul = Math.max(0.2, Math.min(2.0, ev.v));
+      computeLight();
+      done && done({ prev }); break; }
+    case "sun":
+      W.sun.x = wrap(ev.x); W.sun.y = wrap(ev.y);
+      computeLight(); W.lightDirty = true; break;
+    case "feed": {
+      const i = ev.i; if (!(W.alive[i] && W.gen[i] === ev.gen)) break;
+      const cap = P.capMul*W.sz[i], before = W.en[i];
+      W.en[i] = Math.min(cap, W.en[i] + ev.frac*cap);
+      W.pr[i] = Math.min(P.pQuota*W.sz[i], W.pr[i] + ev.frac*P.pQuota*W.sz[i]);
+      if (W.cy[i]){ W.cy[i] = 0; W.gr[i] = 60; }
+      done && done(W.en[i] - before); break; }
+    case "unfeed": {
+      const i = ev.i;
+      if (W.alive[i] && W.gen[i] === ev.gen) W.en[i] = Math.max(0.5, W.en[i] - ev.delta);
+      break; }
+    case "kill": {
+      const i = ev.i; if (!(W.alive[i] && W.gen[i] === ev.gen)) break;
+      const snap = { sp:W.sp[i], x:W.x[i], y:W.y[i], en:W.en[i], sz:W.sz[i],
+        hd:W.hd[i], cd:W.cd[i], cy:W.cy[i], gr:W.gr[i], birth:W.birth[i], mn:W.mn[i], pr:W.pr[i] };
+      snap.corpse = killOrg(i); done && done(snap); break; }
+    case "revive": {
+      const sn = ev.snap;
+      const j = spawn(sn.sp, sn.x, sn.y, sn.en, sn.sz);
+      if (j >= 0){ W.hd[j]=sn.hd; W.cd[j]=sn.cd; W.cy[j]=sn.cy; W.gr[j]=sn.gr; W.birth[j]=sn.birth; W.pr[j]=sn.pr||0;
+        let got = 0;
+        if (sn.corpse >= 0 && W.cAlive[sn.corpse]){ // reclaim the corpse's remaining mineral
+          got = W.cM[sn.corpse]; W.cM[sn.corpse]=0;
+          W.cAlive[sn.corpse]=0; W.cFree.push(sn.corpse);
+        }
+        const c=cellOf(j), top=Math.min(W.M[c], Math.max(0,(sn.mn||0)-got)); W.M[c]-=top;
+        W.mn[j]=got+top; }
+      break; }
+  }
+}
+function drainEvents(){ while (W.events.length) applyEvent(W.events.shift()); }
+function queueEvent(ev){
+  if (ev.type === "sun"){ // coalesce: only the latest sun position matters
+    const k = W.events.findIndex(e => e.type === "sun");
+    if (k >= 0){ W.events[k] = ev; return; }
+  }
+  W.events.push(ev);
+}
+

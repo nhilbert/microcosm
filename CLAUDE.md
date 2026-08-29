@@ -4,18 +4,20 @@ A mobile-first ecosystem sandbox: a single-file React artifact in which artifici
 
 ## Files
 
-- `src/core.js` — the entire simulation + observatory analytics. Pure, deterministic, UI-free. The precious thing.
+- `src/sim/` — the simulation: `params.js` (PRNG + constants), `traits.js` (species-as-data), `world.js` (SoA state, spawn/kill), `events.js` (the only legal outside mutation), `fields.js` (diffusion, light, spatial hash), `step.js` (**the RNG-order contract + the tick**), `init.js` (setup + Node exports). Pure, deterministic, UI-free. The precious thing.
+- `src/observatory/` — `recorder.js`, `analysis.js`, `impact.js`. Pure observers: **zero PRNG draws**, no mutation of dynamic state. Free to rewrite in a port; the sim is not.
 - `src/header.jsx`, `src/ui-render.js`, `src/ui-data.jsx`, `src/ui-reset.jsx`, `src/ui.jsx` — UI layers; `tools/build.py` concatenates all into `dist/microcosm.jsx`, the deliverable artifact. Generated and committed; never hand-edit, CI enforces that it matches `src/`.
 - `harness/tune2.js` — 8-seed × 18,000-tick ecology harness (seeds 11,22,33,44,55,66,77,88). The acceptance authority. Exits non-zero if any seed aborts.
-- `harness/conform.js` — fast conformance check (seeds 11+88, t=3,000 fingerprint). **Hash-bound**: the baseline stores a sha256 of core.js; a hash mismatch with identical fingerprint = behavior-neutral edit, changed fingerprint = undeclared behavior change. `--capture` recaptures (only with a declared reason).
+- `harness/conform.js` — fast conformance check (seeds 11+88, t=3,000 fingerprint). **Hash-bound**: the baseline stores a sha256 of the built `dist/core.js`; a hash mismatch with identical fingerprint = behavior-neutral edit, changed fingerprint = undeclared behavior change. `--capture` recaptures (only with a declared reason).
 - `harness/k6gate.js` — Phase 4 gate script (the Observatory must narrate the decomposers-off collapse unprompted; healthy control silent). Exits non-zero if the gate fails.
+- `docs/porting.md` — the contract for an Android or compiled-language port: what must be bit-exact, what may be rewritten, and how a port proves itself.
 - `harness/conform-baseline.json` — the certified fingerprint plus the `coreHash` it is bound to. Never hand-edit; only `npm run conform:capture` writes it.
-- `LICENSE` (GPL-3.0-or-later, code) and `LICENSE-docs` (CC BY-SA 4.0, everything in `docs/`). The GPL notice lives at the top of `src/header.jsx` so the built artifact carries it once; `core.js` deliberately has no per-file header, to keep its hash stable.
+- `LICENSE` (GPL-3.0-or-later, code) and `LICENSE-docs` (CC BY-SA 4.0, everything in `docs/`). The GPL notice lives at the top of `src/header.jsx` so the built artifact carries it once; the sim sources deliberately carry no per-file header, to keep the core hash stable.
 - `docs/` — concept, phase plans, architecture review, observatory design, genetics research. Closure records and calibration histories live there; read them before touching related systems.
 
 ## Non-negotiable working rules (all earned the hard way)
 
-1. **RNG-order contract** (banner comment in core.js): every organism's random draws happen in fixed order; never add, remove, or reorder draws in step()-reachable code without declaring an ecology change plus full re-acceptance. Use the pre-draw pattern for new randomness.
+1. **RNG-order contract** (banner comment atop `src/sim/step.js`): every organism's random draws happen in fixed order; never add, remove, or reorder draws in step()-reachable code without declaring an ecology change plus full re-acceptance. Use the pre-draw pattern for new randomness.
 2. **Conformance ritual**: after every core edit, run `npm run conform`. Observer/instrumentation changes must be **bit-identical**. Behavior changes must be declared, re-accepted via tune2, and re-captured. Never trust a green check without the hash note making sense. **A handoff or phase closure is not complete while `conform.js` prints a NOTE** — a stale hash means the baseline no longer certifies the file that actually produces it. Rebind it with a declared reason; recapturing is always a visible, deliberate act, never a way past a warning. Fingerprint identity is the behavioral claim, so recapturing on a *changed* fingerprint would launder a behavior change — the one thing never to do.
 3. **Per-edit verification**: patch via exact-string replacement with occurrence-count checks (`count==1`), a fails list, and halt-on-mismatch. Check the file, not the memory of the file — grep anchors before patching.
 4. **Instrument before knob**: measure before tuning. Every calibration in this project that started from theory failed against measurement (see the calibration histories in observatory-design.md).

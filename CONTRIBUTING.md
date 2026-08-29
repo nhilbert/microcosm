@@ -18,37 +18,45 @@ change is ready.
 ## Layout
 
 ```
-src/          the simulation and UI layers (edit here)
-tools/        build.py, which concatenates src/ into the artifact
-dist/         the built artifact — committed on purpose, verified by CI
-harness/      conformance, ecology and gate scripts
-docs/         design record: concept, phase plans, calibration histories
+src/sim/          the simulation — deterministic, under the RNG contract
+src/observatory/  the instruments — pure observers, zero PRNG draws
+src/ui-*          the render layer — disposable, rewritten per platform
+tools/            build.py, which assembles src/ into dist/
+dist/             generated and committed on purpose, verified by CI
+harness/          conformance, ecology and gate scripts
+docs/             design record, calibration histories, porting.md
 ```
 
-Never edit `dist/microcosm.jsx` by hand. It is generated; CI fails the build if
-it does not match `src/`.
+Never edit anything in `dist/` by hand. It is generated; CI fails the build if
+it does not match `src/`. If you are porting the simulation to another language,
+read `docs/porting.md` first.
 
 ## The rules that matter
 
-**1. `src/core.js` is under an RNG-order contract.** Every organism's random
-draws happen in a fixed order. Adding, removing or reordering a draw anywhere
+**1. `src/sim/` is under an RNG-order contract.** Every organism's random draws
+happen in a fixed order. Adding, removing or reordering a draw anywhere
 reachable from `step()` shifts the entire random stream and invalidates every
 recorded result in `docs/`. If you need new randomness, use the pre-draw pattern
-already in the file. There is a banner comment at the top of `core.js`; read it.
+already in the file. There is a banner comment at the top of `src/sim/step.js`;
+read it before changing anything there.
+
+`src/observatory/` is different: it makes **zero** PRNG draws and mutates no
+dynamic state. That is enforced, not merely intended — instrumentation changes
+must come out bit-identical. Keep it that way.
 
 **2. The core is pure and deterministic.** No DOM, no React, no `Date.now()`, no
 `Math.random()`, no I/O. Time is measured in simulation ticks. This is what makes
 the world reproducible from a seed and what allows a native port to be checked
 against it. (UI-side randomness, e.g. picking a fresh seed on reset, is fine.)
 
-**3. Conformance is a ritual, not a formality.** After any change to `core.js`:
+**3. Conformance is a ritual, not a formality.** After any change under `src/`:
 
 ```bash
 npm run conform
 ```
 
 It fingerprints two seeds at t=3,000 and compares against a stored baseline. It
-also stores a sha256 of `core.js`, which lets it distinguish three cases:
+also stores a sha256 of the built `dist/core.js`, letting it tell three cases apart:
 
 | Hash | Fingerprint | Meaning |
 | --- | --- | --- |

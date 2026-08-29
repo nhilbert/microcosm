@@ -12,11 +12,11 @@
     "start": "node tools/dev-server.js",
     "build": "python3 tools/build.py",
     "syntax": "esbuild --loader=jsx --log-level=warning < dist/microcosm.jsx > /dev/null",
-    "conform": "node harness/conform.js",
-    "conform:capture": "node harness/conform.js --capture",
-    "tune": "node harness/tune2.js",
-    "gate": "node harness/k6gate.js",
-    "test": "npm run build && npm run syntax && npm run conform",
+    "conform": "npm run build && node harness/conform.js",
+    "conform:capture": "npm run build && node harness/conform.js --capture",
+    "tune": "npm run build && node harness/tune2.js",
+    "gate": "npm run build && node harness/k6gate.js",
+    "test": "npm run build && npm run syntax && node harness/conform.js",
     "test:full": "npm run test && npm run tune && npm run gate"
   },
   "devDependencies": {

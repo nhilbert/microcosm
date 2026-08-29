@@ -102,19 +102,31 @@ sees it coming and says so without being asked.
 ## Repo layout
 
 ```
-src/core.js         the simulation + observatory analytics — pure, deterministic
-src/header.jsx      React import, licence notice and banner
-src/ui-render.js    canvas drawing
-src/ui-data.jsx     Data mode: the Observatory's five chart pages
-src/ui-reset.jsx    reset control
-src/ui.jsx          the Microcosm component
-tools/build.py      concatenates the above into the artifact
-dist/microcosm.jsx  the built artifact — generated, committed, checked by CI
+src/sim/            the simulation — pure, deterministic, translated exactly by a port
+  params.js           PRNG, tunable constants, body tags
+  traits.js           species-as-data: the TRAITS table
+  world.js            world state W (structure-of-arrays), spawn/kill
+  events.js           interventions: the only legal outside mutation
+  fields.js           mineral diffusion, light, spatial hash, neighbours
+  step.js             the RNG-order contract and the tick
+  init.js             world setup, Node exports
+src/observatory/    the instruments — zero PRNG draws, free to reimplement
+  recorder.js         ring buffer + event detectors
+  analysis.js         reference bands, strain, indicators
+  impact.js           before/after intervention analysis
+src/ui-*            the render layer — explicitly disposable, rewritten per platform
+tools/build.py      assembles the layers into dist/
+dist/microcosm.jsx  the artifact — generated, committed, checked by CI
+dist/core.js        the sim exported for Node — what the harnesses drive
 harness/            conform.js, tune2.js, k6gate.js and the certified baseline
-docs/               concept, phase plans, architecture review, design notes
+docs/               concept, phase plans, design notes, porting.md
 CONTRIBUTING.md     the rules that keep the recorded results meaningful
 CLAUDE.md           working rules and current status
 ```
+
+The layers have no module system — they are concatenated into one scope, which
+is why `tools/build.py` fixes their order and why none of them import anything.
+The file boundaries are for humans; the runtime sees one program.
 
 Never edit `dist/microcosm.jsx` by hand — it is generated from `src/`, and CI
 fails the build if the two disagree.
