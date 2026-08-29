@@ -5,7 +5,7 @@ const LIGHT_REF = { v: 0 };
 const lightInput = () => { let t = 0; const L = W.light; for (let c = 0; c < L.length; c++) t += L[c]; return t; };
 export default function Microcosm(){
   const canvasRef = useRef(null);
-  const [ui, setUi] = useState({ tick: 0, fps: 0, pops: [0,0,0,0,0,0,0], speed: 1, card: null, mineral: { b: 0, f: 0, l: 0, add: 0 }, lightMul: 1, spawnPick: null, sunSel: -1 });
+  const [ui, setUi] = useState({ tick: 0, fps: 0, pops: [0,0,0,0,0,0,0], speed: 1, card: null, mineral: { b: 0, f: 0, l: 0, add: 0 }, lightMul: 1, spawnPick: null, srcSel: -1 });
   const [detent, setDetent] = useState(0); // 0 peek, 1 half, 2 full
   const [undoChip, setUndoChip] = useState(null);
   const [uiMode, setUiMode] = useState("observe");
@@ -13,7 +13,7 @@ export default function Microcosm(){
   const speedRef = useRef(1); // 0 = paused, 1, 4, 16
   const fabLong = useRef(null);
   const dragRef = useRef(null);
-  const [hidden, setHidden] = useState([false,false,false,false,false,false,false,false]); // per-species show/hide (view only); slot 7 = debris (corpses)
+  const [hidden, setHidden] = useState([false,false,false,false,false,false,false,false,false,false]); // per-species show/hide (view only); 7 = debris, 8 = light layer, 9 = heat layer
   const hiddenRef = useRef(hidden); hiddenRef.current = hidden;
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export default function Microcosm(){
     const ctx = canvas.getContext("2d");
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     let vw = 0, vh = 0;
-    const cam = { x: W.suns[0].x, y: W.suns[0].y, z: Math.max(1, Math.min(window.innerWidth, window.innerHeight) / 620) };
+    const cam = { x: W.sources[0].x, y: W.sources[0].y, z: Math.max(1, Math.min(window.innerWidth, window.innerHeight) / 620) };
     const minZ = () => Math.max(vw, vh) / P.WORLD;
     const clampZ = z => Math.max(minZ(), Math.min(6, z));
     const resize = () => {
@@ -40,7 +40,7 @@ export default function Microcosm(){
 
     const S = makeSpriteSet();
 
-    const { LB, MC, MN, CC, LOD_Z, drawLight, updateCarpet } = makeWorldLayers();
+    const { LB, HB, MC, MN, CC, LOD_Z, drawLight, drawHeat, updateCarpet } = makeWorldLayers();
     drawLight();
 
     // selection + follow-cam
@@ -99,8 +99,8 @@ export default function Microcosm(){
       clearTimeout(chipTimer);
       setUi(u => ({ ...u, card: buildCard(), chips: null })); setDetent(0);
     };
-    const nearestSun = (sx, sy) => { let best = { k: 0, d: Infinity }; // nearest sun to a screen point, in px
-      W.suns.forEach((s, k) => { const d = Math.hypot(vw/2 + wd(s.x - cam.x)*cam.z - sx, vh/2 + wd(s.y - cam.y)*cam.z - sy);
+    const nearestSource = (sx, sy) => { let best = { k: 0, d: Infinity }; // nearest sun to a screen point, in px
+      W.sources.forEach((s, k) => { const d = Math.hypot(vw/2 + wd(s.x - cam.x)*cam.z - sx, vh/2 + wd(s.y - cam.y)*cam.z - sy);
         if (d < best.d) best = { k, d }; });
       return best; };
     const doSelect = (cxp, cyp, tight) => {
@@ -131,8 +131,8 @@ export default function Microcosm(){
     };
 
     let mode = "observe";      // gesture routing: observe = pan/select, intervene = tool
-    let sunDrag = null;         // indirect sun drag accumulator + undo origin
-    let sunSel = -1;            // selected sun (intervene): the sun card's subject and the drag target (7.L)
+    let srcDrag = null;         // indirect sun drag accumulator + undo origin
+    let srcSel = -1;            // selected sun (intervene): the sun card's subject and the drag target (7.L)
     let loupe = null;           // magnifier: {x,y} in screen coords while long-pressing
     let chipTimer = 0;
     const LP = document.createElement("canvas"); LP.width = LP.height = Math.round(128 * dpr);
@@ -164,7 +164,7 @@ export default function Microcosm(){
           pushUndo(`Killed ${nm} · Undo`, () => { logIv("undo"); queueEvent({ type:"revive", snap }); });
         }});
       },
-      setMode: m => { mode = m; if (m === "intervene") follow = false; else if (sunSel >= 0) actionsRef.current.selectSun(-1); },
+      setMode: m => { mode = m; if (m === "intervene") follow = false; else if (srcSel >= 0) actionsRef.current.selectSource(-1); },
       pick: (i, g) => { if (W.alive[i] && W.gen[i] === g) selectIndex(i); else clearChips(); },
       undo: () => {
         if (undoAction){ undoAction(); undoAction = null; }
@@ -172,46 +172,47 @@ export default function Microcosm(){
       },
       pushUndoExt: (label, fn) => pushUndo(label, fn),
       // 7.L suns: every change is an event (logged, undoable); a layout is one intervention
-      selectSun: k => { sunSel = k; setUi(u => ({ ...u, sunSel: k })); },
-      addSunAt: (wx, wy, sx, sy) => {
-        if (W.suns.length >= P.maxSuns) return;
+      selectSource: k => { srcSel = k; setUi(u => ({ ...u, srcSel: k })); },
+      addSourceAt: (wx, wy, sx, sy, kind) => { // kind: "sun" (light 1) or "heat" (dark, warmth +10)
+        if (W.sources.length >= P.maxSources) return;
         if (sx !== undefined) pours.push({ sx, sy, t: performance.now() });
-        logIv("sunAdd");
-        queueEvent({ type:"sunAdd", x: wx, y: wy, done: r => {
-          actionsRef.current.selectSun(r.k);
-          pushUndo("Added a sun · Undo", () => { logIv("undo"); actionsRef.current.selectSun(-1); queueEvent({ type:"sunRemove", k: r.k }); });
+        logIv("sourceAdd");
+        const ch = kind === "heat" ? { i: 0, a: 10, sigma: 130 } : {};
+        queueEvent({ type:"sourceAdd", x: wx, y: wy, ...ch, done: r => {
+          actionsRef.current.selectSource(r.k);
+          pushUndo("Added a sun · Undo", () => { logIv("undo"); actionsRef.current.selectSource(-1); queueEvent({ type:"sourceRemove", k: r.k }); });
         }});
       },
-      addSunCenter: () => actionsRef.current.addSunAt(cam.x, cam.y, vw/2, vh/2),
-      removeSun: k => {
-        if (W.suns.length <= 1 || !W.suns[k]) return;
-        actionsRef.current.selectSun(-1);
-        logIv("sunRemove");
-        queueEvent({ type:"sunRemove", k, done: r => {
+      addSourceCenter: kind => actionsRef.current.addSourceAt(cam.x, cam.y, vw/2, vh/2, kind),
+      removeSource: k => {
+        if (W.sources.length <= 1 || !W.sources[k]) return;
+        actionsRef.current.selectSource(-1);
+        logIv("sourceRemove");
+        queueEvent({ type:"sourceRemove", k, done: r => {
           pushUndo("Removed a sun · Undo", () => { logIv("undo");
-            queueEvent({ type:"sunAdd", ...r.snap, at: r.k, done: a => actionsRef.current.selectSun(a.k) }); });
+            queueEvent({ type:"sourceAdd", ...r.snap, at: r.k, done: a => actionsRef.current.selectSource(a.k) }); });
         }});
       },
-      removeSelSun: () => { if (sunSel >= 0) actionsRef.current.removeSun(sunSel); },
-      sunLayout: (layout, label) => {
-        const prev = W.suns.map(s => ({ ...s }));
+      removeSelSource: () => { if (srcSel >= 0) actionsRef.current.removeSource(srcSel); },
+      sourceLayout: (layout, label) => {
+        const prev = W.sources.map(s => ({ ...s }));
         const apply = L => {
-          for (let k = W.suns.length - 1; k >= 1; k--) queueEvent({ type:"sunRemove", k });
-          queueEvent({ type:"sun", k: 0, x: L[0].x, y: L[0].y });
-          queueEvent({ type:"sunSet", k: 0, i: L[0].i, sigma: L[0].sigma });
-          for (let k = 1; k < L.length; k++) queueEvent({ type:"sunAdd", ...L[k] });
+          for (let k = W.sources.length - 1; k >= 1; k--) queueEvent({ type:"sourceRemove", k });
+          queueEvent({ type:"source", k: 0, x: L[0].x, y: L[0].y });
+          queueEvent({ type:"sourceSet", k: 0, i: L[0].i, a: L[0].a || 0, sigma: L[0].sigma });
+          for (let k = 1; k < L.length; k++) queueEvent({ type:"sourceAdd", ...L[k] });
         };
-        apply(layout); actionsRef.current.selectSun(0);
-        logIv("sunLayout");
-        pushUndo(label + " · Undo", () => { logIv("undo"); apply(prev); actionsRef.current.selectSun(-1); });
+        apply(layout); actionsRef.current.selectSource(0);
+        logIv("sourceLayout");
+        pushUndo(label + " · Undo", () => { logIv("undo"); apply(prev); actionsRef.current.selectSource(-1); });
       },
       reset: () => {
         P.mutation = true; // a fresh world starts with the shipped settings (locus settings are restored by initWorld)
         resetWorld(); initWorld((Math.random()*1e9)|0);
-        sel.i = -1; follow = false; sunSel = -1; undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
-        cam.x = W.suns[0].x; cam.y = W.suns[0].y;
+        sel.i = -1; follow = false; srcSel = -1; undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
+        cam.x = W.sources[0].x; cam.y = W.sources[0].y;
         setUi(us => ({ ...us, card: null, chips: [], spawnPick: null, tick: 0,
-          mineral: { b:0, f:0, l:0, add:0 }, lightMul: 1, sunSel: -1 }));
+          mineral: { b:0, f:0, l:0, add:0 }, lightMul: 1, srcSel: -1 }));
       },
       seedAt: (sp, wx, wy, sx, sy) => {
         const nm = SPECIES_META[sp].name;
@@ -233,8 +234,8 @@ export default function Microcosm(){
       pointers.set(e.pointerId, pp);
       if (mode === "intervene" && pointers.size === 1){
         // the drag target: the selected sun, else the sun nearest the finger at touch-down
-        const k = sunSel >= 0 && W.suns[sunSel] ? sunSel : nearestSun(pp.sx, pp.sy).k, s = W.suns[k];
-        sunDrag = { k, x: s.x, y: s.y, ox: s.x, oy: s.y };
+        const k = srcSel >= 0 && W.sources[srcSel] ? srcSel : nearestSource(pp.sx, pp.sy).k, s = W.sources[k];
+        srcDrag = { k, x: s.x, y: s.y, ox: s.x, oy: s.y };
       }
       if (mode === "observe" && pointers.size === 1){
         pp.lt = setTimeout(() => { pp.lt = null;
@@ -260,10 +261,10 @@ export default function Microcosm(){
         if (p.louping){
           if (loupe){ loupe.x = nx; loupe.y = ny; } // loupe follows the finger; camera stays put
         } else if (p.moved){
-          if (mode === "intervene" && sunDrag){
+          if (mode === "intervene" && srcDrag){
             // indirect sun drag: move by the finger's delta, from anywhere on screen
-            sunDrag.x += (nx - p.x) / cam.z; sunDrag.y += (ny - p.y) / cam.z;
-            queueEvent({ type:"sun", k: sunDrag.k, x: sunDrag.x, y: sunDrag.y });
+            srcDrag.x += (nx - p.x) / cam.z; srcDrag.y += (ny - p.y) / cam.z;
+            queueEvent({ type:"source", k: srcDrag.k, x: srcDrag.x, y: srcDrag.y });
           } else if (mode === "observe"){
             follow = false;
             cam.x = wrap(cam.x - (nx - p.x) / cam.z); cam.y = wrap(cam.y - (ny - p.y) / cam.z);
@@ -284,18 +285,18 @@ export default function Microcosm(){
       if (p && p.lt) clearTimeout(p.lt);
       if (p && p.louping){ loupe = null; doSelect(p.x, p.y, true); return; } // precision pick at loupe center
       if (mode === "intervene"){
-        if (p && p.moved && sunDrag && pointers.size === 0){
-          const { ox, oy } = sunDrag;
-          logIv("sun");
-          const k = sunDrag.k;
-          pushUndo("Moved the sun · Undo", () => { logIv("undo"); queueEvent({ type:"sun", k, x: ox, y: oy }); });
+        if (p && p.moved && srcDrag && pointers.size === 0){
+          const { ox, oy } = srcDrag;
+          logIv("source");
+          const k = srcDrag.k;
+          pushUndo("Moved the sun · Undo", () => { logIv("undo"); queueEvent({ type:"source", k, x: ox, y: oy }); });
         } else if (p && !p.moved && !wasPinch && pointers.size === 0 && performance.now() - p.t >= 350){
           const wx2 = wrap(cam.x + (p.sx - vw/2)/cam.z), wy2 = wrap(cam.y + (p.sy - vh/2)/cam.z);
           setUi(us => ({ ...us, spawnPick: { sx: p.sx, sy: p.sy, x: wx2, y: wy2 } }));
         } else if (p && !p.moved && !wasPinch && pointers.size === 0 && performance.now() - p.t < 350){
-          const ns = nearestSun(p.sx, p.sy);
-          if (ns.d <= 28) actionsRef.current.selectSun(ns.k === sunSel ? -1 : ns.k); // tap a sun: its card (again: let go)
-          else if (sunSel >= 0) actionsRef.current.selectSun(-1);                    // tap water with a sun selected: just let go
+          const ns = nearestSource(p.sx, p.sy);
+          if (ns.d <= 28) actionsRef.current.selectSource(ns.k === srcSel ? -1 : ns.k); // tap a sun: its card (again: let go)
+          else if (srcSel >= 0) actionsRef.current.selectSource(-1);                    // tap water with a sun selected: just let go
           else {
             // fertilize pulse: tap open water to pour mineral there
             const fx = wrap(cam.x + (p.sx - vw/2)/cam.z), fy = wrap(cam.y + (p.sy - vh/2)/cam.z);
@@ -306,7 +307,7 @@ export default function Microcosm(){
             }});
           }
         }
-        if (pointers.size === 0) sunDrag = null;
+        if (pointers.size === 0) srcDrag = null;
         return; // no tap-select while a tool is armed
       }
       if (p && !p.moved && !wasPinch && performance.now() - p.t < 350) doSelect(p.sx, p.sy);
@@ -334,7 +335,7 @@ export default function Microcosm(){
       if (steps === maxSteps) acc = 0; // shed backlog: slow-motion, never death-spiral
       const alpha = spd === 0 ? 1 : Math.min(1, acc / P.TICK_MS);
       if (spd === 0) drainEvents(); // interventions apply even while paused
-      if (W.lightDirty){ drawLight(); W.lightDirty = false; }
+      if (W.lightDirty){ drawLight(); drawHeat(); W.lightDirty = false; }
 
       // follow-cam: ease toward the selected organism
       if (follow && selValid()){
@@ -348,11 +349,14 @@ export default function Microcosm(){
       ctx.fillStyle = COL.abyss; ctx.fillRect(0, 0, vw, vh);
       const z = cam.z, hw = vw/2, hh = vh/2, k = P.WORLD/512;
       const view = { cam, vw, vh, z, hw, hh, alpha, dpr, LOD_Z };
-      // tiled light layer
+      // tiled light and heat layers (view toggles: slots 8 and 9 of `hidden`)
       const tlx = cam.x - hw/z, tly = cam.y - hh/z;
       for (let ky = Math.floor(tly/P.WORLD); (ky*P.WORLD) < tly + vh/z; ky++)
-        for (let kx = Math.floor(tlx/P.WORLD); (kx*P.WORLD) < tlx + vw/z; kx++)
-          ctx.drawImage(LB, (kx*P.WORLD - cam.x)*z + hw, (ky*P.WORLD - cam.y)*z + hh, P.WORLD*z, P.WORLD*z);
+        for (let kx = Math.floor(tlx/P.WORLD); (kx*P.WORLD) < tlx + vw/z; kx++){
+          const dx0 = (kx*P.WORLD - cam.x)*z + hw, dy0 = (ky*P.WORLD - cam.y)*z + hh;
+          if (!hiddenRef.current[8]) ctx.drawImage(LB, dx0, dy0, P.WORLD*z, P.WORLD*z);
+          if (!hiddenRef.current[9]) ctx.drawImage(HB, dx0, dy0, P.WORLD*z, P.WORLD*z);
+        }
       // dissolved mineral (below life), then mat carpet (aggregate sessile producers)
       updateCarpet();
       ctx.imageSmoothingEnabled = true;
@@ -369,7 +373,7 @@ export default function Microcosm(){
       drawCorpses(ctx, view, hiddenRef.current[7]);
       W.pops = pops;
 
-      if (mode === "intervene") drawSunAffordance(ctx, view, sunSel);
+      if (mode === "intervene") drawSunAffordance(ctx, view, srcSel);
       // selection ring (non-additive, drawn above organisms)
       if (selValid()){
         drawSelectionRing(ctx, view, sel.i);
@@ -423,13 +427,13 @@ export default function Microcosm(){
   // On desktop the world keeps the stage and detail docks beside it, so you can
   // watch the pond and read the instruments at the same time — the whole point
   // of an observatory. On mobile nothing changes: sheet over world, as before.
-  const sunOpen = uiMode === "intervene" && ui.sunSel >= 0;            // the sun card is showing (7.L)
-  const panelKind = !desktop ? null : uiMode === "data" ? "data" : sunOpen ? "sun" : ui.card ? "card" : null;
+  const srcOpen = uiMode === "intervene" && ui.srcSel >= 0;            // the sun card is showing (7.L)
+  const panelKind = !desktop ? null : uiMode === "data" ? "data" : srcOpen ? "src" : ui.card ? "card" : null;
   const panelW = panelKind === "data" ? LAYOUT.panelData
-               : (panelKind === "card" || panelKind === "sun") ? LAYOUT.panelCard : 0;
-  const sheetUp = !desktop && (!!ui.card || sunOpen);                    // a bottom sheet is up: lift the controls
-  const sheetPad = sunOpen ? 262 : 194;
-  const sunLog = (type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
+               : (panelKind === "card" || panelKind === "src") ? LAYOUT.panelCard : 0;
+  const sheetUp = !desktop && (!!ui.card || srcOpen);                    // a bottom sheet is up: lift the controls
+  const sheetPad = srcOpen ? 262 : 194;
+  const srcLog = (type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
     actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt(label + " · Undo", undoFn); };
 
   // Keyboard: desktop affordance only. Touch never fires these, and every action
@@ -450,11 +454,11 @@ export default function Microcosm(){
       else if (k === "i" || k === "I"){ setUiMode("intervene"); actionsRef.current.setMode && actionsRef.current.setMode("intervene"); }
       else if (k === "d" || k === "D"){ setUiMode(m => { const n = m === "data" ? "observe" : "data"; actionsRef.current.setMode && actionsRef.current.setMode(n); return n; }); }
       else if (k === "z" || k === "Z"){ actionsRef.current.undo && actionsRef.current.undo(); }
-      else if (k === "s" || k === "S"){ setUiMode("intervene"); actionsRef.current.setMode && actionsRef.current.setMode("intervene");
-        actionsRef.current.addSunCenter && actionsRef.current.addSunCenter(); }
-      else if (k === "Delete" || k === "Backspace"){ actionsRef.current.removeSelSun && actionsRef.current.removeSelSun(); }
+      else if (k === "s" || k === "S" || k === "h" || k === "H"){ setUiMode("intervene"); actionsRef.current.setMode && actionsRef.current.setMode("intervene");
+        actionsRef.current.addSourceCenter && actionsRef.current.addSourceCenter(k === "h" || k === "H" ? "heat" : "sun"); }
+      else if (k === "Delete" || k === "Backspace"){ actionsRef.current.removeSelSource && actionsRef.current.removeSelSource(); }
       else if (k === "Escape"){
-        actionsRef.current.selectSun && actionsRef.current.selectSun(-1);
+        actionsRef.current.selectSource && actionsRef.current.selectSource(-1);
         setUi(u => u.spawnPick ? { ...u, spawnPick: null } : { ...u, card: null });
         setUiMode(m => { if (m === "data"){ actionsRef.current.setMode && actionsRef.current.setMode("observe"); return "observe"; } return m; });
       }
@@ -483,17 +487,19 @@ export default function Microcosm(){
         <span>t {String(ui.tick).padStart(6," ")}  ·  {ui.fps} fps</span>
         {/* species counts double as view toggles: click to hide a species from the world, click again to show */}
         <span style={{ pointerEvents:"auto", display:"inline-flex", gap:10 }}>
-          {[...SPECIES.LIVE.map(sp => [sp, GLYPH[sp]]), [7,"◌"]].map(([sp, glyph]) => {
-            const debris = sp === 7, c = debris ? [158,168,178] : SPECIES_META[sp].rgb, name = debris ? "debris" : SPECIES_META[sp].name;
+          {[...SPECIES.LIVE.map(sp => [sp, GLYPH[sp]]), [7,"◌"], [8,"☀"], [9,"♨"]].map(([sp, glyph]) => {
+            const debris = sp === 7, layer = sp >= 8;
+            const c = debris ? [158,168,178] : layer ? (sp === 8 ? [200,222,240] : [240,150,110]) : SPECIES_META[sp].rgb;
+            const name = debris ? "debris" : sp === 8 ? "the light layer" : sp === 9 ? "the heat layer" : SPECIES_META[sp].name;
             return (
             <button key={sp} className="mc-tab"
               onClick={() => setHidden(h => h.map((v, k) => k === sp ? !v : v))}
               title={(hidden[sp] ? "Show " : "Hide ") + name}
               style={{ background:"transparent", border:"none", padding:"2px 3px", cursor:"pointer", font:"inherit",
-                color: !debris && TRAITS[sp].apex ? "rgb(230,240,250)" : `rgb(${c[0]},${c[1]},${c[2]})`,
+                color: !debris && !layer && TRAITS[sp].apex ? "rgb(230,240,250)" : `rgb(${c[0]},${c[1]},${c[2]})`,
                 opacity: hidden[sp] ? 0.32 : 1, textDecoration: hidden[sp] ? "line-through" : "none",
                 textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
-              {glyph} {debris ? (ui.corpses || 0) : ui.pops[sp]}
+              {glyph}{layer ? "" : " " + (debris ? (ui.corpses || 0) : ui.pops[sp])}
             </button> ); })}
         </span>
       </div>
@@ -566,7 +572,7 @@ export default function Microcosm(){
             style={{ width: 130, accentColor: "#F2B24A" }} />
           </div>
           <div style={{ fontSize:10, color:"rgba(242,178,74,0.75)", marginTop:4, whiteSpace:"nowrap" }}>
-            drag → sun · tap sun → card · tap → pour · hold → seed · sun</div>
+            drag → source · tap source → card · tap → pour · hold → seed · sun · heat</div>
         </div>
       )}
       {uiMode === "intervene" && (
@@ -587,13 +593,13 @@ export default function Microcosm(){
                 background:"rgba(21,34,51,0.95)", color:`rgb(${c[0]},${c[1]},${c[2]})`,
                 fontFamily:"ui-monospace, Menlo, monospace" }}>
               ● {SPECIES_META[sp].name}</button> ); })}
-          {W.suns.length < P.maxSuns && (
-            <button onClick={() => { actionsRef.current.addSunAt(ui.spawnPick.x, ui.spawnPick.y, ui.spawnPick.sx, ui.spawnPick.sy);
+          {W.sources.length < P.maxSources && ["sun","heat"].map(kind => (
+            <button key={kind} onClick={() => { actionsRef.current.addSourceAt(ui.spawnPick.x, ui.spawnPick.y, ui.spawnPick.sx, ui.spawnPick.sy, kind);
                 setUi(us => ({ ...us, spawnPick: null })); }}
               style={{ padding:"7px 9px", borderRadius:10, fontSize:11, border:"1px solid rgba(242,178,74,0.45)",
                 background:"rgba(21,34,51,0.95)", color:"#F2B24A", fontFamily:"ui-monospace, Menlo, monospace" }}>
-              ☀ Sun</button>
-          )}
+              {kind === "sun" ? "☀ Sun" : "♨ Heat"}</button>
+          ))}
           <button onClick={() => setUi(us => ({ ...us, spawnPick: null }))}
             style={{ padding:"7px 8px", borderRadius:10, fontSize:11, border:"none",
               background:"transparent", color:"#5E7386" }}>✕</button>
@@ -623,7 +629,7 @@ export default function Microcosm(){
       {undoChip && (
         <button onClick={() => actionsRef.current.undo && actionsRef.current.undo()}
           style={{ position:"absolute", left:"50%", transform:"translateX(-50%)",
-            bottom: sheetUp ? (sunOpen ? sheetPad + 64 : detent===0 ? 194 + 64 : detent===1 ? "48vh" : "82vh")
+            bottom: sheetUp ? (srcOpen ? sheetPad + 64 : detent===0 ? 194 + 64 : detent===1 ? "48vh" : "82vh")
                             : "calc(env(safe-area-inset-bottom, 0px) + 88px)",
             padding:"10px 18px", borderRadius:20, cursor:"pointer",
             border:"1px solid rgba(242,178,74,0.7)", background:"rgba(21,34,51,0.95)",
@@ -633,7 +639,7 @@ export default function Microcosm(){
         </button>
       )}
       {/* specimen card — bottom sheet on mobile, docked panel on desktop */}
-      {ui.card && !desktop && !sunOpen && (
+      {ui.card && !desktop && !srcOpen && (
         <div style={{ position:"absolute", left:0, right:0, bottom:0,
           height: detent===0 ? 178 : detent===1 ? "46vh" : "80vh",
           background:"rgba(21,34,51,0.92)", backdropFilter:"blur(10px)",
@@ -660,19 +666,19 @@ export default function Microcosm(){
         </div>
       )}
       {/* sun card (7.L) — the selected light source: bottom sheet on mobile, docked panel on desktop */}
-      {sunOpen && !desktop && (
+      {srcOpen && !desktop && (
         <div style={{ position:"absolute", left:0, right:0, bottom:0, height: sheetPad - 16,
           background:"rgba(21,34,51,0.92)", backdropFilter:"blur(10px)",
           borderTop:"1px solid rgba(242,178,74,0.35)", borderRadius:"16px 16px 0 0",
           color:COL.plankTxt, display:"flex", flexDirection:"column", overflow:"hidden" }}>
           <div className="mc-scroll" style={{ padding:"14px 18px calc(env(safe-area-inset-bottom, 0px) + 12px)", overflowY:"auto", flex:1 }}>
-            <SunCard k={ui.sunSel} mono={mono} actions={actionsRef} lightMul={ui.lightMul}
-              onClose={() => actionsRef.current.selectSun(-1)} onLog={sunLog} />
+            <SourceCard k={ui.srcSel} mono={mono} actions={actionsRef} lightMul={ui.lightMul}
+              onClose={() => actionsRef.current.selectSource(-1)} onLog={srcLog} />
           </div>
         </div>
       )}
       {/* speed control */}
-      {(sunOpen || !ui.card || detent === 0 || desktop) && (
+      {(srcOpen || !ui.card || detent === 0 || desktop) && (
       <button className="mc-fab" onPointerDown={fabDown} onPointerUp={fabUp} onPointerCancel={fabUp}
         title={vp.fine ? "Space play/pause · 1 2 3 speed · . step" : undefined}
         aria-label={ui.speed === 0 ? "Play (long-press: step one tick)" : `Speed ${ui.speed}x (long-press: step one tick)`}
@@ -710,18 +716,18 @@ export default function Microcosm(){
         <aside style={{ position:"absolute", top:0, right:0, bottom:0, width:panelW,
           background:"rgba(16,26,40,0.97)", borderLeft:"1px solid rgba(94,115,134,0.32)",
           color:COL.plankTxt, display:"flex", flexDirection:"column", overflow:"hidden", zIndex:8 }}>
-          {panelKind === "sun" ? (
+          {panelKind === "src" ? (
             <>
               <div style={{ display:"flex", alignItems:"center", padding:"14px 16px 10px", flexShrink:0 }}>
-                <span style={{ fontSize:11, letterSpacing:1.4, color:"#F2B24A", fontFamily:mono }}>LIGHT</span>
-                <button className="mc-hit" onClick={() => actionsRef.current.selectSun(-1)}
+                <span style={{ fontSize:11, letterSpacing:1.4, color:"#F2B24A", fontFamily:mono }}>ENERGY SOURCE</span>
+                <button className="mc-hit" onClick={() => actionsRef.current.selectSource(-1)}
                   title="Close (Esc)"
                   style={{ marginLeft:"auto", width:28, height:28, borderRadius:8, cursor:"pointer",
                     border:"1px solid rgba(94,115,134,0.3)", background:"transparent",
                     color:COL.silt, fontSize:13, lineHeight:1 }}>✕</button>
               </div>
               <div className="mc-scroll" style={{ padding:"0 16px 18px", overflowY:"auto", flex:1 }}>
-                <SunCard k={ui.sunSel} desktop mono={mono} actions={actionsRef} lightMul={ui.lightMul} onLog={sunLog} />
+                <SourceCard k={ui.srcSel} desktop mono={mono} actions={actionsRef} lightMul={ui.lightMul} onLog={srcLog} />
               </div>
             </>
           ) : panelKind === "card" ? (
@@ -967,32 +973,35 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
   );
 }
 
-// 7.L — the sun card: the selected light source. Intensity and spread are levers (events, logged,
-// undoable, one drag = one undo); a layout is one intervention; and the light budget says plainly what
-// the sky now delivers relative to the shipped world — adding a sun is never energy-neutral.
-// Layouts are ADDITIVE (L.2 finding, phase7-light-plan.md §11): the shipped sun stays where and what it
-// is; extra suns are tight (sigma 130) and far away, so the water between is actually dark. Moving and
-// shrinking the shipped sun collapsed the core on 5/8 seeds and a dim sun below I=0.6 grows no mat.
-const SUN_LAYOUTS = [
-  { key:"one",   label:"One sun",     suns:[{ x:512, y:512, i:1.0, sigma:210 }] },
-  { key:"twin",  label:"Second sun",  suns:[{ x:512, y:512, i:1.0, sigma:210 }, { x:0, y:0, i:1.0, sigma:130 }] },
-  { key:"dim",   label:"Dim sun",     suns:[{ x:512, y:512, i:1.0, sigma:210 }, { x:0, y:0, i:0.7, sigma:130 }] },
-  { key:"isles", label:"Archipelago", suns:[{ x:512, y:512, i:1.0, sigma:210 }, { x:0, y:0, i:0.8, sigma:110 }, { x:0, y:512, i:0.8, sigma:110 }] },
+// 7.L/7.H — the source card: the selected ENERGY SOURCE. Two channels -- light (a sun) and warmth (a heater;
+// negative = a cold source) -- plus spread; a source with both is a hot sun, with light only a sun, with warmth
+// only a black heater. Sliders are levers (events, logged, undoable, one drag = one undo); a layout is one
+// intervention; the light budget says plainly what the sky delivers relative to the shipped world.
+// Layouts are ADDITIVE (L.2 finding, phase7-light-plan.md §11): the shipped sun stays where and what it is;
+// extra sources are tight (sigma 130) and far away. Moving and shrinking the shipped sun collapsed the core.
+const SOURCE_LAYOUTS = [
+  { key:"one",    label:"One sun",     sources:[{ x:512, y:512, i:1.0, a:0, sigma:210 }] },
+  { key:"twin",   label:"Second sun",  sources:[{ x:512, y:512, i:1.0, a:0, sigma:210 }, { x:0, y:0, i:1.0, a:0, sigma:130 }] },
+  { key:"dim",    label:"Dim sun",     sources:[{ x:512, y:512, i:1.0, a:0, sigma:210 }, { x:0, y:0, i:0.7, a:0, sigma:130 }] },
+  { key:"isles",  label:"Archipelago", sources:[{ x:512, y:512, i:1.0, a:0, sigma:210 }, { x:0, y:0, i:0.8, a:0, sigma:110 }, { x:0, y:512, i:0.8, a:0, sigma:110 }] },
+  { key:"hot",    label:"Hot sun",     sources:[{ x:512, y:512, i:1.0, a:8, sigma:210 }] },
+  { key:"heater", label:"Heater",      sources:[{ x:512, y:512, i:1.0, a:0, sigma:210 }, { x:0, y:0, i:0, a:10, sigma:130 }] },
 ];
-function SunCard({ k, desktop, mono, actions, lightMul, onClose, onLog }){
+const sourceKind = s => s.i > 0 && s.a > 0 ? "☀♨ Hot sun" : s.i > 0 && s.a < 0 ? "☀❄ Cold light" : s.i > 0 ? "☀ Sun" : s.a > 0 ? "♨ Heater" : s.a < 0 ? "❄ Cold source" : "○ Dark source";
+function SourceCard({ k, desktop, mono, actions, lightMul, onClose, onLog }){
   const amber = "#F2B24A";
-  const read = () => ({ suns: W.suns.map(s => ({ ...s })), input: lightInput() });
+  const read = () => ({ sources: W.sources.map(s => ({ ...s })), input: lightInput() });
   const [st, setSt] = React.useState(read);
   React.useEffect(() => { const iv = setInterval(() => setSt(read), 400); return () => clearInterval(iv); }, []);
   const dragStart = React.useRef({}), logTimer = React.useRef({});
-  const s = st.suns[k]; if (!s) return null;
+  const s = st.sources[k]; if (!s) return null;
   const commit = (key, v, label) => {
-    if (dragStart.current[key] === undefined) dragStart.current[key] = W.suns[k][key];
-    queueEvent({ type:"sunSet", k, [key]: v });
-    setSt(x => ({ ...x, suns: x.suns.map((q, j) => j === k ? { ...q, [key]: v } : q) }));
+    if (dragStart.current[key] === undefined) dragStart.current[key] = W.sources[k][key];
+    queueEvent({ type:"sourceSet", k, [key]: v });
+    setSt(x => ({ ...x, sources: x.sources.map((q, j) => j === k ? { ...q, [key]: v } : q) }));
     clearTimeout(logTimer.current[key]);
     logTimer.current[key] = setTimeout(() => { const prev = dragStart.current[key]; dragStart.current[key] = undefined;
-      if (prev !== undefined && Math.abs(prev - v) > 1e-9) onLog("sunSet", label, () => queueEvent({ type:"sunSet", k, [key]: prev })); }, 700);
+      if (prev !== undefined && Math.abs(prev - v) > 1e-9) onLog("sourceSet", label, () => queueEvent({ type:"sourceSet", k, [key]: prev })); }, 700);
   };
   const budget = LIGHT_REF.v ? st.input / LIGHT_REF.v : 1;
   const row = { display:"flex", alignItems:"center", gap:10, marginTop:8, fontSize:11, fontFamily:mono };
@@ -1000,35 +1009,33 @@ function SunCard({ k, desktop, mono, actions, lightMul, onClose, onLog }){
   const val = { width:44, textAlign:"right", color:amber, flexShrink:0 };
   const btn = { padding:"5px 9px", borderRadius:8, cursor:"pointer", font:"inherit", fontSize:10, fontFamily:mono,
     border:"1px solid rgba(242,178,74,0.45)", background:"transparent", color:amber };
-  const last = st.suns.length <= 1;
+  const last = st.sources.length <= 1;
+  const slider = (key, min, max, step, label) => (
+    <input type="range" min={min} max={max} step={step} value={s[key]}
+      onChange={e => commit(key, +e.target.value, label)} style={{ flex:1, accentColor:amber }} />);
   return (
     <div style={{ color:"#C9D7E3" }}>
       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-        <span style={{ fontSize:13, fontWeight:600, color:amber }}>☀ Sun {k+1} of {st.suns.length}</span>
+        <span style={{ fontSize:13, fontWeight:600, color:amber }}>{sourceKind(s)} · {k+1} of {st.sources.length}</span>
         <span style={{ fontSize:10, color:"#5E7386", fontFamily:mono, marginLeft:"auto", textAlign:"right" }}>
           light input ×{budget.toFixed(2)}<br/>of the shipped world</span>
         {onClose && <button className="mc-hit" onClick={onClose} aria-label="Close"
           style={{ border:"none", background:"transparent", color:"#5E7386", fontSize:13, cursor:"pointer", padding:"0 0 0 4px" }}>✕</button>}
       </div>
-      <div style={row}><span style={lab}>intensity</span>
-        <input type="range" min="0.1" max="1.5" step="0.05" value={s.i}
-          onChange={e => commit("i", +e.target.value, "Changed a sun's intensity")} style={{ flex:1, accentColor:amber }} />
-        <span style={val}>{s.i.toFixed(2)}</span></div>
-      <div style={row}><span style={lab}>spread</span>
-        <input type="range" min="90" max="300" step="10" value={s.sigma}
-          onChange={e => commit("sigma", +e.target.value, "Changed a sun's spread")} style={{ flex:1, accentColor:amber }} />
-        <span style={val}>{Math.round(s.sigma)}</span></div>
+      <div style={row}><span style={lab}>light</span>{slider("i", 0, 1.5, 0.05, "Changed a source's light")}<span style={val}>{s.i.toFixed(2)}</span></div>
+      <div style={row}><span style={lab}>warmth</span>{slider("a", -8, 15, 0.5, "Changed a source's warmth")}<span style={val}>{(s.a > 0 ? "+" : "") + s.a.toFixed(1)}°</span></div>
+      <div style={row}><span style={lab}>spread</span>{slider("sigma", 90, 300, 10, "Changed a source's spread")}<span style={val}>{Math.round(s.sigma)}</span></div>
       <div style={{ ...row, flexWrap:"wrap", gap:6 }}>
-        {SUN_LAYOUTS.map(L => (
+        {SOURCE_LAYOUTS.map(L => (
           <button key={L.key} className="mc-hit" style={btn}
-            onClick={() => actions.current.sunLayout(L.suns.map(q => ({ ...q })), "Layout: " + L.label)}>{L.label}</button>))}
-        <button className="mc-hit" disabled={last} onClick={() => actions.current.removeSun(k)}
-          title={last ? "The world keeps at least one sun" : "Remove this sun (Delete)"}
+            onClick={() => actions.current.sourceLayout(L.sources.map(q => ({ ...q })), "Layout: " + L.label)}>{L.label}</button>))}
+        <button className="mc-hit" disabled={last} onClick={() => actions.current.removeSource(k)}
+          title={last ? "The world keeps at least one source" : "Remove this source (Delete)"}
           style={{ ...btn, marginLeft:"auto", opacity: last ? 0.35 : 1, borderColor:"rgba(226,96,96,0.6)", color:"rgb(226,96,96)" }}>Remove</button>
       </div>
       <div style={{ fontSize:10, color:"#5E7386", marginTop:8, lineHeight:1.5 }}>
-        {st.suns.length < P.maxSuns ? (desktop ? "S adds a sun at the view centre" : "hold on water → add a sun there") : "four suns at most"}
-        {" · drag anywhere moves this sun"}{Math.abs(lightMul - 1) > 1e-9 ? ` · ☀ lever ×${lightMul.toFixed(2)} on all suns` : ""}
+        {st.sources.length < P.maxSources ? (desktop ? "S adds a sun, H a heater, at the view centre" : "hold on water → add a sun or a heater there") : "four sources at most"}
+        {" · drag anywhere moves this one"}{Math.abs(lightMul - 1) > 1e-9 ? ` · ☀ lever ×${lightMul.toFixed(2)} on all light` : ""}
       </div>
     </div>
   );

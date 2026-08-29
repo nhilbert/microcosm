@@ -57,8 +57,8 @@ World state `W` (`src/sim/world.js`) is structure-of-arrays over typed arrays,
 sized `MAXN = 6000`: parallel `Float32Array`/`Int32Array` columns (`x`, `y`,
 `vx`, `en`, `sp`, `mn`, …) indexed by organism slot, plus grid fields (`M`,
 `dE`, `dM`, `sc`, `light`) over a `GRID × GRID` torus and a corpse pool with its
-own parallel columns. Light sources are a small array `W.suns` of
-`{x, y, i, sigma}` (Phase 7 L; one to `P.maxSuns`); the `light` field is the
+own parallel columns. Light sources are a small array `W.sources` of
+`{x, y, i, sigma}` (Phase 7 L; one to `P.maxSources`); the `light` field is the
 ambient floor plus one toroidal Gaussian per sun, and the plankton's phototaxis
 steers toward the *nearest* sun by toroidal distance.
 
@@ -116,7 +116,7 @@ settings (Phase 6) are events too — `mutation` (`P.mutation`) and `locus`
 (`{sp, key, v}` for `sigma`, `curve` and the price slopes) — and a changed
 `sigma` changes the future PRNG stream exactly as the sun lever does; replay
 must apply them at their ticks. The suns (Phase 7 L) are events as well —
-`sun {k,x,y}`, `sunAdd {x,y,i?,sigma?,at?}`, `sunRemove {k}`, `sunSet {k,i?,sigma?}`
+`source {k,x,y}`, `sourceAdd {x,y,i?,a?,sigma?,at?}`, `sourceRemove {k}`, `sourceSet {k,i?,a?,sigma?}`
 — none of them draws; they change the stream only through ecology.
 
 ## Proving a port correct

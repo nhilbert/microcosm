@@ -94,7 +94,13 @@ Effort: H.0 an afternoon (mostly UI, reusing the sun code — worth generalising
 - **Thermotaxis may hide the metabolic effect** (organisms simply leave). That is biology, but H-P1/H-P2 are measured with avoidance *off* first, then on, so the two are attributable.
 - **H.3 could move the Yoshida numbers.** It is declared for exactly that reason; if the cycle metrics shift materially, the record says so and the owner decides whether ∇light stays.
 
-## 9. Questions for the owner before H.0
+## 9. Decisions (owner, 2026-08-29)
+
+1. `ctmax` ordering as proposed — agreed as the first hypothesis.
+2. Global warming press (`tempAmb`) — **deferred**.
+3. **One object: the energy source.** Suns and heaters are the same thing with two channels, light `i` (0–1.5) and warmth `a` (−8…+15, negative = a cold source). A sun is `a = 0`, a black heater `i = 0`, a hot sun both, a cold light `i > 0, a < 0`. One card with two sliders (light, warmth) plus spread; one set of events (`source`, `sourceAdd`, `sourceRemove`, `sourceSet {k, i?, a?, sigma?}`); the `W.suns` array of Block L becomes `W.sources`, and `computeLight`/`computeTemp` both read it. Phototaxis (until H.3) steers toward the nearest source with `i > 0`.
+
+The questions as asked:
 
 1. Per-species `ctmax` ordering as proposed (Bacillus most tolerant, Venator least) — agree as the first hypothesis?
 2. The global warming press (`tempAmb`) in this block, or deferred?

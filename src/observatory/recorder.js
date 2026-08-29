@@ -28,9 +28,9 @@ const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0],
 // species. Pure reads; `spread` = max - min over patches holding >= 20 individuals (0 with one sun).
 const PATCH_MIN = 20;
 function patchMeans(sp){
-  const K = W.suns.length, n = new Array(K).fill(0), m = new Array(K).fill(0);
+  const K = W.sources.length, n = new Array(K).fill(0), m = new Array(K).fill(0);
   for (let i=0;i<W.n;i++){ if (!W.alive[i] || W.sp[i]!==sp) continue;
-    let best=0, bd=Infinity; for (let k=0;k<K;k++){ const dx=wd(W.suns[k].x-W.x[i]), dy=wd(W.suns[k].y-W.y[i]), d=dx*dx+dy*dy; if (d<bd){ bd=d; best=k; } }
+    let best=0, bd=Infinity; for (let k=0;k<K;k++){ const dx=wd(W.sources[k].x-W.x[i]), dy=wd(W.sources[k].y-W.y[i]), d=dx*dx+dy*dy; if (d<bd){ bd=d; best=k; } }
     n[best]++; m[best]+=W.g[i]; }
   let hi=-1, lo=-1;
   for (let k=0;k<K;k++){ if (n[k] < PATCH_MIN) continue; m[k]/=n[k]; if (hi<0 || m[k]>m[hi]) hi=k; if (lo<0 || m[k]<m[lo]) lo=k; }
@@ -118,7 +118,7 @@ function detectHeredity(r){
     // local adaptation (7.L): with two or more suns, the locus mean differs between patches by >= 0.10 for
     // 10 samples (each patch holding >= 20). Calibrated on the seeded twin/dim layouts: the plankton's defense
     // locus separated by 0.10-0.18 where the grazers stayed in one patch; the mat's light locus by <= 0.04.
-    if (W.suns.length > 1){
+    if (W.sources.length > 1){
       const pm = patchMeans(sp);
       det.adaptRun[sp] = pm.spread >= 0.10 ? det.adaptRun[sp]+1 : 0;
       if (!det.adapt[sp] && det.adaptRun[sp] >= 10){ det.adapt[sp] = 1;
@@ -183,8 +183,8 @@ function record(){
   // 7.L local adaptation: the locus spread between light patches for the mat (56) and the plankton (57);
   // exactly 0 with one sun. (Measured first as a genotype-light correlation: the wrong instrument -- Solara's
   // locus reads shaded light, which mat density equalises across patches; the patch difference is what moved.)
-  B[r+56] = W.suns.length > 1 && TRAITS[SPECIES.MAT].locus ? patchMeans(SPECIES.MAT).spread : 0;
-  B[r+57] = W.suns.length > 1 && TRAITS[SPECIES.PREY].locus ? patchMeans(SPECIES.PREY).spread : 0;
+  B[r+56] = W.sources.length > 1 && TRAITS[SPECIES.MAT].locus ? patchMeans(SPECIES.MAT).spread : 0;
+  B[r+57] = W.sources.length > 1 && TRAITS[SPECIES.PREY].locus ? patchMeans(SPECIES.PREY).spread : 0;
   let fM=0, dM=0;
   for (let c=0;c<P.GRID*P.GRID;c++){ fM+=W.M[c]; dM+=W.dM[c]; }
   let bM=0; for (let i=0;i<W.n;i++) if (W.alive[i]) bM+=W.mn[i];
@@ -199,7 +199,7 @@ function record(){
   B[r+22]=F.corpseToDet-recPrev.corpseToDet; recPrev.corpseToDet=F.corpseToDet;
   B[r+23]=F.egestE-recPrev.egestE;       recPrev.egestE=F.egestE;
   B[r+24]=F.deaths-recPrev.deaths;       recPrev.deaths=F.deaths;
-  B[r+33]=W.suns[0].x; B[r+34]=W.suns[0].y;
+  B[r+33]=W.sources[0].x; B[r+34]=W.sources[0].y;
   for (let sp=0;sp<7;sp++){ B[r+35+sp]=F.deathsBy[sp]-recPrev.deathsBy[sp]; recPrev.deathsBy[sp]=F.deathsBy[sp]; }
   detect(r, awake);
   W.recHead=(W.recHead+1)%REC.N;

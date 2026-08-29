@@ -11,8 +11,8 @@ const PAGE_TITLES = [
   ["Traits", "what is being inherited · mean and spread over time, the population now"],
 ];
 const IV_LABEL = { pour:"You poured mineral", kill:"You killed a specimen", feed:"You fed a specimen", seed:"You introduced organisms",
-  sun:"You moved a sun", sunlight:"You changed the sunlight", undo:"You undid the last action",
-  sunAdd:"You added a sun", sunRemove:"You removed a sun", sunSet:"You changed a sun", sunLayout:"You changed the light layout",
+  source:"You moved an energy source", sunlight:"You changed the sunlight", undo:"You undid the last action",
+  sourceAdd:"You added an energy source", sourceRemove:"You removed an energy source", sourceSet:"You changed an energy source", sourceLayout:"You changed the source layout",
   mutation:"You switched mutation", evolution:"You changed an evolution setting", preset:"You applied an evolution preset" };
 function ImpactLine({ ev }){
   const r = typeof impact === "function" ? impact(ev) : null;
@@ -252,7 +252,7 @@ function drawTraits(g, wpx, hpx){
       g.fillText("-"+Math.round((n-1)*REC.STRIDE/10)+"s", padL, ribT+ribH+11); g.fillText("now", padL+cw-24, ribT+ribH+11);
       const last = at(n-1,42+sp), lsd = at(n-1,49+sp);
       let lab = "mean "+last.toFixed(2)+" · spread ±"+lsd.toFixed(2);
-      if (W.suns.length > 1){ const pm = patchMeans(sp); // 7.L: by patch, only when there is more than one sun
+      if (W.sources.length > 1){ const pm = patchMeans(sp); // 7.L: by patch, only when there is more than one sun
         const parts = pm.n.map((k, j) => k >= PATCH_MIN ? pm.mean[j].toFixed(2) : null).filter(Boolean);
         if (parts.length > 1) lab += " · by sun " + parts.join(" | "); }
       g.fillStyle = "#B8C5D1"; g.fillText(lab, padL+cw-g.measureText(lab).width, top+14);
@@ -269,7 +269,7 @@ function drawTraits(g, wpx, hpx){
     }
     g.strokeStyle = "rgba(201,215,227,0.35)"; g.setLineDash([3,4]);
     g.beginPath(); g.moveTo(padL + cw*L.g0, histT); g.lineTo(padL + cw*L.g0, histT+histH); g.stroke(); g.setLineDash([]);
-    if (W.suns.length > 1){ // 7.L: one small sun mark per patch at that patch's mean -- the split, if any, read off the bars
+    if (W.sources.length > 1){ // 7.L: one small sun mark per patch at that patch's mean -- the split, if any, read off the bars
       const pm = patchMeans(sp); g.font = "9px ui-monospace, Menlo, monospace"; g.fillStyle = "#B8C5D1";
       pm.n.forEach((k, j) => { if (k < PATCH_MIN) return; const x = padL + cw*Math.max(0, Math.min(1, pm.mean[j]));
         g.fillRect(x-0.5, histT-6, 1, 6); g.fillText("☀"+(j+1), x-6, histT-8); }); }

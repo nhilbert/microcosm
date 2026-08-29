@@ -15,7 +15,8 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a
 const P = {
   WORLD: 1024, GRID: 64,
   sunSigma: 210, sunI: 1.0, ambient: 0.03,   // defaults for the shipped sun and for every sun the player adds (7.L)
-  maxSuns: 4,       // light sources are a small array (W.suns); the shipped world has one, at the centre
+  maxSources: 4,    // energy sources (W.sources): light i and warmth a per source; the shipped world has one sun, centred
+  tempAmb: 0,       // ambient warmth (Phase 7 H; the global press is deferred) -- every Q10 factor is exactly 1 at dT = 0
   divPlank: 70, divBenth: 150, shadeMax: 0.95,
   moveCost: 0.003, capMul: 10, invest: 0.5,
   mutSigma: 0.08,  // (settleLimit moved to per-trait rows in 3.0b)

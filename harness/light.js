@@ -29,10 +29,10 @@ const LAYOUTS = {
 const WHICH = (args.includes("--layouts") ? args[args.indexOf("--layouts")+1].split(",") : ["one","matched","twin","dim"]);
 const SEEDED_REF = { v: flag("--seed") };   // colonisation kit: the player seeds the new patch (spawnPack events), else it must be reached by dispersal
 function applyLayout(lay){
-  for (let k = W.suns.length - 1; k >= 1; k--) C.applyEvent({ type:"sunRemove", k });
-  C.applyEvent({ type:"sun", k:0, x: lay[0].x, y: lay[0].y });
-  C.applyEvent({ type:"sunSet", k:0, i: lay[0].i, sigma: lay[0].sigma });
-  for (let k = 1; k < lay.length; k++){ C.applyEvent({ type:"sunAdd", ...lay[k] });
+  for (let k = W.sources.length - 1; k >= 1; k--) C.applyEvent({ type:"sourceRemove", k });
+  C.applyEvent({ type:"source", k:0, x: lay[0].x, y: lay[0].y });
+  C.applyEvent({ type:"sourceSet", k:0, i: lay[0].i, sigma: lay[0].sigma });
+  for (let k = 1; k < lay.length; k++){ C.applyEvent({ type:"sourceAdd", ...lay[k] });
     if (SEEDED_REF.v){ const s = lay[k]; // packs at four points around the new sun: mats, plankton, a grazer pack, decomposers
       for (const [dx,dy] of [[60,0],[-60,0],[0,60],[0,-60]]){ C.applyEvent({ type:"spawnPack", sp:SOL, x:C.wrap(s.x+dx), y:C.wrap(s.y+dy) }); C.applyEvent({ type:"spawnPack", sp:DRI, x:C.wrap(s.x+dx*1.5), y:C.wrap(s.y+dy*1.5) }); }
       C.applyEvent({ type:"spawnPack", sp:SPECIES.GRAZER, x:s.x, y:s.y });
@@ -41,10 +41,10 @@ function applyLayout(lay){
 }
 const lightInput = () => { let t=0; for (let c=0;c<W.light.length;c++) t+=W.light[c]; return t; };
 const cellOf = i => (Math.floor(W.y[i]/(P.WORLD/P.GRID))&(P.GRID-1))*P.GRID + (Math.floor(W.x[i]/(P.WORLD/P.GRID))&(P.GRID-1));
-function patchOf(i){ let best=0, bd=Infinity; for (let k=0;k<W.suns.length;k++){ const dx=C.wd(W.suns[k].x-W.x[i]), dy=C.wd(W.suns[k].y-W.y[i]), d=dx*dx+dy*dy; if (d<bd){ bd=d; best=k; } } return best; }
+function patchOf(i){ let best=0, bd=Infinity; for (let k=0;k<W.sources.length;k++){ const dx=C.wd(W.sources[k].x-W.x[i]), dy=C.wd(W.sources[k].y-W.y[i]), d=dx*dx+dy*dy; if (d<bd){ bd=d; best=k; } } return best; }
 // per species: population and locus mean per patch, genotype-light correlation, global sd
 function patchStats(sp){
-  const K = W.suns.length, n = new Array(K).fill(0), m = new Array(K).fill(0);
+  const K = W.sources.length, n = new Array(K).fill(0), m = new Array(K).fill(0);
   let N=0, sg=0, sl=0, sgg=0, sll=0, sgl=0;
   for (let i=0;i<W.n;i++){ if (!W.alive[i] || W.sp[i]!==sp) continue;
     const k = patchOf(i), g = W.g[i], l = W.light[cellOf(i)];

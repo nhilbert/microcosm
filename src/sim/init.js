@@ -19,10 +19,10 @@ function initWorld(seed){
   recPrev.deathsBy.fill(0);
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);
   for (const k in W.flows) W.flows[k] = (k==="deathsBy") ? [0,0,0,0,0,0,0] : 0;
-  W.suns.length = 0; W.suns.push({ x: P.WORLD/2, y: P.WORLD/2, i: P.sunI, sigma: P.sunSigma }); // one sun, centred (like P.lightMul)
-  computeLight();
+  W.sources.length = 0; W.sources.push({ x: P.WORLD/2, y: P.WORLD/2, i: P.sunI, a: 0, sigma: P.sunSigma }); // one sun, centred (like P.lightMul)
+  computeLight(); computeTemp();
   const nearSun = rad => { const a=R()*6.283, r=Math.sqrt(R())*rad;
-    return [wrap(W.suns[0].x+Math.cos(a)*r), wrap(W.suns[0].y+Math.sin(a)*r)]; };
+    return [wrap(W.sources[0].x+Math.cos(a)*r), wrap(W.sources[0].y+Math.sin(a)*r)]; };
   const endow = endowFounder; { // (hoisted to module scope in the tweaks batch; alias kept)
     void 0;
   };
@@ -39,7 +39,7 @@ function initWorld(seed){
 
 // __NODE_EXPORTS__ (everything below is stripped from the artifact by build.py)
 if (typeof module !== "undefined" && module.exports !== undefined){
-  module.exports = { P, W, R, TRAITS, TAG, REC, SPECIES, LOCUS_DEFAULTS, normalizeTraits, indicators, impact, cellOf, diffuseM, wrap, wd, spawn, killOrg, computeLight, rebuild,
+  module.exports = { P, W, R, TRAITS, TAG, REC, SPECIES, LOCUS_DEFAULTS, normalizeTraits, indicators, impact, cellOf, diffuseM, wrap, wd, spawn, killOrg, computeLight, computeTemp, rebuild,
     cellLight, neighbors, step, initWorld, resetWorld, applyEvent, drainEvents,
     queueEvent, mulberry32, CELL, MAXN };
 }

@@ -2,7 +2,7 @@ const IMPACT_CHS = [[0,"Solara"],[1,"Drifta"],[2,"Cilio"],[3,"Bacillus"],[6,"Ven
 // natural-variability floors (measured: mats barely move, plankton blooms 2.5x unprovoked)
 const IMPACT_NOISE = { 0:12, 1:170, 2:55, 3:20, 6:25, 14:15, 19:30 };
 // presses: interventions that change the regime rather than poke it once (a changed sky, changed evolution settings)
-const IMPACT_PRESS = new Set(["sun","sunlight","sunAdd","sunRemove","sunSet","sunLayout","mutation","evolution","preset"]);
+const IMPACT_PRESS = new Set(["source","sunlight","sourceAdd","sourceRemove","sourceSet","sourceLayout","mutation","evolution","preset"]);
 function impact(entry){
   const isPress = IMPACT_PRESS.has(entry.type);
   const i0 = W.recCount-1 - Math.floor((W.tick - entry.tick)/REC.STRIDE);

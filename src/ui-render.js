@@ -169,7 +169,7 @@ function makeWorldLayers(){
     lg.globalCompositeOperation = "lighter";
     // the layer is one torus tile: a glow near a tile edge must continue on the far side, so each
     // sun is painted at every wrapped offset its radius reaches (the field itself wraps in computeLight)
-    for (const s of W.suns){
+    for (const s of W.sources){
       const a = Math.min(1, s.i), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
       for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
         const x = cx+ox, y = cy+oy;
@@ -183,11 +183,35 @@ function makeWorldLayers(){
     }
     lg.globalCompositeOperation = "source-over";
     lg.fillStyle = "rgba(240,250,255,0.9)";
-    for (const s of W.suns){ const cx = s.x*k, cy = s.y*k;
+    for (const s of W.sources){ if (s.i <= 0) continue; const cx = s.x*k, cy = s.y*k;
       for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
         lg.beginPath(); lg.arc(cx+ox, cy+oy, 5, 0, 6.283); lg.fill(); } }
   };
   drawLight();
+  // heat layer (7.H): warmth as an ember glow, cold as a blue one -- never amber, which is the hand's colour.
+  // Transparent where nothing is warm, so the certified world looks exactly as before.
+  const HB = document.createElement("canvas"); HB.width = 512; HB.height = 512;
+  const hg = HB.getContext("2d");
+  const drawHeat = () => {
+    hg.clearRect(0,0,512,512);
+    const k = 512 / P.WORLD;
+    for (const s of W.sources){ if (s.a === 0) continue;
+      const warm = s.a > 0, m = Math.min(1, Math.abs(s.a)/10), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
+      const c0 = warm ? "255,120,60" : "110,170,255", c1 = warm ? "200,70,40" : "80,120,220";
+      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
+        const x = cx+ox, y = cy+oy;
+        if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
+        const gr = hg.createRadialGradient(x, y, 2, x, y, r);
+        gr.addColorStop(0, `rgba(${c0},${(0.38*m).toFixed(3)})`);
+        gr.addColorStop(0.45, `rgba(${c1},${(0.16*m).toFixed(3)})`);
+        gr.addColorStop(1, `rgba(${c1},0)`);
+        hg.fillStyle = gr; hg.fillRect(0,0,512,512);
+      }
+      if (s.i <= 0){ hg.fillStyle = warm ? "rgba(255,160,110,0.9)" : "rgba(170,210,255,0.9)"; // a dark source still needs a mark
+        for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){ hg.beginPath(); hg.arc(cx+ox, cy+oy, 4, 0, 6.283); hg.fill(); } }
+    }
+  };
+  drawHeat();
 
   // mat carpet: density field for sessile producers (Splatterplots-style aggregation).
   // Denser mats render DARKER, saturated green — thick algae absorb light; brightness stays reserved.
@@ -252,7 +276,7 @@ function makeWorldLayers(){
     }
     ccx.putImageData(ccImg, 0, 0);
   };
-  return { LB, MC, MN, CC, LOD_Z, drawLight, updateCarpet };
+  return { LB, HB, MC, MN, CC, LOD_Z, drawLight, drawHeat, updateCarpet };
 }
 // Sprite set: one sprite per species, plus one per genotype bin for every species with a locus.
 function makeSpriteSet(){
@@ -336,7 +360,7 @@ function drawCorpses(ctx, view, hiddenDebris){
 }
 function drawSunAffordance(ctx, view, selSun){
   const { cam, z, hw, hh } = view;
-  W.suns.forEach((s, k) => {
+  W.sources.forEach((s, k) => {
     const ssx = hw + wd(s.x - cam.x)*z, ssy = hh + wd(s.y - cam.y)*z, on = k === selSun;
     ctx.strokeStyle = on ? "rgba(242,178,74,1)" : "rgba(242,178,74,0.9)"; ctx.lineWidth = on ? 2.5 : 1.5;
     ctx.beginPath(); ctx.arc(ssx, ssy, 16, 0, 6.283); ctx.stroke();

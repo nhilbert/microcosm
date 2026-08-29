@@ -37,9 +37,9 @@ function diffuseM(){
   }
   A.set(AT);
 }
-// Irradiance adds: the field is the ambient floor plus one toroidal Gaussian per sun. Draw-free.
+// Irradiance adds: the field is the ambient floor plus one toroidal Gaussian per source's light. Draw-free.
 function computeLight(){
-  const S = W.suns;
+  const S = W.sources;
   for (let gy = 0; gy < P.GRID; gy++) for (let gx = 0; gx < P.GRID; gx++){
     const cx=(gx+0.5)*CELL, cyy=(gy+0.5)*CELL;
     let v = P.ambient;
@@ -48,6 +48,21 @@ function computeLight(){
       v += s.i * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
     }
     W.light[gy*P.GRID+gx] = v * P.lightMul;
+  }
+}
+// Warmth above ambient (7.H): the same Gaussians, each source's `a` (negative = a cold source). Static like
+// light, recomputed on events only. Sources with a = 0 are skipped so the shipped world's field is exactly 0.
+function computeTemp(){
+  const S = W.sources;
+  for (let gy = 0; gy < P.GRID; gy++) for (let gx = 0; gx < P.GRID; gx++){
+    const cx=(gx+0.5)*CELL, cyy=(gy+0.5)*CELL;
+    let v = P.tempAmb;
+    for (let k = 0; k < S.length; k++){
+      const s = S[k]; if (s.a === 0) continue;
+      const dx=wd(cx-s.x), dy=wd(cyy-s.y);
+      v += s.a * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+    }
+    W.temp[gy*P.GRID+gx] = v;
   }
 }
 
