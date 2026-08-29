@@ -54,13 +54,28 @@ throughout the UI; every other colour belongs to the world.
 sized for a phone screen. Drop it into any React host, or paste it into a Claude
 artifact. It is committed, so you can grab it without building anything.
 
-To build it from the layers in `src/`:
+To run it locally in a browser:
 
 ```bash
-npm install     # devDependencies (esbuild, for the syntax check)
+npm install
+npm start       # -> http://127.0.0.1:5173
+```
+
+That serves a dev page holding the app inside a phone-sized **iframe**, with
+buttons for a few device sizes and a fill-the-window mode. The iframe matters:
+the app roots itself with `position:fixed` and reads `window.innerWidth`, so it
+needs a real viewport — a CSS box would not constrain it. Edit anything in
+`src/` and the frame rebuilds and reloads itself.
+
+To build the artifact from the layers in `src/`:
+
+```bash
 npm run build   # src/ -> dist/microcosm.jsx
 npm test        # build + syntax check + conformance
 ```
+
+Nothing in `dev/` ships. It exists so a browser has something to load; the
+artifact is unaffected by it.
 
 ## The harnesses
 

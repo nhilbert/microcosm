@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Microcosm — dev</title>
+<style>
+  :root{
+    --bg:#0C0F16; --panel:#141926; --line:#232B3D;
+    --ink:#C8D2E4; --dim:#6C7A94; --amber:#F2B24A;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:13px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    gap:14px; padding:18px 18px 26px;
+  }
+  header{ display:flex; align-items:baseline; gap:10px; }
+  h1{ font-size:14px; font-weight:600; margin:0; letter-spacing:.02em; }
+  h1 span{ color:var(--amber); }
+  .note{ color:var(--dim); font-size:12px; }
+  .bar{
+    display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:9px; padding:6px;
+  }
+  button{
+    font:inherit; color:var(--ink); background:transparent;
+    border:1px solid transparent; border-radius:6px;
+    padding:5px 11px; cursor:pointer;
+  }
+  button:hover{ background:#1D2434; }
+  button[aria-pressed="true"]{
+    background:#20283A; border-color:var(--amber); color:#fff;
+  }
+  .sep{ width:1px; align-self:stretch; background:var(--line); margin:2px 4px; }
+  .stage{ display:flex; align-items:center; justify-content:center; flex:1; min-height:0; }
+  .device{
+    background:#000; border:1px solid var(--line); border-radius:26px;
+    padding:8px; box-shadow:0 18px 50px rgba(0,0,0,.55);
+    transition:width .16s ease, height .16s ease;
+  }
+  .device.flat{ border-radius:8px; padding:4px; }
+  iframe{
+    display:block; width:100%; height:100%; border:0;
+    border-radius:19px; background:#05070C;
+  }
+  .device.flat iframe{ border-radius:5px; }
+  footer{ color:var(--dim); font-size:11.5px; text-align:center; max-width:640px; }
+  code{ color:var(--ink); background:#1A2130; padding:1px 5px; border-radius:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Micro<span>cosm</span></h1>
+  <span class="note">local dev · the frame below is a real viewport, not a CSS box</span>
+</header>
+
+<div class="bar" role="group" aria-label="Device size">
+  <button data-w="390" data-h="844" aria-pressed="true">iPhone 14 · 390×844</button>
+  <button data-w="360" data-h="800">Android · 360×800</button>
+  <button data-w="430" data-h="932">Max · 430×932</button>
+  <button data-w="820" data-h="1180">Tablet · 820×1180</button>
+  <button id="fill">Desktop · fill window</button>
+  <div class="sep"></div>
+  <button id="rotate" title="Swap width and height">Rotate</button>
+  <button id="reload" title="Reload the app frame">Reload</button>
+</div>
+
+<div class="stage">
+  <div class="device" id="device">
+    <iframe id="app" src="app.html" title="Microcosm"
+            allow="fullscreen" scrolling="no"></iframe>
+  </div>
+</div>
+
+<footer>
+  Edit anything in <code>src/</code> and the frame reloads by itself.
+  The app is unmodified — it runs in its own viewport, so <code>position:fixed</code>
+  and <code>window.innerWidth</code> behave exactly as they do on a phone.
+</footer>
+
+<script>
+  const device = document.getElementById("device");
+  const frame  = document.getElementById("app");
+  const sizeButtons = [...document.querySelectorAll("button[data-w]")];
+  let w = 390, h = 844, fill = false;
+
+  function apply(){
+    if (fill){
+      device.style.width = "100%"; device.style.height = "100%";
+      device.style.transform = "none";
+      device.classList.add("flat");
+      document.body.style.padding = "18px";
+      return;
+    }
+    device.style.width  = w + "px";
+    device.style.height = h + "px";
+    device.classList.toggle("flat", Math.min(w, h) > 600);
+    // keep the frame on screen on short displays
+    const avail = window.innerHeight - 190;
+    device.style.transform = h > avail ? `scale(${(avail / h).toFixed(3)})` : "none";
+    device.style.transformOrigin = "top center";
+  }
+
+  const fillBtn = document.getElementById("fill");
+  sizeButtons.forEach(b => b.addEventListener("click", () => {
+    sizeButtons.forEach(o => o.setAttribute("aria-pressed", String(o === b)));
+    fillBtn.setAttribute("aria-pressed", "false");
+    fill = false; w = +b.dataset.w; h = +b.dataset.h; apply();
+  }));
+  fillBtn.addEventListener("click", () => {
+    sizeButtons.forEach(o => o.setAttribute("aria-pressed", "false"));
+    fillBtn.setAttribute("aria-pressed", "true");
+    fill = true; apply();
+  });
+
+  document.getElementById("rotate").addEventListener("click", () => {
+    [w, h] = [h, w]; apply();
+  });
+  document.getElementById("reload").addEventListener("click", () => {
+    frame.contentWindow.location.reload();
+  });
+
+  window.addEventListener("resize", apply);
+  apply();
+</script>
+</body>
+</html>

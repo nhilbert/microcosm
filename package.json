@@ -9,6 +9,7 @@
     "node": ">=18"
   },
   "scripts": {
+    "start": "node tools/dev-server.js",
     "build": "python3 tools/build.py",
     "syntax": "esbuild --loader=jsx --log-level=warning < dist/microcosm.jsx > /dev/null",
     "conform": "node harness/conform.js",
@@ -19,6 +20,8 @@
     "test:full": "npm run test && npm run tune && npm run gate"
   },
   "devDependencies": {
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   }
 }

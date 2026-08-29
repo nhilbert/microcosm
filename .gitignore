@@ -17,3 +17,6 @@ Thumbs.db
 
 # dist/ is NOT ignored: dist/microcosm.jsx is the deliverable artifact
 # and is committed deliberately. CI checks it matches src/.
+
+# dev server bundle output
+dev/.build/
