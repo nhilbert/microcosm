@@ -10,9 +10,11 @@ living system and find out what happens.
 
 ## What's in the world
 
-Seven species are defined; five are alive in the shipped world. Two of them
-carry a heritable trait and evolve — Drifta's defense against grazing, and
-Cilio's pursuit of it:
+Seven species are defined; five are alive in the shipped world. Four of them
+carry a heritable trait and evolve — Solara's light adaptation, Drifta's defense
+against grazing, Cilio's pursuit of it, and Bacillus's rate-versus-yield
+metabolism — and you can set the mutation rate, the shape of each trade-off and
+the prices yourself, as interventions the Observatory then reports on:
 
 | Species | Role |
 | --- | --- |

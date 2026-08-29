@@ -106,7 +106,11 @@ directly from `W.g`; both are observers and may be reimplemented freely.
 legal way to mutate the world from outside. Events are applied at tick
 boundaries and logged, which is what makes interventions undoable and replayable.
 A port should expose exactly this and nothing else; a UI that writes into `W`
-directly will desynchronise from the event log and break replay.
+directly will desynchronise from the event log and break replay. The evolution
+settings (Phase 6) are events too — `mutation` (`P.mutation`) and `locus`
+(`{sp, key, v}` for `sigma`, `curve` and the price slopes) — and a changed
+`sigma` changes the future PRNG stream exactly as the sun lever does; replay
+must apply them at their ticks.
 
 ## Proving a port correct
 
