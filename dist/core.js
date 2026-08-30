@@ -115,6 +115,19 @@ const SPECIES_ROWS = [
       "hiTrait": "grazing resistance",
       "loTrait": "growth rate"
     },
+    "loci": [
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "warmSlope": 0.4,
+        "warmGainSlope": 0.25,
+        "label": "Thermal",
+        "hiWord": "heat-tolerant",
+        "loWord": "quick-burning",
+        "hiTrait": "warm upkeep relief",
+        "loTrait": "warm intake"
+      }
+    ],
     "topt": 9,
     "ctmax": 14,
     "thermo": 0.6
@@ -227,6 +240,19 @@ const SPECIES_ROWS = [
       "hiTrait": "feeding rate",
       "loTrait": "yield"
     },
+    "loci": [
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "warmSlope": 0.4,
+        "warmGainSlope": 0.25,
+        "label": "Thermal",
+        "hiWord": "heat-tolerant",
+        "loWord": "quick-burning",
+        "hiTrait": "warm upkeep relief",
+        "loTrait": "warm intake"
+      }
+    ],
     "topt": 12,
     "ctmax": 18,
     "thermo": 0.25
@@ -411,7 +437,12 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //              ecology sets. See docs/genetics-scaling.md. 0 = the original linear form.
 //   rateSlope  detritivore feeding rate x (1 + rateSlope*(g-g0))   effSlope   yield effE x (1 - effSlope*(g-g0))
 //              the rate-yield trade-off of microbial metabolism (Pfeiffer, Schuster & Bonhoeffer 2001)
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, curve: 0 };
+//   warmSlope  upkeep's warmth response down-regulated: maintenance x (1 - warmSlope*(g-g0)*dT/10) --
+//              Padfield's respiration-Q10 compensation (7.H.5). warmGainSlope prices it: the species'
+//              warmth-SCALED gain (photosynthesis for the drifter, decomposition for the decomposer)
+//              x (1 - warmGainSlope*(g-g0)*dT/10). Both exactly 1 at dT <= 0: a locus expressing only
+//              these is warmth-gated (warmGated, derived) -- invisible until the world warms.
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, curve: 0 };
 // Multi-locus (Phase 7): a species row carries `locus` (its first, display locus) and optionally
 // `loci: [...]` for the rest; the loader flattens both into t.loci, ordered — LOCUS ORDER IS PART OF
 // THE RNG CONTRACT (one mutation draw per locus, in order, at every division). t.locus stays an alias
@@ -426,6 +457,8 @@ function normalizeTraits(rows){
     if (t.loci.length > MAXLOCI) throw new Error(t.name+" carries "+t.loci.length+" loci; W.g holds "+MAXLOCI);
     for (const L of t.loci){
       for (const k in LOCUS_DEFAULTS) if (L[k] === undefined) L[k] = LOCUS_DEFAULTS[k];
+      L.warmGated = !(L.escSlope || L.kpSlope || L.catchSlope || L.kbSlope || L.lightSlope || L.rateSlope || L.effSlope)
+        && !!(L.warmSlope || L.warmGainSlope); // expressed only through warmth: the narration detectors stay silent in an unwarmed world
       checkLocus(t, L);
     }
     t.locus = t.loci.length ? t.loci[0] : null;
@@ -442,6 +475,7 @@ function checkLocus(t, L){
     const mults = { kb: 1 + L.kbSlope*d - q, kp: 1 - L.kpSlope*d - q, catch: 1 - L.catchSlope*d - q,
       rate: 1 + L.rateSlope*d - q, eff: 1 - L.effSlope*d - q,
       lightDark: 1 + L.lightSlope*d - q, lightBright: 1 - L.lightSlope*d - q,
+      warmCost: 1 - L.warmSlope*d*1.5, warmGain: 1 - L.warmGainSlope*d*1.5, // at the hottest legal source (dT 15)
       escape: t.escape ? (t.escape.p + L.escSlope*d - t.escape.p*L.curve*d*d)/t.escape.p : 1 };
     for (const k in mults) if (!(mults[k] >= LOCUS_MULT_MIN && mults[k] <= LOCUS_MULT_MAX)) bad.push(k+"@g="+g+"="+mults[k].toFixed(2));
   }
@@ -921,10 +955,15 @@ function detectHeredity(r){
   // Calibrated on the 8-seed evolving ensemble: founders sit within +-0.05 of g0 for the first
   // ~2,000 ticks (sd 0.02-0.05), so the dead zone silences the founding; a real sweep carries the
   // mean >= 0.10 from g0 with a 60% majority on that side, reached at t ~ 8,000-12,000.
+  // a warmth-gated locus is unexpressed in an unwarmed world: its variation is pure drift, and narrating
+  // drift as selection ("a line is taking over", "lines coexist, neither winning") would be a lie. Selection
+  // stories wait for warmth; rail contact is a corridor concern and is always reported.
+  const warmWorld = P.tempAmb > 0 || W.sources.some(s => s.a > 0);
   for (let sp=0; sp<7; sp++){
     const loci = TRAITS[sp].loci; if (!loci.length || B[r+sp] < 50) continue;
     for (let kL=0; kL<loci.length && kL<LOCUS_CH.length; kL++){
     const L = loci[kL], di = sp*2 + kL, off = kL*MAXN;
+    const gated = L.warmGated && !warmWorld;
     const mean = B[r+LOCUS_CH[kL][0]+sp], sd = B[r+LOCUS_CH[kL][1]+sp], name = TRAITS[sp].name;
     let hi=0, lo=0, n=0, railHi=0, railLo=0;
     for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; const g=W.g[off+i]; if (g > L.g0+0.05) hi++; else if (g < L.g0-0.05) lo++; if (g > 0.98) railHi++; else if (g < 0.02) railLo++; }
@@ -936,9 +975,10 @@ function detectHeredity(r){
     if (!det.rail[di] && det.railRun[di] >= 10){ det.rail[di] = railDir;
       pushEvent("rail", sp, name+" has reached the limit of its "+L.label.toLowerCase()+" — "+Math.round(railShare*100)+"% at the "+(railDir>0 ? L.hiWord : L.loWord)+" edge.", kL); }
     else if (det.rail[di] && railShare < 0.15) det.rail[di] = 0;
-    const dir = (mean - L.g0 >= 0.10 && shareHi >= 0.6) ? 1 : (L.g0 - mean >= 0.10 && shareLo >= 0.6) ? -1 : 0;
+    const dir = gated ? 0 : (mean - L.g0 >= 0.10 && shareHi >= 0.6) ? 1 : (L.g0 - mean >= 0.10 && shareLo >= 0.6) ? -1 : 0;
     const share = dir > 0 ? shareHi : shareLo;
     const word = dir > 0 ? L.hiWord : L.loWord;
+    if (gated) det.sweep[di] = 0;
     if (det.sweep[di] === 0 && dir !== 0){ det.sweep[di] = dir;
       pushEvent("sweep", sp, "A "+word+" "+name+" line is taking over — "+Math.round(share*100)+"% of the population and rising.", kL); }
     else if (Math.abs(det.sweep[di]) === 1 && dir === det.sweep[di] && share >= 0.85){ det.sweep[di] *= 2;
@@ -947,7 +987,7 @@ function detectHeredity(r){
     // diversifying: standing variation established with no line winning -- both strategies coexist.
     // Measured on the balanced (5.7) world: sd climbs 0.02 -> 0.10-0.17 while the mean stays near g0;
     // a sweep instead carries the mean away. The two events are mutually exclusive by construction.
-    if (det.sweep[di] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[di]++;
+    if (!gated && det.sweep[di] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[di]++;
     else det.diverseRun[di] = 0;
     if (!det.diverse[di] && det.diverseRun[di] >= 10){ det.diverse[di] = 1;
       pushEvent("diverse", sp, name+" is diversifying — "+L.hiWord+" and "+L.loWord+" lines coexist, neither winning.", kL); }
@@ -955,7 +995,7 @@ function detectHeredity(r){
     // local adaptation (7.L): with two or more suns, the locus mean differs between patches by >= 0.10 for
     // 10 samples (each patch holding >= 20). Calibrated on the seeded twin/dim layouts: the plankton's defense
     // locus separated by 0.10-0.18 where the grazers stayed in one patch; the mat's light locus by <= 0.04.
-    if (W.sources.length > 1){
+    if (W.sources.length > 1 && !gated){
       const pm = patchMeans(sp, kL);
       det.adaptRun[di] = pm.spread >= 0.10 ? det.adaptRun[di]+1 : 0;
       if (!det.adapt[di] && det.adaptRun[di] >= 10){ det.adapt[di] = 1;
@@ -964,7 +1004,7 @@ function detectHeredity(r){
     } else { det.adapt[di] = 0; det.adaptRun[di] = 0; }
     // diversity collapse: variation falls to well under half of what it was 270 samples ago.
     // Selection consuming variation is the normal end of a sweep; the event names the cost.
-    if (W.recCount >= 271){
+    if (W.recCount >= 271 && !gated){
       const sdAgo = B[((W.recHead-270+N)%N)*CH + LOCUS_CH[kL][1] + sp];
       if (!det.uniform[di] && sdAgo >= 0.06 && sd <= 0.4*sdAgo){ det.uniform[di] = 1;
         pushEvent("uniform", sp, kL === 0 ? "Variation collapsing in "+name+" — the population is becoming uniform."
@@ -1295,7 +1335,14 @@ function step(){
     const loci = T.loci, nL = loci.length;
     let kbG = 1;
     for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0; kbG *= 1 + L.kbSlope*d - L.curve*d*d; }
-    let cost = T.kb*kbG*Math.pow(W.sz[i],0.75)*W.qR[cT]; // maintenance: Q10 2.5
+    // thermal locus (7.H.5): warmth-response down-regulation (Padfield) -- upkeep's warmth response
+    // flattened (wR), the warmth-scaled gain flattened with it (wA, the price). Exactly 1 at dT <= 0,
+    // so the unwarmed world expresses nothing; curvature runs through the ambient sites like any locus.
+    let wR = 1, wA = 1;
+    if (dT > 0) for (let k=0;k<nL;k++){ const L=loci[k]; if (L.warmSlope !== 0 || L.warmGainSlope !== 0){
+      const d=W.g[k*MAXN+i]-L.g0, hw=dT*0.1;
+      wR *= 1 - L.warmSlope*d*hw; wA *= 1 - L.warmGainSlope*d*hw; } }
+    let cost = T.kb*kbG*Math.pow(W.sz[i],0.75)*W.qR[cT]*wR; // maintenance: Q10 2.5, flattened by the thermal locus
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -1309,7 +1356,7 @@ function step(){
       let kpG = 1;
       for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0, q=L.curve*d*d;
         kpG *= (1 + L.kpSlope*(-d) - q) * (1 + L.lightSlope*d*(1 - 2*Lc) - q); }
-      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat*W.qP[cT]*tpc; // photosynthesis: Q10 1.6, cut off past ctmax
+      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat*W.qP[cT]*tpc*wA; // photosynthesis: Q10 1.6, cut off past ctmax, flattened by the thermal locus (its price)
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
       if (W.pr[i] < pQ && W.en[i] > 0.6*cap){
@@ -1457,10 +1504,10 @@ function step(){
       let rateG = 1, effG = 1; // rate-yield locus; both exactly 1 at g0
       for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0, q=L.curve*d*d;
         rateG *= 1 + L.rateSlope*d - q; effG *= 1 - L.effSlope*d - q; }
-      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]*W.qD[c0]*tpc); // decomposition: Q10 2.0
+      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]*W.qD[c0]*tpc*wA); // decomposition: Q10 2.0, flattened by the thermal locus (its price)
       if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE*effG); }
       const pQ3=P.pQuota*W.sz[i];
-      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i]*W.qD[c0]*tpc, Math.max(0,(pQ3-W.pr[i])/D.effP));
+      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i]*W.qD[c0]*tpc*wA, Math.max(0,(pQ3-W.pr[i])/D.effP));
       if(eatP>0){ W.dP[c0]-=eatP; W.pr[i]+=eatP*D.effP; }
       const minz=Math.min(W.dM[c0], D.minRate*W.sz[i]);
       if(minz>0){

@@ -58,7 +58,14 @@ function step(){
     const loci = T.loci, nL = loci.length;
     let kbG = 1;
     for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0; kbG *= 1 + L.kbSlope*d - L.curve*d*d; }
-    let cost = T.kb*kbG*Math.pow(W.sz[i],0.75)*W.qR[cT]; // maintenance: Q10 2.5
+    // thermal locus (7.H.5): warmth-response down-regulation (Padfield) -- upkeep's warmth response
+    // flattened (wR), the warmth-scaled gain flattened with it (wA, the price). Exactly 1 at dT <= 0,
+    // so the unwarmed world expresses nothing; curvature runs through the ambient sites like any locus.
+    let wR = 1, wA = 1;
+    if (dT > 0) for (let k=0;k<nL;k++){ const L=loci[k]; if (L.warmSlope !== 0 || L.warmGainSlope !== 0){
+      const d=W.g[k*MAXN+i]-L.g0, hw=dT*0.1;
+      wR *= 1 - L.warmSlope*d*hw; wA *= 1 - L.warmGainSlope*d*hw; } }
+    let cost = T.kb*kbG*Math.pow(W.sz[i],0.75)*W.qR[cT]*wR; // maintenance: Q10 2.5, flattened by the thermal locus
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -72,7 +79,7 @@ function step(){
       let kpG = 1;
       for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0, q=L.curve*d*d;
         kpG *= (1 + L.kpSlope*(-d) - q) * (1 + L.lightSlope*d*(1 - 2*Lc) - q); }
-      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat*W.qP[cT]*tpc; // photosynthesis: Q10 1.6, cut off past ctmax
+      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat*W.qP[cT]*tpc*wA; // photosynthesis: Q10 1.6, cut off past ctmax, flattened by the thermal locus (its price)
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
       if (W.pr[i] < pQ && W.en[i] > 0.6*cap){
@@ -220,10 +227,10 @@ function step(){
       let rateG = 1, effG = 1; // rate-yield locus; both exactly 1 at g0
       for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0, q=L.curve*d*d;
         rateG *= 1 + L.rateSlope*d - q; effG *= 1 - L.effSlope*d - q; }
-      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]*W.qD[c0]*tpc); // decomposition: Q10 2.0
+      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]*W.qD[c0]*tpc*wA); // decomposition: Q10 2.0, flattened by the thermal locus (its price)
       if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE*effG); }
       const pQ3=P.pQuota*W.sz[i];
-      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i]*W.qD[c0]*tpc, Math.max(0,(pQ3-W.pr[i])/D.effP));
+      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i]*W.qD[c0]*tpc*wA, Math.max(0,(pQ3-W.pr[i])/D.effP));
       if(eatP>0){ W.dP[c0]-=eatP; W.pr[i]+=eatP*D.effP; }
       const minz=Math.min(W.dM[c0], D.minRate*W.sz[i]);
       if(minz>0){

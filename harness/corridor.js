@@ -7,13 +7,17 @@
 //   --fuzz [k]   evolution as the fuzzer: mutation ON with every sigma x k (default 4), 3x the horizon,
 //                8 seeds -- if the optimiser cannot break the world, the corridor is safe
 //   --sample N   N stratified random interior points, pinned, mutation off (fixed budget, statistical claim)
+// Multi-locus: L counts (species, locus) pairs -- every plane is pinned and fuzzed. A warmth-gated
+// locus (thermal) is expression-inert in the unwarmed certified world; its rails here certify only the
+// storage and draw machinery, and its ecological rails live in the heated worlds of harness/heat.js.
 // Several modes may be combined; the exit code is 1 if any configuration collapses.
 const L = require("./lib.js"); const { C, W, P, TRAITS, SEEDS, HORIZON, LOCI } = L;
 const argv = process.argv.slice(2);
 const has = f => argv.includes(f), after = f => { const i = argv.indexOf(f); return i >= 0 && argv[i+1] && !argv[i+1].startsWith("--") ? +argv[i+1] : null; };
 let modes = argv.filter(a => a.startsWith("--")).map(a => a.slice(2));
-if (!modes.length) modes = [LOCI.length <= 3 ? "corners" : "rails"];
-const sigma0 = LOCI.map(sp => TRAITS[sp].locus.sigma);
+const PAIRS = []; LOCI.forEach(sp => TRAITS[sp].loci.forEach((Lc, k) => PAIRS.push({ sp, k, L: Lc })));
+if (!modes.length) modes = [PAIRS.length <= 3 ? "corners" : "rails"];
+const sigma0 = PAIRS.map(p => p.L.sigma);
 let anyFail = false, runs = 0;
 
 function runPinned(label, corner, ticks = HORIZON){
@@ -28,37 +32,37 @@ function runPinned(label, corner, ticks = HORIZON){
     if (ok) console.log(`seed ${seed}: OK apex ${!vSeen ? "never" : vLost < 0 ? "held ("+last[6]+")" : "lost t="+vLost} | S=${last[0]} D=${last[1]} C=${last[2]} B=${last[3]} | audit ${(100*(L.auditM()-M0)/M0).toFixed(4)}%`);
   }
 }
-const word = (sp, r) => TRAITS[sp].name + " " + (r >= 0.99 ? TRAITS[sp].locus.hiWord : r <= 0.01 ? TRAITS[sp].locus.loWord : r.toFixed(2));
+const word = (p, r) => TRAITS[p.sp].name + (p.k ? " " + p.L.label.toLowerCase() : "") + " " + (r >= 0.99 ? p.L.hiWord : r <= 0.01 ? p.L.loWord : r.toFixed(2));
 
 if (modes.includes("corners")){
-  for (let m = 0; m < (1 << LOCI.length); m++){ const corner = LOCI.map((sp, k) => [sp, (m >> k) & 1]);
-    runPinned("corner: " + corner.map(([sp, r]) => word(sp, r)).join(" + "), corner); }
+  for (let m = 0; m < (1 << PAIRS.length); m++){ const corner = PAIRS.map((p, j) => [p.sp, (m >> j) & 1, p.k]);
+    runPinned("corner: " + corner.map(([, r], j) => word(PAIRS[j], r)).join(" + "), corner); }
 }
 if (modes.includes("rails")){
-  for (const sp of LOCI) for (const r of [0, 1]) runPinned(`rail: ${word(sp, r)}, others at g0`, [[sp, r]]);
-  runPinned("corner: all low", LOCI.map(sp => [sp, 0]));
-  runPinned("corner: all high", LOCI.map(sp => [sp, 1]));
+  for (const p of PAIRS) for (const r of [0, 1]) runPinned(`rail: ${word(p, r)}, others at g0`, [[p.sp, r, p.k]]);
+  runPinned("corner: all low", PAIRS.map(p => [p.sp, 0, p.k]));
+  runPinned("corner: all high", PAIRS.map(p => [p.sp, 1, p.k]));
 }
 if (modes.includes("sample")){
   const N = after("--sample") || 24, rng = C.mulberry32(20260829);
-  for (let k = 0; k < N; k++){ // stratified per locus: stratum k of N, jittered
-    const pt = LOCI.map(sp => [sp, +(((k + rng()) / N + rng() * 0.37) % 1).toFixed(3)]);
-    runPinned(`sample ${k+1}/${N}: ` + pt.map(([sp, r]) => word(sp, r)).join(" + "), pt); }
+  for (let j = 0; j < N; j++){ // stratified per locus: stratum j of N, jittered
+    const pt = PAIRS.map(p => [p.sp, +(((j + rng()) / N + rng() * 0.37) % 1).toFixed(3), p.k]);
+    runPinned(`sample ${j+1}/${N}: ` + pt.map(([, r], jj) => word(PAIRS[jj], r)).join(" + "), pt); }
 }
 if (modes.includes("fuzz")){
-  const k = after("--fuzz") || 4, ticks = 3 * HORIZON;
-  LOCI.forEach((sp, i) => TRAITS[sp].locus.sigma = sigma0[i] * k);
-  console.log(`\n=== fuzz: mutation ON, every sigma x ${k}, ${ticks} ticks -- evolution as the adversary ===`);
+  const kf = after("--fuzz") || 4, ticks = 3 * HORIZON;
+  PAIRS.forEach((p, j) => p.L.sigma = sigma0[j] * kf);
+  console.log(`\n=== fuzz: mutation ON, every sigma x ${kf}, ${ticks} ticks -- evolution as the adversary ===`);
   for (const seed of SEEDS){
-    L.start(seed, true); const M0 = L.auditM(); let ok = true, last = null, worst = "";
+    L.start(seed, true); const M0 = L.auditM(); let ok = true, last = null;
     for (let t = 0; t <= ticks; t++){ C.step(); const p = L.pops(); last = p;
       if (L.coreCollapsed(p, t)){ console.log(`seed ${seed}: ECOSYSTEM COLLAPSE at t=${t} pops=${p}`); ok = false; anyFail = true; break; } }
     runs++;
-    if (ok){ const g = LOCI.map(sp => { const s = L.locusStats(sp); return TRAITS[sp].name.slice(0,2) + L.fmtG(s) + (s.railHi > 0.2 || s.railLo > 0.2 ? "!" : ""); }).join(" ");
+    if (ok){ const g = PAIRS.map(p => { const s = L.locusStats(p.sp, p.k); return TRAITS[p.sp].name.slice(0,2) + (p.k ? "ᵗ" : "") + L.fmtG(s) + (s.railHi > 0.2 || s.railLo > 0.2 ? "!" : ""); }).join(" ");
       console.log(`seed ${seed}: OK | S=${last[0]} D=${last[1]} C=${last[2]} B=${last[3]} V=${last[6]} | ${g} | audit ${(100*(L.auditM()-M0)/M0).toFixed(4)}%`); }
   }
-  LOCI.forEach((sp, i) => TRAITS[sp].locus.sigma = sigma0[i]);
+  PAIRS.forEach((p, j) => p.L.sigma = sigma0[j]);
 }
 console.log(anyFail ? `\nCORRIDOR: NOT CERTIFIED — a configuration breaks the ecosystem (${modes.join("+")}, ${runs} runs)`
-                    : `\nCORRIDOR CERTIFIED (${modes.join("+")}: ${runs} runs, 8 seeds, ${LOCI.length} loci) — the ecosystem criterion holds in every configuration`);
+                    : `\nCORRIDOR CERTIFIED (${modes.join("+")}: ${runs} runs, 8 seeds, ${PAIRS.length} loci) — the ecosystem criterion holds in every configuration`);
 process.exit(anyFail ? 1 : 0);

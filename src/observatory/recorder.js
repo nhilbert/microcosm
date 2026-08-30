@@ -98,10 +98,15 @@ function detectHeredity(r){
   // Calibrated on the 8-seed evolving ensemble: founders sit within +-0.05 of g0 for the first
   // ~2,000 ticks (sd 0.02-0.05), so the dead zone silences the founding; a real sweep carries the
   // mean >= 0.10 from g0 with a 60% majority on that side, reached at t ~ 8,000-12,000.
+  // a warmth-gated locus is unexpressed in an unwarmed world: its variation is pure drift, and narrating
+  // drift as selection ("a line is taking over", "lines coexist, neither winning") would be a lie. Selection
+  // stories wait for warmth; rail contact is a corridor concern and is always reported.
+  const warmWorld = P.tempAmb > 0 || W.sources.some(s => s.a > 0);
   for (let sp=0; sp<7; sp++){
     const loci = TRAITS[sp].loci; if (!loci.length || B[r+sp] < 50) continue;
     for (let kL=0; kL<loci.length && kL<LOCUS_CH.length; kL++){
     const L = loci[kL], di = sp*2 + kL, off = kL*MAXN;
+    const gated = L.warmGated && !warmWorld;
     const mean = B[r+LOCUS_CH[kL][0]+sp], sd = B[r+LOCUS_CH[kL][1]+sp], name = TRAITS[sp].name;
     let hi=0, lo=0, n=0, railHi=0, railLo=0;
     for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; const g=W.g[off+i]; if (g > L.g0+0.05) hi++; else if (g < L.g0-0.05) lo++; if (g > 0.98) railHi++; else if (g < 0.02) railLo++; }
@@ -113,9 +118,10 @@ function detectHeredity(r){
     if (!det.rail[di] && det.railRun[di] >= 10){ det.rail[di] = railDir;
       pushEvent("rail", sp, name+" has reached the limit of its "+L.label.toLowerCase()+" — "+Math.round(railShare*100)+"% at the "+(railDir>0 ? L.hiWord : L.loWord)+" edge.", kL); }
     else if (det.rail[di] && railShare < 0.15) det.rail[di] = 0;
-    const dir = (mean - L.g0 >= 0.10 && shareHi >= 0.6) ? 1 : (L.g0 - mean >= 0.10 && shareLo >= 0.6) ? -1 : 0;
+    const dir = gated ? 0 : (mean - L.g0 >= 0.10 && shareHi >= 0.6) ? 1 : (L.g0 - mean >= 0.10 && shareLo >= 0.6) ? -1 : 0;
     const share = dir > 0 ? shareHi : shareLo;
     const word = dir > 0 ? L.hiWord : L.loWord;
+    if (gated) det.sweep[di] = 0;
     if (det.sweep[di] === 0 && dir !== 0){ det.sweep[di] = dir;
       pushEvent("sweep", sp, "A "+word+" "+name+" line is taking over — "+Math.round(share*100)+"% of the population and rising.", kL); }
     else if (Math.abs(det.sweep[di]) === 1 && dir === det.sweep[di] && share >= 0.85){ det.sweep[di] *= 2;
@@ -124,7 +130,7 @@ function detectHeredity(r){
     // diversifying: standing variation established with no line winning -- both strategies coexist.
     // Measured on the balanced (5.7) world: sd climbs 0.02 -> 0.10-0.17 while the mean stays near g0;
     // a sweep instead carries the mean away. The two events are mutually exclusive by construction.
-    if (det.sweep[di] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[di]++;
+    if (!gated && det.sweep[di] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[di]++;
     else det.diverseRun[di] = 0;
     if (!det.diverse[di] && det.diverseRun[di] >= 10){ det.diverse[di] = 1;
       pushEvent("diverse", sp, name+" is diversifying — "+L.hiWord+" and "+L.loWord+" lines coexist, neither winning.", kL); }
@@ -132,7 +138,7 @@ function detectHeredity(r){
     // local adaptation (7.L): with two or more suns, the locus mean differs between patches by >= 0.10 for
     // 10 samples (each patch holding >= 20). Calibrated on the seeded twin/dim layouts: the plankton's defense
     // locus separated by 0.10-0.18 where the grazers stayed in one patch; the mat's light locus by <= 0.04.
-    if (W.sources.length > 1){
+    if (W.sources.length > 1 && !gated){
       const pm = patchMeans(sp, kL);
       det.adaptRun[di] = pm.spread >= 0.10 ? det.adaptRun[di]+1 : 0;
       if (!det.adapt[di] && det.adaptRun[di] >= 10){ det.adapt[di] = 1;
@@ -141,7 +147,7 @@ function detectHeredity(r){
     } else { det.adapt[di] = 0; det.adaptRun[di] = 0; }
     // diversity collapse: variation falls to well under half of what it was 270 samples ago.
     // Selection consuming variation is the normal end of a sweep; the event names the cost.
-    if (W.recCount >= 271){
+    if (W.recCount >= 271 && !gated){
       const sdAgo = B[((W.recHead-270+N)%N)*CH + LOCUS_CH[kL][1] + sp];
       if (!det.uniform[di] && sdAgo >= 0.06 && sd <= 0.4*sdAgo){ det.uniform[di] = 1;
         pushEvent("uniform", sp, kL === 0 ? "Variation collapsing in "+name+" — the population is becoming uniform."
