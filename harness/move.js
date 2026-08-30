@@ -151,5 +151,80 @@ if (flag("--d5")){
   console.log("the distortion exists only under torpor -- Necro, not live -- where the charge overprices by 1/tor).");
 }
 
-if (!flag("--metrics") && !flag("--trap") && !flag("--d5"))
-  console.log("usage: node harness/move.js --metrics | --trap [--a 8] | --d5");
+if (flag("--escape")){
+  // MV.1 flagship — the trap-escape test (phase7-movement-plan.md §2 MV.1, research §6.4).
+  // Same-seed A/B at the +8 sun: warmth-preference locus frozen (sigma 0) vs live at sigma
+  // 0.03 (shipped) and, with --sweep, 0.06 / 0.09 / 0.12 (the legal locus-event range).
+  // Pre-registered: (a) escape is threshold-like in sigma and at 0.03 the collapse likely
+  // still outruns selection -- the expected, honest result; (b) where escape occurs, the
+  // Bogert interaction: selection on the H.5 thermal locus (plane 1) stalls as behaviour
+  // re-shields physiology. Plus the unwarmed drift control: locus-2 selection stories must
+  // stay silent (warmGated).
+  const a = num("--a", 8);
+  const sigmas = flag("--sweep") ? [0, 0.03, 0.06, 0.09, 0.12] : [0, 0.03];
+  const KL = TRAITS[SPECIES.PREY].loci.findIndex(Lc => Lc.tprefSpan);
+  if (KL < 0){ console.log("Drifta carries no warmth-preference locus"); process.exit(1); }
+  const escRun = (seed, sig, setup) => {
+    L.start(seed, true);
+    TRAITS[SPECIES.PREY].loci[KL].sigma = sig; // after start: initWorld restores shipped sigma
+    let coreLost = -1, apexLost = -1;
+    for (let t=1;t<=HORIZON;t++){
+      if (t === AT) setup();
+      C.step();
+      const p = L.pops();
+      if (apexLost < 0 && t > AT && p[SPECIES.APEX] === 0) apexLost = t;
+      if (coreLost < 0 && L.coreCollapsed(p, t)) coreLost = t;
+    }
+    const pref = L.locusStats(SPECIES.PREY, KL), therm = L.locusStats(SPECIES.PREY, 1);
+    const ev2 = W.sysEvents.filter(e => e.locus === KL && e.sp === SPECIES.PREY).map(e => e.type+"@"+e.tick);
+    return { coreLost, apexLost, pref, therm, feltD: chan(58+SPECIES.PREY), ev2 };
+  };
+  console.log("=== unwarmed drift control (locus live, sigma 0.03): locus-2 stories must stay silent ===");
+  { let ok = true;
+    for (const s of SEEDS){ const r = escRun(s, 0.03, () => {});
+      if (r.ev2.length){ ok = false; console.log(`seed ${s}: NARRATED ${r.ev2.join(" ")}`); } }
+    console.log(`gated silence: ${ok ? "PASS 8/8" : "FAIL"}`); }
+  for (const sig of sigmas){
+    console.log(`\n=== hot sun +${a} at t=${AT} · warmth-preference sigma ${sig}${sig===0 ? " (FROZEN)" : ""} (8 seeds) ===`);
+    console.log("seed | core       | apex   | pref mean±sd (rails lo/hi) | thermal mean | Drifta felt | locus-2 events");
+    const rows = [];
+    for (const s of SEEDS){ const r = escRun(s, sig, () => C.applyEvent({ type:"sourceSet", k:0, a })); rows.push(r);
+      console.log(`${s}   | ${r.coreLost>0 ? "LOST@"+String(r.coreLost).padStart(5) : "HELD      "} | ${r.apexLost>0 ? String(r.apexLost).padStart(5) : " held"}  | ${f(r.pref.mean)}±${f(r.pref.sd)} (${Math.round(100*r.pref.railLo)}/${Math.round(100*r.pref.railHi)}%)      | ${f(r.therm.mean)}         | ${f(r.feltD,1)}        | ${r.ev2.join(" ")||"-"}`); }
+    const held = rows.filter(r => r.coreLost < 0).length;
+    console.log(`sigma ${sig}: core held ${held}/8 · pref mean ${f(Math.min(...rows.map(r=>r.pref.mean)))}–${f(Math.max(...rows.map(r=>r.pref.mean)))} · thermal mean ${f(Math.min(...rows.map(r=>r.therm.mean)))}–${f(Math.max(...rows.map(r=>r.therm.mean)))}`);
+  }
+}
+
+if (flag("--patch")){
+  // MV.1 local adaptation: heater +10 at a seeded far sun (the H.5 layout). Does the set-point
+  // locus separate by patch through its own expression?
+  const a = num("--a", 10);
+  const KL = TRAITS[SPECIES.PREY].loci.findIndex(Lc => Lc.tprefSpan);
+  console.log(`=== warmth-preference by patch: heater +${a} at a seeded far sun at t=${AT} (evolving, 8 seeds) ===`);
+  console.log("seed | whole mean±sd | patch0 (sun) | patch1 (warm) | spread | n0/n1 | adapt events");
+  const spreads = [];
+  for (const s of SEEDS){
+    L.start(s, true);
+    for (let t=1;t<=HORIZON;t++){
+      if (t === AT){ C.applyEvent({ type:"sourceAdd", x:0, y:0, i:1, a, sigma:130 });
+        for (const [dx,dy] of [[60,0],[-60,0],[0,60],[0,-60]]){ C.applyEvent({ type:"spawnPack", sp:SPECIES.MAT, x:C.wrap(dx), y:C.wrap(dy) }); C.applyEvent({ type:"spawnPack", sp:SPECIES.PREY, x:C.wrap(dx*1.5), y:C.wrap(dy*1.5) }); }
+        C.applyEvent({ type:"spawnPack", sp:SPECIES.GRAZER, x:0, y:0 }); C.applyEvent({ type:"spawnPack", sp:3, x:40, y:40 }); }
+      C.step();
+    }
+    const K = W.sources.length, n = new Array(K).fill(0), m = new Array(K).fill(0); let N=0, sg=0, sgg=0;
+    const off = KL*C.MAXN;
+    for (let i=0;i<W.n;i++){ if (!W.alive[i] || W.sp[i]!==SPECIES.PREY) continue;
+      let best=0, bd=Infinity; for (let k=0;k<K;k++){ const dx=C.wd(W.sources[k].x-W.x[i]), dy=C.wd(W.sources[k].y-W.y[i]), d=dx*dx+dy*dy; if (d<bd){ bd=d; best=k; } }
+      n[best]++; m[best]+=W.g[off+i]; N++; sg+=W.g[off+i]; sgg+=W.g[off+i]*W.g[off+i]; }
+    const mean = N? sg/N : NaN, sd = N? Math.sqrt(Math.max(0, sgg/N-mean*mean)) : NaN;
+    const p0 = n[0]>=20 ? m[0]/n[0] : NaN, p1 = n[1]>=20 ? m[1]/n[1] : NaN;
+    const spread = !isNaN(p0) && !isNaN(p1) ? Math.abs(p1-p0) : NaN;
+    if (!isNaN(spread)) spreads.push(spread);
+    const ad = W.sysEvents.filter(e => e.type==="adapt" && e.sp===SPECIES.PREY && e.locus===KL).map(e => "@"+e.tick).join(" ");
+    console.log(`${s}   | ${f(mean)}±${f(sd)}    | ${f(p0)}         | ${f(p1)}          | ${f(spread)}   | ${n[0]}/${n[1]} | ${ad||"-"}`);
+  }
+  console.log(`patch spread >= 0.10 on ${spreads.filter(v=>v>=0.10).length}/8 seeds (${8-spreads.length} without a measurable warm-patch population)`);
+}
+
+if (!flag("--metrics") && !flag("--trap") && !flag("--d5") && !flag("--escape") && !flag("--patch"))
+  console.log("usage: node harness/move.js --metrics | --trap [--a 8] | --d5 | --escape [--a 8] [--sweep] | --patch [--a 10]");
