@@ -85,6 +85,16 @@
         "loWord": "cool-seeking",
         "hiTrait": "warmer set-point",
         "loTrait": "cooler set-point"
+      },
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "dampSpan": 0.04,
+        "label": "Restlessness",
+        "hiWord": "roving",
+        "loWord": "settled",
+        "hiTrait": "path persistence",
+        "loTrait": "quick settling"
       }
     ],
     "topt": 9,

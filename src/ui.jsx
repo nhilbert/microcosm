@@ -90,6 +90,7 @@ export default function Microcosm(){
           if (L.warmSlope) parts.push([L.hiTrait, Math.round(100 * L.warmSlope*(g - L.g0))]);
           if (L.warmGainSlope) parts.push([L.loTrait, Math.round(-100 * L.warmGainSlope*(g - L.g0))]);
           if (L.tprefSpan) parts.push(["preferred warmth", +(L.tprefSpan*(g - L.g0)).toFixed(1), "°"]); // a set-point shifts in degrees, not percent (MV.1)
+          if (L.dampSpan) parts.push(["settling rate", Math.round(100*((1 - (T.damp + L.dampSpan*(g - L.g0)))/(1 - T.damp) - 1))]); // MV.2: how fast the drift decays vs the founder (roving = slower settling)
           return { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
         });
       }

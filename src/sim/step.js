@@ -94,8 +94,14 @@ function step(){
       // Unit direction of the gradient; in a flat cell there is nothing to steer by. Same two draws as before.
       const lgx=W.lgx[cT], lgy=W.lgy[cT], lg=Math.hypot(lgx,lgy);
       const px = lg > 0 ? T.phototaxis*deficit*lgx/lg : 0, py = lg > 0 ? T.phototaxis*deficit*lgy/lg : 0;
-      W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + px;
-      W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + py;
+      // MV.2 (declared change): persistence is heritable -- damp + dampSpan*(g - g0) summed over the
+      // loci carrying dampSpan, in locus order; exactly T.damp at g0. Damp-led by measurement (the
+      // noise syndrome cancels in the diffusion exponent; phase7-movement-plan.md MV.2 design notes):
+      // roving lines wander straighter, settled lines decay their drift quickly. Same two draws.
+      let dp = T.damp;
+      for (let k=0;k<T.loci.length;k++){ const Lk = T.loci[k]; if (Lk.dampSpan) dp += Lk.dampSpan*(W.g[k*MAXN+i]-Lk.g0); }
+      W.vx[i]=W.vx[i]*dp + (R()-0.5)*T.noise + px;
+      W.vy[i]=W.vy[i]*dp + (R()-0.5)*T.noise + py;
       if (T.thermo && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2 thermotaxis: down the discomfort gradient |dT - tpref| (draw-free; skipped in a flat field)
         // MV.1 (declared change): the set-point is heritable -- tpref = topt + tprefSpan*(g - g0) summed
         // over the loci carrying tprefSpan, in locus order; exactly topt at g0. The §12 trap decision made

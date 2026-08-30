@@ -136,6 +136,16 @@ const SPECIES_ROWS = [
         "loWord": "cool-seeking",
         "hiTrait": "warmer set-point",
         "loTrait": "cooler set-point"
+      },
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "dampSpan": 0.04,
+        "label": "Restlessness",
+        "hiWord": "roving",
+        "loWord": "settled",
+        "hiTrait": "path persistence",
+        "loTrait": "quick settling"
       }
     ],
     "topt": 9,
@@ -452,7 +462,7 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //              warmth-SCALED gain (photosynthesis for the drifter, decomposition for the decomposer)
 //              x (1 - warmGainSlope*(g-g0)*dT/10). Both exactly 1 at dT <= 0: a locus expressing only
 //              these is warmth-gated (warmGated, derived) -- invisible until the world warms.
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, tprefSpan: 0, curve: 0 };
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, tprefSpan: 0, dampSpan: 0, curve: 0 };
 // Multi-locus (Phase 7): a species row carries `locus` (its first, display locus) and optionally
 // `loci: [...]` for the rest; the loader flattens both into t.loci, ordered — LOCUS ORDER IS PART OF
 // THE RNG CONTRACT (one mutation draw per locus, in order, at every division). t.locus stays an alias
@@ -492,6 +502,9 @@ function checkLocus(t, L){
   // A reference-shifting locus (MV.1): the set-point must stay inside the species' thermal niche at both rails
   if (L.tprefSpan){ const tLo = t.topt - L.tprefSpan*L.g0, tHi = t.topt + L.tprefSpan*(1-L.g0);
     if (!(tLo >= 0 && tHi <= t.ctmax)) bad.push("tpref["+tLo.toFixed(1)+".."+tHi.toFixed(1)+"] outside [0,"+t.ctmax+"]"); }
+  // A persistence-gain locus (MV.2): damp must stay a damping at both rails, with headroom below 1
+  if (L.dampSpan){ const dLo = t.damp - L.dampSpan*L.g0, dHi = t.damp + L.dampSpan*(1-L.g0);
+    if (!(dLo >= 0.5 && dHi <= 0.99)) bad.push("damp["+dLo.toFixed(3)+".."+dHi.toFixed(3)+"] outside [0.5,0.99]"); }
   if (bad.length) throw new Error("locus on "+t.name+" expresses a multiplier outside ["+LOCUS_MULT_MIN+","+LOCUS_MULT_MAX+"] or an out-of-niche reference: "+bad.join(" "));
 }
 // ---------- the species table: src/sim/species.json, inlined by tools/build.py as SPECIES_ROWS ----------
@@ -677,7 +690,7 @@ function applyEvent(ev){
     case "locus": {
       const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].loci[ev.locus|0]; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break; // ev.locus: which locus (default 0, the display locus)
       const prev = Lc[ev.key];
-      const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : ev.key === "tprefSpan" ? [0, 8] : [0, 1.5]; // slopes are prices: bounded too; a reference span is degrees, not a multiplier
+      const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : ev.key === "tprefSpan" ? [0, 8] : ev.key === "dampSpan" ? [0, 0.08] : [0, 1.5]; // slopes are prices: bounded too; reference spans carry their own units (degrees, damping)
       Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));
       done && done({ prev }); break; }
     // Energy sources (7.L/7.H): light i (0-1.5) and warmth a (-8..15) per source. Never fewer than one
@@ -1469,8 +1482,14 @@ function step(){
       // Unit direction of the gradient; in a flat cell there is nothing to steer by. Same two draws as before.
       const lgx=W.lgx[cT], lgy=W.lgy[cT], lg=Math.hypot(lgx,lgy);
       const px = lg > 0 ? T.phototaxis*deficit*lgx/lg : 0, py = lg > 0 ? T.phototaxis*deficit*lgy/lg : 0;
-      W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + px;
-      W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + py;
+      // MV.2 (declared change): persistence is heritable -- damp + dampSpan*(g - g0) summed over the
+      // loci carrying dampSpan, in locus order; exactly T.damp at g0. Damp-led by measurement (the
+      // noise syndrome cancels in the diffusion exponent; phase7-movement-plan.md MV.2 design notes):
+      // roving lines wander straighter, settled lines decay their drift quickly. Same two draws.
+      let dp = T.damp;
+      for (let k=0;k<T.loci.length;k++){ const Lk = T.loci[k]; if (Lk.dampSpan) dp += Lk.dampSpan*(W.g[k*MAXN+i]-Lk.g0); }
+      W.vx[i]=W.vx[i]*dp + (R()-0.5)*T.noise + px;
+      W.vy[i]=W.vy[i]*dp + (R()-0.5)*T.noise + py;
       if (T.thermo && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2 thermotaxis: down the discomfort gradient |dT - tpref| (draw-free; skipped in a flat field)
         // MV.1 (declared change): the set-point is heritable -- tpref = topt + tprefSpan*(g - g0) summed
         // over the loci carrying tprefSpan, in locus order; exactly topt at g0. The §12 trap decision made

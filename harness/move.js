@@ -293,5 +293,36 @@ if (flag("--invade")){
   }
 }
 
-if (!flag("--metrics") && !flag("--trap") && !flag("--d5") && !flag("--escape") && !flag("--patch") && !flag("--surface") && !flag("--invade"))
+if (flag("--pheno")){
+  // MV.2 phenotype legibility (D7: behaviour is the display): does the restlessness genotype show in
+  // the tracks themselves? Shipped world, 8 seeds: at t=12,000 adopt up to 60 living Drifta, follow
+  // 1,500 ticks, and correlate each survivor's genotype with its realized net step per tick.
+  const KL = TRAITS[SPECIES.PREY].loci.findIndex(Lc => Lc.dampSpan);
+  if (KL < 0){ console.log("Drifta carries no restlessness locus"); process.exit(1); }
+  console.log("=== restlessness phenotype: g (plane "+KL+") vs net step per tick, shipped world ===");
+  console.log("seed | tracks | r(g, netStep) | netStep top-quartile g | bottom quartile");
+  for (const s of SEEDS){
+    L.start(s, true);
+    for (let t=1;t<=12000;t++) C.step();
+    const tr = []; const off = KL*C.MAXN;
+    for (let i=0;i<W.n && tr.length<60;i++) if (W.alive[i] && W.sp[i]===SPECIES.PREY && !W.cy[i])
+      tr.push({ i, birth: W.birth[i], g: W.g[off+i], xs:[W.x[i]], ys:[W.y[i]], done:false });
+    for (let t=1;t<=1500;t++){ C.step();
+      if (t % REC.STRIDE === 0) for (const k of tr){ if (k.done) continue;
+        if (!W.alive[k.i] || W.birth[k.i] !== k.birth){ k.done = true; continue; }
+        k.xs.push(W.x[k.i]); k.ys.push(W.y[k.i]); } }
+    const done = tr.filter(k => k.xs.length >= 40).map(k => {
+      const ux = L.unwrapTrack(k.xs), uy = L.unwrapTrack(k.ys);
+      return { g: k.g, ns: Math.hypot(ux[ux.length-1]-ux[0], uy[uy.length-1]-uy[0])/((k.xs.length-1)*REC.STRIDE) }; });
+    if (done.length < 10){ console.log(`${s}   | ${done.length} — too few survivors`); continue; }
+    const mg = done.reduce((a,b)=>a+b.g,0)/done.length, mn2 = done.reduce((a,b)=>a+b.ns,0)/done.length;
+    let cov=0, vg=0, vn=0; for (const d of done){ cov+=(d.g-mg)*(d.ns-mn2); vg+=(d.g-mg)**2; vn+=(d.ns-mn2)**2; }
+    const r = vg>0 && vn>0 ? cov/Math.sqrt(vg*vn) : NaN;
+    const byG = done.slice().sort((a,b)=>a.g-b.g), q = Math.max(1, Math.floor(done.length/4));
+    const lo = byG.slice(0,q).reduce((a,b)=>a+b.ns,0)/q, hi = byG.slice(-q).reduce((a,b)=>a+b.ns,0)/q;
+    console.log(`${s}   | ${done.length}     | ${f(r)}          | ${f(hi,3)}                  | ${f(lo,3)}`);
+  }
+}
+
+if (!flag("--metrics") && !flag("--trap") && !flag("--d5") && !flag("--escape") && !flag("--patch") && !flag("--surface") && !flag("--invade") && !flag("--pheno"))
   console.log("usage: node harness/move.js --metrics | --trap [--a 8] | --d5 | --escape [--a 8] [--sweep] | --patch [--a 10] | --surface | --invade sp,plane[,gA,gB]");
