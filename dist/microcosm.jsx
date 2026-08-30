@@ -1688,24 +1688,34 @@ const SPECIES_META = [
 // Species profiles ("Steckbrief"), from the same TRAITS rows the sim runs on. Shown on the
 // specimen card. Image: assets/species/<key>.jpg (640px), optional -- the card hides the slot if missing.
 const SPECIES_PROFILE = [
-  { key:"solara", habitat:"the lit floor near the sun; a carpet, thickest where light is strongest",
+  { key:"solara",
+    intro:"Solara is a colonial, mat-forming alga of the lit floor. Anchored in place, it turns light and dissolved mineral into biomass, spreading cell by cell across the sediment until crowding halts it. Where the light is strongest the carpet grows thickest — the pond's primary producer and its living floor.",
+    habitat:"the lit floor near the sun; a carpet, thickest where light is strongest",
     behaviour:"sessile; photosynthesises; divides into the neighbouring floor until the mat is crowded",
     food:"light and dissolved mineral", eatenBy:"Cilio — poor food; the lowest 35 units of every mat are ungrazeable refugia",
     size:"7–9 units at founding", lifecycle:"small constant hazard; no cyst" },
-  { key:"drifta", habitat:"open water wherever the light reaches; drifts up the local light gradient — in dark water there is nothing to steer by, so it never crosses to a farther sun",
+  { key:"drifta",
+    intro:"Drifta is a free-drifting planktonic alga of the open water and the fastest grower in the world. It rides the water with a weak pull toward light, and when starved it folds into a resistant cyst until light returns. As the grazer's favourite food, its numbers rise and crash in the pond's great prey cycles.",
+    habitat:"open water wherever the light reaches; drifts up the local light gradient — in dark water there is nothing to steer by, so it never crosses to a farther sun",
     behaviour:"damped random walk with weak phototaxis; encysts when starved, wakes when light returns",
     food:"light and dissolved mineral — the fastest grower in the world", eatenBy:"Cilio — its best food; a 35% escape jink breaks contact",
     size:"3.4 units", lifecycle:"cyst at 18% reserve, wakes on light" },
-  { key:"cilio", habitat:"the productive core, following its food",
+  { key:"cilio",
+    intro:"Cilio is a ciliate grazer — a single cell driven by a shimmering fringe of cilia. It steers actively toward its prey, prefers Drifta above all, and flees when the alarm scent of injured neighbours drifts past. It holds the middle of the food web: chief consumer of the producers, and the sole prey of the apex predator.",
+    habitat:"the productive core, following its food",
     behaviour:"steering forager; pursues the nearest edible target; flees down the alarm gradient when neighbours are injured",
     food:"Drifta (best), Bacillus (survival food), Solara (poor)", eatenBy:"Venator — with a 30% escape jink of its own",
     size:"6 units", lifecycle:"matures 200 ticks after division, divides at most every 160; encysts when starved, wakes on prey" },
-  { key:"bacillus", habitat:"wherever dead matter settles; follows detritus gradients",
+  { key:"bacillus",
+    intro:"Bacillus is a colony-forming decomposer bacterium. Tumbling along detritus gradients, it consumes dead matter and returns its bound mineral to the water — the recycling service every other species depends on. Without it, the pond's mineral slowly locks up in corpses and the whole web strangles.",
+    habitat:"wherever dead matter settles; follows detritus gradients",
     behaviour:"run-and-tumble; eats detritus and mineralises — returns bound mineral to the water. The recycling guild.",
     food:"detritus energy and protein", eatenBy:"Cilio — survival food; cysts edible at half yield",
     size:"2 units; colonies, not cells", lifecycle:"encysts when starved; wakes on detritus or death-scent" },
   null, null,
-  { key:"venator", habitat:"the hunting grounds around the core; a pack founds together as cysts",
+  { key:"venator",
+    intro:"Venator is the pond's apex predator, a fast pursuit hunter that feeds on Cilio alone. It strikes in a straight line with a jet burst, holds a territory against its own kind, and breeds slower than anything else in the water. An apex is knife-edged by nature: it persists in most worlds and is lost in some.",
+    habitat:"the hunting grounds around the core; a pack founds together as cysts",
     behaviour:"fast straight-line pursuit with a jet burst; outturned by its prey; territorial; finishes the carcasses of its own kills",
     food:"Cilio only", eatenBy:"nothing",
     size:"9 units", lifecycle:"the slowest breeder (700-tick cooldown); a knife-edged apex — reported, never required" },
@@ -3164,7 +3174,11 @@ export default function Microcosm(){
         <div style={{ position:"absolute", inset:0, pointerEvents:"none",
           boxShadow:"inset 0 0 46px rgba(242,178,74,0.32)" }} />
       )}
-      {/* mode switch + tool hint */}
+      {/* mode switch + tool hint. Hidden while the specimen sheet is expanded
+          past its peek (same rule as the speed control): at half or full height
+          the sheet owns that screen space, and a fixed-offset bar would float
+          over its content (seen on phone: tabs across the portrait). */}
+      {(srcOpen || !ui.card || detent === 0 || desktop) && (
       <div style={{ position:"absolute", left:16, zIndex:6,
         bottom: sheetUp ? sheetPad : "calc(env(safe-area-inset-bottom, 0px) + 20px)",
         transition:"bottom 0.25s",
@@ -3188,6 +3202,7 @@ export default function Microcosm(){
           ))}
         </div>
       </div>
+      )}
       {uiMode === "data" && !desktop && <DataMode />}
       <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()} card={sheetUp} />
       {/* sun-intensity press lever (intervene mode) */}
@@ -3297,7 +3312,7 @@ export default function Microcosm(){
             <div style={{ width:40, height:4, borderRadius:2, background:"rgba(94,115,134,0.7)", margin:"0 auto" }} />
           </div>
           <div className="mc-scroll" style={{ padding:"0 18px calc(env(safe-area-inset-bottom, 0px) + 14px)",
-            overflowY: detent===2 ? "auto" : "hidden", flex:1 }}>
+            overflowY: detent>=1 ? "auto" : "hidden", flex:1 }}>
             <SpecimenBody card={ui.card} tick={ui.tick} detail={detent}
               onFeed={() => actionsRef.current.feed && actionsRef.current.feed()}
               onKill={() => actionsRef.current.kill && actionsRef.current.kill()} />
@@ -3531,6 +3546,11 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
           style={{ display:"block", width:"100%", maxHeight:200, objectFit:"cover", borderRadius:12, marginTop:12,
             border:"1px solid rgba(94,115,134,0.3)" }} />
       )}
+      {detail >= 1 && SPECIES_PROFILE[card.sp] && (
+        <div style={{ marginTop:10, fontSize:12.5, lineHeight:1.55 }}>
+          {SPECIES_PROFILE[card.sp].intro}
+        </div>
+      )}
       <div style={{ marginTop:10, display:"grid", gap:5 }}>
         {[["E", card.en, card.cap, `rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})`],
           ["P", card.pr, card.pQ, "rgb(226,170,150)"],
@@ -3596,7 +3616,7 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
               color:"#0B131E", fontSize:14, fontWeight:600 }}>Kill</button>
         </div>
       )}
-      {detail === 2 && SPECIES_PROFILE[card.sp] && (() => { const pf = SPECIES_PROFILE[card.sp]; return (
+      {detail >= 1 && SPECIES_PROFILE[card.sp] && (() => { const pf = SPECIES_PROFILE[card.sp]; return (
         <div style={{ marginTop:18, fontSize:12, lineHeight:1.5 }}>
           <div style={{ fontSize:11, color:COL.silt, letterSpacing:1.2 }}>PROFILE</div>
           <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"5px 12px", marginTop:8 }}>
@@ -3608,7 +3628,7 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
               </React.Fragment>))}
           </div>
         </div> ); })()}
-      {detail === 2 && (
+      {detail >= 1 && (
         <div style={{ marginTop:18, fontSize:12, color:COL.silt, lineHeight:1.5 }}>
           Amber marks your hand: everything you do to the world, as opposed to what
           nature does, is shown in this color.
