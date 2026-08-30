@@ -82,9 +82,15 @@ function tintRgb(rgb, t){
   const [h, s, l] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
   return hslToRgb(h - TINT_HUE*k, Math.min(1, s + 0.10*Math.abs(k)), Math.max(0.15, Math.min(0.85, l - TINT_LIGHT*k)));
 }
-function makeSprite(rgb, shape){
+// vis (locus visual grammar, owner decision 2026-08-30, implemented with this UI block):
+//   { outline: 0..1 }  defense loci -- tougher lines carry a shell-like ring around the body
+//   { round: 0..1 }    feeding/metabolic axes, circular<->square -- thriftier rounds the silhouette,
+//                      keener/voracious keeps it sharp
+// Tint is applied by the CALLER and belongs to temperature loci alone (warm-adapted leans warm).
+function makeSprite(rgb, shape, vis){
   const s = 64, c = document.createElement("canvas"); c.width = s; c.height = s;
   const g = c.getContext("2d"); const [r, gg, b] = rgb;
+  const rnd = vis && vis.round !== undefined ? vis.round : 0;
   if (shape === "nucleus"){ // Solara individual: small dim marker; the mass lives in the carpet layer
     g.fillStyle = `rgba(${Math.round(r*0.8)},${Math.round(gg*0.9)},${Math.round(b*0.85)},0.55)`;
     g.beginPath(); g.arc(s/2, s/2, 5, 0, 6.283); g.fill();
@@ -99,7 +105,9 @@ function makeSprite(rgb, shape){
     grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
     g.fillStyle = grad; g.fillRect(0, 0, s, s);
     g.fillStyle = `rgba(${Math.min(255,r+60)},${Math.min(255,gg+60)},${Math.min(255,b+50)},0.85)`;
-    g.fillRect(s/2-3.4, s/2-3.4, 6.8, 6.8);
+    const half = 3.4 - rnd*1.1; // stroke-rounding fattens the core; shrink so the body stays one size
+    g.beginPath(); g.rect(s/2-half, s/2-half, half*2, half*2); g.fill();
+    if (rnd > 0.02){ g.strokeStyle = g.fillStyle; g.lineJoin = "round"; g.lineWidth = rnd*4.5; g.stroke(); }
     return c;
   }
   if (shape === "tri"){ // Cilio: rare + moving, allowed the luminance peak
@@ -108,9 +116,14 @@ function makeSprite(rgb, shape){
     grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
     g.fillStyle = grad; g.fillRect(0, 0, s, s);
     // the mark carries the color: a pure white triangle washed every tint out under the screen composite
+    g.save();
+    if (rnd > 0.02){ g.translate(s/2, s/2); g.scale(1 - 0.09*rnd, 1 - 0.09*rnd); g.translate(-s/2, -s/2); }
     g.fillStyle = `rgba(${Math.min(255,r+55)},${Math.min(255,gg+55)},${Math.min(255,b+55)},0.95)`;
     g.beginPath(); g.moveTo(s*0.72, s*0.5); g.lineTo(s*0.38, s*0.36); g.lineTo(s*0.38, s*0.64); g.closePath(); g.fill();
-    g.strokeStyle = "rgba(255,255,255,0.55)"; g.lineWidth = 1.2; g.stroke();
+    g.lineJoin = "round";
+    if (rnd > 0.02){ g.strokeStyle = g.fillStyle; g.lineWidth = rnd*7; g.stroke(); }
+    g.strokeStyle = "rgba(255,255,255,0.55)"; g.lineWidth = 1.2 + rnd*4; g.stroke();
+    g.restore();
   } else { // Drifta: soft glow, colored (not white) center, modest alpha
     grad.addColorStop(0, `rgba(${r},${gg},${b},0.6)`);
     grad.addColorStop(0.4, `rgba(${r},${gg},${b},0.22)`);
@@ -118,6 +131,11 @@ function makeSprite(rgb, shape){
     g.fillStyle = grad; g.fillRect(0, 0, s, s);
     g.fillStyle = `rgba(${Math.min(255,r+40)},${Math.min(255,gg+35)},${Math.min(255,b+30)},0.9)`;
     g.beginPath(); g.arc(s/2, s/2, 3.6, 0, 6.283); g.fill();
+    if (vis && vis.outline !== undefined && vis.outline > 0.02){ // defense ring: the tougher end wears a shell
+      g.strokeStyle = `rgba(235,246,255,${(0.10 + 0.75*vis.outline).toFixed(3)})`;
+      g.lineWidth = 1 + 1.6*vis.outline;
+      g.beginPath(); g.arc(s/2, s/2, 5.6, 0, 6.283); g.stroke();
+    }
   }
   return c;
 }
@@ -288,16 +306,39 @@ function makeWorldLayers(){
   };
   return { LB, HB, MC, MN, CC, LOD_Z, drawLight, drawHeat, updateCarpet };
 }
-// Sprite set: one sprite per species, plus one per genotype bin for every species with a locus.
+// Sprite set under the locus visual grammar (owner decision 2026-08-30, one documented increment):
+//   tint      <- the species' temperature locus (warmSlope/warmGainSlope), warm-adapted leaning WARM
+//                (tintRgb runs warm at t=0, so the temperature axis passes 1-g). Tint no longer shows
+//                the display loci -- a deliberate change of what an existing player's colors mean.
+//   outline   <- the defense locus (escSlope): tougher wears a ring.
+//   roundness <- feeding/metabolic axes (catchSlope/rateSlope/effSlope): thrifty rounds, keen stays sharp.
+//   elongated<->circular stays reserved for a future speed locus; movement-strategy loci (tprefSpan)
+//   carry NO body channel by owner decision D7 -- their display is behaviour itself.
+// Exception, documented: the mat carpet keeps its plane-0 (light locus) genotype turn -- a per-cell
+// pixel field has no outline or body form to carry it, and an invisible locus is worse than an
+// off-grammar one.
 function makeSpriteSet(){
   const sprites = [makeSprite(COL.solara,"nucleus"), makeSprite(COL.drifta,"dot"), makeSprite(COL.cilio,"tri"), makeSprite(COL.bacillus,"square"),
     makeSprite(COL.mycora,"dot"), makeSprite(COL.necro,"dot"), makeSprite(COL.venator,"tri")];
-  // one sprite per genotype bin for every species that carries a locus (7 bins across [0,1])
   const TINT_BINS = 7;
-  const tints = TRAITS.map((T, sp) => T.locus && SHAPES[sp] !== "ray"
-    ? Array.from({ length: TINT_BINS }, (_, b) => makeSprite(tintRgb(SPECIES_META[sp].rgb, b/(TINT_BINS-1)), SHAPES[sp]))
-    : null);
-  return { sprites, tints, TINT_BINS };
+  const grammar = TRAITS.map((T, sp) => {
+    if (!T.loci.length || SHAPES[sp] === "ray" || SHAPES[sp] === "nucleus") return null;
+    const tintPlane = T.loci.findIndex(L => L.warmSlope || L.warmGainSlope);
+    const outlinePlane = T.loci.findIndex(L => L.escSlope > 0);
+    const roundPlane = T.loci.findIndex(L => L.catchSlope > 0 || L.rateSlope > 0 || L.effSlope > 0);
+    const morphPlane = outlinePlane >= 0 ? outlinePlane : roundPlane;
+    if (tintPlane < 0 && morphPlane < 0) return null;
+    const tN = tintPlane >= 0 ? TINT_BINS : 1, mN = morphPlane >= 0 ? TINT_BINS : 1;
+    const bins = Array.from({ length: tN }, (_, tb) =>
+      Array.from({ length: mN }, (_, mb) => {
+        const rgb = tintPlane >= 0 ? tintRgb(SPECIES_META[sp].rgb, 1 - tb/(TINT_BINS-1)) : SPECIES_META[sp].rgb;
+        const gM = mb/(TINT_BINS-1);
+        const vis = outlinePlane >= 0 ? { outline: gM } : roundPlane >= 0 ? { round: 1 - gM } : undefined;
+        return makeSprite(rgb, SHAPES[sp], vis);
+      }));
+    return { tintPlane, morphPlane, tN, mN, bins };
+  });
+  return { sprites, grammar, TINT_BINS };
 }
 // Organisms, with the screen composite, cull margin and LOD; returns the live census the strip and card need.
 function drawOrganisms(ctx, view, hidden, S){
@@ -329,7 +370,13 @@ function drawOrganisms(ctx, view, hidden, S){
       continue;
     }
     const r = W.sz[i] * SPRITE_SCALE[spb] * z;
-    const spr = S.tints[spb] ? S.tints[spb][Math.max(0, Math.min(S.TINT_BINS-1, Math.round(W.g[i]*(S.TINT_BINS-1))))] : S.sprites[spb];
+    let spr = S.sprites[spb];
+    const gr = S.grammar[spb];
+    if (gr){ // locus visual grammar: tint by the temperature plane, outline/roundness by the defense/feeding plane
+      const tb = gr.tN > 1 ? Math.max(0, Math.min(gr.tN-1, Math.round(W.g[gr.tintPlane*MAXN+i]*(gr.tN-1)))) : 0;
+      const mb = gr.mN > 1 ? Math.max(0, Math.min(gr.mN-1, Math.round(W.g[gr.morphPlane*MAXN+i]*(gr.mN-1)))) : 0;
+      spr = gr.bins[tb][mb];
+    }
     if (SHAPES[spb] === "tri"){
       ctx.save(); ctx.translate(sx, sy); ctx.rotate(W.hd[i]);
       ctx.drawImage(spr, -r, -r, r*2, r*2); ctx.restore();

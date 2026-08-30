@@ -305,7 +305,10 @@ function TraitsLegend(){
     });
   }
   return <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
-    {rows}<span style={{ color:"#5E7386", marginLeft:"auto" }}>{P.mutation ? "mutation on" : "mutation off"}</span></div>;
+    {rows}<span style={{ color:"#5E7386", marginLeft:"auto" }}>{P.mutation ? "mutation on" : "mutation off"}</span>
+    <span style={{ flexBasis:"100%", color:"#42566A", fontSize:10 }}>
+      in the world: body tint = warmth adaptation (warm-adapted leans warm) · ring = tougher defense ·
+      rounded↔sharp body = thrifty↔keen feeding · warmth preference shows only in where they swim</span></div>;
 }
 function HealthPage(){
   const ind = typeof indicators === "function" ? indicators() : null;
