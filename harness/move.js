@@ -78,8 +78,8 @@ if (flag("--metrics")){
     console.log(`seed ${s}: alpha ${MB.map((sp,m)=>TRAITS[sp].name.slice(0,3)+" "+f(bands[m].alphas[bands[m].alphas.length-1])).join(" · ")}`);
   }
   console.log("\nspecies  | lightAlign        | netStep/tick      | entropy           | ambRes            | MSD alpha (cohort medians over seeds)");
-  for (let m=0;m<MB.length;m++){ const b = bands[m];
-    console.log(`${TRAITS[MB[m]].name.padEnd(9)}| ${f(b.la[0])}..${f(b.la[1])}      | ${f(b.ns[0])}..${f(b.ns[1])}      | ${f(b.oe[0])}..${f(b.oe[1])}      | ${f(b.ar[0])}..${f(b.ar[1])}      | ${f(Math.min(...b.alphas))}..${f(Math.max(...b.alphas))} (med ${f(med(b.alphas))})`); }
+  for (let m=0;m<MB.length;m++){ const b = bands[m], as = b.alphas.filter(v => !Number.isNaN(v));
+    console.log(`${TRAITS[MB[m]].name.padEnd(9)}| ${f(b.la[0])}..${f(b.la[1])}      | ${f(b.ns[0])}..${f(b.ns[1])}      | ${f(b.oe[0])}..${f(b.oe[1])}      | ${f(b.ar[0])}..${f(b.ar[1])}      | ${f(Math.min(...as))}..${f(Math.max(...as))} (med ${f(med(b.alphas))}, ${as.length}/8 seeds)`); }
   console.log(`\nstructural silence (warmth channels exactly 0, zero heatTrap events on 8/8): ${silent ? "PASS" : "FAIL"}`);
   if (!silent) process.exit(1);
 }
