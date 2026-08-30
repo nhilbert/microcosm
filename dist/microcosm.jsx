@@ -311,6 +311,16 @@ const SPECIES_ROWS = [
         "loWord": "quick-burning",
         "hiTrait": "warm upkeep relief",
         "loTrait": "warm intake"
+      },
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "tumbleSlope": 0.5,
+        "label": "Search style",
+        "hiWord": "smooth-running",
+        "loWord": "twitchy",
+        "hiTrait": "run length",
+        "loTrait": "quick turning"
       }
     ],
     "topt": 12,
@@ -502,7 +512,7 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //              warmth-SCALED gain (photosynthesis for the drifter, decomposition for the decomposer)
 //              x (1 - warmGainSlope*(g-g0)*dT/10). Both exactly 1 at dT <= 0: a locus expressing only
 //              these is warmth-gated (warmGated, derived) -- invisible until the world warms.
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, tprefSpan: 0, dampSpan: 0, pcSpeedSlope: 0, pcTurnSlope: 0, curve: 0 };
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, tprefSpan: 0, dampSpan: 0, pcSpeedSlope: 0, pcTurnSlope: 0, tumbleSlope: 0, curve: 0 };
 // Multi-locus (Phase 7): a species row carries `locus` (its first, display locus) and optionally
 // `loci: [...]` for the rest; the loader flattens both into t.loci, ordered — LOCUS ORDER IS PART OF
 // THE RNG CONTRACT (one mutation draw per locus, in order, at every division). t.locus stays an alias
@@ -538,6 +548,7 @@ function checkLocus(t, L){
       warmCost: 1 - L.warmSlope*d*1.5, warmGain: 1 - L.warmGainSlope*d*1.5, // at the hottest legal source (dT 15)
       pcSpeedA: 1 - L.pcSpeedSlope*d, pcSpeedB: 1 + L.pcSpeedSlope*d,       // MV-C: both phases of the post-capture program
       pcTurnA: 1 + L.pcTurnSlope*d, pcTurnB: 1 - L.pcTurnSlope*d,
+      tumble: 1 - L.tumbleSlope*d,                                          // MV.3: tumble propensity (che axis)
       escape: t.escape ? (t.escape.p + L.escSlope*d - t.escape.p*L.curve*d*d)/t.escape.p : 1 };
     for (const k in mults) if (!(mults[k] >= LOCUS_MULT_MIN && mults[k] <= LOCUS_MULT_MAX)) bad.push(k+"@g="+g+"="+mults[k].toFixed(2));
   }
@@ -1551,7 +1562,12 @@ function step(){
       const c0=cellOf(i);
       let here = T.tumbleField==="scent" ? W.sc[c0]*40 : W.dE[c0]+W.dP[c0]+W.dM[c0];
       if (T.thermo && dT !== T.topt && (W.tgx[c0] !== 0 || W.tgy[c0] !== 0)) here -= T.thermo*Math.abs(dT - T.topt); // 7.H.2 klinokinesis: discomfort reads as "worse", raising tumbling (Berg & Brown)
-      const pT = here > W.mem[i]+0.01 ? T.tumbleLow : T.tumbleHigh;
+      // MV.3 (declared): tumble frequency is heritable -- the whole tumble propensity scaled by
+      // 1 - tumbleSlope*(g - g0) per locus carrying tumbleSlope, in locus order; exactly the bare
+      // thresholds at g0 (the che-circuit axis: smooth-running lengthens runs, twitchy shortens them).
+      // The draw at R()<pT stays unconditional; only its threshold value moves.
+      let pT = here > W.mem[i]+0.01 ? T.tumbleLow : T.tumbleHigh;
+      for (let k=0;k<nL;k++){ const Lk = loci[k]; if (Lk.tumbleSlope) pT *= 1 - Lk.tumbleSlope*(W.g[k*MAXN+i]-Lk.g0); }
       W.mem[i]=here;
       if(R()<pT) W.hd[i]=R()*6.283;
       const tor = T.torpor && W.en[i] < T.torpor*cap ? 0.6 : 1;
@@ -2955,6 +2971,7 @@ export default function Microcosm(){
           if (L.dampSpan) parts.push(["settling rate", Math.round(100*((1 - (T.damp + L.dampSpan*(g - L.g0)))/(1 - T.damp) - 1))]); // MV.2: how fast the drift decays vs the founder (roving = slower settling)
           if (L.pcTurnSlope) parts.push(["after-kill searching", Math.round(100 * L.pcTurnSlope*(g - L.g0))]); // MV-C: phase-A turn amplitude
           if (L.pcSpeedSlope) parts.push(["after-kill departure", Math.round(100 * L.pcSpeedSlope*(L.g0 - g))]); // MV-C: phase-A speed (movers leave faster)
+          if (L.tumbleSlope) parts.push(["run length", Math.round(100 * L.tumbleSlope*(g - L.g0))]); // MV.3: fewer tumbles = longer runs
           return { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
         });
       }

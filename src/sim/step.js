@@ -120,7 +120,12 @@ function step(){
       const c0=cellOf(i);
       let here = T.tumbleField==="scent" ? W.sc[c0]*40 : W.dE[c0]+W.dP[c0]+W.dM[c0];
       if (T.thermo && dT !== T.topt && (W.tgx[c0] !== 0 || W.tgy[c0] !== 0)) here -= T.thermo*Math.abs(dT - T.topt); // 7.H.2 klinokinesis: discomfort reads as "worse", raising tumbling (Berg & Brown)
-      const pT = here > W.mem[i]+0.01 ? T.tumbleLow : T.tumbleHigh;
+      // MV.3 (declared): tumble frequency is heritable -- the whole tumble propensity scaled by
+      // 1 - tumbleSlope*(g - g0) per locus carrying tumbleSlope, in locus order; exactly the bare
+      // thresholds at g0 (the che-circuit axis: smooth-running lengthens runs, twitchy shortens them).
+      // The draw at R()<pT stays unconditional; only its threshold value moves.
+      let pT = here > W.mem[i]+0.01 ? T.tumbleLow : T.tumbleHigh;
+      for (let k=0;k<nL;k++){ const Lk = loci[k]; if (Lk.tumbleSlope) pT *= 1 - Lk.tumbleSlope*(W.g[k*MAXN+i]-Lk.g0); }
       W.mem[i]=here;
       if(R()<pT) W.hd[i]=R()*6.283;
       const tor = T.torpor && W.en[i] < T.torpor*cap ? 0.6 : 1;

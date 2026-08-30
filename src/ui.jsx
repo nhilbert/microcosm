@@ -93,6 +93,7 @@ export default function Microcosm(){
           if (L.dampSpan) parts.push(["settling rate", Math.round(100*((1 - (T.damp + L.dampSpan*(g - L.g0)))/(1 - T.damp) - 1))]); // MV.2: how fast the drift decays vs the founder (roving = slower settling)
           if (L.pcTurnSlope) parts.push(["after-kill searching", Math.round(100 * L.pcTurnSlope*(g - L.g0))]); // MV-C: phase-A turn amplitude
           if (L.pcSpeedSlope) parts.push(["after-kill departure", Math.round(100 * L.pcSpeedSlope*(L.g0 - g))]); // MV-C: phase-A speed (movers leave faster)
+          if (L.tumbleSlope) parts.push(["run length", Math.round(100 * L.tumbleSlope*(g - L.g0))]); // MV.3: fewer tumbles = longer runs
           return { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
         });
       }

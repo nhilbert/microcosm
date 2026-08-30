@@ -233,6 +233,16 @@
         "loWord": "quick-burning",
         "hiTrait": "warm upkeep relief",
         "loTrait": "warm intake"
+      },
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "tumbleSlope": 0.5,
+        "label": "Search style",
+        "hiWord": "smooth-running",
+        "loWord": "twitchy",
+        "hiTrait": "run length",
+        "loTrait": "quick turning"
       }
     ],
     "topt": 12,
