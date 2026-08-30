@@ -36,7 +36,7 @@ v1.0 · 2026-08-30 · Decisions D1–D7 **resolved** (owner, 2026-08-30) — rec
 **MV.4 — Cilio warmth-preference unblinding.**
 - Give Cilio a small fixed thermo gain (measured, ~0.2–0.3) governed by a heritable set-point locus, idle-branch only, draw-free — evolution pricing what hard-coding got wrong (3/8 core loss when fed hunters walked away from prey). Venator stays excluded (N≈25 drift-dominated; the genetics-phase honesty rule extends).
 
-**Deferred, with re-entry conditions**: speed loci (re-enter with MV.1–2 records closed; whether the reserved elongation channel accompanies a speed locus is a grammar decision taken at that increment); boldness/flee-threshold (re-enter when a diversifying story is wanted for Cilio); protean escape-angle (re-enter after a measured pursuit arms race exists); heritable plasticity rate (re-enter only as its own declared phase — research §3.4 honesty note applies until then).
+**Deferred, with re-entry conditions**: a **movement Data page** charting the MV.0 channels (alignment, net step, entropy, warm/ambient reserve — owner decision 2026-08-30: re-enter after MV.2, when the rover/sitter locus gives those channels a story; until then the heatTrap events in the feed are the movement observatory's only surface); speed loci (re-enter with MV.1–2 records closed; whether the reserved elongation channel accompanies a speed locus is a grammar decision taken at that increment); boldness/flee-threshold (re-enter when a diversifying story is wanted for Cilio); protean escape-angle (re-enter after a measured pursuit arms race exists); heritable plasticity rate (re-enter only as its own declared phase — research §3.4 honesty note applies until then).
 
 ## 3. Harness
 
