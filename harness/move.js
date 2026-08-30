@@ -273,7 +273,8 @@ if (flag("--invade")){
   // (rover/sitter) should return toward the middle from both rare starts.
   const arg = (args[args.indexOf("--invade")+1] || "1,0").split(",").map(Number);
   const sp = arg[0], plane = arg[1] || 0, gA = arg[2] === undefined ? 0.8 : arg[2], gB = arg[3] === undefined ? 0.2 : arg[3];
-  console.log(`=== invasion from rare: ${TRAITS[sp].name} plane ${plane}, 95%/5% at t=${AT}, both directions (8 seeds) ===`);
+  const pct = arg[4] || 5, every = Math.max(2, Math.round(100/pct)); // minority fraction: 5% drowns in drift at Cilio's N (~100 -> 5 founders)
+  console.log(`=== invasion from rare: ${TRAITS[sp].name} plane ${plane}, ${100-pct}%/${pct}% at t=${AT}, both directions (8 seeds) ===`);
   for (const [res, inv] of [[gA, gB], [gB, gA]]){
     console.log(`\nresident g=${res} / invader g=${inv} at 5%:`);
     console.log("seed | invader share at t=3k 6k 9k 12k 15k 18k | pop 18k");
@@ -282,7 +283,7 @@ if (flag("--invade")){
       const off = plane*C.MAXN, shares = [];
       for (let t=1;t<=HORIZON;t++){
         if (t === AT){ let k = 0;
-          for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ W.g[off+i] = (k % 20 === 0) ? inv : res; k++; } }
+          for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ W.g[off+i] = (k % every === 0) ? inv : res; k++; } }
         C.step();
         if (t % 3000 === 0 && t >= AT){ let n = 0, ninv = 0;
           for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; if (Math.abs(W.g[off+i]-inv) < Math.abs(W.g[off+i]-res)) ninv++; }
