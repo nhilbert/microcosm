@@ -13,6 +13,8 @@
 //  56-57 locus spread between light patches, mat/plankton (7.L)  58-64 mean warmth experienced per species (7.H)
 //  65    warm-cell count (dT > 3)   66-72 population in warm cells per species
 //  73-74 detritus per warm cell / per ambient cell (7.H.4; all of 65-74 exactly 0 without a warm source)
+//  75-81 second-locus mean per species   82-88 second-locus sd (multi-locus: locus plane 1;
+//        channels 42-55 stay the DISPLAY locus, plane 0, so every calibrated reader keeps its meaning)
 // CONTRACT: the recorder is a pure observer — zero PRNG draws, zero
 // mutation of dynamic state. Conformance bit-identity with the recorder
 // running is the standing acceptance test for this whole layer.
@@ -22,28 +24,31 @@
 const DET_ESTAB = [40, 40, 20, 80, 10, 4, 4]; // establishment thresholds per species
 const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0], crash:[0,0,0,0,0,0,0],
   packAwake:false, depleted:false, lockedWarn:false,
-  sweep:[0,0,0,0,0,0,0],   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
-  uniform:[0,0,0,0,0,0,0],
-  diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0],   // standing polymorphism: both ends coexist
-  rail:[0,0,0,0,0,0,0], railRun:[0,0,0,0,0,0,0],           // corridor contact: a locus pinned at its edge (6.2)
-  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0],         // local adaptation (7.L): the locus differs between light patches
+  // heredity detectors run per (species, locus plane): index sp*2 + plane, 2 recorded planes (LOCUS_CH)
+  sweep:new Array(14).fill(0),   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
+  uniform:new Array(14).fill(0),
+  diverse:new Array(14).fill(0), diverseRun:new Array(14).fill(0),   // standing polymorphism: both ends coexist
+  rail:new Array(14).fill(0), railRun:new Array(14).fill(0),           // corridor contact: a locus pinned at its edge (6.2)
+  adapt:new Array(14).fill(0), adaptRun:new Array(14).fill(0),         // local adaptation (7.L): the locus differs between patches
   heatRetreat:[0,0,0,0,0,0,0],                              // 7.H.4: a species is thinning out of the warm water
   heatPile:false, heatPileRun:0,                            // 7.H.4: detritus piling up in the warm core (measured 10.1/10.3: x4+ ambient)
   heatStarve:false, heatStarveRun:0 };                      // 7.H.4: the apex declining while the warmth it feels stays >= 3
 // 7.L patch statistics: nearest sun by toroidal distance (the phototaxis rule), locus mean per patch for one
 // species. Pure reads; `spread` = max - min over patches holding >= 20 individuals (0 with one sun).
 const PATCH_MIN = 20;
-function patchMeans(sp){
+const LOCUS_CH = [[42,49],[75,82]]; // [mean base, sd base] per recorded locus plane
+function patchMeans(sp, plane){
+  const off = (plane||0)*MAXN;
   const K = W.sources.length, n = new Array(K).fill(0), m = new Array(K).fill(0);
   for (let i=0;i<W.n;i++){ if (!W.alive[i] || W.sp[i]!==sp) continue;
     let best=0, bd=Infinity; for (let k=0;k<K;k++){ const dx=wd(W.sources[k].x-W.x[i]), dy=wd(W.sources[k].y-W.y[i]), d=dx*dx+dy*dy; if (d<bd){ bd=d; best=k; } }
-    n[best]++; m[best]+=W.g[i]; }
+    n[best]++; m[best]+=W.g[off+i]; }
   let hi=-1, lo=-1;
   for (let k=0;k<K;k++){ if (n[k] < PATCH_MIN) continue; m[k]/=n[k]; if (hi<0 || m[k]>m[hi]) hi=k; if (lo<0 || m[k]<m[lo]) lo=k; }
   return { n, mean: m, hi, lo, spread: hi>=0 && lo>=0 ? m[hi]-m[lo] : 0 };
 }
-function pushEvent(type, sp, text){
-  W.sysEvents.push({ tick: W.tick, type, sp, text });
+function pushEvent(type, sp, text, locus){
+  W.sysEvents.push(locus !== undefined ? { tick: W.tick, type, sp, locus, text } : { tick: W.tick, type, sp, text });
   if (W.sysEvents.length > 200) W.sysEvents.shift();
 }
 function detect(r, awake){
@@ -94,51 +99,55 @@ function detectHeredity(r){
   // ~2,000 ticks (sd 0.02-0.05), so the dead zone silences the founding; a real sweep carries the
   // mean >= 0.10 from g0 with a 60% majority on that side, reached at t ~ 8,000-12,000.
   for (let sp=0; sp<7; sp++){
-    const L = TRAITS[sp].locus; if (!L || B[r+sp] < 50) continue;
-    const mean = B[r+42+sp], sd = B[r+49+sp], name = TRAITS[sp].name;
+    const loci = TRAITS[sp].loci; if (!loci.length || B[r+sp] < 50) continue;
+    for (let kL=0; kL<loci.length && kL<LOCUS_CH.length; kL++){
+    const L = loci[kL], di = sp*2 + kL, off = kL*MAXN;
+    const mean = B[r+LOCUS_CH[kL][0]+sp], sd = B[r+LOCUS_CH[kL][1]+sp], name = TRAITS[sp].name;
     let hi=0, lo=0, n=0, railHi=0, railLo=0;
-    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; const g=W.g[i]; if (g > L.g0+0.05) hi++; else if (g < L.g0-0.05) lo++; if (g > 0.98) railHi++; else if (g < 0.02) railLo++; }
+    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; const g=W.g[off+i]; if (g > L.g0+0.05) hi++; else if (g < L.g0-0.05) lo++; if (g > 0.98) railHi++; else if (g < 0.02) railLo++; }
     const shareHi = hi/n, shareLo = lo/n;
     // rail contact (6.2): a third of the population pinned at a corridor edge for 10 samples -- the
     // trait has run out of room, which is a certification concern the player should see as a story
     const railShare = Math.max(railHi, railLo)/n, railDir = railHi >= railLo ? 1 : -1;
-    det.railRun[sp] = railShare >= 0.30 ? det.railRun[sp]+1 : 0;
-    if (!det.rail[sp] && det.railRun[sp] >= 10){ det.rail[sp] = railDir;
-      pushEvent("rail", sp, name+" has reached the limit of its "+L.label.toLowerCase()+" — "+Math.round(railShare*100)+"% at the "+(railDir>0 ? L.hiWord : L.loWord)+" edge."); }
-    else if (det.rail[sp] && railShare < 0.15) det.rail[sp] = 0;
+    det.railRun[di] = railShare >= 0.30 ? det.railRun[di]+1 : 0;
+    if (!det.rail[di] && det.railRun[di] >= 10){ det.rail[di] = railDir;
+      pushEvent("rail", sp, name+" has reached the limit of its "+L.label.toLowerCase()+" — "+Math.round(railShare*100)+"% at the "+(railDir>0 ? L.hiWord : L.loWord)+" edge.", kL); }
+    else if (det.rail[di] && railShare < 0.15) det.rail[di] = 0;
     const dir = (mean - L.g0 >= 0.10 && shareHi >= 0.6) ? 1 : (L.g0 - mean >= 0.10 && shareLo >= 0.6) ? -1 : 0;
     const share = dir > 0 ? shareHi : shareLo;
     const word = dir > 0 ? L.hiWord : L.loWord;
-    if (det.sweep[sp] === 0 && dir !== 0){ det.sweep[sp] = dir;
-      pushEvent("sweep", sp, "A "+word+" "+name+" line is taking over — "+Math.round(share*100)+"% of the population and rising."); }
-    else if (Math.abs(det.sweep[sp]) === 1 && dir === det.sweep[sp] && share >= 0.85){ det.sweep[sp] *= 2;
-      pushEvent("sweep", sp, "The "+word+" "+name+" line has taken over — "+Math.round(share*100)+"% of the population."); }
-    else if (det.sweep[sp] !== 0 && Math.max(shareHi, shareLo) < 0.45) det.sweep[sp] = 0;
+    if (det.sweep[di] === 0 && dir !== 0){ det.sweep[di] = dir;
+      pushEvent("sweep", sp, "A "+word+" "+name+" line is taking over — "+Math.round(share*100)+"% of the population and rising.", kL); }
+    else if (Math.abs(det.sweep[di]) === 1 && dir === det.sweep[di] && share >= 0.85){ det.sweep[di] *= 2;
+      pushEvent("sweep", sp, "The "+word+" "+name+" line has taken over — "+Math.round(share*100)+"% of the population.", kL); }
+    else if (det.sweep[di] !== 0 && Math.max(shareHi, shareLo) < 0.45) det.sweep[di] = 0;
     // diversifying: standing variation established with no line winning -- both strategies coexist.
     // Measured on the balanced (5.7) world: sd climbs 0.02 -> 0.10-0.17 while the mean stays near g0;
     // a sweep instead carries the mean away. The two events are mutually exclusive by construction.
-    if (det.sweep[sp] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[sp]++;
-    else det.diverseRun[sp] = 0;
-    if (!det.diverse[sp] && det.diverseRun[sp] >= 10){ det.diverse[sp] = 1;
-      pushEvent("diverse", sp, name+" is diversifying — "+L.hiWord+" and "+L.loWord+" lines coexist, neither winning."); }
-    else if (det.diverse[sp] && (sd < 0.06 || det.sweep[sp] !== 0)) det.diverse[sp] = 0;
+    if (det.sweep[di] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[di]++;
+    else det.diverseRun[di] = 0;
+    if (!det.diverse[di] && det.diverseRun[di] >= 10){ det.diverse[di] = 1;
+      pushEvent("diverse", sp, name+" is diversifying — "+L.hiWord+" and "+L.loWord+" lines coexist, neither winning.", kL); }
+    else if (det.diverse[di] && (sd < 0.06 || det.sweep[di] !== 0)) det.diverse[di] = 0;
     // local adaptation (7.L): with two or more suns, the locus mean differs between patches by >= 0.10 for
     // 10 samples (each patch holding >= 20). Calibrated on the seeded twin/dim layouts: the plankton's defense
     // locus separated by 0.10-0.18 where the grazers stayed in one patch; the mat's light locus by <= 0.04.
     if (W.sources.length > 1){
-      const pm = patchMeans(sp);
-      det.adaptRun[sp] = pm.spread >= 0.10 ? det.adaptRun[sp]+1 : 0;
-      if (!det.adapt[sp] && det.adaptRun[sp] >= 10){ det.adapt[sp] = 1;
-        pushEvent("adapt", sp, name+" differs by patch — "+L.hiWord+" near sun "+(pm.hi+1)+", "+L.loWord+" near sun "+(pm.lo+1)+"."); }
-      else if (det.adapt[sp] && pm.spread < 0.05) det.adapt[sp] = 0;
-    } else { det.adapt[sp] = 0; det.adaptRun[sp] = 0; }
+      const pm = patchMeans(sp, kL);
+      det.adaptRun[di] = pm.spread >= 0.10 ? det.adaptRun[di]+1 : 0;
+      if (!det.adapt[di] && det.adaptRun[di] >= 10){ det.adapt[di] = 1;
+        pushEvent("adapt", sp, name+" differs by patch — "+L.hiWord+" near sun "+(pm.hi+1)+", "+L.loWord+" near sun "+(pm.lo+1)+".", kL); }
+      else if (det.adapt[di] && pm.spread < 0.05) det.adapt[di] = 0;
+    } else { det.adapt[di] = 0; det.adaptRun[di] = 0; }
     // diversity collapse: variation falls to well under half of what it was 270 samples ago.
     // Selection consuming variation is the normal end of a sweep; the event names the cost.
     if (W.recCount >= 271){
-      const sdAgo = B[((W.recHead-270+N)%N)*CH + 49 + sp];
-      if (!det.uniform[sp] && sdAgo >= 0.06 && sd <= 0.4*sdAgo){ det.uniform[sp] = 1;
-        pushEvent("uniform", sp, "Variation collapsing in "+name+" — the population is becoming uniform."); }
-      else if (det.uniform[sp] && sd > 0.7*sdAgo) det.uniform[sp] = 0;
+      const sdAgo = B[((W.recHead-270+N)%N)*CH + LOCUS_CH[kL][1] + sp];
+      if (!det.uniform[di] && sdAgo >= 0.06 && sd <= 0.4*sdAgo){ det.uniform[di] = 1;
+        pushEvent("uniform", sp, kL === 0 ? "Variation collapsing in "+name+" — the population is becoming uniform."
+          : "Variation collapsing in "+name+"'s "+L.label.toLowerCase()+" — the trait is becoming uniform.", kL); }
+      else if (det.uniform[di] && sd > 0.7*sdAgo) det.uniform[di] = 0;
+    }
     }
   }
 }
@@ -216,13 +225,15 @@ function record(){
     if (!W.cy[i]) awake[sp]++;
   }
   for (let sp=0;sp<7;sp++) if (B[r+sp]>0) B[r+26+sp]/=B[r+sp];
-  // locus mean + sd per species, awake and dormant alike (the genome does not sleep)
+  // locus mean + sd per (species, locus plane), awake and dormant alike (the genome does not sleep)
   for (let sp=0;sp<7;sp++){
-    if (!TRAITS[sp].locus || B[r+sp] === 0) continue;
-    let m=0, m2=0;
-    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ const g=W.g[i]; m+=g; m2+=g*g; }
-    const n=B[r+sp], mean=m/n, varr=Math.max(0, m2/n - mean*mean);
-    B[r+42+sp]=mean; B[r+49+sp]=Math.sqrt(varr);
+    const loci = TRAITS[sp].loci; if (!loci.length || B[r+sp] === 0) continue;
+    for (let k=0;k<loci.length && k<LOCUS_CH.length;k++){
+      let m=0, m2=0; const off=k*MAXN;
+      for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ const g=W.g[off+i]; m+=g; m2+=g*g; }
+      const n=B[r+sp], mean=m/n, varr=Math.max(0, m2/n - mean*mean);
+      B[r+LOCUS_CH[k][0]+sp]=mean; B[r+LOCUS_CH[k][1]+sp]=Math.sqrt(varr);
+    }
   }
   // 7.L local adaptation: the locus spread between light patches for the mat (56) and the plankton (57);
   // exactly 0 with one sun. (Measured first as a genotype-light correlation: the wrong instrument -- Solara's

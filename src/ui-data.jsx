@@ -216,12 +216,15 @@ function drawMetabolism(g, wpx, hpx){
 // it is the fuel gauge of evolution, and a sweep is visible as the ribbon narrowing while it moves.
 function drawTraits(g, wpx, hpx){
   g.fillStyle = "#0B131E"; g.fillRect(0, 0, wpx, hpx);
-  const loci = SPECIES.LOCI.filter(sp => !TRAITS[sp].apex);
+  const bands = []; // one band per (species, locus): the multi-locus page
+  for (const sp of SPECIES.LOCI){ if (TRAITS[sp].apex) continue;
+    TRAITS[sp].loci.forEach((_, k) => { if (k < 2) bands.push([sp, k]); }); }
   const n = W.recCount;
-  if (!loci.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
-  const bandH = hpx / loci.length;
-  loci.forEach((sp, bi) => {
-    const L = TRAITS[sp].locus, c = SPECIES_META[sp].rgb, col = "rgb("+c[0]+","+c[1]+","+c[2]+")";
+  if (!bands.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
+  const bandH = hpx / bands.length;
+  bands.forEach(([sp, kL], bi) => {
+    const L = TRAITS[sp].loci[kL], c = SPECIES_META[sp].rgb, col = "rgb("+c[0]+","+c[1]+","+c[2]+")";
+    const mCh = (kL ? 75 : 42)+sp, sCh = (kL ? 82 : 49)+sp;
     const top = bi*bandH, padL = 34, padR = 10;
     // vertical budget per band: header 22, ribbon, 24 for the patch marks, histogram, 26 for its labels
     const histH = Math.max(20, Math.round(bandH*0.28)), ribH = Math.max(30, bandH - 22 - 24 - histH - 26);
@@ -242,24 +245,24 @@ function drawTraits(g, wpx, hpx){
       const F = { padL, padT: ribT, ch: ribH, cw };
       drawMarkers(g, F, n, W.tick);
       g.beginPath();
-      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1); const y = yOf(at(k,42+sp)+at(k,49+sp)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
-      for (let k=n-1;k>=0;k--){ const x = padL + cw*k/Math.max(1,n-1); g.lineTo(x, yOf(at(k,42+sp)-at(k,49+sp))); }
+      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1); const y = yOf(at(k,mCh)+at(k,sCh)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
+      for (let k=n-1;k>=0;k--){ const x = padL + cw*k/Math.max(1,n-1); g.lineTo(x, yOf(at(k,mCh)-at(k,sCh))); }
       g.closePath(); g.fillStyle = "rgba("+c[0]+","+c[1]+","+c[2]+",0.22)"; g.fill();
       g.strokeStyle = col; g.lineWidth = 1.6; g.beginPath();
-      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1), y = yOf(at(k,42+sp)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
+      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1), y = yOf(at(k,mCh)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
       g.stroke();
       g.fillStyle = "#5E7386"; g.font = "10px ui-monospace, Menlo, monospace";
       g.fillText("-"+Math.round((n-1)*REC.STRIDE/10)+"s", padL, ribT+ribH+11); g.fillText("now", padL+cw-24, ribT+ribH+11);
-      const last = at(n-1,42+sp), lsd = at(n-1,49+sp);
+      const last = at(n-1,mCh), lsd = at(n-1,sCh);
       let lab = "mean "+last.toFixed(2)+" · spread ±"+lsd.toFixed(2);
-      if (W.sources.length > 1){ const pm = patchMeans(sp); // 7.L: by patch, only when there is more than one sun
+      if (W.sources.length > 1){ const pm = patchMeans(sp, kL); // 7.L: by patch, only when there is more than one sun
         const parts = pm.n.map((k, j) => k >= PATCH_MIN ? pm.mean[j].toFixed(2) : null).filter(Boolean);
         if (parts.length > 1) lab += " · by sun " + parts.join(" | "); }
       g.fillStyle = "#B8C5D1"; g.fillText(lab, padL+cw-g.measureText(lab).width, top+14);
     } else { g.fillStyle="#5E7386"; g.fillText("gathering history…", padL+6, ribT+ribH/2); }
     // histogram of the living population
     const BINS = 24, hist = new Float32Array(BINS); let tot=0;
-    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ hist[Math.min(BINS-1, Math.floor(W.g[i]*BINS))]++; tot++; }
+    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ hist[Math.min(BINS-1, Math.floor(W.g[kL*MAXN+i]*BINS))]++; tot++; }
     let hmax = 1; for (let b=0;b<BINS;b++) hmax = Math.max(hmax, hist[b]);
     const bw = cw/BINS;
     for (let b=0;b<BINS;b++){
@@ -270,7 +273,7 @@ function drawTraits(g, wpx, hpx){
     g.strokeStyle = "rgba(201,215,227,0.35)"; g.setLineDash([3,4]);
     g.beginPath(); g.moveTo(padL + cw*L.g0, histT); g.lineTo(padL + cw*L.g0, histT+histH); g.stroke(); g.setLineDash([]);
     if (W.sources.length > 1){ // 7.L: one small sun mark per patch at that patch's mean -- the split, if any, read off the bars
-      const pm = patchMeans(sp); g.font = "9px ui-monospace, Menlo, monospace"; g.fillStyle = "#B8C5D1";
+      const pm = patchMeans(sp, kL); g.font = "9px ui-monospace, Menlo, monospace"; g.fillStyle = "#B8C5D1";
       pm.n.forEach((k, j) => { if (k < PATCH_MIN) return; const x = padL + cw*Math.max(0, Math.min(1, pm.mean[j]));
         g.fillRect(x-0.5, histT-6, 1, 6); g.fillText("☀"+(j+1), x-6, histT-8); }); }
     g.fillStyle = "#5E7386"; g.font = "10px ui-monospace, Menlo, monospace";
@@ -283,11 +286,13 @@ function TraitsLegend(){
   const n = W.recCount; if (n < 1) return null;
   const r = ((W.recHead-1+REC.N)%REC.N)*REC.CH;
   const rows = [];
-  for (const sp of SPECIES.LOCI){ const L = TRAITS[sp].locus; if (TRAITS[sp].apex) continue;
-    const c = SPECIES_META[sp].rgb, mean = W.rec[r+42+sp], sd = W.rec[r+49+sp];
-    let hi=0, tot=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ tot++; if (W.g[i] > L.g0+0.05) hi++; }
-    rows.push(<span key={sp} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
-      ● {SPECIES_META[sp].name} {L.label.toLowerCase()} {mean.toFixed(2)} ±{sd.toFixed(2)} · {L.hiWord} {tot ? Math.round(100*hi/tot) : 0}%</span>);
+  for (const sp of SPECIES.LOCI){ if (TRAITS[sp].apex) continue;
+    TRAITS[sp].loci.forEach((L, kL) => { if (kL >= 2) return;
+      const c = SPECIES_META[sp].rgb, mean = W.rec[r+(kL?75:42)+sp], sd = W.rec[r+(kL?82:49)+sp];
+      let hi=0, tot=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ tot++; if (W.g[kL*MAXN+i] > L.g0+0.05) hi++; }
+      rows.push(<span key={sp+"·"+kL} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
+        ● {SPECIES_META[sp].name} {L.label.toLowerCase()} {mean.toFixed(2)} ±{sd.toFixed(2)} · {L.hiWord} {tot ? Math.round(100*hi/tot) : 0}%</span>);
+    });
   }
   return <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
     {rows}<span style={{ color:"#5E7386", marginLeft:"auto" }}>{P.mutation ? "mutation on" : "mutation off"}</span></div>;

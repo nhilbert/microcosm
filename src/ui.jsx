@@ -75,18 +75,22 @@ export default function Microcosm(){
       }
       // ancestry line (5.3): lineage generation, and the locus expressed as % change vs the founder
       let heredity = null;
-      if (T.locus){
-        const L = T.locus, g = W.g[i];
-        const parts = [];
-        if (L.escSlope && T.escape) parts.push([L.hiTrait, Math.round(100 * L.escSlope*(g - L.g0) / T.escape.p)]);
-        if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
-        if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
-        if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
-        if (L.rateSlope) parts.push([L.hiTrait, Math.round(100 * L.rateSlope*(g - L.g0))]);
-        if (L.effSlope) parts.push([L.loTrait, Math.round(-100 * L.effSlope*(g - L.g0))]);
-        if (L.lightSlope){ parts.push([L.hiTrait, Math.round(100 * L.lightSlope*(g - L.g0))]);
-                           parts.push([L.loTrait, Math.round(-100 * L.lightSlope*(g - L.g0))]); }
-        heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
+      if (T.loci.length){
+        heredity = T.loci.map((L, kk) => {
+          const g = W.g[kk*MAXN+i];
+          const parts = [];
+          if (L.escSlope && T.escape) parts.push([L.hiTrait, Math.round(100 * L.escSlope*(g - L.g0) / T.escape.p)]);
+          if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
+          if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
+          if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
+          if (L.rateSlope) parts.push([L.hiTrait, Math.round(100 * L.rateSlope*(g - L.g0))]);
+          if (L.effSlope) parts.push([L.loTrait, Math.round(-100 * L.effSlope*(g - L.g0))]);
+          if (L.lightSlope){ parts.push([L.hiTrait, Math.round(100 * L.lightSlope*(g - L.g0))]);
+                             parts.push([L.loTrait, Math.round(-100 * L.lightSlope*(g - L.g0))]); }
+          if (L.warmSlope) parts.push([L.hiTrait, Math.round(100 * L.warmSlope*(g - L.g0))]);
+          if (L.warmGainSlope) parts.push([L.loTrait, Math.round(-100 * L.warmGainSlope*(g - L.g0))]);
+          return { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
+        });
       }
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
         age: Math.floor((W.tick - W.birth[i]) / 10), state: stateOf(i),
@@ -766,8 +770,8 @@ export default function Microcosm(){
 // Phase 6.0 — evolution settings. Every control is an intervention: it goes through the event
 // queue (logged, undoable, replay-safe) and never writes P or TRAITS directly. Amber = the hand.
 function EvolutionPanel({ desktop, mono, onLog }){
-  const loci = []; for (let sp=0; sp<7; sp++) if (TRAITS[sp].locus) loci.push(sp);
-  const read = () => ({ mutation: P.mutation, rows: loci.map(sp => ({ sp, sigma: TRAITS[sp].locus.sigma, curve: TRAITS[sp].locus.curve })) });
+  const loci = []; for (let sp=0; sp<7; sp++) TRAITS[sp].loci.forEach((_, k) => loci.push({ sp, k })); // one row per (species, locus)
+  const read = () => ({ mutation: P.mutation, rows: loci.map(({ sp, k }) => ({ sp, k, sigma: TRAITS[sp].loci[k].sigma, curve: TRAITS[sp].loci[k].curve })) });
   const [evo, setEvo] = React.useState(read);
   const [open, setOpen] = React.useState(desktop);
   const [advanced, setAdvanced] = React.useState(false);
@@ -781,13 +785,13 @@ function EvolutionPanel({ desktop, mono, onLog }){
     wild:    { label:"Wild",    mutation:true,  set:(sp,L)=>({ curve:-0.2, sigma:Math.min(0.12, L.sigma0*2) }) },
     frozen:  { label:"Frozen",  mutation:false, set:()=>({}) },
   };
-  const shipped = React.useRef(loci.map(sp => ({ sp, sigma0: TRAITS[sp].locus.sigma }))); // captured on first mount
+  const shipped = React.useRef(loci.map(({ sp, k }) => ({ sp, k, sigma0: TRAITS[sp].loci[k].sigma }))); // captured on first mount
   const applyPreset = name => {
     const pr = PRESETS[name]; const prevs = [];
     if (P.mutation !== pr.mutation){ prevs.push({ type:"mutation", v:P.mutation }); queueEvent({ type:"mutation", v:pr.mutation }); }
-    for (const sp of loci){ const L = TRAITS[sp].locus, s0 = shipped.current.find(x => x.sp===sp).sigma0;
+    for (const { sp, k } of loci){ const L = TRAITS[sp].loci[k], s0 = shipped.current.find(x => x.sp===sp && x.k===k).sigma0;
       const vals = pr.set(sp, { ...L, sigma0:s0 });
-      for (const key in vals){ if (Math.abs(L[key]-vals[key]) < 1e-9) continue; prevs.push({ type:"locus", sp, key, v:L[key] }); queueEvent({ type:"locus", sp, key, v:vals[key] }); } }
+      for (const key in vals){ if (Math.abs(L[key]-vals[key]) < 1e-9) continue; prevs.push({ type:"locus", sp, locus:k, key, v:L[key] }); queueEvent({ type:"locus", sp, locus:k, key, v:vals[key] }); } }
     if (prevs.length) onLog("preset", "Preset: " + pr.label, () => prevs.forEach(e => queueEvent(e)));
     setTimeout(() => setEvo(read), 150);
   };
@@ -795,16 +799,16 @@ function EvolutionPanel({ desktop, mono, onLog }){
   const logTimer = React.useRef({});
   React.useEffect(() => { const iv = setInterval(() => setEvo(read), 1000); return () => clearInterval(iv); }, []);
   const amber = "#F2B24A";
-  const commit = (sp, key, v, label) => {
-    const k = sp + key;
-    if (dragStart.current[k] === undefined) dragStart.current[k] = TRAITS[sp].locus[key];
-    queueEvent({ type:"locus", sp, key, v });
-    setEvo(e => ({ ...e, rows: e.rows.map(r => r.sp === sp ? { ...r, [key]: v } : r) }));
+  const commit = (sp, kL, key, v, label) => {
+    const k = sp + ":" + kL + ":" + key;
+    if (dragStart.current[k] === undefined) dragStart.current[k] = TRAITS[sp].loci[kL][key];
+    queueEvent({ type:"locus", sp, locus:kL, key, v });
+    setEvo(e => ({ ...e, rows: e.rows.map(r => r.sp === sp && r.k === kL ? { ...r, [key]: v } : r) }));
     clearTimeout(logTimer.current[k]);
     logTimer.current[k] = setTimeout(() => {
       const prev = dragStart.current[k]; dragStart.current[k] = undefined;
       if (prev !== undefined && Math.abs(prev - v) > 1e-9)
-        onLog("evolution", label, () => queueEvent({ type:"locus", sp, key, v: prev }));
+        onLog("evolution", label, () => queueEvent({ type:"locus", sp, locus:kL, key, v: prev }));
     }, 700);
   };
   const toggleMutation = () => {
@@ -812,9 +816,9 @@ function EvolutionPanel({ desktop, mono, onLog }){
     queueEvent({ type:"mutation", v }); setEvo(e => ({ ...e, mutation: v }));
     onLog("mutation", v ? "Mutation on" : "Mutation off", () => queueEvent({ type:"mutation", v: prev }));
   };
-  const slider = (sp, key, min, max, step, label) => { const row = evo.rows.find(r => r.sp === sp); return (
+  const slider = (sp, kL, key, min, max, step, label) => { const row = evo.rows.find(r => r.sp === sp && r.k === kL); return (
     <input type="range" min={min} max={max} step={step} value={row ? row[key] : 0}
-      onChange={e => commit(sp, key, +e.target.value, label)}
+      onChange={e => commit(sp, kL, key, +e.target.value, label)}
       title={label} style={{ width: desktop ? 110 : 84, accentColor: amber }} /> ); };
   return (
     <div style={{ position:"absolute", top: 126, left:"50%", transform:"translateX(-50%)", zIndex:5,
@@ -835,11 +839,11 @@ function EvolutionPanel({ desktop, mono, onLog }){
           <span style={{ color:"#5E7386", fontSize:9 }}></span>
           <span style={{ color:"#5E7386", fontSize:9 }}>mutation rate</span>
           <span style={{ color:"#5E7386", fontSize:9 }}>trade-off curve</span>
-          {evo.rows.map(r => { const c = SPECIES_META[r.sp].rgb; return (
-            <React.Fragment key={r.sp}>
-              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})` }}>{SPECIES_META[r.sp].name} <span style={{ color:"#5E7386" }}>{TRAITS[r.sp].locus.label.toLowerCase()}</span></span>
-              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, "sigma", 0, 0.12, 0.005, "Mutation rate · " + SPECIES_META[r.sp].name)}<span style={{ width:34, color:amber }}>{r.sigma.toFixed(3)}</span></span>
-              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, "curve", -0.5, 0.8, 0.05, "Trade-off curvature · " + SPECIES_META[r.sp].name)}<span style={{ width:34, color:amber }}>{r.curve >= 0 ? "+" : ""}{r.curve.toFixed(2)}</span></span>
+          {evo.rows.map(r => { const c = SPECIES_META[r.sp].rgb, lab = TRAITS[r.sp].loci[r.k].label; return (
+            <React.Fragment key={r.sp+"·"+r.k}>
+              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})` }}>{SPECIES_META[r.sp].name} <span style={{ color:"#5E7386" }}>{lab.toLowerCase()}</span></span>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, r.k, "sigma", 0, 0.12, 0.005, "Mutation rate · " + SPECIES_META[r.sp].name + " " + lab)}<span style={{ width:34, color:amber }}>{r.sigma.toFixed(3)}</span></span>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, r.k, "curve", -0.5, 0.8, 0.05, "Trade-off curvature · " + SPECIES_META[r.sp].name + " " + lab)}<span style={{ width:34, color:amber }}>{r.curve >= 0 ? "+" : ""}{r.curve.toFixed(2)}</span></span>
             </React.Fragment> ); })}
           <span style={{ gridColumn:"1 / -1", color:"rgba(242,178,74,0.7)", fontSize:9, marginTop:2 }}>
             curve &lt; 0 sweeps and splits · 0 as shipped · &gt; 0 settles to the middle</span>
@@ -853,15 +857,15 @@ function EvolutionPanel({ desktop, mono, onLog }){
               style={{ marginLeft:"auto", padding:"2px 8px", borderRadius:8, cursor:"pointer", font:"inherit", fontSize:10,
                 border:"1px solid rgba(94,115,134,0.4)", background:"transparent", color:"#8FA3B5" }}>{advanced ? "hide prices" : "prices…"}</button>
           </span>
-          {advanced && evo.rows.map(r => { const L = TRAITS[r.sp].locus, c = SPECIES_META[r.sp].rgb;
-            const keys = PRICE_KEYS.filter(k => L[k]); return (
-            <React.Fragment key={"p"+r.sp}>
-              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})`, fontSize:10, alignSelf:"start", paddingTop:3 }}>{SPECIES_META[r.sp].name} prices</span>
+          {advanced && evo.rows.map(r => { const L = TRAITS[r.sp].loci[r.k], c = SPECIES_META[r.sp].rgb;
+            const keys = PRICE_KEYS.filter(k => L[k]); if (!keys.length) return null; return (
+            <React.Fragment key={"p"+r.sp+"·"+r.k}>
+              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})`, fontSize:10, alignSelf:"start", paddingTop:3 }}>{SPECIES_META[r.sp].name} {L.label.toLowerCase()} prices</span>
               <span style={{ gridColumn:"2 / -1", display:"grid", gridTemplateColumns:"auto auto auto", gap:"2px 8px", alignItems:"center" }}>
-                {keys.map(k => { const bal = BALANCE[r.sp] && BALANCE[r.sp][k]; return (
+                {keys.map(k => { const bal = r.k === 0 && BALANCE[r.sp] && BALANCE[r.sp][k]; return (
                   <React.Fragment key={k}>
-                    <span style={{ color:"#5E7386", fontSize:9 }}>{k.replace("Slope","")}{bal !== undefined ? <span style={{ color:"rgba(242,178,74,0.6)" }}> · balance {bal}</span> : ""}</span>
-                    <input type="range" min={0} max={1} step={0.05} value={L[k]} onChange={e => commit(r.sp, k, +e.target.value, "Price · " + SPECIES_META[r.sp].name + " " + k.replace("Slope",""))}
+                    <span style={{ color:"#5E7386", fontSize:9 }}>{k.replace("Slope","")}{bal ? <span style={{ color:"rgba(242,178,74,0.6)" }}> · balance {bal}</span> : ""}</span>
+                    <input type="range" min={0} max={1} step={0.05} value={L[k]} onChange={e => commit(r.sp, r.k, k, +e.target.value, "Price · " + SPECIES_META[r.sp].name + " " + k.replace("Slope",""))}
                       style={{ width: desktop ? 110 : 84, accentColor: amber }} />
                     <span style={{ width:30, color:amber, fontSize:10 }}>{L[k].toFixed(2)}</span>
                   </React.Fragment> ); })}
@@ -932,27 +936,27 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
           )}
         </div>
       )}
-      {detail >= 1 && card.heredity && (
-        <div style={{ marginTop:14, fontSize:12, lineHeight:1.5 }}>
-          <div style={{ fontSize:11, color:COL.silt }}>{card.heredity.label.toUpperCase()} · heritable</div>
+      {detail >= 1 && card.heredity && card.heredity.map((h, hk) => (
+        <div key={hk} style={{ marginTop:14, fontSize:12, lineHeight:1.5 }}>
+          <div style={{ fontSize:11, color:COL.silt }}>{h.label.toUpperCase()} · heritable</div>
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:4 }}>
-            <span style={{ fontFamily:mono, fontSize:12 }}>{card.heredity.g.toFixed(2)}</span>
+            <span style={{ fontFamily:mono, fontSize:12 }}>{h.g.toFixed(2)}</span>
             <div style={{ flex:1, height:4, borderRadius:2, background:"rgba(11,19,30,0.8)", position:"relative" }}>
-              <div style={{ position:"absolute", left:`${card.heredity.g0*100}%`, top:-3, width:1, height:10, background:"rgba(201,215,227,0.45)" }} />
-              <div style={{ position:"absolute", left:`calc(${card.heredity.g*100}% - 3px)`, top:-1, width:6, height:6, borderRadius:3,
+              <div style={{ position:"absolute", left:`${h.g0*100}%`, top:-3, width:1, height:10, background:"rgba(201,215,227,0.45)" }} />
+              <div style={{ position:"absolute", left:`calc(${h.g*100}% - 3px)`, top:-1, width:6, height:6, borderRadius:3,
                 background:`rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})` }} />
             </div>
           </div>
           <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:COL.silt, marginTop:2 }}>
-            <span>{card.heredity.loWord}</span><span>{card.heredity.hiWord}</span>
+            <span>{h.loWord}</span><span>{h.hiWord}</span>
           </div>
           <div style={{ marginTop:4, color:COL.silt }}>
-            vs founder: {card.heredity.parts.map(([nm, pct], k) => (
-              <span key={nm}>{k ? " · " : ""}<span style={{ color: pct === 0 ? COL.silt : pct > 0 ? "rgb(140,230,170)" : "rgb(226,170,150)" }}>
+            vs founder: {h.parts.map(([nm, pct], k) => (
+              <span key={nm+k}>{k ? " · " : ""}<span style={{ color: pct === 0 ? COL.silt : pct > 0 ? "rgb(140,230,170)" : "rgb(226,170,150)" }}>
                 {pct > 0 ? "+" : ""}{pct}%</span> {nm}</span>))}
           </div>
         </div>
-      )}
+      ))}
       {detail >= 1 && (
         <div style={{ display:"flex", gap:10, marginTop:18 }}>
           <button className="mc-hit mc-hit-amber" onClick={onFeed}
