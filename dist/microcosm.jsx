@@ -1094,25 +1094,34 @@ function detectHeat(r){
   }
   else if (det.heatStarve && felt < 2) det.heatStarve = false;
 }
-// ---- movement (MV.0): the trap detector -- a species concentrating where its budget is negative ----
-// The mechanism-level statistic behind phase7-heat-plan.md §12: the +8 core drew the plankton in and
-// the grazer that followed starved there. Reads only warm-core census (65-72) and the MV.0 reserve
-// channels (133-140), every one exactly 0 without a warm source, so the certified world is silent by
-// construction. The apex is excluded -- its heat story is heatStarve. Thresholds calibrated in
-// harness/move.js against the hot-sun (+8) worlds; the wording claims only what is measured:
-// crowding (share of the population in warm cells) and the reserve gap against the ambient population.
+// ---- movement (MV.0): the trap detector -- a species running its reserve down in warmth it stays in ----
+// The statistic behind phase7-heat-plan.md §12 (the +8 core), calibrated in harness/move.js --trap.
+// The first design contrasted warm-core reserve against the ambient population (channels 133-140) and
+// died against the measurement: under +8 the warm region covers the whole inhabited area, the share
+// saturates at 1.0 for every species, and no ambient population remains to contrast with (fired 0/8
+// while the grazer went extinct 8/8). What separates the trap worlds is LEVEL, not contrast: warmth
+// felt >= 3 sustained while the reserve sits below the species' measured healthy band (REFERENCE_BANDS
+// resP10) and keeps falling. Measured on the +8 worlds: Drifta -- the species whose set-point drags it
+// in -- fires 8/8 at t 3,700-4,680, ahead of the core loss (4,180-5,444) on every seed; Bacillus 5/8
+// (a true squeeze, the one heatRetreat also sees); the grazer's own collapse outruns the trend window
+// (~1,200 ticks) and stays narrated by its crash/extinction events. Warmth felt is exactly 0 in an
+// unwarmed world, so the certified world is silent by construction. Apex excluded: heatStarve is its story.
 function detectMove(r){
-  const B = W.rec;
-  const wN = B[r+65];
+  const B = W.rec, N = REC.N, CH = REC.CH;
+  if (W.recCount < 26) return;
+  const r25 = ((W.recHead-25+N)%N)*CH;
   for (let m=0;m<SPECIES.MOBILE.length;m++){
     const sp = SPECIES.MOBILE[m]; if (sp === SPECIES.APEX) continue;
-    const pop = B[r+sp], inWarm = B[r+66+sp], share = pop > 0 ? inWarm/pop : 0;
-    const wRes = B[r+133+m], aRes = B[r+137+m];
-    const on = wN >= 20 && pop >= 50 && inWarm >= 25 && share >= 0.5 && aRes - wRes >= 0.08;
+    const RB = REFERENCE_BANDS[sp]; if (!RB) continue;
+    const pop = B[r+sp], felt = B[r+58+sp];
+    const reserve = pop >= 1 ? (B[r+7+sp]/pop)/(P.capMul*(B[r+26+sp]||1)) : 0;
+    const popAgo = B[r25+sp];
+    const resAgo = popAgo >= 1 ? (B[r25+7+sp]/popAgo)/(P.capMul*(B[r25+26+sp]||1)) : reserve;
+    const on = pop >= 50 && felt >= 3 && reserve < RB.resP10 && reserve < resAgo - 0.02;
     det.heatTrapRun[sp] = on ? det.heatTrapRun[sp]+1 : 0;
     if (!det.heatTrap[sp] && det.heatTrapRun[sp] >= 10){ det.heatTrap[sp] = 1;
-      pushEvent("heatTrap", sp, TRAITS[sp].name+" is crowding into the warm water and starving there — reserve "+Math.round(wRes*100)+"% inside against "+Math.round(aRes*100)+"% outside."); }
-    else if (det.heatTrap[sp] && (share < 0.3 || aRes - wRes < 0.02)) det.heatTrap[sp] = 0;
+      pushEvent("heatTrap", sp, TRAITS[sp].name+" is running itself down in the warm water — reserve "+Math.round(reserve*100)+"% against a healthy "+Math.round(RB.resP10*100)+"%+."); }
+    else if (det.heatTrap[sp] && (felt < 2 || reserve > RB.resP10)) det.heatTrap[sp] = 0;
   }
 }
 // ---- chemistry: mineral depletion trend and lock-up level (the K6 detectors) ----
