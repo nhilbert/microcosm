@@ -294,12 +294,14 @@ if (flag("--invade")){
 }
 
 if (flag("--pheno")){
-  // MV.2 phenotype legibility (D7: behaviour is the display): does the restlessness genotype show in
-  // the tracks themselves? Shipped world, 8 seeds: at t=12,000 adopt up to 60 living Drifta, follow
-  // 1,500 ticks, and correlate each survivor's genotype with its realized net step per tick.
-  const KL = TRAITS[SPECIES.PREY].loci.findIndex(Lc => Lc.dampSpan);
-  if (KL < 0){ console.log("Drifta carries no restlessness locus"); process.exit(1); }
-  console.log("=== restlessness phenotype: g (plane "+KL+") vs net step per tick, shipped world ===");
+  // Movement-phenotype legibility (D7: behaviour is the display): does a genotype show in the tracks?
+  // --pheno sp,plane (default 1,3): shipped world, 8 seeds, adopt a live cohort at t=12,000, follow
+  // its tracks, correlate each survivor's genotype with its realized net step per tick.
+  const pa = (args[args.indexOf("--pheno")+1] || "").split(",").map(Number);
+  const PSP = Number.isFinite(pa[0]) ? pa[0] : SPECIES.PREY;
+  const KL = Number.isFinite(pa[1]) ? pa[1] : TRAITS[SPECIES.PREY].loci.findIndex(Lc => Lc.dampSpan);
+  if (KL < 0 || !TRAITS[PSP].loci[KL]){ console.log("no such (species, plane)"); process.exit(1); }
+  console.log("=== movement phenotype: "+TRAITS[PSP].name+" plane "+KL+" g vs net step per tick, shipped world ===");
   console.log("seed | tracks | r(g, netStep) | netStep top-quartile g | bottom quartile");
   for (const s of SEEDS){
     L.start(s, true);
@@ -308,7 +310,7 @@ if (flag("--pheno")){
     // survivors per seed. 300 ticks (15 samples) of a 250-strong cohort is what the prey's real
     // lifespan supports, and net step over 300 ticks is still the phenotype.
     const tr = []; const off = KL*C.MAXN;
-    for (let i=0;i<W.n && tr.length<250;i++) if (W.alive[i] && W.sp[i]===SPECIES.PREY && !W.cy[i])
+    for (let i=0;i<W.n && tr.length<250;i++) if (W.alive[i] && W.sp[i]===PSP && !W.cy[i])
       tr.push({ i, birth: W.birth[i], g: W.g[off+i], xs:[W.x[i]], ys:[W.y[i]], done:false });
     for (let t=1;t<=600;t++){ C.step();
       if (t % REC.STRIDE === 0) for (const k of tr){ if (k.done) continue;

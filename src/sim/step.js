@@ -22,6 +22,7 @@
 // declared intent — then re-capture with `node conform.js --capture`
 // and re-run the full 8-seed harness (tune2.js) before shipping.
 // ============================================================
+const PC_A = 30, PC_B = 30; // MV-C post-capture window: afterglow / relocate phase lengths (ticks)
 function step(){
   drainEvents();
   diffuseM();
@@ -129,7 +130,7 @@ function step(){
     else if(T.movement==="steer"){ // pursuit forager
       const torpid = W.en[i] < T.torpor*cap;
       const hungry = W.en[i] < T.satiation*cap && W.handle[i]<=0;
-      if(W.handle[i]>0) W.handle[i]--; if(W.cd[i]>0) W.cd[i]--;
+      if(W.handle[i]>0) W.handle[i]--; if(W.cd[i]>0) W.cd[i]--; if(W.pc[i]>0) W.pc[i]--;
       let nearKin=0, tx=0, ty=0, best=1e9, found=false, target=-1;
       let fleeing=false;
       if(T.flee){
@@ -212,17 +213,32 @@ function step(){
                 const spill = mShare-kept;
                 if (spill>0){ W.M[cellOf(i)]+=spill; W.flows.excrete+=spill; }
               }
-              if(W.en[target]<=0.5){ killOrg(target); W.handle[i]=T.handling*W.qH[cT]; } // handling shortens with warmth (Q10 0.65)
+              if(W.en[target]<=0.5){ killOrg(target); W.handle[i]=T.handling*W.qH[cT]; W.pc[i]=PC_A+PC_B; } // handling shortens with warmth (Q10 0.65); the kill starts the post-capture window (MV-C)
             }
           }
         }
       } else {
-        W.hd[i]+=(R()-0.5)*0.5;
+        // MV-C (declared): the post-capture program. A fixed two-phase state machine on W.pc whose
+        // dials are the hunting-style locus: phase A (first PC_A ticks after a kill) and phase B
+        // (the PC_B after) mirror one axis -- kill-and-stay searches the kill site first (slow, turny)
+        // and leaves decisively after; kill-and-move departs at once and settles elsewhere. Every
+        // factor is exactly 1 at g0: the timer runs, nothing expresses (the warmth-gate pattern as a
+        // behaviour gate). Value modulation only, at the existing idle draw and idle speed -- no draw
+        // is added, moved, or made conditional.
+        let pcS = 1, pcT2 = 1;
+        if (W.pc[i] > 0){
+          const ph = W.pc[i] > PC_B ? 1 : -1;
+          for (let k=0;k<nL;k++){ const L=loci[k]; if (L.pcSpeedSlope || L.pcTurnSlope){
+            const d = W.g[k*MAXN+i]-L.g0;
+            pcS *= 1 - L.pcSpeedSlope*d*ph;
+            pcT2 *= 1 + L.pcTurnSlope*d*ph; } }
+        }
+        W.hd[i]+=(R()-0.5)*0.5*pcT2;
         if (T.thermo && !hungry && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2: an idle, fed hunter turns toward its preferred warmth; hunger overrides (Hedgecock)
           const sgn = dT > T.topt ? -1 : 1, ta = Math.atan2(sgn*W.tgy[cT], sgn*W.tgx[cT]);
           let da=ta-W.hd[i]; while(da>Math.PI)da-=6.283; while(da<-Math.PI)da+=6.283;
           W.hd[i]+=Math.max(-T.turnRate*0.5, Math.min(T.turnRate*0.5, da)); }
-        speed=(hungry? T.speed*0.7 : T.speed*0.3)*(torpid?0.75:1);
+        speed=(hungry? T.speed*0.7 : T.speed*0.3)*(torpid?0.75:1)*pcS;
       }
       if(T.burst && !fleeing){ // jet burst: brief straight-line speed spike, quadratic cost, long cooldown
         if(W.bst[i]>0){ speed*=T.burst.mul; W.bst[i]--; if(W.bst[i]===0) W.bst[i]=-T.burst.cd; }

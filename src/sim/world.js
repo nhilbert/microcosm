@@ -17,6 +17,7 @@ const W = {
   g: new Float32Array(MAXLOCI*MAXN),  // heritable locus values in [0,1]: locus k of organism i at k*MAXN+i (plane 0 = the display locus, so W.g[i] keeps reading it), else 0
   lg: new Uint16Array(MAXN),          // lineage generation: founders 0, child = parent + 1 (draw-free bookkeeping)
   flee: new Int16Array(MAXN), bst: new Int16Array(MAXN),
+  pc: new Int16Array(MAXN),   // post-capture program timer (MV-C): ticks left in the two-phase after-kill window; expresses nothing at g0
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
   events: [], eventLog: [], lightDirty: false,
@@ -59,7 +60,7 @@ function spawn(species, sx, sy, e, size, mnEndow, prEndow){
   W.x[i]=wrap(sx); W.y[i]=wrap(sy); W.px[i]=W.x[i]; W.py[i]=W.y[i];
   W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.sp[i]=species; W.alive[i]=1;
   W.hd[i]=R()*6.283; W.cd[i]=TRAITS[species].matureCd; W.handle[i]=0; W.cy[i]=0; W.gr[i]=0;
-  W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0;
+  W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0; W.pc[i]=0;
   { const loci = TRAITS[species].loci; // every plane reset: slots are reused across species
     for (let k=0;k<MAXLOCI;k++) W.g[k*MAXN+i] = k < loci.length ? loci[k].g0 : 0; }
   W.lg[i]=0;

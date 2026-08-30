@@ -208,6 +208,19 @@ const SPECIES_ROWS = [
       "p": 0.3,
       "kick": 22
     },
+    "loci": [
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "pcSpeedSlope": 0.5,
+        "pcTurnSlope": 0.8,
+        "label": "Hunting style",
+        "hiWord": "kill-and-stay",
+        "loWord": "kill-and-move",
+        "hiTrait": "search at the kill",
+        "loTrait": "swift departure"
+      }
+    ],
     "locus": {
       "g0": 0.5,
       "sigma": 0.03,
@@ -462,7 +475,7 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //              warmth-SCALED gain (photosynthesis for the drifter, decomposition for the decomposer)
 //              x (1 - warmGainSlope*(g-g0)*dT/10). Both exactly 1 at dT <= 0: a locus expressing only
 //              these is warmth-gated (warmGated, derived) -- invisible until the world warms.
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, tprefSpan: 0, dampSpan: 0, curve: 0 };
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, tprefSpan: 0, dampSpan: 0, pcSpeedSlope: 0, pcTurnSlope: 0, curve: 0 };
 // Multi-locus (Phase 7): a species row carries `locus` (its first, display locus) and optionally
 // `loci: [...]` for the rest; the loader flattens both into t.loci, ordered — LOCUS ORDER IS PART OF
 // THE RNG CONTRACT (one mutation draw per locus, in order, at every division). t.locus stays an alias
@@ -496,6 +509,8 @@ function checkLocus(t, L){
       rate: 1 + L.rateSlope*d - q, eff: 1 - L.effSlope*d - q,
       lightDark: 1 + L.lightSlope*d - q, lightBright: 1 - L.lightSlope*d - q,
       warmCost: 1 - L.warmSlope*d*1.5, warmGain: 1 - L.warmGainSlope*d*1.5, // at the hottest legal source (dT 15)
+      pcSpeedA: 1 - L.pcSpeedSlope*d, pcSpeedB: 1 + L.pcSpeedSlope*d,       // MV-C: both phases of the post-capture program
+      pcTurnA: 1 + L.pcTurnSlope*d, pcTurnB: 1 - L.pcTurnSlope*d,
       escape: t.escape ? (t.escape.p + L.escSlope*d - t.escape.p*L.curve*d*d)/t.escape.p : 1 };
     for (const k in mults) if (!(mults[k] >= LOCUS_MULT_MIN && mults[k] <= LOCUS_MULT_MAX)) bad.push(k+"@g="+g+"="+mults[k].toFixed(2));
   }
@@ -549,6 +564,7 @@ const W = {
   g: new Float32Array(MAXLOCI*MAXN),  // heritable locus values in [0,1]: locus k of organism i at k*MAXN+i (plane 0 = the display locus, so W.g[i] keeps reading it), else 0
   lg: new Uint16Array(MAXN),          // lineage generation: founders 0, child = parent + 1 (draw-free bookkeeping)
   flee: new Int16Array(MAXN), bst: new Int16Array(MAXN),
+  pc: new Int16Array(MAXN),   // post-capture program timer (MV-C): ticks left in the two-phase after-kill window; expresses nothing at g0
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
   events: [], eventLog: [], lightDirty: false,
@@ -591,7 +607,7 @@ function spawn(species, sx, sy, e, size, mnEndow, prEndow){
   W.x[i]=wrap(sx); W.y[i]=wrap(sy); W.px[i]=W.x[i]; W.py[i]=W.y[i];
   W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.sp[i]=species; W.alive[i]=1;
   W.hd[i]=R()*6.283; W.cd[i]=TRAITS[species].matureCd; W.handle[i]=0; W.cy[i]=0; W.gr[i]=0;
-  W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0;
+  W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0; W.pc[i]=0;
   { const loci = TRAITS[species].loci; // every plane reset: slots are reused across species
     for (let k=0;k<MAXLOCI;k++) W.g[k*MAXN+i] = k < loci.length ? loci[k].g0 : 0; }
   W.lg[i]=0;
@@ -1410,6 +1426,7 @@ function impact(entry){
 // declared intent — then re-capture with `node conform.js --capture`
 // and re-run the full 8-seed harness (tune2.js) before shipping.
 // ============================================================
+const PC_A = 30, PC_B = 30; // MV-C post-capture window: afterglow / relocate phase lengths (ticks)
 function step(){
   drainEvents();
   diffuseM();
@@ -1517,7 +1534,7 @@ function step(){
     else if(T.movement==="steer"){ // pursuit forager
       const torpid = W.en[i] < T.torpor*cap;
       const hungry = W.en[i] < T.satiation*cap && W.handle[i]<=0;
-      if(W.handle[i]>0) W.handle[i]--; if(W.cd[i]>0) W.cd[i]--;
+      if(W.handle[i]>0) W.handle[i]--; if(W.cd[i]>0) W.cd[i]--; if(W.pc[i]>0) W.pc[i]--;
       let nearKin=0, tx=0, ty=0, best=1e9, found=false, target=-1;
       let fleeing=false;
       if(T.flee){
@@ -1600,17 +1617,32 @@ function step(){
                 const spill = mShare-kept;
                 if (spill>0){ W.M[cellOf(i)]+=spill; W.flows.excrete+=spill; }
               }
-              if(W.en[target]<=0.5){ killOrg(target); W.handle[i]=T.handling*W.qH[cT]; } // handling shortens with warmth (Q10 0.65)
+              if(W.en[target]<=0.5){ killOrg(target); W.handle[i]=T.handling*W.qH[cT]; W.pc[i]=PC_A+PC_B; } // handling shortens with warmth (Q10 0.65); the kill starts the post-capture window (MV-C)
             }
           }
         }
       } else {
-        W.hd[i]+=(R()-0.5)*0.5;
+        // MV-C (declared): the post-capture program. A fixed two-phase state machine on W.pc whose
+        // dials are the hunting-style locus: phase A (first PC_A ticks after a kill) and phase B
+        // (the PC_B after) mirror one axis -- kill-and-stay searches the kill site first (slow, turny)
+        // and leaves decisively after; kill-and-move departs at once and settles elsewhere. Every
+        // factor is exactly 1 at g0: the timer runs, nothing expresses (the warmth-gate pattern as a
+        // behaviour gate). Value modulation only, at the existing idle draw and idle speed -- no draw
+        // is added, moved, or made conditional.
+        let pcS = 1, pcT2 = 1;
+        if (W.pc[i] > 0){
+          const ph = W.pc[i] > PC_B ? 1 : -1;
+          for (let k=0;k<nL;k++){ const L=loci[k]; if (L.pcSpeedSlope || L.pcTurnSlope){
+            const d = W.g[k*MAXN+i]-L.g0;
+            pcS *= 1 - L.pcSpeedSlope*d*ph;
+            pcT2 *= 1 + L.pcTurnSlope*d*ph; } }
+        }
+        W.hd[i]+=(R()-0.5)*0.5*pcT2;
         if (T.thermo && !hungry && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2: an idle, fed hunter turns toward its preferred warmth; hunger overrides (Hedgecock)
           const sgn = dT > T.topt ? -1 : 1, ta = Math.atan2(sgn*W.tgy[cT], sgn*W.tgx[cT]);
           let da=ta-W.hd[i]; while(da>Math.PI)da-=6.283; while(da<-Math.PI)da+=6.283;
           W.hd[i]+=Math.max(-T.turnRate*0.5, Math.min(T.turnRate*0.5, da)); }
-        speed=(hungry? T.speed*0.7 : T.speed*0.3)*(torpid?0.75:1);
+        speed=(hungry? T.speed*0.7 : T.speed*0.3)*(torpid?0.75:1)*pcS;
       }
       if(T.burst && !fleeing){ // jet burst: brief straight-line speed spike, quadratic cost, long cooldown
         if(W.bst[i]>0){ speed*=T.burst.mul; W.bst[i]--; if(W.bst[i]===0) W.bst[i]=-T.burst.cd; }

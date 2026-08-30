@@ -157,6 +157,19 @@
       "p": 0.3,
       "kick": 22
     },
+    "loci": [
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "pcSpeedSlope": 0.5,
+        "pcTurnSlope": 0.8,
+        "label": "Hunting style",
+        "hiWord": "kill-and-stay",
+        "loWord": "kill-and-move",
+        "hiTrait": "search at the kill",
+        "loTrait": "swift departure"
+      }
+    ],
     "locus": {
       "g0": 0.5,
       "sigma": 0.03,
