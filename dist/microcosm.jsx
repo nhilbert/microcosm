@@ -2900,6 +2900,7 @@ export default function Microcosm(){
                              parts.push([L.loTrait, Math.round(-100 * L.lightSlope*(g - L.g0))]); }
           if (L.warmSlope) parts.push([L.hiTrait, Math.round(100 * L.warmSlope*(g - L.g0))]);
           if (L.warmGainSlope) parts.push([L.loTrait, Math.round(-100 * L.warmGainSlope*(g - L.g0))]);
+          if (L.tprefSpan) parts.push(["preferred warmth", +(L.tprefSpan*(g - L.g0)).toFixed(1), "°"]); // a set-point shifts in degrees, not percent (MV.1)
           return { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
         });
       }
@@ -3772,9 +3773,9 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
             <span>{h.loWord}</span><span>{h.hiWord}</span>
           </div>
           <div style={{ marginTop:4, color:COL.silt }}>
-            vs founder: {h.parts.map(([nm, pct], k) => (
+            vs founder: {h.parts.map(([nm, pct, unit], k) => (
               <span key={nm+k}>{k ? " · " : ""}<span style={{ color: pct === 0 ? COL.silt : pct > 0 ? "rgb(140,230,170)" : "rgb(226,170,150)" }}>
-                {pct > 0 ? "+" : ""}{pct}%</span> {nm}</span>))}
+                {pct > 0 ? "+" : ""}{pct}{unit || "%"}</span> {nm}</span>))}
           </div>
         </div>
       ))}
