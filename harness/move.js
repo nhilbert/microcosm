@@ -276,7 +276,7 @@ if (flag("--invade")){
   const pct = arg[4] || 5, every = Math.max(2, Math.round(100/pct)); // minority fraction: 5% drowns in drift at Cilio's N (~100 -> 5 founders)
   console.log(`=== invasion from rare: ${TRAITS[sp].name} plane ${plane}, ${100-pct}%/${pct}% at t=${AT}, both directions (8 seeds) ===`);
   for (const [res, inv] of [[gA, gB], [gB, gA]]){
-    console.log(`\nresident g=${res} / invader g=${inv} at 5%:`);
+    console.log(`\nresident g=${res} / invader g=${inv} at ${pct}%:`);
     console.log("seed | invader share at t=3k 6k 9k 12k 15k 18k | pop 18k");
     for (const s of SEEDS){
       L.start(s, true);
