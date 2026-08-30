@@ -51,10 +51,15 @@ if (modes.includes("sample")){
 }
 if (modes.includes("fuzz")){
   const kf = after("--fuzz") || 4, ticks = 3 * HORIZON;
-  PAIRS.forEach((p, j) => p.L.sigma = sigma0[j] * kf);
   console.log(`\n=== fuzz: mutation ON, every sigma x ${kf}, ${ticks} ticks -- evolution as the adversary ===`);
   for (const seed of SEEDS){
-    L.start(seed, true); const M0 = L.auditM(); let ok = true, last = null;
+    L.start(seed, true);
+    // AFTER start, per seed: initWorld restores shipped sigma from LOCUS_SHIPPED (the Phase 6 reset
+    // guard), so setting it before the loop silently fuzzed at x1 from Phase 6 until MV.1's battery
+    // caught it -- the "fuzz" seed-77 collapse reproduced tune2's shipped-sigma collapse tick-exact,
+    // which only an unmultiplied sigma explains. Instrument incident recorded in phase7-movement-plan.md.
+    PAIRS.forEach((p, j) => p.L.sigma = sigma0[j] * kf);
+    const M0 = L.auditM(); let ok = true, last = null;
     for (let t = 0; t <= ticks; t++){ C.step(); const p = L.pops(); last = p;
       if (L.coreCollapsed(p, t)){ console.log(`seed ${seed}: ECOSYSTEM COLLAPSE at t=${t} pops=${p}`); ok = false; anyFail = true; break; } }
     runs++;

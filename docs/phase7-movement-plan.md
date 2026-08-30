@@ -76,6 +76,10 @@ Bacillus reading α ≈ 1.01 — run-and-tumble as textbook diffusion — is the
 
 **D5 resolved (measure first, decided with data): no fix.** Bacillus's realized per-tick displacement equals `T.speed` exactly (286k/356k organism-ticks, max deviation 4.3e-5 — float wrap noise): with torpor 0 the flat `T.speed²` charge *is* the realized-quadratic charge, bit for bit. The distortion exists only under torpor (Necro, not live), where the flat charge overprices by 1/tor ≈ 1.67 — recorded for whenever Necro re-enters or a tumble-speed locus is proposed; MV.3's threshold locus does not touch speed and needs nothing.
 
-## 7. Risks
+## 7. Instrument incident — corridor fuzz ran at ×1 from Phase 6 to MV.1 (found 2026-08-30, fixed)
+
+corridor.js multiplied every σ×4 *before* its seed loop; the Phase 6 `LOCUS_SHIPPED` restore in initWorld resets σ on every start, so each fuzz run actually executed at shipped σ. Caught by MV.1's own battery: the "fuzz" seed-77 collapse reproduced tune2's shipped-σ collapse tick-exact (t=12,851, identical populations) — only an unmultiplied σ explains a bit-identical trajectory. Consequence for the records: every "fuzz 8/8" claim since Phase 6 (H.3, H.4, H.5 stabilization passes) was a *shipped-σ, 54k-tick* long-horizon check — still meaningful, but not the ×4 adversary it was labeled as; the rails and corners are unaffected (mutation off). Fixed by setting σ after start, per seed; the true ×4 fuzz re-run on the MV.1 build is part of this phase's record. The meta-lesson is the project's own: the instrument is only as honest as the calibration fights behind it — and a fingerprint-identical reproduction (tune2 vs fuzz) is what caught it.
+
+## 8. Risks
 
 Research §6.6 applies wholesale (integrator exploits, trap-by-design, sign-flip, dead knobs, positional epistasis, apex drift, the honesty note). Phase-specific addition: MV.1 + MV.2 give Drifta four live loci — the joint corridor is 4-dimensional; rails/fuzz/sample discipline (5.9 pattern) replaces corners entirely, and the two H.3 extreme-corner grazer extinctions may gain siblings — in-corridor findings to document, not tune away, unless the owner rules otherwise.
