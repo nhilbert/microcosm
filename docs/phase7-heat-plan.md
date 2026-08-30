@@ -211,7 +211,7 @@ Two edits, both exactly neutral at dT = 0 (all four conformance fingerprints ide
 
 Against §10.2 (whose grazer intake carried no Q10): the grazer squeeze is gone — Cilio 134–206 (was 124–163 with one seed at 16), Bacillus 774–1,244 (was 659–795 with one seed at 134, control 865–1,002), no near-collapse seed, plankton settles higher (1,051–2,058). **Apex first survives**: lost 8/8 at t 4,037–5,661 (was 4,168–5,488). Drifta CV median 0.38 (was 0.41; control 0.25) — **uniform warming still destabilises the cycle**, but the collapse tail was the missing rate's artefact and is gone. §10.2's "worth revisiting" is resolved: the destabilisation is real, the near-collapse was not.
 
-### 12.2 The hot sun, re-measured — a thermal trap (open owner decision)
+### 12.2 The hot sun, re-measured — a thermal trap (CLOSED 2026-08-30: owner decision (a), the sun stays lethal)
 
 §10.1 (core held 0/8 lost) was measured pre-H.2, metabolism only. On the current core the hot sun (+8 on the shipped sun) **loses the core on 8/8 seeds** (Cilio extinct t 4,201–4,805; Bacillus 245–335; plankton median distance from the sun 49, was 110–137). Attribution by A/B, 8 seeds each:
 
@@ -225,6 +225,8 @@ Against §10.2 (whose grazer intake carried no Q10): the grazer squeeze is gone 
 **The cause is Drifta's H.2 thermotaxis, not the attack Q10** (which only hastens the grazer's end by ~400–1,300 ticks). The plankton's set-point (tpref = topt = +9) makes a +8 core pure attraction: it packs into the lit warm centre, and the grazer that follows starves there — meals devalued on its falling limb (topt +6), upkeep ×1.7. The mirror image of the hunter-set-point failure of §10.4, from the prey's side: a hard-coded set-point walks the plankton into water that kills its grazer. The far heater (§12.4) is unaffected — the trap needs warmth *on* the light.
 
 **Open decision (owner):** (a) accept as a finding — the hot sun is a lethal, fully narrated lever (pile-up warned at t 3,180, ~25 min before core loss; grazer and decomposer thinning at 4,000; extinctions in order), undoable like every source event; or (b) reprice Drifta's set-point (tpref below topt, or a lower thermo gain) — a declared ecology change with full re-acceptance. Until decided, (a) is the shipped behaviour. The H.2 record already named this class of problem as belonging to the movement genome.
+
+**Decision (owner, 2026-08-30): (a) — the sun stays lethal.** Taken after the H.5 measurement closed the last escape route: a heritable thermal trait does not outrun the trap either (core lost 8/8 unchanged; phase7-multilocus-plan.md §3). The set-point itself remains movement-genome territory, where evolution — not a reprice — may one day discover a better controller.
 
 ### 12.3 H-P5 — the loci under a heated patch (`--loci`, heater +10 on a seeded far sun)
 

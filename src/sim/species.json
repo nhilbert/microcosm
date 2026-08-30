@@ -64,6 +64,19 @@
       "hiTrait": "grazing resistance",
       "loTrait": "growth rate"
     },
+    "loci": [
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "warmSlope": 0.4,
+        "warmGainSlope": 0.25,
+        "label": "Thermal",
+        "hiWord": "heat-tolerant",
+        "loWord": "quick-burning",
+        "hiTrait": "warm upkeep relief",
+        "loTrait": "warm intake"
+      }
+    ],
     "topt": 9,
     "ctmax": 14,
     "thermo": 0.6
@@ -176,6 +189,19 @@
       "hiTrait": "feeding rate",
       "loTrait": "yield"
     },
+    "loci": [
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "warmSlope": 0.4,
+        "warmGainSlope": 0.25,
+        "label": "Thermal",
+        "hiWord": "heat-tolerant",
+        "loWord": "quick-burning",
+        "hiTrait": "warm upkeep relief",
+        "loTrait": "warm intake"
+      }
+    ],
     "topt": 12,
     "ctmax": 18,
     "thermo": 0.25

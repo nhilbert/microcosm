@@ -56,7 +56,7 @@ function applyEvent(ev){
       P.mutation = !!ev.v;
       done && done({ prev }); break; }
     case "locus": {
-      const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].locus; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break;
+      const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].loci[ev.locus|0]; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break; // ev.locus: which locus (default 0, the display locus)
       const prev = Lc[ev.key];
       const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : [0, 1.5]; // slopes are prices: bounded too
       Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));

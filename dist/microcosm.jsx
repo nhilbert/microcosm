@@ -142,6 +142,19 @@ const SPECIES_ROWS = [
       "hiTrait": "grazing resistance",
       "loTrait": "growth rate"
     },
+    "loci": [
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "warmSlope": 0.4,
+        "warmGainSlope": 0.25,
+        "label": "Thermal",
+        "hiWord": "heat-tolerant",
+        "loWord": "quick-burning",
+        "hiTrait": "warm upkeep relief",
+        "loTrait": "warm intake"
+      }
+    ],
     "topt": 9,
     "ctmax": 14,
     "thermo": 0.6
@@ -254,6 +267,19 @@ const SPECIES_ROWS = [
       "hiTrait": "feeding rate",
       "loTrait": "yield"
     },
+    "loci": [
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "warmSlope": 0.4,
+        "warmGainSlope": 0.25,
+        "label": "Thermal",
+        "hiWord": "heat-tolerant",
+        "loWord": "quick-burning",
+        "hiTrait": "warm upkeep relief",
+        "loTrait": "warm intake"
+      }
+    ],
     "topt": 12,
     "ctmax": 18,
     "thermo": 0.25
@@ -438,27 +464,45 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //              ecology sets. See docs/genetics-scaling.md. 0 = the original linear form.
 //   rateSlope  detritivore feeding rate x (1 + rateSlope*(g-g0))   effSlope   yield effE x (1 - effSlope*(g-g0))
 //              the rate-yield trade-off of microbial metabolism (Pfeiffer, Schuster & Bonhoeffer 2001)
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, curve: 0 };
+//   warmSlope  upkeep's warmth response down-regulated: maintenance x (1 - warmSlope*(g-g0)*dT/10) --
+//              Padfield's respiration-Q10 compensation (7.H.5). warmGainSlope prices it: the species'
+//              warmth-SCALED gain (photosynthesis for the drifter, decomposition for the decomposer)
+//              x (1 - warmGainSlope*(g-g0)*dT/10). Both exactly 1 at dT <= 0: a locus expressing only
+//              these is warmth-gated (warmGated, derived) -- invisible until the world warms.
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, curve: 0 };
+// Multi-locus (Phase 7): a species row carries `locus` (its first, display locus) and optionally
+// `loci: [...]` for the rest; the loader flattens both into t.loci, ordered — LOCUS ORDER IS PART OF
+// THE RNG CONTRACT (one mutation draw per locus, in order, at every division). t.locus stays an alias
+// for loci[0]: the display locus that drives tint, the single-locus channels and the legacy harness reads.
+const MAXLOCI = 4; // W.g is sized MAXLOCI planes of MAXN; raising it is a storage change, not an ecology change
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
     if (t.cyst) for (const k in CYST_DEFAULTS) if (t.cyst[k] === undefined) t.cyst[k] = CYST_DEFAULTS[k];
     if (t.corpsivore) for (const k in CORPSIVORE_DEFAULTS) if (t.corpsivore[k] === undefined) t.corpsivore[k] = CORPSIVORE_DEFAULTS[k];
-    if (t.locus) for (const k in LOCUS_DEFAULTS) if (t.locus[k] === undefined) t.locus[k] = LOCUS_DEFAULTS[k];
-    if (t.locus) checkLocus(t);
+    t.loci = (t.locus ? [t.locus] : []).concat(t.loci || []);
+    if (t.loci.length > MAXLOCI) throw new Error(t.name+" carries "+t.loci.length+" loci; W.g holds "+MAXLOCI);
+    for (const L of t.loci){
+      for (const k in LOCUS_DEFAULTS) if (L[k] === undefined) L[k] = LOCUS_DEFAULTS[k];
+      L.warmGated = !(L.escSlope || L.kpSlope || L.catchSlope || L.kbSlope || L.lightSlope || L.rateSlope || L.effSlope)
+        && !!(L.warmSlope || L.warmGainSlope); // expressed only through warmth: the narration detectors stay silent in an unwarmed world
+      checkLocus(t, L);
+    }
+    t.locus = t.loci.length ? t.loci[0] : null;
   }
   return rows;
 }
 // Load-time guardrail: every multiplier a locus can express must stay inside [LOCUS_MULT_MIN, LOCUS_MULT_MAX]
 // across the whole corridor, curvature included. A typo in a slope fails here, not in a 54k-tick run.
 const LOCUS_MULT_MIN = 0.3, LOCUS_MULT_MAX = 3.0;
-function checkLocus(t){
-  const L = t.locus, bad = [];
+function checkLocus(t, L){
+  const bad = [];
   for (const g of [0, 0.25, 0.5, 0.75, 1]){
     const d = g - L.g0, q = L.curve*d*d;
     const mults = { kb: 1 + L.kbSlope*d - q, kp: 1 - L.kpSlope*d - q, catch: 1 - L.catchSlope*d - q,
       rate: 1 + L.rateSlope*d - q, eff: 1 - L.effSlope*d - q,
       lightDark: 1 + L.lightSlope*d - q, lightBright: 1 - L.lightSlope*d - q,
+      warmCost: 1 - L.warmSlope*d*1.5, warmGain: 1 - L.warmGainSlope*d*1.5, // at the hottest legal source (dT 15)
       escape: t.escape ? (t.escape.p + L.escSlope*d - t.escape.p*L.curve*d*d)/t.escape.p : 1 };
     for (const k in mults) if (!(mults[k] >= LOCUS_MULT_MIN && mults[k] <= LOCUS_MULT_MAX)) bad.push(k+"@g="+g+"="+mults[k].toFixed(2));
   }
@@ -490,7 +534,7 @@ const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
 // Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
 // Lives here because W.rec is sized from it; changing CH is a declared rebaseline.
-const REC = { N: 900, STRIDE: 20, CH: 75 };  // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species (7.H); 65-74: warm-core census (7.H.4)
+const REC = { N: 900, STRIDE: 20, CH: 89 };  // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species (7.H); 65-74: warm-core census (7.H.4); 75-88: second-locus mean/sd (multi-locus)
 
 // ---------- world state (module singletons; one artifact instance) ----------
 const W = {
@@ -502,7 +546,7 @@ const W = {
   hd: new Float32Array(MAXN), handle: new Int16Array(MAXN),
   cd: new Int16Array(MAXN), cy: new Uint8Array(MAXN), gr: new Int16Array(MAXN),
   mn: new Float32Array(MAXN), pr: new Float32Array(MAXN), mem: new Float32Array(MAXN),
-  g: new Float32Array(MAXN),          // heritable locus value in [0,1] (species with TRAITS.locus), else 0
+  g: new Float32Array(MAXLOCI*MAXN),  // heritable locus values in [0,1]: locus k of organism i at k*MAXN+i (plane 0 = the display locus, so W.g[i] keeps reading it), else 0
   lg: new Uint16Array(MAXN),          // lineage generation: founders 0, child = parent + 1 (draw-free bookkeeping)
   flee: new Int16Array(MAXN), bst: new Int16Array(MAXN),
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
@@ -548,7 +592,9 @@ function spawn(species, sx, sy, e, size, mnEndow, prEndow){
   W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.sp[i]=species; W.alive[i]=1;
   W.hd[i]=R()*6.283; W.cd[i]=TRAITS[species].matureCd; W.handle[i]=0; W.cy[i]=0; W.gr[i]=0;
   W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0;
-  W.g[i]=TRAITS[species].locus ? TRAITS[species].locus.g0 : 0; W.lg[i]=0;
+  { const loci = TRAITS[species].loci; // every plane reset: slots are reused across species
+    for (let k=0;k<MAXLOCI;k++) W.g[k*MAXN+i] = k < loci.length ? loci[k].g0 : 0; }
+  W.lg[i]=0;
   W.birth[i]=W.tick; W.gen[i]=(W.gen[i]+1)&0xffff;
   return i;
 }
@@ -642,7 +688,7 @@ function applyEvent(ev){
       P.mutation = !!ev.v;
       done && done({ prev }); break; }
     case "locus": {
-      const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].locus; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break;
+      const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].loci[ev.locus|0]; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break; // ev.locus: which locus (default 0, the display locus)
       const prev = Lc[ev.key];
       const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : [0, 1.5]; // slopes are prices: bounded too
       Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));
@@ -851,6 +897,8 @@ function neighbors(i, radius, cb){
 //  56-57 locus spread between light patches, mat/plankton (7.L)  58-64 mean warmth experienced per species (7.H)
 //  65    warm-cell count (dT > 3)   66-72 population in warm cells per species
 //  73-74 detritus per warm cell / per ambient cell (7.H.4; all of 65-74 exactly 0 without a warm source)
+//  75-81 second-locus mean per species   82-88 second-locus sd (multi-locus: locus plane 1;
+//        channels 42-55 stay the DISPLAY locus, plane 0, so every calibrated reader keeps its meaning)
 // CONTRACT: the recorder is a pure observer — zero PRNG draws, zero
 // mutation of dynamic state. Conformance bit-identity with the recorder
 // running is the standing acceptance test for this whole layer.
@@ -860,28 +908,31 @@ function neighbors(i, radius, cb){
 const DET_ESTAB = [40, 40, 20, 80, 10, 4, 4]; // establishment thresholds per species
 const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0], crash:[0,0,0,0,0,0,0],
   packAwake:false, depleted:false, lockedWarn:false,
-  sweep:[0,0,0,0,0,0,0],   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
-  uniform:[0,0,0,0,0,0,0],
-  diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0],   // standing polymorphism: both ends coexist
-  rail:[0,0,0,0,0,0,0], railRun:[0,0,0,0,0,0,0],           // corridor contact: a locus pinned at its edge (6.2)
-  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0],         // local adaptation (7.L): the locus differs between light patches
+  // heredity detectors run per (species, locus plane): index sp*2 + plane, 2 recorded planes (LOCUS_CH)
+  sweep:new Array(14).fill(0),   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
+  uniform:new Array(14).fill(0),
+  diverse:new Array(14).fill(0), diverseRun:new Array(14).fill(0),   // standing polymorphism: both ends coexist
+  rail:new Array(14).fill(0), railRun:new Array(14).fill(0),           // corridor contact: a locus pinned at its edge (6.2)
+  adapt:new Array(14).fill(0), adaptRun:new Array(14).fill(0),         // local adaptation (7.L): the locus differs between patches
   heatRetreat:[0,0,0,0,0,0,0],                              // 7.H.4: a species is thinning out of the warm water
   heatPile:false, heatPileRun:0,                            // 7.H.4: detritus piling up in the warm core (measured 10.1/10.3: x4+ ambient)
   heatStarve:false, heatStarveRun:0 };                      // 7.H.4: the apex declining while the warmth it feels stays >= 3
 // 7.L patch statistics: nearest sun by toroidal distance (the phototaxis rule), locus mean per patch for one
 // species. Pure reads; `spread` = max - min over patches holding >= 20 individuals (0 with one sun).
 const PATCH_MIN = 20;
-function patchMeans(sp){
+const LOCUS_CH = [[42,49],[75,82]]; // [mean base, sd base] per recorded locus plane
+function patchMeans(sp, plane){
+  const off = (plane||0)*MAXN;
   const K = W.sources.length, n = new Array(K).fill(0), m = new Array(K).fill(0);
   for (let i=0;i<W.n;i++){ if (!W.alive[i] || W.sp[i]!==sp) continue;
     let best=0, bd=Infinity; for (let k=0;k<K;k++){ const dx=wd(W.sources[k].x-W.x[i]), dy=wd(W.sources[k].y-W.y[i]), d=dx*dx+dy*dy; if (d<bd){ bd=d; best=k; } }
-    n[best]++; m[best]+=W.g[i]; }
+    n[best]++; m[best]+=W.g[off+i]; }
   let hi=-1, lo=-1;
   for (let k=0;k<K;k++){ if (n[k] < PATCH_MIN) continue; m[k]/=n[k]; if (hi<0 || m[k]>m[hi]) hi=k; if (lo<0 || m[k]<m[lo]) lo=k; }
   return { n, mean: m, hi, lo, spread: hi>=0 && lo>=0 ? m[hi]-m[lo] : 0 };
 }
-function pushEvent(type, sp, text){
-  W.sysEvents.push({ tick: W.tick, type, sp, text });
+function pushEvent(type, sp, text, locus){
+  W.sysEvents.push(locus !== undefined ? { tick: W.tick, type, sp, locus, text } : { tick: W.tick, type, sp, text });
   if (W.sysEvents.length > 200) W.sysEvents.shift();
 }
 function detect(r, awake){
@@ -931,52 +982,62 @@ function detectHeredity(r){
   // Calibrated on the 8-seed evolving ensemble: founders sit within +-0.05 of g0 for the first
   // ~2,000 ticks (sd 0.02-0.05), so the dead zone silences the founding; a real sweep carries the
   // mean >= 0.10 from g0 with a 60% majority on that side, reached at t ~ 8,000-12,000.
+  // a warmth-gated locus is unexpressed in an unwarmed world: its variation is pure drift, and narrating
+  // drift as selection ("a line is taking over", "lines coexist, neither winning") would be a lie. Selection
+  // stories wait for warmth; rail contact is a corridor concern and is always reported.
+  const warmWorld = P.tempAmb > 0 || W.sources.some(s => s.a > 0);
   for (let sp=0; sp<7; sp++){
-    const L = TRAITS[sp].locus; if (!L || B[r+sp] < 50) continue;
-    const mean = B[r+42+sp], sd = B[r+49+sp], name = TRAITS[sp].name;
+    const loci = TRAITS[sp].loci; if (!loci.length || B[r+sp] < 50) continue;
+    for (let kL=0; kL<loci.length && kL<LOCUS_CH.length; kL++){
+    const L = loci[kL], di = sp*2 + kL, off = kL*MAXN;
+    const gated = L.warmGated && !warmWorld;
+    const mean = B[r+LOCUS_CH[kL][0]+sp], sd = B[r+LOCUS_CH[kL][1]+sp], name = TRAITS[sp].name;
     let hi=0, lo=0, n=0, railHi=0, railLo=0;
-    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; const g=W.g[i]; if (g > L.g0+0.05) hi++; else if (g < L.g0-0.05) lo++; if (g > 0.98) railHi++; else if (g < 0.02) railLo++; }
+    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; const g=W.g[off+i]; if (g > L.g0+0.05) hi++; else if (g < L.g0-0.05) lo++; if (g > 0.98) railHi++; else if (g < 0.02) railLo++; }
     const shareHi = hi/n, shareLo = lo/n;
     // rail contact (6.2): a third of the population pinned at a corridor edge for 10 samples -- the
     // trait has run out of room, which is a certification concern the player should see as a story
     const railShare = Math.max(railHi, railLo)/n, railDir = railHi >= railLo ? 1 : -1;
-    det.railRun[sp] = railShare >= 0.30 ? det.railRun[sp]+1 : 0;
-    if (!det.rail[sp] && det.railRun[sp] >= 10){ det.rail[sp] = railDir;
-      pushEvent("rail", sp, name+" has reached the limit of its "+L.label.toLowerCase()+" — "+Math.round(railShare*100)+"% at the "+(railDir>0 ? L.hiWord : L.loWord)+" edge."); }
-    else if (det.rail[sp] && railShare < 0.15) det.rail[sp] = 0;
-    const dir = (mean - L.g0 >= 0.10 && shareHi >= 0.6) ? 1 : (L.g0 - mean >= 0.10 && shareLo >= 0.6) ? -1 : 0;
+    det.railRun[di] = railShare >= 0.30 ? det.railRun[di]+1 : 0;
+    if (!det.rail[di] && det.railRun[di] >= 10){ det.rail[di] = railDir;
+      pushEvent("rail", sp, name+" has reached the limit of its "+L.label.toLowerCase()+" — "+Math.round(railShare*100)+"% at the "+(railDir>0 ? L.hiWord : L.loWord)+" edge.", kL); }
+    else if (det.rail[di] && railShare < 0.15) det.rail[di] = 0;
+    const dir = gated ? 0 : (mean - L.g0 >= 0.10 && shareHi >= 0.6) ? 1 : (L.g0 - mean >= 0.10 && shareLo >= 0.6) ? -1 : 0;
     const share = dir > 0 ? shareHi : shareLo;
     const word = dir > 0 ? L.hiWord : L.loWord;
-    if (det.sweep[sp] === 0 && dir !== 0){ det.sweep[sp] = dir;
-      pushEvent("sweep", sp, "A "+word+" "+name+" line is taking over — "+Math.round(share*100)+"% of the population and rising."); }
-    else if (Math.abs(det.sweep[sp]) === 1 && dir === det.sweep[sp] && share >= 0.85){ det.sweep[sp] *= 2;
-      pushEvent("sweep", sp, "The "+word+" "+name+" line has taken over — "+Math.round(share*100)+"% of the population."); }
-    else if (det.sweep[sp] !== 0 && Math.max(shareHi, shareLo) < 0.45) det.sweep[sp] = 0;
+    if (gated) det.sweep[di] = 0;
+    if (det.sweep[di] === 0 && dir !== 0){ det.sweep[di] = dir;
+      pushEvent("sweep", sp, "A "+word+" "+name+" line is taking over — "+Math.round(share*100)+"% of the population and rising.", kL); }
+    else if (Math.abs(det.sweep[di]) === 1 && dir === det.sweep[di] && share >= 0.85){ det.sweep[di] *= 2;
+      pushEvent("sweep", sp, "The "+word+" "+name+" line has taken over — "+Math.round(share*100)+"% of the population.", kL); }
+    else if (det.sweep[di] !== 0 && Math.max(shareHi, shareLo) < 0.45) det.sweep[di] = 0;
     // diversifying: standing variation established with no line winning -- both strategies coexist.
     // Measured on the balanced (5.7) world: sd climbs 0.02 -> 0.10-0.17 while the mean stays near g0;
     // a sweep instead carries the mean away. The two events are mutually exclusive by construction.
-    if (det.sweep[sp] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[sp]++;
-    else det.diverseRun[sp] = 0;
-    if (!det.diverse[sp] && det.diverseRun[sp] >= 10){ det.diverse[sp] = 1;
-      pushEvent("diverse", sp, name+" is diversifying — "+L.hiWord+" and "+L.loWord+" lines coexist, neither winning."); }
-    else if (det.diverse[sp] && (sd < 0.06 || det.sweep[sp] !== 0)) det.diverse[sp] = 0;
+    if (!gated && det.sweep[di] === 0 && sd >= 0.10 && Math.abs(mean - L.g0) < 0.15 && shareHi >= 0.2 && shareLo >= 0.2) det.diverseRun[di]++;
+    else det.diverseRun[di] = 0;
+    if (!det.diverse[di] && det.diverseRun[di] >= 10){ det.diverse[di] = 1;
+      pushEvent("diverse", sp, name+" is diversifying — "+L.hiWord+" and "+L.loWord+" lines coexist, neither winning.", kL); }
+    else if (det.diverse[di] && (sd < 0.06 || det.sweep[di] !== 0)) det.diverse[di] = 0;
     // local adaptation (7.L): with two or more suns, the locus mean differs between patches by >= 0.10 for
     // 10 samples (each patch holding >= 20). Calibrated on the seeded twin/dim layouts: the plankton's defense
     // locus separated by 0.10-0.18 where the grazers stayed in one patch; the mat's light locus by <= 0.04.
-    if (W.sources.length > 1){
-      const pm = patchMeans(sp);
-      det.adaptRun[sp] = pm.spread >= 0.10 ? det.adaptRun[sp]+1 : 0;
-      if (!det.adapt[sp] && det.adaptRun[sp] >= 10){ det.adapt[sp] = 1;
-        pushEvent("adapt", sp, name+" differs by patch — "+L.hiWord+" near sun "+(pm.hi+1)+", "+L.loWord+" near sun "+(pm.lo+1)+"."); }
-      else if (det.adapt[sp] && pm.spread < 0.05) det.adapt[sp] = 0;
-    } else { det.adapt[sp] = 0; det.adaptRun[sp] = 0; }
+    if (W.sources.length > 1 && !gated){
+      const pm = patchMeans(sp, kL);
+      det.adaptRun[di] = pm.spread >= 0.10 ? det.adaptRun[di]+1 : 0;
+      if (!det.adapt[di] && det.adaptRun[di] >= 10){ det.adapt[di] = 1;
+        pushEvent("adapt", sp, name+" differs by patch — "+L.hiWord+" near sun "+(pm.hi+1)+", "+L.loWord+" near sun "+(pm.lo+1)+".", kL); }
+      else if (det.adapt[di] && pm.spread < 0.05) det.adapt[di] = 0;
+    } else { det.adapt[di] = 0; det.adaptRun[di] = 0; }
     // diversity collapse: variation falls to well under half of what it was 270 samples ago.
     // Selection consuming variation is the normal end of a sweep; the event names the cost.
-    if (W.recCount >= 271){
-      const sdAgo = B[((W.recHead-270+N)%N)*CH + 49 + sp];
-      if (!det.uniform[sp] && sdAgo >= 0.06 && sd <= 0.4*sdAgo){ det.uniform[sp] = 1;
-        pushEvent("uniform", sp, "Variation collapsing in "+name+" — the population is becoming uniform."); }
-      else if (det.uniform[sp] && sd > 0.7*sdAgo) det.uniform[sp] = 0;
+    if (W.recCount >= 271 && !gated){
+      const sdAgo = B[((W.recHead-270+N)%N)*CH + LOCUS_CH[kL][1] + sp];
+      if (!det.uniform[di] && sdAgo >= 0.06 && sd <= 0.4*sdAgo){ det.uniform[di] = 1;
+        pushEvent("uniform", sp, kL === 0 ? "Variation collapsing in "+name+" — the population is becoming uniform."
+          : "Variation collapsing in "+name+"'s "+L.label.toLowerCase()+" — the trait is becoming uniform.", kL); }
+      else if (det.uniform[di] && sd > 0.7*sdAgo) det.uniform[di] = 0;
+    }
     }
   }
 }
@@ -1054,13 +1115,15 @@ function record(){
     if (!W.cy[i]) awake[sp]++;
   }
   for (let sp=0;sp<7;sp++) if (B[r+sp]>0) B[r+26+sp]/=B[r+sp];
-  // locus mean + sd per species, awake and dormant alike (the genome does not sleep)
+  // locus mean + sd per (species, locus plane), awake and dormant alike (the genome does not sleep)
   for (let sp=0;sp<7;sp++){
-    if (!TRAITS[sp].locus || B[r+sp] === 0) continue;
-    let m=0, m2=0;
-    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ const g=W.g[i]; m+=g; m2+=g*g; }
-    const n=B[r+sp], mean=m/n, varr=Math.max(0, m2/n - mean*mean);
-    B[r+42+sp]=mean; B[r+49+sp]=Math.sqrt(varr);
+    const loci = TRAITS[sp].loci; if (!loci.length || B[r+sp] === 0) continue;
+    for (let k=0;k<loci.length && k<LOCUS_CH.length;k++){
+      let m=0, m2=0; const off=k*MAXN;
+      for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ const g=W.g[off+i]; m+=g; m2+=g*g; }
+      const n=B[r+sp], mean=m/n, varr=Math.max(0, m2/n - mean*mean);
+      B[r+LOCUS_CH[k][0]+sp]=mean; B[r+LOCUS_CH[k][1]+sp]=Math.sqrt(varr);
+    }
   }
   // 7.L local adaptation: the locus spread between light patches for the mat (56) and the plankton (57);
   // exactly 0 with one sun. (Measured first as a genotype-light correlation: the wrong instrument -- Solara's
@@ -1164,8 +1227,9 @@ function indicators(){ // labels follow the naming rule: functional first, scien
     for(let k=1;k<=KL;k++) loss+=B[((W.recHead-k+REC.N)%REC.N)*REC.CH+35+2];
     ven = { reserve: (B[r0+13]/B[r0+6])/cap, preyLossRate: loss/(KL*REC.STRIDE/10) };
   }
-  let adSum=0, adN=0; // adaptability (6.2): mean locus sd over species with a locus and >= 20 alive
-  for (let sp=0;sp<7;sp++) if (TRAITS[sp].locus && B[r0+sp] >= 20){ adSum += B[r0+49+sp]; adN++; }
+  let adSum=0, adN=0; // adaptability (6.2): mean locus sd over every (species, locus) with >= 20 alive
+  for (let sp=0;sp<7;sp++) if (B[r0+sp] >= 20)
+    TRAITS[sp].loci.forEach((L, k) => { if (k < 2){ adSum += B[r0+(k ? 82 : 49)+sp]; adN++; } });
   return {
     adaptability: adN ? +(adSum/adN).toFixed(3) : null, // subtitle: mean heritable variation
     variety: +H.toFixed(2),                      // subtitle: Shannon diversity
@@ -1253,6 +1317,9 @@ function impact(entry){
 //      an unconditional R() to a shared path.
 //   4. Field passes (diffusion, leach, scent) and the corpse pass are
 //      draw-free and must remain so.
+//   5. Heredity draws one mutation kick PER LOCUS, in TRAITS[sp].loci
+//      order, at every division (sigma > 0 and P.mutation only). Adding,
+//      removing or reordering a species' loci is a declared ecology change.
 // Modification protocol: after ANY edit to this file, run
 //   `node conform.js`   (2 seeds x 3000 ticks, ~3 s)
 // A changed fingerprint is fine only when an ecology change is the
@@ -1289,8 +1356,20 @@ function step(){
     if(T.cyst && W.gr[i]<=0 && W.en[i]<T.cyst.enter*cap){
       W.cy[i]=1; W.vx[i]=0; W.vy[i]=0; continue;
     }
-    const gd = T.locus ? W.g[i]-T.locus.g0 : 0, gq = T.locus ? T.locus.curve*gd*gd : 0; // locus deviation and its curvature penalty (exactly 0 at g0)
-    let cost = T.kb*(T.locus ? 1 + T.locus.kbSlope*gd - gq : 1)*Math.pow(W.sz[i],0.75)*W.qR[cT]; // maintenance: Q10 2.5
+    // Multi-locus expression (Phase 7): every locus contributes one factor per site, in locus order,
+    // each `1 + slope*d - curve*d*d`. A slope the locus does not name is 0 and its curve defaults to 0,
+    // so an unexpressed factor multiplies by exactly 1.0 — the single-locus arithmetic bit for bit.
+    const loci = T.loci, nL = loci.length;
+    let kbG = 1;
+    for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0; kbG *= 1 + L.kbSlope*d - L.curve*d*d; }
+    // thermal locus (7.H.5): warmth-response down-regulation (Padfield) -- upkeep's warmth response
+    // flattened (wR), the warmth-scaled gain flattened with it (wA, the price). Exactly 1 at dT <= 0,
+    // so the unwarmed world expresses nothing; curvature runs through the ambient sites like any locus.
+    let wR = 1, wA = 1;
+    if (dT > 0) for (let k=0;k<nL;k++){ const L=loci[k]; if (L.warmSlope !== 0 || L.warmGainSlope !== 0){
+      const d=W.g[k*MAXN+i]-L.g0, hw=dT*0.1;
+      wR *= 1 - L.warmSlope*d*hw; wA *= 1 - L.warmGainSlope*d*hw; } }
+    let cost = T.kb*kbG*Math.pow(W.sz[i],0.75)*W.qR[cT]*wR; // maintenance: Q10 2.5, flattened by the thermal locus
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -1301,8 +1380,10 @@ function step(){
       }
       const sat = Math.min(1, W.mn[i]/mQ); // Liebig: mineral-starved cells photosynthesize weakly
       const Lc = cellLight(i);
-      const kpG = T.locus ? (1 + T.locus.kpSlope*(-gd) - gq) * (1 + T.locus.lightSlope*gd*(1 - 2*Lc) - gq) : 1;
-      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat*W.qP[cT]*tpc; // photosynthesis: Q10 1.6, cut off past ctmax
+      let kpG = 1;
+      for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0, q=L.curve*d*d;
+        kpG *= (1 + L.kpSlope*(-d) - q) * (1 + L.lightSlope*d*(1 - 2*Lc) - q); }
+      const gppGain = T.kp*kpG*Lc*W.sz[i]*sat*W.qP[cT]*tpc*wA; // photosynthesis: Q10 1.6, cut off past ctmax, flattened by the thermal locus (its price)
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
       if (W.pr[i] < pQ && W.en[i] > 0.6*cap){
@@ -1381,9 +1462,15 @@ function step(){
         speed=T.speed*(torpid?0.75:1)*W.qS[cT]; // pursuit quickens with warmth (Q10 1.3), its quadratic cost with it
         if(best<W.sz[i]+6 && target>=0){
           const TJ = TRAITS[W.sp[target]];
-          const tgd = TJ.locus ? W.g[target]-TJ.locus.g0 : 0;
-          const escP = TJ.escape ? (TJ.locus ? TJ.escape.p + TJ.locus.escSlope*tgd - TJ.escape.p*TJ.locus.curve*tgd*tgd : TJ.escape.p)
-                                   * (T.locus ? 1 + T.locus.catchSlope*(-gd) - gq : 1) : 0;
+          let escP = 0;
+          if (TJ.escape){ // prey loci shift the base chance additively, hunter loci multiply what remains
+            escP = TJ.escape.p;
+            const lJ = TJ.loci;
+            for (let k=0;k<lJ.length;k++){ const L=lJ[k], d=W.g[k*MAXN+target]-L.g0;
+              escP = escP + L.escSlope*d - TJ.escape.p*L.curve*d*d; }
+            for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0;
+              escP *= 1 + L.catchSlope*(-d) - L.curve*d*d; }
+          }
           if(TJ.escape && R()<escP){ // escape jink: prey darts away, contact broken
             const ja=R()*6.283;
             W.x[target]=wrap(W.x[target]+Math.cos(ja)*TJ.escape.kick);
@@ -1441,11 +1528,13 @@ function step(){
     }
     if(T.detritivore){
       const c0=cellOf(i), D=T.detritivore;
-      const rateG = T.locus ? 1 + T.locus.rateSlope*gd - gq : 1, effG = T.locus ? 1 - T.locus.effSlope*gd - gq : 1; // rate-yield locus; both exactly 1 at g0
-      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]*W.qD[c0]*tpc); // decomposition: Q10 2.0
+      let rateG = 1, effG = 1; // rate-yield locus; both exactly 1 at g0
+      for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0, q=L.curve*d*d;
+        rateG *= 1 + L.rateSlope*d - q; effG *= 1 - L.effSlope*d - q; }
+      const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]*W.qD[c0]*tpc*wA); // decomposition: Q10 2.0, flattened by the thermal locus (its price)
       if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE*effG); }
       const pQ3=P.pQuota*W.sz[i];
-      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i]*W.qD[c0]*tpc, Math.max(0,(pQ3-W.pr[i])/D.effP));
+      const eatP=Math.min(W.dP[c0], D.rateP*rateG*W.sz[i]*W.qD[c0]*tpc*wA, Math.max(0,(pQ3-W.pr[i])/D.effP));
       if(eatP>0){ W.dP[c0]-=eatP; W.pr[i]+=eatP*D.effP; }
       const minz=Math.min(W.dM[c0], D.minRate*W.sz[i]);
       if(minz>0){
@@ -1507,13 +1596,14 @@ function step(){
       const ci = spawn(W.sp[i], nx, ny, childE, childSz, childM, childP);
       if (ci >= 0){
         W.lg[ci] = W.lg[i] + 1;
-        if (T.locus){ // heredity: child = parent, plus one uniform kick of +-sigma when mutation is on
-          let gc = W.g[i];
-          if (T.locus.sigma > 0 && P.mutation){ // draw only when mutating: the silent genome consumes zero draws
-            gc += (R()-0.5)*2*T.locus.sigma;
+        for (let k=0;k<nL;k++){ // heredity: child = parent, plus one uniform kick of +-sigma PER LOCUS, in locus order (the declared L-draws-per-division rule)
+          const L = loci[k];
+          let gc = W.g[k*MAXN+i];
+          if (L.sigma > 0 && P.mutation){ // draw only when mutating: the silent genome consumes zero draws
+            gc += (R()-0.5)*2*L.sigma;
             gc = gc < 0 ? 0 : gc > 1 ? 1 : gc; // the corridor
           }
-          W.g[ci] = gc;
+          W.g[k*MAXN+ci] = gc;
         }
       }
       if(T.reproCooldown) W.cd[i]=T.reproCooldown;
@@ -1538,7 +1628,7 @@ function step(){
 }
 
 // the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul)
-const LOCUS_SHIPPED = TRAITS.map(T => T.locus ? { sigma: T.locus.sigma, curve: T.locus.curve } : null);
+const LOCUS_SHIPPED = TRAITS.map(T => T.loci.map(L => ({ sigma: L.sigma, curve: L.curve })));
 function resetWorld(){
   W.initialized = false; W.n = 0; W.freeList.length = 0; W.alive.fill(0);
   W.tick = 0; W.events.length = 0; W.eventLog.length = 0;
@@ -1551,7 +1641,7 @@ function initWorld(seed){
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
   // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
-  TRAITS.forEach((T, sp) => { if (T.locus){ T.locus.sigma = LOCUS_SHIPPED[sp].sigma; T.locus.curve = LOCUS_SHIPPED[sp].curve; } });
+  TRAITS.forEach((T, sp) => T.loci.forEach((L, k) => { L.sigma = LOCUS_SHIPPED[sp][k].sigma; L.curve = LOCUS_SHIPPED[sp][k].curve; }));
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
   det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0); det.adapt.fill(0); det.adaptRun.fill(0);
   det.heatRetreat.fill(0); det.heatPile=false; det.heatPileRun=0; det.heatStarve=false; det.heatStarveRun=0;
@@ -2262,12 +2352,15 @@ function drawMetabolism(g, wpx, hpx){
 // it is the fuel gauge of evolution, and a sweep is visible as the ribbon narrowing while it moves.
 function drawTraits(g, wpx, hpx){
   g.fillStyle = "#0B131E"; g.fillRect(0, 0, wpx, hpx);
-  const loci = SPECIES.LOCI.filter(sp => !TRAITS[sp].apex);
+  const bands = []; // one band per (species, locus): the multi-locus page
+  for (const sp of SPECIES.LOCI){ if (TRAITS[sp].apex) continue;
+    TRAITS[sp].loci.forEach((_, k) => { if (k < 2) bands.push([sp, k]); }); }
   const n = W.recCount;
-  if (!loci.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
-  const bandH = hpx / loci.length;
-  loci.forEach((sp, bi) => {
-    const L = TRAITS[sp].locus, c = SPECIES_META[sp].rgb, col = "rgb("+c[0]+","+c[1]+","+c[2]+")";
+  if (!bands.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
+  const bandH = hpx / bands.length;
+  bands.forEach(([sp, kL], bi) => {
+    const L = TRAITS[sp].loci[kL], c = SPECIES_META[sp].rgb, col = "rgb("+c[0]+","+c[1]+","+c[2]+")";
+    const mCh = (kL ? 75 : 42)+sp, sCh = (kL ? 82 : 49)+sp;
     const top = bi*bandH, padL = 34, padR = 10;
     // vertical budget per band: header 22, ribbon, 24 for the patch marks, histogram, 26 for its labels
     const histH = Math.max(20, Math.round(bandH*0.28)), ribH = Math.max(30, bandH - 22 - 24 - histH - 26);
@@ -2288,24 +2381,24 @@ function drawTraits(g, wpx, hpx){
       const F = { padL, padT: ribT, ch: ribH, cw };
       drawMarkers(g, F, n, W.tick);
       g.beginPath();
-      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1); const y = yOf(at(k,42+sp)+at(k,49+sp)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
-      for (let k=n-1;k>=0;k--){ const x = padL + cw*k/Math.max(1,n-1); g.lineTo(x, yOf(at(k,42+sp)-at(k,49+sp))); }
+      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1); const y = yOf(at(k,mCh)+at(k,sCh)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
+      for (let k=n-1;k>=0;k--){ const x = padL + cw*k/Math.max(1,n-1); g.lineTo(x, yOf(at(k,mCh)-at(k,sCh))); }
       g.closePath(); g.fillStyle = "rgba("+c[0]+","+c[1]+","+c[2]+",0.22)"; g.fill();
       g.strokeStyle = col; g.lineWidth = 1.6; g.beginPath();
-      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1), y = yOf(at(k,42+sp)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
+      for (let k=0;k<n;k++){ const x = padL + cw*k/Math.max(1,n-1), y = yOf(at(k,mCh)); k===0 ? g.moveTo(x,y) : g.lineTo(x,y); }
       g.stroke();
       g.fillStyle = "#5E7386"; g.font = "10px ui-monospace, Menlo, monospace";
       g.fillText("-"+Math.round((n-1)*REC.STRIDE/10)+"s", padL, ribT+ribH+11); g.fillText("now", padL+cw-24, ribT+ribH+11);
-      const last = at(n-1,42+sp), lsd = at(n-1,49+sp);
+      const last = at(n-1,mCh), lsd = at(n-1,sCh);
       let lab = "mean "+last.toFixed(2)+" · spread ±"+lsd.toFixed(2);
-      if (W.sources.length > 1){ const pm = patchMeans(sp); // 7.L: by patch, only when there is more than one sun
+      if (W.sources.length > 1){ const pm = patchMeans(sp, kL); // 7.L: by patch, only when there is more than one sun
         const parts = pm.n.map((k, j) => k >= PATCH_MIN ? pm.mean[j].toFixed(2) : null).filter(Boolean);
         if (parts.length > 1) lab += " · by sun " + parts.join(" | "); }
       g.fillStyle = "#B8C5D1"; g.fillText(lab, padL+cw-g.measureText(lab).width, top+14);
     } else { g.fillStyle="#5E7386"; g.fillText("gathering history…", padL+6, ribT+ribH/2); }
     // histogram of the living population
     const BINS = 24, hist = new Float32Array(BINS); let tot=0;
-    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ hist[Math.min(BINS-1, Math.floor(W.g[i]*BINS))]++; tot++; }
+    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ hist[Math.min(BINS-1, Math.floor(W.g[kL*MAXN+i]*BINS))]++; tot++; }
     let hmax = 1; for (let b=0;b<BINS;b++) hmax = Math.max(hmax, hist[b]);
     const bw = cw/BINS;
     for (let b=0;b<BINS;b++){
@@ -2316,7 +2409,7 @@ function drawTraits(g, wpx, hpx){
     g.strokeStyle = "rgba(201,215,227,0.35)"; g.setLineDash([3,4]);
     g.beginPath(); g.moveTo(padL + cw*L.g0, histT); g.lineTo(padL + cw*L.g0, histT+histH); g.stroke(); g.setLineDash([]);
     if (W.sources.length > 1){ // 7.L: one small sun mark per patch at that patch's mean -- the split, if any, read off the bars
-      const pm = patchMeans(sp); g.font = "9px ui-monospace, Menlo, monospace"; g.fillStyle = "#B8C5D1";
+      const pm = patchMeans(sp, kL); g.font = "9px ui-monospace, Menlo, monospace"; g.fillStyle = "#B8C5D1";
       pm.n.forEach((k, j) => { if (k < PATCH_MIN) return; const x = padL + cw*Math.max(0, Math.min(1, pm.mean[j]));
         g.fillRect(x-0.5, histT-6, 1, 6); g.fillText("☀"+(j+1), x-6, histT-8); }); }
     g.fillStyle = "#5E7386"; g.font = "10px ui-monospace, Menlo, monospace";
@@ -2329,11 +2422,13 @@ function TraitsLegend(){
   const n = W.recCount; if (n < 1) return null;
   const r = ((W.recHead-1+REC.N)%REC.N)*REC.CH;
   const rows = [];
-  for (const sp of SPECIES.LOCI){ const L = TRAITS[sp].locus; if (TRAITS[sp].apex) continue;
-    const c = SPECIES_META[sp].rgb, mean = W.rec[r+42+sp], sd = W.rec[r+49+sp];
-    let hi=0, tot=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ tot++; if (W.g[i] > L.g0+0.05) hi++; }
-    rows.push(<span key={sp} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
-      ● {SPECIES_META[sp].name} {L.label.toLowerCase()} {mean.toFixed(2)} ±{sd.toFixed(2)} · {L.hiWord} {tot ? Math.round(100*hi/tot) : 0}%</span>);
+  for (const sp of SPECIES.LOCI){ if (TRAITS[sp].apex) continue;
+    TRAITS[sp].loci.forEach((L, kL) => { if (kL >= 2) return;
+      const c = SPECIES_META[sp].rgb, mean = W.rec[r+(kL?75:42)+sp], sd = W.rec[r+(kL?82:49)+sp];
+      let hi=0, tot=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ tot++; if (W.g[kL*MAXN+i] > L.g0+0.05) hi++; }
+      rows.push(<span key={sp+"·"+kL} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
+        ● {SPECIES_META[sp].name} {L.label.toLowerCase()} {mean.toFixed(2)} ±{sd.toFixed(2)} · {L.hiWord} {tot ? Math.round(100*hi/tot) : 0}%</span>);
+    });
   }
   return <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
     {rows}<span style={{ color:"#5E7386", marginLeft:"auto" }}>{P.mutation ? "mutation on" : "mutation off"}</span></div>;
@@ -2607,18 +2702,22 @@ export default function Microcosm(){
       }
       // ancestry line (5.3): lineage generation, and the locus expressed as % change vs the founder
       let heredity = null;
-      if (T.locus){
-        const L = T.locus, g = W.g[i];
-        const parts = [];
-        if (L.escSlope && T.escape) parts.push([L.hiTrait, Math.round(100 * L.escSlope*(g - L.g0) / T.escape.p)]);
-        if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
-        if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
-        if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
-        if (L.rateSlope) parts.push([L.hiTrait, Math.round(100 * L.rateSlope*(g - L.g0))]);
-        if (L.effSlope) parts.push([L.loTrait, Math.round(-100 * L.effSlope*(g - L.g0))]);
-        if (L.lightSlope){ parts.push([L.hiTrait, Math.round(100 * L.lightSlope*(g - L.g0))]);
-                           parts.push([L.loTrait, Math.round(-100 * L.lightSlope*(g - L.g0))]); }
-        heredity = { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
+      if (T.loci.length){
+        heredity = T.loci.map((L, kk) => {
+          const g = W.g[kk*MAXN+i];
+          const parts = [];
+          if (L.escSlope && T.escape) parts.push([L.hiTrait, Math.round(100 * L.escSlope*(g - L.g0) / T.escape.p)]);
+          if (L.catchSlope) parts.push([L.hiTrait, Math.round(100 * L.catchSlope*(g - L.g0))]);
+          if (L.kpSlope) parts.push([L.loTrait, Math.round(100 * L.kpSlope*(L.g0 - g))]);
+          if (L.kbSlope) parts.push([L.loTrait, Math.round(-100 * L.kbSlope*(g - L.g0))]);
+          if (L.rateSlope) parts.push([L.hiTrait, Math.round(100 * L.rateSlope*(g - L.g0))]);
+          if (L.effSlope) parts.push([L.loTrait, Math.round(-100 * L.effSlope*(g - L.g0))]);
+          if (L.lightSlope){ parts.push([L.hiTrait, Math.round(100 * L.lightSlope*(g - L.g0))]);
+                             parts.push([L.loTrait, Math.round(-100 * L.lightSlope*(g - L.g0))]); }
+          if (L.warmSlope) parts.push([L.hiTrait, Math.round(100 * L.warmSlope*(g - L.g0))]);
+          if (L.warmGainSlope) parts.push([L.loTrait, Math.round(-100 * L.warmGainSlope*(g - L.g0))]);
+          return { label: L.label, g, g0: L.g0, hiWord: L.hiWord, loWord: L.loWord, parts };
+        });
       }
       return { name: spc.name, role: spc.role, rgb: spc.rgb, id: `${i}·${W.gen[i]}`,
         age: Math.floor((W.tick - W.birth[i]) / 10), state: stateOf(i),
@@ -3298,8 +3397,8 @@ export default function Microcosm(){
 // Phase 6.0 — evolution settings. Every control is an intervention: it goes through the event
 // queue (logged, undoable, replay-safe) and never writes P or TRAITS directly. Amber = the hand.
 function EvolutionPanel({ desktop, mono, onLog }){
-  const loci = []; for (let sp=0; sp<7; sp++) if (TRAITS[sp].locus) loci.push(sp);
-  const read = () => ({ mutation: P.mutation, rows: loci.map(sp => ({ sp, sigma: TRAITS[sp].locus.sigma, curve: TRAITS[sp].locus.curve })) });
+  const loci = []; for (let sp=0; sp<7; sp++) TRAITS[sp].loci.forEach((_, k) => loci.push({ sp, k })); // one row per (species, locus)
+  const read = () => ({ mutation: P.mutation, rows: loci.map(({ sp, k }) => ({ sp, k, sigma: TRAITS[sp].loci[k].sigma, curve: TRAITS[sp].loci[k].curve })) });
   const [evo, setEvo] = React.useState(read);
   const [open, setOpen] = React.useState(desktop);
   const [advanced, setAdvanced] = React.useState(false);
@@ -3313,13 +3412,13 @@ function EvolutionPanel({ desktop, mono, onLog }){
     wild:    { label:"Wild",    mutation:true,  set:(sp,L)=>({ curve:-0.2, sigma:Math.min(0.12, L.sigma0*2) }) },
     frozen:  { label:"Frozen",  mutation:false, set:()=>({}) },
   };
-  const shipped = React.useRef(loci.map(sp => ({ sp, sigma0: TRAITS[sp].locus.sigma }))); // captured on first mount
+  const shipped = React.useRef(loci.map(({ sp, k }) => ({ sp, k, sigma0: TRAITS[sp].loci[k].sigma }))); // captured on first mount
   const applyPreset = name => {
     const pr = PRESETS[name]; const prevs = [];
     if (P.mutation !== pr.mutation){ prevs.push({ type:"mutation", v:P.mutation }); queueEvent({ type:"mutation", v:pr.mutation }); }
-    for (const sp of loci){ const L = TRAITS[sp].locus, s0 = shipped.current.find(x => x.sp===sp).sigma0;
+    for (const { sp, k } of loci){ const L = TRAITS[sp].loci[k], s0 = shipped.current.find(x => x.sp===sp && x.k===k).sigma0;
       const vals = pr.set(sp, { ...L, sigma0:s0 });
-      for (const key in vals){ if (Math.abs(L[key]-vals[key]) < 1e-9) continue; prevs.push({ type:"locus", sp, key, v:L[key] }); queueEvent({ type:"locus", sp, key, v:vals[key] }); } }
+      for (const key in vals){ if (Math.abs(L[key]-vals[key]) < 1e-9) continue; prevs.push({ type:"locus", sp, locus:k, key, v:L[key] }); queueEvent({ type:"locus", sp, locus:k, key, v:vals[key] }); } }
     if (prevs.length) onLog("preset", "Preset: " + pr.label, () => prevs.forEach(e => queueEvent(e)));
     setTimeout(() => setEvo(read), 150);
   };
@@ -3327,16 +3426,16 @@ function EvolutionPanel({ desktop, mono, onLog }){
   const logTimer = React.useRef({});
   React.useEffect(() => { const iv = setInterval(() => setEvo(read), 1000); return () => clearInterval(iv); }, []);
   const amber = "#F2B24A";
-  const commit = (sp, key, v, label) => {
-    const k = sp + key;
-    if (dragStart.current[k] === undefined) dragStart.current[k] = TRAITS[sp].locus[key];
-    queueEvent({ type:"locus", sp, key, v });
-    setEvo(e => ({ ...e, rows: e.rows.map(r => r.sp === sp ? { ...r, [key]: v } : r) }));
+  const commit = (sp, kL, key, v, label) => {
+    const k = sp + ":" + kL + ":" + key;
+    if (dragStart.current[k] === undefined) dragStart.current[k] = TRAITS[sp].loci[kL][key];
+    queueEvent({ type:"locus", sp, locus:kL, key, v });
+    setEvo(e => ({ ...e, rows: e.rows.map(r => r.sp === sp && r.k === kL ? { ...r, [key]: v } : r) }));
     clearTimeout(logTimer.current[k]);
     logTimer.current[k] = setTimeout(() => {
       const prev = dragStart.current[k]; dragStart.current[k] = undefined;
       if (prev !== undefined && Math.abs(prev - v) > 1e-9)
-        onLog("evolution", label, () => queueEvent({ type:"locus", sp, key, v: prev }));
+        onLog("evolution", label, () => queueEvent({ type:"locus", sp, locus:kL, key, v: prev }));
     }, 700);
   };
   const toggleMutation = () => {
@@ -3344,9 +3443,9 @@ function EvolutionPanel({ desktop, mono, onLog }){
     queueEvent({ type:"mutation", v }); setEvo(e => ({ ...e, mutation: v }));
     onLog("mutation", v ? "Mutation on" : "Mutation off", () => queueEvent({ type:"mutation", v: prev }));
   };
-  const slider = (sp, key, min, max, step, label) => { const row = evo.rows.find(r => r.sp === sp); return (
+  const slider = (sp, kL, key, min, max, step, label) => { const row = evo.rows.find(r => r.sp === sp && r.k === kL); return (
     <input type="range" min={min} max={max} step={step} value={row ? row[key] : 0}
-      onChange={e => commit(sp, key, +e.target.value, label)}
+      onChange={e => commit(sp, kL, key, +e.target.value, label)}
       title={label} style={{ width: desktop ? 110 : 84, accentColor: amber }} /> ); };
   return (
     <div style={{ position:"absolute", top: 126, left:"50%", transform:"translateX(-50%)", zIndex:5,
@@ -3367,11 +3466,11 @@ function EvolutionPanel({ desktop, mono, onLog }){
           <span style={{ color:"#5E7386", fontSize:9 }}></span>
           <span style={{ color:"#5E7386", fontSize:9 }}>mutation rate</span>
           <span style={{ color:"#5E7386", fontSize:9 }}>trade-off curve</span>
-          {evo.rows.map(r => { const c = SPECIES_META[r.sp].rgb; return (
-            <React.Fragment key={r.sp}>
-              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})` }}>{SPECIES_META[r.sp].name} <span style={{ color:"#5E7386" }}>{TRAITS[r.sp].locus.label.toLowerCase()}</span></span>
-              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, "sigma", 0, 0.12, 0.005, "Mutation rate · " + SPECIES_META[r.sp].name)}<span style={{ width:34, color:amber }}>{r.sigma.toFixed(3)}</span></span>
-              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, "curve", -0.5, 0.8, 0.05, "Trade-off curvature · " + SPECIES_META[r.sp].name)}<span style={{ width:34, color:amber }}>{r.curve >= 0 ? "+" : ""}{r.curve.toFixed(2)}</span></span>
+          {evo.rows.map(r => { const c = SPECIES_META[r.sp].rgb, lab = TRAITS[r.sp].loci[r.k].label; return (
+            <React.Fragment key={r.sp+"·"+r.k}>
+              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})` }}>{SPECIES_META[r.sp].name} <span style={{ color:"#5E7386" }}>{lab.toLowerCase()}</span></span>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, r.k, "sigma", 0, 0.12, 0.005, "Mutation rate · " + SPECIES_META[r.sp].name + " " + lab)}<span style={{ width:34, color:amber }}>{r.sigma.toFixed(3)}</span></span>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:5 }}>{slider(r.sp, r.k, "curve", -0.5, 0.8, 0.05, "Trade-off curvature · " + SPECIES_META[r.sp].name + " " + lab)}<span style={{ width:34, color:amber }}>{r.curve >= 0 ? "+" : ""}{r.curve.toFixed(2)}</span></span>
             </React.Fragment> ); })}
           <span style={{ gridColumn:"1 / -1", color:"rgba(242,178,74,0.7)", fontSize:9, marginTop:2 }}>
             curve &lt; 0 sweeps and splits · 0 as shipped · &gt; 0 settles to the middle</span>
@@ -3385,15 +3484,15 @@ function EvolutionPanel({ desktop, mono, onLog }){
               style={{ marginLeft:"auto", padding:"2px 8px", borderRadius:8, cursor:"pointer", font:"inherit", fontSize:10,
                 border:"1px solid rgba(94,115,134,0.4)", background:"transparent", color:"#8FA3B5" }}>{advanced ? "hide prices" : "prices…"}</button>
           </span>
-          {advanced && evo.rows.map(r => { const L = TRAITS[r.sp].locus, c = SPECIES_META[r.sp].rgb;
-            const keys = PRICE_KEYS.filter(k => L[k]); return (
-            <React.Fragment key={"p"+r.sp}>
-              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})`, fontSize:10, alignSelf:"start", paddingTop:3 }}>{SPECIES_META[r.sp].name} prices</span>
+          {advanced && evo.rows.map(r => { const L = TRAITS[r.sp].loci[r.k], c = SPECIES_META[r.sp].rgb;
+            const keys = PRICE_KEYS.filter(k => L[k]); if (!keys.length) return null; return (
+            <React.Fragment key={"p"+r.sp+"·"+r.k}>
+              <span style={{ color:`rgb(${c[0]},${c[1]},${c[2]})`, fontSize:10, alignSelf:"start", paddingTop:3 }}>{SPECIES_META[r.sp].name} {L.label.toLowerCase()} prices</span>
               <span style={{ gridColumn:"2 / -1", display:"grid", gridTemplateColumns:"auto auto auto", gap:"2px 8px", alignItems:"center" }}>
-                {keys.map(k => { const bal = BALANCE[r.sp] && BALANCE[r.sp][k]; return (
+                {keys.map(k => { const bal = r.k === 0 && BALANCE[r.sp] && BALANCE[r.sp][k]; return (
                   <React.Fragment key={k}>
-                    <span style={{ color:"#5E7386", fontSize:9 }}>{k.replace("Slope","")}{bal !== undefined ? <span style={{ color:"rgba(242,178,74,0.6)" }}> · balance {bal}</span> : ""}</span>
-                    <input type="range" min={0} max={1} step={0.05} value={L[k]} onChange={e => commit(r.sp, k, +e.target.value, "Price · " + SPECIES_META[r.sp].name + " " + k.replace("Slope",""))}
+                    <span style={{ color:"#5E7386", fontSize:9 }}>{k.replace("Slope","")}{bal ? <span style={{ color:"rgba(242,178,74,0.6)" }}> · balance {bal}</span> : ""}</span>
+                    <input type="range" min={0} max={1} step={0.05} value={L[k]} onChange={e => commit(r.sp, r.k, k, +e.target.value, "Price · " + SPECIES_META[r.sp].name + " " + k.replace("Slope",""))}
                       style={{ width: desktop ? 110 : 84, accentColor: amber }} />
                     <span style={{ width:30, color:amber, fontSize:10 }}>{L[k].toFixed(2)}</span>
                   </React.Fragment> ); })}
@@ -3464,27 +3563,27 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
           )}
         </div>
       )}
-      {detail >= 1 && card.heredity && (
-        <div style={{ marginTop:14, fontSize:12, lineHeight:1.5 }}>
-          <div style={{ fontSize:11, color:COL.silt }}>{card.heredity.label.toUpperCase()} · heritable</div>
+      {detail >= 1 && card.heredity && card.heredity.map((h, hk) => (
+        <div key={hk} style={{ marginTop:14, fontSize:12, lineHeight:1.5 }}>
+          <div style={{ fontSize:11, color:COL.silt }}>{h.label.toUpperCase()} · heritable</div>
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:4 }}>
-            <span style={{ fontFamily:mono, fontSize:12 }}>{card.heredity.g.toFixed(2)}</span>
+            <span style={{ fontFamily:mono, fontSize:12 }}>{h.g.toFixed(2)}</span>
             <div style={{ flex:1, height:4, borderRadius:2, background:"rgba(11,19,30,0.8)", position:"relative" }}>
-              <div style={{ position:"absolute", left:`${card.heredity.g0*100}%`, top:-3, width:1, height:10, background:"rgba(201,215,227,0.45)" }} />
-              <div style={{ position:"absolute", left:`calc(${card.heredity.g*100}% - 3px)`, top:-1, width:6, height:6, borderRadius:3,
+              <div style={{ position:"absolute", left:`${h.g0*100}%`, top:-3, width:1, height:10, background:"rgba(201,215,227,0.45)" }} />
+              <div style={{ position:"absolute", left:`calc(${h.g*100}% - 3px)`, top:-1, width:6, height:6, borderRadius:3,
                 background:`rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})` }} />
             </div>
           </div>
           <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:COL.silt, marginTop:2 }}>
-            <span>{card.heredity.loWord}</span><span>{card.heredity.hiWord}</span>
+            <span>{h.loWord}</span><span>{h.hiWord}</span>
           </div>
           <div style={{ marginTop:4, color:COL.silt }}>
-            vs founder: {card.heredity.parts.map(([nm, pct], k) => (
-              <span key={nm}>{k ? " · " : ""}<span style={{ color: pct === 0 ? COL.silt : pct > 0 ? "rgb(140,230,170)" : "rgb(226,170,150)" }}>
+            vs founder: {h.parts.map(([nm, pct], k) => (
+              <span key={nm+k}>{k ? " · " : ""}<span style={{ color: pct === 0 ? COL.silt : pct > 0 ? "rgb(140,230,170)" : "rgb(226,170,150)" }}>
                 {pct > 0 ? "+" : ""}{pct}%</span> {nm}</span>))}
           </div>
         </div>
-      )}
+      ))}
       {detail >= 1 && (
         <div style={{ display:"flex", gap:10, marginTop:18 }}>
           <button className="mc-hit mc-hit-amber" onClick={onFeed}

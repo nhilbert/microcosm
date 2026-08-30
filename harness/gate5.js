@@ -16,7 +16,8 @@
 //                          (written by `node harness/yoshida.js --capture`) on this build, bit-exactly
 const fs = require("fs"), path = require("path");
 const L = require("./lib.js"); const { C, W, REC, TRAITS, SPECIES, SEEDS, HORIZON } = L;
-const SP = SPECIES.PREY, LOC = TRAITS[SP].locus; // the gate watches the Yoshida prey's locus
+const SP = SPECIES.PREY, LOC = TRAITS[SP].locus; // the gate watches the Yoshida prey's DISPLAY locus (plane 0; multi-locus events carry e.locus)
+const p0 = e => !(e.locus > 0); // display-locus events only
 const chan = (back, ch) => W.rec[((W.recHead-back+REC.N)%REC.N)*REC.CH + ch];
 const HERED = e => e.type==="sweep" || e.type==="uniform" || e.type==="diverse";
 
@@ -27,13 +28,13 @@ function run(seed, mutation){
     C.step();
     if (t === 2000) sd2k = chan(1, 49+SP);
     if (sweepTick < 0){
-      const ev = W.sysEvents.find(e => e.type === "sweep" && e.sp === SP);
+      const ev = W.sysEvents.find(e => e.type === "sweep" && e.sp === SP && p0(e));
       if (ev){ sweepTick = ev.tick; sweepMeanAtFire = chan(1, 42+SP);
         let hi=0,lo=0,n=0; for (let i=0;i<W.n;i++) if (W.alive[i]&&W.sp[i]===SP){ n++; if (W.g[i]>LOC.g0+0.05) hi++; else if (W.g[i]<LOC.g0-0.05) lo++; }
         sweepShareAtFire = Math.max(hi,lo)/Math.max(1,n); }
     }
   }
-  const diverseTick = (W.sysEvents.find(e => e.type==="diverse" && e.sp===SP) || { tick:-1 }).tick;
+  const diverseTick = (W.sysEvents.find(e => e.type==="diverse" && e.sp===SP && p0(e)) || { tick:-1 }).tick;
   return { sweepTick, diverseTick, sweepMeanAtFire, sweepShareAtFire, sd2k, sd18k: chan(1, 49+SP), mean18k: chan(1, 42+SP), hered: W.sysEvents.filter(HERED) };
 }
 

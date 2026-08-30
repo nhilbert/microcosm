@@ -13,12 +13,15 @@ const LOCI = SPECIES.LOCI;
 function pops(){ const p=[0,0,0,0,0,0,0]; for (let i=0;i<W.n;i++) if (W.alive[i]) p[W.sp[i]]++; return p; }
 function auditM(){ let t=0; for (let c=0;c<P.GRID*P.GRID;c++) t+=W.M[c]+W.dM[c];
   for (let i=0;i<W.n;i++) if (W.alive[i]) t+=W.mn[i]; for (let k=0;k<W.cN;k++) if (W.cAlive[k]) t+=W.cM[k]; return t; }
-function locusStats(sp){ // mean, sd and rail shares of the locus among the living of one species
-  let n=0,m=0,m2=0,lo=0,hi=0; for (let i=0;i<W.n;i++){ if (!W.alive[i]||W.sp[i]!==sp) continue; const g=W.g[i]; n++; m+=g; m2+=g*g; if (g<0.02) lo++; if (g>0.98) hi++; }
+function locusStats(sp, plane){ // mean, sd and rail shares of one locus (default: the display locus) among the living of one species
+  const off = (plane||0)*C.MAXN;
+  let n=0,m=0,m2=0,lo=0,hi=0; for (let i=0;i<W.n;i++){ if (!W.alive[i]||W.sp[i]!==sp) continue; const g=W.g[off+i]; n++; m+=g; m2+=g*g; if (g<0.02) lo++; if (g>0.98) hi++; }
   const mean = n? m/n : 0; return { n, mean, sd: n? Math.sqrt(Math.max(0, m2/n-mean*mean)) : 0, railLo: n? lo/n : 0, railHi: n? hi/n : 0 }; }
 const fmtG = s => s.mean.toFixed(2)+"±"+s.sd.toFixed(2);
 function start(seed, mutation){ P.mutation = mutation; C.resetWorld(); C.initWorld(seed); }
-function pin(corner){ for (const [sp,g] of corner) for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp) W.g[i]=g; }
+function pin(corner){ // entries [sp, g] pin the display locus; [sp, g, plane] pins that plane
+  for (const [sp,g,plane] of corner){ const off = (plane||0)*C.MAXN;
+    for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp) W.g[off+i]=g; } }
 // the amended ecosystem criterion: the four core species persist; the apex is reported, not required
 function coreCollapsed(p, t){ // a core species gone; the grazer only counts after its founding transient
   return SPECIES.CORE.some(sp => p[sp]===0 && (sp !== SPECIES.GRAZER || t > 950)); }

@@ -4,6 +4,8 @@
 //   node harness/heat.js --heater [--a 10] [--at 3000]  a dark heater at the far corner (seeded, like Block L)
 //   node harness/heat.js --press [--amb 6]              global warming: P.tempAmb raised at --at (the deferred lever, as an experiment)
 //   node harness/heat.js --loci  [--a 10]               H-P5: the existing loci under a heated patch (per-patch locus means, heater layout)
+//   node harness/heat.js --thermal [--ws x] [--wgs y]   H.5: the thermal locus (plane 1, Drifta + Bacillus) — drift control (no warmth),
+//                                                       hot sun +8, heater +10; --ws/--wgs override warmSlope/warmGainSlope (price surface)
 //   node harness/heat.js --gate                         7.H.4 gate: heat narrated unprompted, untouched control silent
 //   --nothermo                                          H-P6 control: species blind to warmth (thermotaxis off), metabolism unchanged
 //
@@ -114,6 +116,51 @@ if (flag("--loci")){ // H-P5: the existing loci under a heated patch, measured w
   }
   for (const sp of LOCI) console.log(`${TRAITS[sp].name}: patch spread >= 0.10 on ${spreads[sp].filter(v=>v>=0.10).length}/8 seeds (both patches held; ${8-spreads[sp].length} seed(s) without a measurable warm-patch population)`);
 }
+if (flag("--thermal")){
+  // H.5 measurement: what the thermal locus does in an unwarmed world (drift, must stay unnarrated),
+  // under the hot sun (the thermal-trap layout: core lost 8/8 on the pre-H.5 build), and at a heater
+  // patch (H-P5 territory: Bacillus's budget excluded it from the warm patch before selection could act).
+  const TH = [SPECIES.PREY, 3].filter(sp => TRAITS[sp].loci.length > 1);
+  if (!TH.length){ console.log("no species carries a thermal locus"); process.exit(1); }
+  const ws = num("--ws", NaN), wgs = num("--wgs", NaN);
+  for (const sp of TH){ const Lc = TRAITS[sp].loci[1];
+    if (!isNaN(ws)) Lc.warmSlope = ws; if (!isNaN(wgs)) Lc.warmGainSlope = wgs; }
+  console.log(`thermal locus prices: ${TH.map(sp => TRAITS[sp].name+" warmSlope "+TRAITS[sp].loci[1].warmSlope+" warmGainSlope "+TRAITS[sp].loci[1].warmGainSlope).join(" · ")}`);
+  const thermalRun = (seed, setup) => {
+    TRAITS.forEach((T, sp) => { T.thermo = THERMO0[sp]; });
+    P.tempAmb = 0; L.start(seed, true);
+    let apexLost=-1, coreLost=-1;
+    for (let t=1;t<=HORIZON;t++){ if (t === AT) setup(); C.step();
+      const p = L.pops();
+      if (apexLost < 0 && t > AT && p[SPECIES.APEX] === 0) apexLost = t;
+      if (coreLost < 0 && L.coreCollapsed(p, t)) coreLost = t; }
+    const out = { seed, apexLost, coreLost, stats: {}, coreMean: {}, ev: [] };
+    for (const sp of TH){
+      out.stats[sp] = L.locusStats(sp, 1);
+      let n=0, m=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp && W.temp[cellOf(i)] > 3){ n++; m+=W.g[C.MAXN+i]; }
+      out.coreMean[sp] = n >= 20 ? m/n : NaN;
+    }
+    out.ev = W.sysEvents.filter(e => e.locus === 1).map(e => e.type+":"+TRAITS[e.sp].name.slice(0,3)+"@"+e.tick);
+    return out;
+  };
+  const thermalReport = (title, setup) => {
+    console.log(`\n=== ${title} (evolving, 8 seeds, horizon ${HORIZON}) ===`);
+    console.log("seed | core  | apex   | " + TH.map(sp => TRAITS[sp].name.slice(0,3)+" mean±sd (rails lo/hi) core-mean").join(" | ") + " | thermal-locus events");
+    const rows = [];
+    for (const s of SEEDS){ const r = thermalRun(s, setup); rows.push(r);
+      const cols = TH.map(sp => { const st = r.stats[sp];
+        return `${f(st.mean)}±${f(st.sd)} (${Math.round(100*st.railLo)}/${Math.round(100*st.railHi)}%) ${f(r.coreMean[sp])}`; }).join(" | ");
+      console.log(`${s}   | ${r.coreLost>0 ? "LOST@"+r.coreLost : "ok   "} | ${r.apexLost>0 ? String(r.apexLost).padStart(5) : " held"}  | ${cols} | ${r.ev.join(" ")||"-"}`); }
+    for (const sp of TH){
+      const ms = rows.map(r => r.stats[sp].mean).filter(v => !isNaN(v));
+      console.log(`${TRAITS[sp].name}: mean g over seeds ${f(Math.min(...ms))}–${f(Math.max(...ms))} · sd ${f(Math.min(...rows.map(r=>r.stats[sp].sd)))}–${f(Math.max(...rows.map(r=>r.stats[sp].sd)))}`); }
+    console.log(`core lost ${rows.filter(r=>r.coreLost>0).length}/8 · apex lost ${rows.filter(r=>r.apexLost>0).length}/8`);
+    return rows;
+  };
+  thermalReport("drift control: no warmth anywhere (certified world)", () => {});
+  thermalReport("hot sun: warmth +8 on the shipped sun", () => C.applyEvent({ type:"sourceSet", k:0, a:8 }));
+  thermalReport("heater +10 at a seeded far sun", () => { C.applyEvent({ type:"sourceAdd", x:0, y:0, i:1, a:10, sigma:130 }); seedKit(0,0); });
+}
 if (flag("--gate")){
   // 7.H.4 gate (phase7-heat-plan.md §12): the Observatory narrates the warm water unprompted.
   //   1. hot sun (+8 on the shipped sun at t=3000): detritus pile-up (heatPile) narrated on >= 6/8 seeds, and
@@ -159,4 +206,4 @@ if (flag("--gate")){
   console.log(`3. control silent, channels exactly 0: ${c3 ? "PASS" : "FAIL"}`);
   if (!(c1r>=2 && c1p>=6 && starved.length>=6 && lead.length===starved.length && c3)) process.exit(1);
 }
-if (!flag("--spot") && !flag("--heater") && !flag("--press") && !flag("--loci") && !flag("--gate")) console.log("usage: node harness/heat.js --spot [--a 8] | --heater [--a 10] | --press [--amb 6] | --loci [--a 10] | --gate  [--at 3000]");
+if (!flag("--spot") && !flag("--heater") && !flag("--press") && !flag("--loci") && !flag("--thermal") && !flag("--gate")) console.log("usage: node harness/heat.js --spot [--a 8] | --heater [--a 10] | --press [--amb 6] | --loci [--a 10] | --thermal [--ws x --wgs y] | --gate  [--at 3000]");
