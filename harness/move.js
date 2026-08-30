@@ -22,22 +22,32 @@ const MB = SPECIES.MOBILE;
 const f = (v, d=2) => (v===undefined || Number.isNaN(v)) ? "  -  " : v.toFixed(d);
 const med = xs => { const a = xs.filter(v => !Number.isNaN(v)).sort((x,y)=>x-y); return a.length ? a[Math.floor(a.length/2)] : NaN; };
 
-// tracked cohort for MSD: up to `per` organisms per mobile species, adopted at t=AT, followed while the
-// slot stays alive with an unchanged birth tick (slot reuse ends the track, it never corrupts it)
-function adoptCohort(per){
-  const tracks = [];
-  for (const sp of MB){ let k=0;
-    for (let i=0;i<W.n && k<per;i++) if (W.alive[i] && W.sp[i]===sp && !W.cy[i]){ tracks.push({ sp, i, birth: W.birth[i], xs:[W.x[i]], ys:[W.y[i]], done:false }); k++; } }
-  return tracks;
+// tracked cohort for MSD: up to `per` live organisms per mobile species at a time, followed while the
+// slot stays alive with an unchanged birth tick (slot reuse ends the track, it never corrupts it).
+// Rolling adoption: a dead track's seat is refilled at the next sample, because a fixed t=AT cohort
+// starves the fast-turnover species -- Drifta lives a few hundred ticks, far short of a long window.
+// Finished segments of >= 60 samples (1,200 ticks) are kept; alpha is fit over lags 1-25.
+const SEG_MIN = 60, LAG_MAX = 25;
+function makeCohort(per){ return { per, active: [], segs: [] }; }
+function sampleCohort(co){
+  const alive = new Map();
+  for (const t of co.active){
+    if (!W.alive[t.i] || W.birth[t.i] !== t.birth || W.sp[t.i] !== t.sp){
+      if (t.xs.length >= SEG_MIN) co.segs.push(t);
+      t.done = true; continue; }
+    t.xs.push(W.x[t.i]); t.ys.push(W.y[t.i]);
+    alive.set(t.sp, (alive.get(t.sp)||0)+1);
+  }
+  co.active = co.active.filter(t => !t.done);
+  const tracked = new Set(co.active.map(t => t.sp+":"+t.i));
+  for (const sp of MB){ let need = co.per - (alive.get(sp)||0);
+    for (let i=0;i<W.n && need>0;i++)
+      if (W.alive[i] && W.sp[i]===sp && !W.cy[i] && !tracked.has(sp+":"+i)){
+        co.active.push({ sp, i, birth: W.birth[i], xs:[W.x[i]], ys:[W.y[i]], done:false }); need--; } }
 }
-function sampleCohort(tracks){
-  for (const t of tracks){ if (t.done) continue;
-    if (!W.alive[t.i] || W.birth[t.i] !== t.birth){ t.done = true; continue; }
-    t.xs.push(W.x[t.i]); t.ys.push(W.y[t.i]); }
-}
-function cohortAlpha(tracks, sp){
-  const as = tracks.filter(t => t.sp===sp && t.xs.length >= 150)
-    .map(t => L.msdAlpha(L.msd(L.unwrapTrack(t.xs), L.unwrapTrack(t.ys), 60)));
+function cohortAlpha(co, sp){
+  const all = co.segs.concat(co.active.filter(t => t.xs.length >= SEG_MIN));
+  const as = all.filter(t => t.sp===sp).map(t => L.msdAlpha(L.msd(L.unwrapTrack(t.xs), L.unwrapTrack(t.ys), LAG_MAX)));
   return { n: as.length, alpha: med(as) };
 }
 
@@ -51,7 +61,7 @@ if (flag("--metrics")){
     let tracks = null, warmPeak = 0;
     for (let t=1;t<=HORIZON;t++){
       C.step();
-      if (t === AT) tracks = adoptCohort(30);
+      if (t === AT) tracks = makeCohort(30);
       if (t % REC.STRIDE === 0){
         if (tracks) sampleCohort(tracks);
         if (t > AT) for (let m=0;m<MB.length;m++){
