@@ -2522,6 +2522,8 @@ function DataMode({ docked }){
     if (Math.abs(dx) > 64 && performance.now() - s.t < 600)
       setPage(p => Math.max(0, Math.min(4, p + (dx < 0 ? 1 : -1))));
   };
+  const traitBands = Math.max(1, SPECIES.LOCI.filter(sp => !TRAITS[sp].apex)
+    .reduce((a, sp) => a + Math.min(2, TRAITS[sp].loci.length), 0));
   const n = W.recCount;
   const k = (scrub !== null && n>0) ? Math.min(scrub, n-1) : (n>0 ? n-1 : 0);
   const at2 = sp => n>0 ? Math.round(W.rec[((W.recHead-n+k+REC.N)%REC.N)*REC.CH + sp]) : 0;
@@ -2546,11 +2548,20 @@ function DataMode({ docked }){
               color:"#B8C5D1", fontFamily:"inherit" }}>{logScale ? "log" : "lin"}</button>
         )}
       </div>
-      {page === 3 ? <HealthPage /> : page === 4 ? <EventsPage /> : (
+      {page === 3 ? <HealthPage /> : page === 4 ? <EventsPage /> : page === 5 ? (
+        // Traits: one band per (species, locus) — six since multi-locus. A fixed-height canvas would
+        // squeeze the bands into each other (each needs ~130px), so the canvas takes the room it needs
+        // and the pane scrolls.
+        <div className="mc-scroll" style={{ flex:1, minHeight:0, overflowY:"auto" }}>
+          <canvas ref={cRef} onPointerDown={e => { e.stopPropagation(); swDown(e); }}
+            onPointerUp={swUp}
+            style={{ width:"100%", height:"100%", minHeight: traitBands*132, display:"block", touchAction:"pan-y" }} />
+        </div>
+      ) : (
         <canvas ref={cRef} onPointerDown={e => { e.stopPropagation(); swDown(e); onScrub(e); }}
           onPointerMove={e => e.buttons && onScrub(e)}
           onPointerUp={e => { swUp(e); setScrub(null); }}
-          style={{ width:"100%", height: page===5 ? (docked ? "62%" : "58%") : docked ? "38%" : "46%", minHeight:170,
+          style={{ width:"100%", height: docked ? "38%" : "46%", minHeight:170,
             touchAction:"none", cursor: page===0 ? "col-resize" : "default" }} />
       )}
       {page === 0 && (
@@ -3450,8 +3461,10 @@ function EvolutionPanel({ desktop, mono, onLog }){
   return (
     <div style={{ position:"absolute", top: 126, left:"50%", transform:"translateX(-50%)", zIndex:5,
       padding:"6px 12px 8px", borderRadius:12, background:"rgba(11,19,30,0.78)", border:"1px solid rgba(242,178,74,0.35)",
-      color:"#C9D7E3", fontSize:11, fontFamily:mono, maxWidth:"calc(100vw - 24px)" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+      color:"#C9D7E3", fontSize:11, fontFamily:mono, maxWidth:"calc(100vw - 24px)",
+      // six locus rows since multi-locus: the panel must never outgrow the screen — header stays, rows scroll
+      maxHeight:"calc(100vh - 190px)", display:"flex", flexDirection:"column" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
         <button className="mc-hit" onClick={() => setOpen(o => !o)}
           style={{ background:"transparent", border:"none", color:amber, cursor:"pointer", font:"inherit", padding:0 }}>
           {open ? "▾" : "▸"} Evolution</button>
@@ -3462,7 +3475,8 @@ function EvolutionPanel({ desktop, mono, onLog }){
           mutation {evo.mutation ? "on" : "off"}</button>
       </div>
       {open && (
-        <div style={{ display:"grid", gridTemplateColumns:"auto auto auto", gap:"4px 10px", alignItems:"center", marginTop:6 }}>
+        <div className="mc-scroll" style={{ display:"grid", gridTemplateColumns:"auto auto auto", gap:"4px 10px", alignItems:"center", marginTop:6,
+          overflowY:"auto", minHeight:0 }}>
           <span style={{ color:"#5E7386", fontSize:9 }}></span>
           <span style={{ color:"#5E7386", fontSize:9 }}>mutation rate</span>
           <span style={{ color:"#5E7386", fontSize:9 }}>trade-off curve</span>

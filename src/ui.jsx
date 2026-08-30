@@ -823,8 +823,10 @@ function EvolutionPanel({ desktop, mono, onLog }){
   return (
     <div style={{ position:"absolute", top: 126, left:"50%", transform:"translateX(-50%)", zIndex:5,
       padding:"6px 12px 8px", borderRadius:12, background:"rgba(11,19,30,0.78)", border:"1px solid rgba(242,178,74,0.35)",
-      color:"#C9D7E3", fontSize:11, fontFamily:mono, maxWidth:"calc(100vw - 24px)" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+      color:"#C9D7E3", fontSize:11, fontFamily:mono, maxWidth:"calc(100vw - 24px)",
+      // six locus rows since multi-locus: the panel must never outgrow the screen — header stays, rows scroll
+      maxHeight:"calc(100vh - 190px)", display:"flex", flexDirection:"column" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
         <button className="mc-hit" onClick={() => setOpen(o => !o)}
           style={{ background:"transparent", border:"none", color:amber, cursor:"pointer", font:"inherit", padding:0 }}>
           {open ? "▾" : "▸"} Evolution</button>
@@ -835,7 +837,8 @@ function EvolutionPanel({ desktop, mono, onLog }){
           mutation {evo.mutation ? "on" : "off"}</button>
       </div>
       {open && (
-        <div style={{ display:"grid", gridTemplateColumns:"auto auto auto", gap:"4px 10px", alignItems:"center", marginTop:6 }}>
+        <div className="mc-scroll" style={{ display:"grid", gridTemplateColumns:"auto auto auto", gap:"4px 10px", alignItems:"center", marginTop:6,
+          overflowY:"auto", minHeight:0 }}>
           <span style={{ color:"#5E7386", fontSize:9 }}></span>
           <span style={{ color:"#5E7386", fontSize:9 }}>mutation rate</span>
           <span style={{ color:"#5E7386", fontSize:9 }}>trade-off curve</span>
