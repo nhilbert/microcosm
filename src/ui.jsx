@@ -537,7 +537,11 @@ export default function Microcosm(){
         <div style={{ position:"absolute", inset:0, pointerEvents:"none",
           boxShadow:"inset 0 0 46px rgba(242,178,74,0.32)" }} />
       )}
-      {/* mode switch + tool hint */}
+      {/* mode switch + tool hint. Hidden while the specimen sheet is expanded
+          past its peek (same rule as the speed control): at half or full height
+          the sheet owns that screen space, and a fixed-offset bar would float
+          over its content (seen on phone: tabs across the portrait). */}
+      {(srcOpen || !ui.card || detent === 0 || desktop) && (
       <div style={{ position:"absolute", left:16, zIndex:6,
         bottom: sheetUp ? sheetPad : "calc(env(safe-area-inset-bottom, 0px) + 20px)",
         transition:"bottom 0.25s",
@@ -561,6 +565,7 @@ export default function Microcosm(){
           ))}
         </div>
       </div>
+      )}
       {uiMode === "data" && !desktop && <DataMode />}
       <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()} card={sheetUp} />
       {/* sun-intensity press lever (intervene mode) */}
@@ -670,7 +675,7 @@ export default function Microcosm(){
             <div style={{ width:40, height:4, borderRadius:2, background:"rgba(94,115,134,0.7)", margin:"0 auto" }} />
           </div>
           <div className="mc-scroll" style={{ padding:"0 18px calc(env(safe-area-inset-bottom, 0px) + 14px)",
-            overflowY: detent===2 ? "auto" : "hidden", flex:1 }}>
+            overflowY: detent>=1 ? "auto" : "hidden", flex:1 }}>
             <SpecimenBody card={ui.card} tick={ui.tick} detail={detent}
               onFeed={() => actionsRef.current.feed && actionsRef.current.feed()}
               onKill={() => actionsRef.current.kill && actionsRef.current.kill()} />
@@ -904,6 +909,11 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
           style={{ display:"block", width:"100%", maxHeight:200, objectFit:"cover", borderRadius:12, marginTop:12,
             border:"1px solid rgba(94,115,134,0.3)" }} />
       )}
+      {detail >= 1 && SPECIES_PROFILE[card.sp] && (
+        <div style={{ marginTop:10, fontSize:12.5, lineHeight:1.55 }}>
+          {SPECIES_PROFILE[card.sp].intro}
+        </div>
+      )}
       <div style={{ marginTop:10, display:"grid", gap:5 }}>
         {[["E", card.en, card.cap, `rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})`],
           ["P", card.pr, card.pQ, "rgb(226,170,150)"],
@@ -969,7 +979,7 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
               color:"#0B131E", fontSize:14, fontWeight:600 }}>Kill</button>
         </div>
       )}
-      {detail === 2 && SPECIES_PROFILE[card.sp] && (() => { const pf = SPECIES_PROFILE[card.sp]; return (
+      {detail >= 1 && SPECIES_PROFILE[card.sp] && (() => { const pf = SPECIES_PROFILE[card.sp]; return (
         <div style={{ marginTop:18, fontSize:12, lineHeight:1.5 }}>
           <div style={{ fontSize:11, color:COL.silt, letterSpacing:1.2 }}>PROFILE</div>
           <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"5px 12px", marginTop:8 }}>
@@ -981,7 +991,7 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
               </React.Fragment>))}
           </div>
         </div> ); })()}
-      {detail === 2 && (
+      {detail >= 1 && (
         <div style={{ marginTop:18, fontSize:12, color:COL.silt, lineHeight:1.5 }}>
           Amber marks your hand: everything you do to the world, as opposed to what
           nature does, is shown in this color.
