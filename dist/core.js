@@ -412,21 +412,31 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //   rateSlope  detritivore feeding rate x (1 + rateSlope*(g-g0))   effSlope   yield effE x (1 - effSlope*(g-g0))
 //              the rate-yield trade-off of microbial metabolism (Pfeiffer, Schuster & Bonhoeffer 2001)
 const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, curve: 0 };
+// Multi-locus (Phase 7): a species row carries `locus` (its first, display locus) and optionally
+// `loci: [...]` for the rest; the loader flattens both into t.loci, ordered — LOCUS ORDER IS PART OF
+// THE RNG CONTRACT (one mutation draw per locus, in order, at every division). t.locus stays an alias
+// for loci[0]: the display locus that drives tint, the single-locus channels and the legacy harness reads.
+const MAXLOCI = 4; // W.g is sized MAXLOCI planes of MAXN; raising it is a storage change, not an ecology change
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
     if (t.cyst) for (const k in CYST_DEFAULTS) if (t.cyst[k] === undefined) t.cyst[k] = CYST_DEFAULTS[k];
     if (t.corpsivore) for (const k in CORPSIVORE_DEFAULTS) if (t.corpsivore[k] === undefined) t.corpsivore[k] = CORPSIVORE_DEFAULTS[k];
-    if (t.locus) for (const k in LOCUS_DEFAULTS) if (t.locus[k] === undefined) t.locus[k] = LOCUS_DEFAULTS[k];
-    if (t.locus) checkLocus(t);
+    t.loci = (t.locus ? [t.locus] : []).concat(t.loci || []);
+    if (t.loci.length > MAXLOCI) throw new Error(t.name+" carries "+t.loci.length+" loci; W.g holds "+MAXLOCI);
+    for (const L of t.loci){
+      for (const k in LOCUS_DEFAULTS) if (L[k] === undefined) L[k] = LOCUS_DEFAULTS[k];
+      checkLocus(t, L);
+    }
+    t.locus = t.loci.length ? t.loci[0] : null;
   }
   return rows;
 }
 // Load-time guardrail: every multiplier a locus can express must stay inside [LOCUS_MULT_MIN, LOCUS_MULT_MAX]
 // across the whole corridor, curvature included. A typo in a slope fails here, not in a 54k-tick run.
 const LOCUS_MULT_MIN = 0.3, LOCUS_MULT_MAX = 3.0;
-function checkLocus(t){
-  const L = t.locus, bad = [];
+function checkLocus(t, L){
+  const bad = [];
   for (const g of [0, 0.25, 0.5, 0.75, 1]){
     const d = g - L.g0, q = L.curve*d*d;
     const mults = { kb: 1 + L.kbSlope*d - q, kp: 1 - L.kpSlope*d - q, catch: 1 - L.catchSlope*d - q,
@@ -475,7 +485,7 @@ const W = {
   hd: new Float32Array(MAXN), handle: new Int16Array(MAXN),
   cd: new Int16Array(MAXN), cy: new Uint8Array(MAXN), gr: new Int16Array(MAXN),
   mn: new Float32Array(MAXN), pr: new Float32Array(MAXN), mem: new Float32Array(MAXN),
-  g: new Float32Array(MAXN),          // heritable locus value in [0,1] (species with TRAITS.locus), else 0
+  g: new Float32Array(MAXLOCI*MAXN),  // heritable locus values in [0,1]: locus k of organism i at k*MAXN+i (plane 0 = the display locus, so W.g[i] keeps reading it), else 0
   lg: new Uint16Array(MAXN),          // lineage generation: founders 0, child = parent + 1 (draw-free bookkeeping)
   flee: new Int16Array(MAXN), bst: new Int16Array(MAXN),
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
@@ -521,7 +531,9 @@ function spawn(species, sx, sy, e, size, mnEndow, prEndow){
   W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.sp[i]=species; W.alive[i]=1;
   W.hd[i]=R()*6.283; W.cd[i]=TRAITS[species].matureCd; W.handle[i]=0; W.cy[i]=0; W.gr[i]=0;
   W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0;
-  W.g[i]=TRAITS[species].locus ? TRAITS[species].locus.g0 : 0; W.lg[i]=0;
+  { const loci = TRAITS[species].loci; // every plane reset: slots are reused across species
+    for (let k=0;k<MAXLOCI;k++) W.g[k*MAXN+i] = k < loci.length ? loci[k].g0 : 0; }
+  W.lg[i]=0;
   W.birth[i]=W.tick; W.gen[i]=(W.gen[i]+1)&0xffff;
   return i;
 }
@@ -615,7 +627,7 @@ function applyEvent(ev){
       P.mutation = !!ev.v;
       done && done({ prev }); break; }
     case "locus": {
-      const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].locus; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break;
+      const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].loci[ev.locus|0]; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break; // ev.locus: which locus (default 0, the display locus)
       const prev = Lc[ev.key];
       const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : [0, 1.5]; // slopes are prices: bounded too
       Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));
@@ -1226,6 +1238,9 @@ function impact(entry){
 //      an unconditional R() to a shared path.
 //   4. Field passes (diffusion, leach, scent) and the corpse pass are
 //      draw-free and must remain so.
+//   5. Heredity draws one mutation kick PER LOCUS, in TRAITS[sp].loci
+//      order, at every division (sigma > 0 and P.mutation only). Adding,
+//      removing or reordering a species' loci is a declared ecology change.
 // Modification protocol: after ANY edit to this file, run
 //   `node conform.js`   (2 seeds x 3000 ticks, ~3 s)
 // A changed fingerprint is fine only when an ecology change is the
@@ -1262,8 +1277,13 @@ function step(){
     if(T.cyst && W.gr[i]<=0 && W.en[i]<T.cyst.enter*cap){
       W.cy[i]=1; W.vx[i]=0; W.vy[i]=0; continue;
     }
-    const gd = T.locus ? W.g[i]-T.locus.g0 : 0, gq = T.locus ? T.locus.curve*gd*gd : 0; // locus deviation and its curvature penalty (exactly 0 at g0)
-    let cost = T.kb*(T.locus ? 1 + T.locus.kbSlope*gd - gq : 1)*Math.pow(W.sz[i],0.75)*W.qR[cT]; // maintenance: Q10 2.5
+    // Multi-locus expression (Phase 7): every locus contributes one factor per site, in locus order,
+    // each `1 + slope*d - curve*d*d`. A slope the locus does not name is 0 and its curve defaults to 0,
+    // so an unexpressed factor multiplies by exactly 1.0 — the single-locus arithmetic bit for bit.
+    const loci = T.loci, nL = loci.length;
+    let kbG = 1;
+    for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0; kbG *= 1 + L.kbSlope*d - L.curve*d*d; }
+    let cost = T.kb*kbG*Math.pow(W.sz[i],0.75)*W.qR[cT]; // maintenance: Q10 2.5
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -1274,7 +1294,9 @@ function step(){
       }
       const sat = Math.min(1, W.mn[i]/mQ); // Liebig: mineral-starved cells photosynthesize weakly
       const Lc = cellLight(i);
-      const kpG = T.locus ? (1 + T.locus.kpSlope*(-gd) - gq) * (1 + T.locus.lightSlope*gd*(1 - 2*Lc) - gq) : 1;
+      let kpG = 1;
+      for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0, q=L.curve*d*d;
+        kpG *= (1 + L.kpSlope*(-d) - q) * (1 + L.lightSlope*d*(1 - 2*Lc) - q); }
       const gppGain = T.kp*kpG*Lc*W.sz[i]*sat*W.qP[cT]*tpc; // photosynthesis: Q10 1.6, cut off past ctmax
       W.en[i]+=gppGain; W.flows.gpp+=gppGain;
       const pQ = P.pQuota*W.sz[i];
@@ -1354,9 +1376,15 @@ function step(){
         speed=T.speed*(torpid?0.75:1)*W.qS[cT]; // pursuit quickens with warmth (Q10 1.3), its quadratic cost with it
         if(best<W.sz[i]+6 && target>=0){
           const TJ = TRAITS[W.sp[target]];
-          const tgd = TJ.locus ? W.g[target]-TJ.locus.g0 : 0;
-          const escP = TJ.escape ? (TJ.locus ? TJ.escape.p + TJ.locus.escSlope*tgd - TJ.escape.p*TJ.locus.curve*tgd*tgd : TJ.escape.p)
-                                   * (T.locus ? 1 + T.locus.catchSlope*(-gd) - gq : 1) : 0;
+          let escP = 0;
+          if (TJ.escape){ // prey loci shift the base chance additively, hunter loci multiply what remains
+            escP = TJ.escape.p;
+            const lJ = TJ.loci;
+            for (let k=0;k<lJ.length;k++){ const L=lJ[k], d=W.g[k*MAXN+target]-L.g0;
+              escP = escP + L.escSlope*d - TJ.escape.p*L.curve*d*d; }
+            for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0;
+              escP *= 1 + L.catchSlope*(-d) - L.curve*d*d; }
+          }
           if(TJ.escape && R()<escP){ // escape jink: prey darts away, contact broken
             const ja=R()*6.283;
             W.x[target]=wrap(W.x[target]+Math.cos(ja)*TJ.escape.kick);
@@ -1414,7 +1442,9 @@ function step(){
     }
     if(T.detritivore){
       const c0=cellOf(i), D=T.detritivore;
-      const rateG = T.locus ? 1 + T.locus.rateSlope*gd - gq : 1, effG = T.locus ? 1 - T.locus.effSlope*gd - gq : 1; // rate-yield locus; both exactly 1 at g0
+      let rateG = 1, effG = 1; // rate-yield locus; both exactly 1 at g0
+      for (let k=0;k<nL;k++){ const L=loci[k], d=W.g[k*MAXN+i]-L.g0, q=L.curve*d*d;
+        rateG *= 1 + L.rateSlope*d - q; effG *= 1 - L.effSlope*d - q; }
       const eatE=Math.min(W.dE[c0], D.rateE*rateG*W.sz[i]*W.qD[c0]*tpc); // decomposition: Q10 2.0
       if(eatE>0){ W.dE[c0]-=eatE; W.en[i]=Math.min(cap, W.en[i]+eatE*D.effE*effG); }
       const pQ3=P.pQuota*W.sz[i];
@@ -1480,13 +1510,14 @@ function step(){
       const ci = spawn(W.sp[i], nx, ny, childE, childSz, childM, childP);
       if (ci >= 0){
         W.lg[ci] = W.lg[i] + 1;
-        if (T.locus){ // heredity: child = parent, plus one uniform kick of +-sigma when mutation is on
-          let gc = W.g[i];
-          if (T.locus.sigma > 0 && P.mutation){ // draw only when mutating: the silent genome consumes zero draws
-            gc += (R()-0.5)*2*T.locus.sigma;
+        for (let k=0;k<nL;k++){ // heredity: child = parent, plus one uniform kick of +-sigma PER LOCUS, in locus order (the declared L-draws-per-division rule)
+          const L = loci[k];
+          let gc = W.g[k*MAXN+i];
+          if (L.sigma > 0 && P.mutation){ // draw only when mutating: the silent genome consumes zero draws
+            gc += (R()-0.5)*2*L.sigma;
             gc = gc < 0 ? 0 : gc > 1 ? 1 : gc; // the corridor
           }
-          W.g[ci] = gc;
+          W.g[k*MAXN+ci] = gc;
         }
       }
       if(T.reproCooldown) W.cd[i]=T.reproCooldown;
@@ -1511,7 +1542,7 @@ function step(){
 }
 
 // the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul)
-const LOCUS_SHIPPED = TRAITS.map(T => T.locus ? { sigma: T.locus.sigma, curve: T.locus.curve } : null);
+const LOCUS_SHIPPED = TRAITS.map(T => T.loci.map(L => ({ sigma: L.sigma, curve: L.curve })));
 function resetWorld(){
   W.initialized = false; W.n = 0; W.freeList.length = 0; W.alive.fill(0);
   W.tick = 0; W.events.length = 0; W.eventLog.length = 0;
@@ -1524,7 +1555,7 @@ function initWorld(seed){
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
   // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
-  TRAITS.forEach((T, sp) => { if (T.locus){ T.locus.sigma = LOCUS_SHIPPED[sp].sigma; T.locus.curve = LOCUS_SHIPPED[sp].curve; } });
+  TRAITS.forEach((T, sp) => T.loci.forEach((L, k) => { L.sigma = LOCUS_SHIPPED[sp][k].sigma; L.curve = LOCUS_SHIPPED[sp][k].curve; }));
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
   det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0); det.adapt.fill(0); det.adaptRun.fill(0);
   det.heatRetreat.fill(0); det.heatPile=false; det.heatPileRun=0; det.heatStarve=false; det.heatStarveRun=0;
@@ -1554,5 +1585,5 @@ function initWorld(seed){
 if (typeof module !== "undefined" && module.exports !== undefined){
   module.exports = { P, W, R, TRAITS, TAG, REC, SPECIES, LOCUS_DEFAULTS, normalizeTraits, indicators, impact, cellOf, diffuseM, wrap, wd, spawn, killOrg, computeLight, computeTemp, rebuild,
     cellLight, neighbors, step, initWorld, resetWorld, applyEvent, drainEvents,
-    queueEvent, mulberry32, CELL, MAXN };
+    queueEvent, mulberry32, CELL, MAXN, MAXLOCI };
 }

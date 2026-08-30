@@ -44,21 +44,31 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //   rateSlope  detritivore feeding rate x (1 + rateSlope*(g-g0))   effSlope   yield effE x (1 - effSlope*(g-g0))
 //              the rate-yield trade-off of microbial metabolism (Pfeiffer, Schuster & Bonhoeffer 2001)
 const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, curve: 0 };
+// Multi-locus (Phase 7): a species row carries `locus` (its first, display locus) and optionally
+// `loci: [...]` for the rest; the loader flattens both into t.loci, ordered — LOCUS ORDER IS PART OF
+// THE RNG CONTRACT (one mutation draw per locus, in order, at every division). t.locus stays an alias
+// for loci[0]: the display locus that drives tint, the single-locus channels and the legacy harness reads.
+const MAXLOCI = 4; // W.g is sized MAXLOCI planes of MAXN; raising it is a storage change, not an ecology change
 function normalizeTraits(rows){
   for (const t of rows){
     for (const k in TRAIT_DEFAULTS) if (t[k] === undefined) t[k] = TRAIT_DEFAULTS[k];
     if (t.cyst) for (const k in CYST_DEFAULTS) if (t.cyst[k] === undefined) t.cyst[k] = CYST_DEFAULTS[k];
     if (t.corpsivore) for (const k in CORPSIVORE_DEFAULTS) if (t.corpsivore[k] === undefined) t.corpsivore[k] = CORPSIVORE_DEFAULTS[k];
-    if (t.locus) for (const k in LOCUS_DEFAULTS) if (t.locus[k] === undefined) t.locus[k] = LOCUS_DEFAULTS[k];
-    if (t.locus) checkLocus(t);
+    t.loci = (t.locus ? [t.locus] : []).concat(t.loci || []);
+    if (t.loci.length > MAXLOCI) throw new Error(t.name+" carries "+t.loci.length+" loci; W.g holds "+MAXLOCI);
+    for (const L of t.loci){
+      for (const k in LOCUS_DEFAULTS) if (L[k] === undefined) L[k] = LOCUS_DEFAULTS[k];
+      checkLocus(t, L);
+    }
+    t.locus = t.loci.length ? t.loci[0] : null;
   }
   return rows;
 }
 // Load-time guardrail: every multiplier a locus can express must stay inside [LOCUS_MULT_MIN, LOCUS_MULT_MAX]
 // across the whole corridor, curvature included. A typo in a slope fails here, not in a 54k-tick run.
 const LOCUS_MULT_MIN = 0.3, LOCUS_MULT_MAX = 3.0;
-function checkLocus(t){
-  const L = t.locus, bad = [];
+function checkLocus(t, L){
+  const bad = [];
   for (const g of [0, 0.25, 0.5, 0.75, 1]){
     const d = g - L.g0, q = L.curve*d*d;
     const mults = { kb: 1 + L.kbSlope*d - q, kp: 1 - L.kpSlope*d - q, catch: 1 - L.catchSlope*d - q,

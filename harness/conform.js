@@ -23,7 +23,8 @@ function fingerprint(seed, mutation){
   const p=[0,0,0,0,0,0,0]; let sx=0, se=0, sm=0, sg=0;
   for (let i=0;i<W.n;i++){ if(!W.alive[i]) continue;
     p[W.sp[i]]++; sx+=W.x[i]+W.y[i]; se+=W.en[i]; sm+=W.mn[i];
-    const Lc = C.TRAITS[W.sp[i]].locus; if (Lc) sg += W.g[i] - Lc.g0; } // expressed deviation: exactly 0 in any silent world
+    const loci = C.TRAITS[W.sp[i]].loci; // expressed deviation over EVERY locus: exactly 0 in any silent world
+    for (let k=0;k<loci.length;k++) sg += W.g[k*C.MAXN+i] - loci[k].g0; }
   let fM=0; for (let c=0;c<P.GRID*P.GRID;c++) fM+=W.M[c];
   return { pops:p, posSum:+sx.toFixed(3), enSum:+se.toFixed(3), mnSum:+sm.toFixed(3), fieldM:+fM.toFixed(3), gSum:+sg.toFixed(3) };
 }

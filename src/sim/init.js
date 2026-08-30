@@ -1,5 +1,5 @@
 // the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul)
-const LOCUS_SHIPPED = TRAITS.map(T => T.locus ? { sigma: T.locus.sigma, curve: T.locus.curve } : null);
+const LOCUS_SHIPPED = TRAITS.map(T => T.loci.map(L => ({ sigma: L.sigma, curve: L.curve })));
 function resetWorld(){
   W.initialized = false; W.n = 0; W.freeList.length = 0; W.alive.fill(0);
   W.tick = 0; W.events.length = 0; W.eventLog.length = 0;
@@ -12,7 +12,7 @@ function initWorld(seed){
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
   // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
-  TRAITS.forEach((T, sp) => { if (T.locus){ T.locus.sigma = LOCUS_SHIPPED[sp].sigma; T.locus.curve = LOCUS_SHIPPED[sp].curve; } });
+  TRAITS.forEach((T, sp) => T.loci.forEach((L, k) => { L.sigma = LOCUS_SHIPPED[sp][k].sigma; L.curve = LOCUS_SHIPPED[sp][k].curve; }));
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
   det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0); det.adapt.fill(0); det.adaptRun.fill(0);
   det.heatRetreat.fill(0); det.heatPile=false; det.heatPileRun=0; det.heatStarve=false; det.heatStarveRun=0;
@@ -42,5 +42,5 @@ function initWorld(seed){
 if (typeof module !== "undefined" && module.exports !== undefined){
   module.exports = { P, W, R, TRAITS, TAG, REC, SPECIES, LOCUS_DEFAULTS, normalizeTraits, indicators, impact, cellOf, diffuseM, wrap, wd, spawn, killOrg, computeLight, computeTemp, rebuild,
     cellLight, neighbors, step, initWorld, resetWorld, applyEvent, drainEvents,
-    queueEvent, mulberry32, CELL, MAXN };
+    queueEvent, mulberry32, CELL, MAXN, MAXLOCI };
 }
