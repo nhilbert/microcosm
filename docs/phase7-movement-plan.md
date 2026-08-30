@@ -13,7 +13,7 @@ v1.0 · 2026-08-30 · Decisions D1–D7 **resolved** (owner, 2026-08-30) — rec
 
 ## 2. Increments (one at a time, each closed before the next)
 
-**MV.0 — Movement observatory + substrate (observer-only, bit-identical).**
+**MV.0 — Movement observatory + substrate (observer-only, bit-identical). SHIPPED — record in §6.**
 - Recorder: extend per-species locus coverage from 2 planes to MAXLOCI 4 (+14 channels), add per-mobile-species movement metrics — gradient alignment (mean cos θ, velocity vs. field gradient), mean run length/straightness, occupancy entropy — ≈ +12–15 channels, plus the **trap detector**: occupancy-weighted realized energy balance ("the population is concentrating where its budget is negative", worded *since*, calibrated against bands measured here). MSD-regime estimator lives in harness/lib.js (with selftest cases), not in the recorder.
 - Zero PRNG draws, no dynamic-state mutation; conformance fingerprints must be bit-identical, hash rebound with declared reason ("MV.0 recorder extension").
 - Deliverable: measured reference bands for every movement metric in the shipped world + the four heat/light scenario worlds; detectors calibrated (control silent).
@@ -56,6 +56,25 @@ The flagship's expected first result at shipped σ is that evolution does **not*
 - **D6 — MV.4 stays in phase, last**, contingent on MV.1's record.
 - **D7 — No visual grammar for movement-strategy loci.** The owner expects movement loci to be visible from behaviour itself; the 10-second rail test applies to motion (path shape, trails, aggregation), and a locus that fails it is Observatory-carried, not given a body channel. The elongated↔circular reservation for speed/mobility (grammar decision, 2026-08-30) stays recorded for a possible future speed locus, but nothing in this phase binds to it and the phase no longer sequences behind the UI grammar increment.
 
-## 6. Risks
+## 6. MV.0 record (closed 2026-08-30)
+
+**Shipped (observer-only; all four conformance fingerprints bit-identical, baseline rebound with this record as the declared reason — the captured fingerprints equal the previous baseline's, only the hash moved).** Recorder: locus planes 2→4 (`LOCUS_CH` ×4, detector slots `sp*4+plane`, 28 each), movement channels 117–140 per SPECIES.MOBILE (light/warmth gradient alignment; net displacement per tick over the sample stride, slot-reuse-guarded by birth tick; occupancy entropy over 8×8, normalized; warm/ambient mean reserve), `heatTrap` detector, Adaptability vital generalized over LOCUS_CH. harness/lib.js: `unwrapTrack`/`msd`/`msdAlpha` with selftest guards (ballistic 2.00, diffusive 1.03, confined −0.03 — the confined case needed an OU walk, not an orbit: a deterministic orbit's MSD is periodic, not a plateau). harness/move.js `--metrics|--trap|--d5`; npm `move`, `move:trap`. Gates at this commit: npm test green, K6 gate ALL CRITERIA PASS, heat gate ALL PASS (control silent, channels exactly 0). tune2/gate5/corridor untouched by construction (zero draws, no dynamic-state mutation).
+
+**Reference bands (shipped world, 8 seeds, t>3,000):**
+
+| species | lightAlign | netStep/tick | entropy | ambRes | MSD α (rolling cohort, lags 1–25) |
+|---|---|---|---|---|---|
+| Drifta | −0.03..0.44 | 0.09..0.33 | 0.40..0.60 | 0.23..0.36 | 1.02..1.31 (med 1.11) |
+| Cilio | −0.53..0.34 | 0.64..1.19 | 0.40..0.62 | 0.25..0.71 | 0.97..1.10 (med 1.06) |
+| Bacillus | −0.11..0.08 | 0.14..0.26 | 0.56..0.70 | 0.19..0.27 | 0.98..1.03 (med 1.01) |
+| Venator | −0.99..0.73 | 0.00..1.50 | 0.00..0.81 | 0.00..0.77 | 1.23..1.60 (med 1.28, 7/8) |
+
+Bacillus reading α ≈ 1.01 — run-and-tumble as textbook diffusion — is the instrument's built-in validation; Drifta's 1.11 is the taxis showing. Structural silence verified: warmth channels exactly 0 and zero heatTrap events on 8/8 shipped seeds. Instrument fight #1: a fixed t=3,000 MSD cohort with a 150-sample window returned almost no tracks — lifespans are far shorter than the window; the shipped estimator uses rolling adoption, ≥60-sample segments.
+
+**Trap detector — calibration history (the phase's first theory died on schedule).** Design 1 (inside/outside reserve gap on channels 133–140) fired 0/8 under the +8 sun while the grazer went extinct 8/8: the warm region covers the whole inhabited area, share saturates at 1.0 for every species, no ambient population remains to contrast against — contrast is the wrong axis, level is the right one. Shipped detector: warmth felt ≥ 3 + reserve below the species' measured band (REFERENCE_BANDS resP10) + falling vs 25 samples ago, 10-sample run, pop ≥ 50, apex excluded (heatStarve is its story). Measured (+8 sun, 8 seeds): **Drifta — the species whose set-point drags it in — fires 8/8** at t 3,660–4,680, ahead of the core loss (4,180–5,444) on every seed; **Bacillus 7/8** (a true squeeze, the one heatRetreat also sees), **Cilio 4/8** at t 3,180–3,200 with ~1,000–1,800-tick leads where it fires — all 19 fires ahead of the respective extinction, zero behind. Instrument fight #2, recorded: the recorder fired *earlier* than the harness simulation that chose the thresholds, because its trend window reaches back into the pre-warming baseline while the simulation's history began blind at the warming tick — the recorder is the authority. Finding: the grazer's own collapse (~1,200 ticks) outruns the trend window on 4/8 seeds; its death stays narrated by crash/extinction events, and the §12 attribution stays with the harness A/B. Known limit, deferred to MV.1's measurement worlds: false-positive characterization under milder warmth (a cycle trough coinciding with felt ≥ 3 would fire truthfully but tell a smaller story).
+
+**D5 resolved (measure first, decided with data): no fix.** Bacillus's realized per-tick displacement equals `T.speed` exactly (286k/356k organism-ticks, max deviation 4.3e-5 — float wrap noise): with torpor 0 the flat `T.speed²` charge *is* the realized-quadratic charge, bit for bit. The distortion exists only under torpor (Necro, not live), where the flat charge overprices by 1/tor ≈ 1.67 — recorded for whenever Necro re-enters or a tumble-speed locus is proposed; MV.3's threshold locus does not touch speed and needs nothing.
+
+## 7. Risks
 
 Research §6.6 applies wholesale (integrator exploits, trap-by-design, sign-flip, dead knobs, positional epistasis, apex drift, the honesty note). Phase-specific addition: MV.1 + MV.2 give Drifta four live loci — the joint corridor is 4-dimensional; rails/fuzz/sample discipline (5.9 pattern) replaces corners entirely, and the two H.3 extreme-corner grazer extinctions may gain siblings — in-corridor findings to document, not tune away, unless the owner rules otherwise.
