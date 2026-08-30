@@ -88,17 +88,17 @@ if (flag("--trap")){
   const a = num("--a", 8);
   console.log(`=== trap detector calibration: warmth +${a} on the shipped sun at t=${AT} (evolving, 8 seeds) ===`);
   console.log("per species: max share of population in warm cells · max reserve gap (amb - warm) while share >= 0.5 · heatTrap fire tick · extinction tick");
-  // v2 candidate (measured after the gap statistic died: under +8 the warm region covers the whole
-  // inhabited area, share saturates at 1.0 for every species and no ambient population remains to
-  // contrast against): warmth felt >= 3 sustained + reserve below the species' measured healthy band
-  // (REFERENCE_BANDS resP10) + falling against 25 samples ago. Simulated here from the channels the
-  // real detector reads, so the threshold choice is measurement, not theory.
-  const RESP10 = { 0:0.44, 1:0.28, 2:0.37, 3:0.23, 6:0.27 }; // analysis.js REFERENCE_BANDS resP10
-  const fired = MB.map(() => 0), led = MB.map(() => 0), ext2 = MB.map(() => 0), v2f = MB.map(() => 0), v2led = MB.map(() => 0);
+  // Reports the REAL detector (recorder heatTrap) with the raw statistics behind it. Calibration
+  // history: the first (gap) statistic died against this measurement -- under +8 the warm region covers
+  // the whole inhabited area, share saturates at 1.0 and no ambient population remains to contrast
+  // against; the shipped level statistic (felt >= 3 + reserve below band + falling vs 25 samples ago)
+  // was chosen from a harness simulation of these channels and then measured to fire EARLIER than the
+  // simulation, because the recorder's trend window reaches back into the pre-warming baseline while
+  // the simulation's history began blind at the warming tick. The recorder is the authority.
+  const fired = MB.map(() => 0), led = MB.map(() => 0), ext2 = MB.map(() => 0);
   for (const s of SEEDS){
     L.start(s, true);
-    const maxShare = MB.map(() => 0), maxGap = MB.map(() => NaN), maxFelt = MB.map(() => 0), minRes = MB.map(() => Infinity);
-    const v2run = MB.map(() => 0), v2tick = MB.map(() => -1), resHist = MB.map(() => []);
+    const maxFelt = MB.map(() => 0), minRes = MB.map(() => Infinity);
     let coreLost = -1;
     for (let t=1;t<=HORIZON;t++){
       if (t === AT) C.applyEvent({ type:"sourceSet", k:0, a });
@@ -106,18 +106,10 @@ if (flag("--trap")){
       if (coreLost < 0 && L.coreCollapsed(L.pops(), t)) coreLost = t;
       if (t % REC.STRIDE === 0 && t > AT) for (let m=0;m<MB.length;m++){
         const sp = MB[m], pop = chan(sp);
-        if (pop < 20){ resHist[m].push(NaN); continue; }
-        const share = chan(66+sp)/pop, gap = chan(137+m) - chan(133+m), felt = chan(58+sp);
-        const reserve = (chan(7+sp)/pop)/(P.capMul*(chan(26+sp)||1));
-        resHist[m].push(reserve);
-        if (share > maxShare[m]) maxShare[m] = share;
-        if (share >= 0.5 && !(gap <= maxGap[m])) maxGap[m] = gap;
+        if (pop < 50) continue;
+        const felt = chan(58+sp), reserve = (chan(7+sp)/pop)/(P.capMul*(chan(26+sp)||1));
         if (felt > maxFelt[m]) maxFelt[m] = felt;
-        if (pop >= 50 && reserve < minRes[m]) minRes[m] = reserve;
-        const h = resHist[m], ago = h.length > 25 ? h[h.length-26] : NaN;
-        const on = pop >= 50 && felt >= 3 && reserve < (RESP10[sp]||0) && !Number.isNaN(ago) && reserve < ago - 0.02;
-        v2run[m] = on ? v2run[m]+1 : 0;
-        if (v2tick[m] < 0 && v2run[m] >= 10) v2tick[m] = t;
+        if (reserve < minRes[m]) minRes[m] = reserve;
       }
     }
     const cols = MB.map((sp,m) => {
@@ -126,14 +118,11 @@ if (flag("--trap")){
       if (trap) fired[m]++;
       if (ext) ext2[m]++;
       if (trap && (!ext || trap.tick < ext.tick)) led[m]++;
-      if (v2tick[m] > 0) v2f[m]++;
-      if (v2tick[m] > 0 && (!ext || v2tick[m] < ext.tick)) v2led[m]++;
-      return `${TRAITS[sp].name.slice(0,3)} sh${f(maxShare[m])} felt${f(maxFelt[m],1)} res${f(minRes[m]===Infinity?NaN:minRes[m])}${v2tick[m]>0 ? " v2@"+v2tick[m] : ""}${trap ? " trap@"+trap.tick : ""}${ext ? " ext@"+ext.tick : ""}`;
+      return `${TRAITS[sp].name.slice(0,3)} felt${f(maxFelt[m],1)} res${f(minRes[m]===Infinity?NaN:minRes[m])}${trap ? " trap@"+trap.tick : ""}${ext ? " ext@"+ext.tick : ""}`;
     }).join(" | ");
     console.log(`seed ${s}: ${cols} | core ${coreLost>0 ? "LOST@"+coreLost : "held"}`);
   }
-  console.log(`\nheatTrap fired: ${MB.map((sp,m)=>TRAITS[sp].name.slice(0,3)+" "+fired[m]+"/8 (ahead "+led[m]+"/"+fired[m]+")").join(" · ")}`);
-  console.log(`v2 candidate:   ${MB.map((sp,m)=>TRAITS[sp].name.slice(0,3)+" "+v2f[m]+"/8 (ahead of its extinction "+v2led[m]+"/"+v2f[m]+"; extinctions "+ext2[m]+"/8)").join(" · ")}`);
+  console.log(`\nheatTrap fired: ${MB.map((sp,m)=>TRAITS[sp].name.slice(0,3)+" "+fired[m]+"/8 (ahead of its extinction "+led[m]+"/"+fired[m]+"; extinctions "+ext2[m]+"/8)").join(" · ")}`);
 }
 
 if (flag("--d5")){
