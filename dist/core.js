@@ -763,6 +763,10 @@ function queueEvent(ev){
     const k = W.events.findIndex(e => e.type === "source" && (e.k|0) === (ev.k|0));
     if (k >= 0){ W.events[k] = ev; return; }
   }
+  if (ev.type === "wallSet"){ // coalesce a slider drag: only the latest properties of that wall matter within one tick
+    const k = W.events.findIndex(e => e.type === "wallSet" && (e.k|0) === (ev.k|0));
+    if (k >= 0){ W.events[k] = { ...W.events[k], ...ev }; return; }
+  }
   W.events.push(ev);
 }
 
@@ -1361,7 +1365,8 @@ const IMPACT_CHS = [[0,"Solara"],[1,"Drifta"],[2,"Cilio"],[3,"Bacillus"],[6,"Ven
 // natural-variability floors (measured: mats barely move, plankton blooms 2.5x unprovoked)
 const IMPACT_NOISE = { 0:12, 1:170, 2:55, 3:20, 6:25, 14:15, 19:30 };
 // presses: interventions that change the regime rather than poke it once (a changed sky, changed evolution settings)
-const IMPACT_PRESS = new Set(["source","sunlight","sourceAdd","sourceRemove","sourceSet","sourceLayout","mutation","evolution","preset"]);
+const IMPACT_PRESS = new Set(["source","sunlight","sourceAdd","sourceRemove","sourceSet","sourceLayout","mutation","evolution","preset",
+  "wallAdd","wallRemove","wallSet"]); // a wall changes the regime, not a moment (7.W)
 function impact(entry){
   const isPress = IMPACT_PRESS.has(entry.type);
   const i0 = W.recCount-1 - Math.floor((W.tick - entry.tick)/REC.STRIDE);

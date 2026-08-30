@@ -147,6 +147,10 @@ function queueEvent(ev){
     const k = W.events.findIndex(e => e.type === "source" && (e.k|0) === (ev.k|0));
     if (k >= 0){ W.events[k] = ev; return; }
   }
+  if (ev.type === "wallSet"){ // coalesce a slider drag: only the latest properties of that wall matter within one tick
+    const k = W.events.findIndex(e => e.type === "wallSet" && (e.k|0) === (ev.k|0));
+    if (k >= 0){ W.events[k] = { ...W.events[k], ...ev }; return; }
+  }
   W.events.push(ev);
 }
 

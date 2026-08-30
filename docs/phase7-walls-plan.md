@@ -177,6 +177,30 @@ declared), tune2 8/8 (no walls in the acceptance worlds), `--open` exact,
 findings, not gates — the gates for narration (refuge census channels, compartment
 cards) are the deferred follow-up below.
 
+## 7a. Measurement record (2026-08-30, shipped build)
+
+- **`--open`** PASS 2/2: the transparent wall present for 3,000 ticks fingerprints
+  exactly like the no-wall world. Property continuity proven; ships as a gate.
+- **`--seal`** PASS 4/4: total M audit flat (drift ≤ 0.27 over 12,000 ticks — the
+  Float32 stencil rounding the shipped world already carries); the dark side holds
+  at exactly ambient light and empties completely (K6-style strangulation, the
+  split-world experiment P3 wanted); the sun side persists. **Recorded**: the apex
+  was lost on the sun side in all four sealed runs at 12k — a two-thirds world is
+  below Venator's knife edge; consistent with the apex's establishment history,
+  not gated.
+- **`--shade`** 4/4: mat biomass in the shadow sector 0 versus ≈7,000 in the
+  control. The occluded field selects; the painted layer is only a picture.
+- **`--hideout`** (Fine mesh box, same-seed A/B, 18k): refuge floor (minimum
+  Drifta after founding) higher with the mesh on 7/8; the box accumulates 27–153
+  Drifta with grazers excluded in 5/8. **Finding (Huffaker's apparatus, complete
+  with failure mode)**: on exactly the three seeds where a grazer sat inside the
+  box at founding (11, 22, 88 — the mesh blocks its exit as well as its entry),
+  the "refuge" inverts into a feedlot and Drifta ends far below control. Cycle
+  damping is NOT consistent at this refuge size (CV down on 4, up on 3, tied 1) —
+  the LV-refuge amplitude prediction is untested at 1/64th of the world's area;
+  a larger-refuge sweep is future work, not a claim. Venator outcomes reshuffle
+  in both directions (0/37, 40/6…) — the apex stays knife-edged, nothing gated.
+
 ## 8. Deferred (one extension, then defer — rule 9)
 
 - Compartment analytics (flood-fill labels, per-compartment audit card) — the P3
