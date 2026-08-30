@@ -202,3 +202,49 @@ Same heater, plankton and decomposer steering, hunters not: **core held 8/8**, C
 **Mechanism (diagnosed, old vs new core on the same corners).** The gradient rule packs the plankton tighter around the sun: mean distance from the sun 91–113 (was 108–140), no drifters in dark water in either rule. A denser plankton core concentrates the grazers, and the pack hunts them more efficiently — Venator rises to 30–47 (was 22–28) and eats the grazer out. It is a trophic cascade at the genome extremes (faster-growing prey with a thrifty grazer; or tougher prey with a keen grazer and a voracious decomposer), and the same mechanism shows benignly in the shipped world as the apex holding on more seeds. Not an artefact: drifters at the peak cell (gradient exactly 0) and in the dark behave as intended.
 
 **Decision (owner, 2026-08-29): H.3 accepted** with the two extreme-corner grazer extinctions as a documented in-corridor finding, consistent with the Phase 5.9 corner decision (rails + fuzz are the operative guarantee). Conformance recaptured with this reason; Yoshida baseline recaptured above.
+
+## 12. H.4 — attack-rate Q10, heat narration, H-P5 (2026-08-30)
+
+Two edits, both exactly neutral at dT = 0 (all four conformance fingerprints identical; hash rebound with this reason): the **attack-rate Q10** (`P.q10.attack = 1.8`, Rall E ≈ 0.45 eV — a hunter's bite scales with the warmth of its cell, flatter than its ×2.5 upkeep, so the eater still loses ground) and the **warm-core census** (channels 65–74: warm-cell count at dT > 3, per-species warm-core population, detritus per warm and per ambient cell — all exactly 0 in an unwarmed world) feeding three calibrated narrations.
+
+### 12.1 The press, re-measured with the attack Q10 (`--press --amb 6`)
+
+Against §10.2 (whose grazer intake carried no Q10): the grazer squeeze is gone — Cilio 134–206 (was 124–163 with one seed at 16), Bacillus 774–1,244 (was 659–795 with one seed at 134, control 865–1,002), no near-collapse seed, plankton settles higher (1,051–2,058). **Apex first survives**: lost 8/8 at t 4,037–5,661 (was 4,168–5,488). Drifta CV median 0.38 (was 0.41; control 0.25) — **uniform warming still destabilises the cycle**, but the collapse tail was the missing rate's artefact and is gone. §10.2's "worth revisiting" is resolved: the destabilisation is real, the near-collapse was not.
+
+### 12.2 The hot sun, re-measured — a thermal trap (open owner decision)
+
+§10.1 (core held 0/8 lost) was measured pre-H.2, metabolism only. On the current core the hot sun (+8 on the shipped sun) **loses the core on 8/8 seeds** (Cilio extinct t 4,201–4,805; Bacillus 245–335; plankton median distance from the sun 49, was 110–137). Attribution by A/B, 8 seeds each:
+
+| hot sun +8 | core lost | Cilio at 18k | Drifta dist |
+|---|---|---|---|
+| §10.1 record (pre-H.2) | 0/8 | 122–169 | — |
+| current core, thermotaxis **off** | 0/8 | 132–187 | 124 |
+| H.3 core (thermotaxis on, **no** attack Q10) | 8/8 (t 4,604–6,101) | 0 | 48 |
+| current core (thermotaxis on + attack Q10) | 8/8 (t 4,201–4,805) | 0 | 49 |
+
+**The cause is Drifta's H.2 thermotaxis, not the attack Q10** (which only hastens the grazer's end by ~400–1,300 ticks). The plankton's set-point (tpref = topt = +9) makes a +8 core pure attraction: it packs into the lit warm centre, and the grazer that follows starves there — meals devalued on its falling limb (topt +6), upkeep ×1.7. The mirror image of the hunter-set-point failure of §10.4, from the prey's side: a hard-coded set-point walks the plankton into water that kills its grazer. The far heater (§12.4) is unaffected — the trap needs warmth *on* the light.
+
+**Open decision (owner):** (a) accept as a finding — the hot sun is a lethal, fully narrated lever (pile-up warned at t 3,180, ~25 min before core loss; grazer and decomposer thinning at 4,000; extinctions in order), undoable like every source event; or (b) reprice Drifta's set-point (tpref below topt, or a lower thermo gain) — a declared ecology change with full re-acceptance. Until decided, (a) is the shipped behaviour. The H.2 record already named this class of problem as belonging to the movement genome.
+
+### 12.3 H-P5 — the loci under a heated patch (`--loci`, heater +10 on a seeded far sun)
+
+- **Drifta: patch spread ≥ 0.10 on 7/8** (0.16–0.37; seed 88 at 0.07): the warm patch selects *faster-growing* (patch means 0.25–0.38) while the sun patch drifts tougher (0.48–0.70). As in Block L, the selection is predation-mediated — the grazer cannot hold the warm patch, so defense goes unpriced there. Heat selects indirectly, through who can live in the patch.
+- **Bacillus: unmeasurable, and that is the finding** — the decomposer holds the warm patch on 0/8 seeds (its budget fails before selection can reprice its locus, §10.3). The predicted shift toward *frugal* cannot happen in a patch the species cannot occupy. H-P5's Bacillus half is overturned.
+
+### 12.4 The far heater, re-measured (`--heater`, +10 σ130 seeded)
+
+Unchanged in shape from §10.5 (the hunters never enter the warm patch, so the attack Q10 barely binds): core held 8/8, Drifta in the core 263–308, Solara in the core 387–449, detritus 13–14 per warm cell, cycle damped (Drifta CV median 0.15), apex lost 7/8. Pile-up narrated 8/8 (t 4,660–6,560).
+
+### 12.5 The narrations and the gate (`npm run heat:gate`)
+
+Three detectors, pure observers over channels 58–74, silent by construction without a warm source:
+
+- **thinning** (`heatRetreat`, per species): warm-core count halves against 50 samples ago (ago ≥ 30, warm core ≥ 20 cells). Wording claims only what is measured — thinning where it is warm, whether by dying or by leaving.
+- **pile-up** (`heatPile`): detritus per warm cell ≥ 4 and ≥ 2× ambient for 10 samples, with a real ambient outside (≥ 100 cells, so a global press is not a "core").
+- **starving pack** (`heatStarve`): warmth felt by the apex ≥ 3 for 10 samples while the pack count falls; the card names the mechanism (upkeep ×2.5^(dT/10) against meals at ×1.8^(dT/10)).
+
+Gate, 8 seeds each: **hot sun** — pile-up 8/8 (t 3,180, ~25 min before the collapse), thinning narrated 8/8 for the grazer and 8/8 for the decomposer; the first-draft criterion (mat thinning) was the pre-H.2 story and was corrected to the measurement — the mat *holds* the hot sun on the current core. **Press** — starving pack 8/8, ahead of the apex extinction on 8/8 (leads 80–2,120 ticks). **Control** — silent 8/8, channels 58–74 exactly 0. All three criteria PASS.
+
+### 12.6 Stabilization pass (Phase 7 closure, 2026-08-30)
+
+Everything green at one commit, on the recaptured baseline (conform prints no NOTE): tune2 **8/8 OK** (apex held 4/8, M-audit drift ≤ 0.011%); K6 gate **ALL PASS** (lock-up warned 360 ticks ahead, strain lead 482 s — the Phase 4 record to the second); gate5 **ALL PASS** with the Yoshida seed-22 metrics bit-exact against the baseline (4,860 / 6,120, phase 0.06); heat gate **ALL PASS** (§12.5); light gate **7/8 narrated, control silent** (the H.3 numbers); corridor rails **64/64**, fuzz **8/8**, and the two extreme-corner grazer extinctions of the H.3 record reproduced tick-exact (all-low seed 55 t=7,088; all-high seed 44 t=2,425) — the harness exits 1 on them by design, and they remain the owner-accepted in-corridor finding. The block hands over to walls, multi-locus and the movement genome with one open owner decision (§12.2, the thermal trap) and the thermal locus deferred to multi-locus as planned.

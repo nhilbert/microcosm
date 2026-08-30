@@ -10,6 +10,9 @@
 //  35-41 deaths per species since previous sample
 //  42-48 locus mean per species (Phase 5.1; 0 for species without a locus or with none alive)
 //  49-55 locus standard deviation per species — variance is the fuel gauge of evolution
+//  56-57 locus spread between light patches, mat/plankton (7.L)  58-64 mean warmth experienced per species (7.H)
+//  65    warm-cell count (dT > 3)   66-72 population in warm cells per species
+//  73-74 detritus per warm cell / per ambient cell (7.H.4; all of 65-74 exactly 0 without a warm source)
 // CONTRACT: the recorder is a pure observer — zero PRNG draws, zero
 // mutation of dynamic state. Conformance bit-identity with the recorder
 // running is the standing acceptance test for this whole layer.
@@ -23,7 +26,10 @@ const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0],
   uniform:[0,0,0,0,0,0,0],
   diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0],   // standing polymorphism: both ends coexist
   rail:[0,0,0,0,0,0,0], railRun:[0,0,0,0,0,0,0],           // corridor contact: a locus pinned at its edge (6.2)
-  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0] };         // local adaptation (7.L): the locus differs between light patches
+  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0],         // local adaptation (7.L): the locus differs between light patches
+  heatRetreat:[0,0,0,0,0,0,0],                              // 7.H.4: a species is thinning out of the warm water
+  heatPile:false, heatPileRun:0,                            // 7.H.4: detritus piling up in the warm core (measured 10.1/10.3: x4+ ambient)
+  heatStarve:false, heatStarveRun:0 };                      // 7.H.4: the apex declining while the warmth it feels stays >= 3
 // 7.L patch statistics: nearest sun by toroidal distance (the phototaxis rule), locus mean per patch for one
 // species. Pure reads; `spread` = max - min over patches holding >= 20 individuals (0 with one sun).
 const PATCH_MIN = 20;
@@ -44,6 +50,7 @@ function detect(r, awake){
   detectEcology(r, awake);
   detectHeredity(r);
   detectChemistry(r);
+  detectHeat(r);
 }
 // ---- ecology: establishment, wake, extinction, blooms and crashes per species ----
 function detectEcology(r, awake){
@@ -135,6 +142,43 @@ function detectHeredity(r){
     }
   }
 }
+// ---- heat (7.H.4): the warm-water narrations, calibrated against the §10 tables of phase7-heat-plan.md ----
+// All three read only warm-core channels (65-74) and warmth felt (58-64), every one exactly 0 without a warm
+// source, so the certified world is silent by construction. Warm = dT > 3, the harness's own cut.
+function detectHeat(r){
+  const B = W.rec, N = REC.N, CH = REC.CH;
+  const wN = B[r+65], cells = P.GRID*P.GRID;
+  // retreat: a species' warm-core count halves against 50 samples (1,000 ticks) ago. Measured 10.1: the hot
+  // sun halves the mat within ~2,000 ticks; 10.4: thermotaxis moves the plankton out at the same pace. The
+  // wording claims only what is measured -- thinning where it is warm, whether by dying or by leaving.
+  if (W.recCount >= 51 && wN >= 20){
+    const r50 = ((W.recHead-50+N)%N)*CH;
+    for (let sp=0; sp<7; sp++){
+      const ago = B[r50+66+sp], now = B[r+66+sp];
+      if (!det.heatRetreat[sp] && ago >= 30 && now <= 0.5*ago){ det.heatRetreat[sp] = 1;
+        pushEvent("heatRetreat", sp, TRAITS[sp].name+" is thinning out of the warm water — down "+Math.round((1-now/Math.max(1,ago))*100)+"% where it is warm."); }
+      else if (det.heatRetreat[sp] && now >= 0.8*Math.max(1,ago)) det.heatRetreat[sp] = 0;
+    }
+  } else if (wN < 20) det.heatRetreat.fill(0);
+  // pile-up: dead matter accumulating in the warm core faster than decomposition eats it. Measured 10.1/10.3:
+  // 3.4-9.7 per warm cell against 0.01-2.4 ambient; healthy cells carry ~2. Needs a real ambient outside
+  // (>= 100 cells) so a global press does not read as a "core".
+  const warmD = B[r+73], ambD = B[r+74];
+  det.heatPileRun = (wN >= 20 && cells - wN >= 100 && warmD >= 4 && warmD >= 2*Math.max(0.2, ambD)) ? det.heatPileRun+1 : 0;
+  if (!det.heatPile && det.heatPileRun >= 10){ det.heatPile = true;
+    pushEvent("heatPile", -1, "Dead matter is piling up in the warm water — "+warmD.toFixed(1)+" per cell against "+ambD.toFixed(1)+" outside."); }
+  else if (det.heatPile && (wN < 20 || warmD < 2)) det.heatPile = false;
+  // apex starving in the heat: warmth felt >= 3 sustained while the pack shrinks. Upkeep scales x2.5^(dT/10)
+  // against a bite at x1.8^(dT/10) -- the mismatch is the mechanism (10.2), the count falling is the evidence.
+  const APX = SPECIES.APEX, felt = B[r+58+APX];
+  det.heatStarveRun = (felt >= 3 && B[r+APX] > 0) ? det.heatStarveRun+1 : 0;
+  if (!det.heatStarve && det.heatStarveRun >= 10 && W.recCount >= 26){
+    const r25 = ((W.recHead-25+N)%N)*CH;
+    if (B[r+APX] < B[r25+APX]){ det.heatStarve = true;
+      pushEvent("heatStarve", APX, "The pack is starving in the heat — upkeep ×"+Math.pow(P.q10.resp, felt/10).toFixed(1)+" against meals that scale flatter."); }
+  }
+  else if (det.heatStarve && felt < 2) det.heatStarve = false;
+}
 // ---- chemistry: mineral depletion trend and lock-up level (the K6 detectors) ----
 function detectChemistry(r){
   const B = W.rec, N = REC.N, CH = REC.CH;
@@ -183,14 +227,19 @@ function record(){
   // 7.L local adaptation: the locus spread between light patches for the mat (56) and the plankton (57);
   // exactly 0 with one sun. (Measured first as a genotype-light correlation: the wrong instrument -- Solara's
   // locus reads shaded light, which mat density equalises across patches; the patch difference is what moved.)
-  // 7.H: mean warmth experienced per species (58-64); exactly 0 without a warm source
-  { const st = [0,0,0,0,0,0,0], sn = [0,0,0,0,0,0,0];
-    for (let i=0;i<W.n;i++) if (W.alive[i]){ st[W.sp[i]] += W.temp[cellOf(i)]; sn[W.sp[i]]++; }
-    for (let sp=0;sp<7;sp++) B[r+58+sp] = sn[sp] ? st[sp]/sn[sp] : 0; }
+  // 7.H: mean warmth experienced per species (58-64) and warm-core population (66-72); exactly 0 without a warm source
+  { const st = [0,0,0,0,0,0,0], sn = [0,0,0,0,0,0,0], wc = [0,0,0,0,0,0,0];
+    for (let i=0;i<W.n;i++) if (W.alive[i]){ const tv = W.temp[cellOf(i)]; st[W.sp[i]] += tv; sn[W.sp[i]]++; if (tv > 3) wc[W.sp[i]]++; }
+    for (let sp=0;sp<7;sp++){ B[r+58+sp] = sn[sp] ? st[sp]/sn[sp] : 0; B[r+66+sp] = wc[sp]; } }
   B[r+56] = W.sources.length > 1 && TRAITS[SPECIES.MAT].locus ? patchMeans(SPECIES.MAT).spread : 0;
   B[r+57] = W.sources.length > 1 && TRAITS[SPECIES.PREY].locus ? patchMeans(SPECIES.PREY).spread : 0;
-  let fM=0, dM=0;
-  for (let c=0;c<P.GRID*P.GRID;c++){ fM+=W.M[c]; dM+=W.dM[c]; }
+  let fM=0, dM=0, wCells=0, wDet=0, aDet=0;
+  for (let c=0;c<P.GRID*P.GRID;c++){ fM+=W.M[c]; dM+=W.dM[c];
+    const Dc = W.dE[c]+W.dP[c]+W.dM[c];
+    if (W.temp[c] > 3){ wCells++; wDet+=Dc; } else aDet+=Dc; }
+  { const cells = P.GRID*P.GRID; // 7.H.4 warm-core census: count, detritus per warm cell / per ambient cell.
+    // 74 is gated on a warm core existing, so all of 65-74 are exactly 0 in an unwarmed world.
+    B[r+65]=wCells; B[r+73]= wCells ? wDet/wCells : 0; B[r+74]= wCells && cells-wCells ? aDet/(cells-wCells) : 0; }
   let bM=0; for (let i=0;i<W.n;i++) if (W.alive[i]) bM+=W.mn[i];
   let cM=0, cN2=0;
   for (let k=0;k<W.cN;k++) if (W.cAlive[k]){ cM+=W.cM[k]; cN2++; }

@@ -22,6 +22,7 @@
     "gate5": "npm run build && node harness/gate5.js",
     "light": "npm run build && node harness/light.js --patches --seed",
     "light:gate": "npm run build && node harness/light.js --gate",
+    "heat:gate": "npm run build && node harness/heat.js --gate",
     "selftest": "node harness/selftest.js",
     "yoshida:capture": "npm run build && node harness/yoshida.js --capture",
     "test": "npm run build && npm run syntax && node harness/selftest.js && node harness/conform.js",
