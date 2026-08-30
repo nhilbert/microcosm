@@ -3013,13 +3013,19 @@ export default function Microcosm(){
         transition:"right 0.2s ease" }}>
       <canvas ref={canvasRef} style={{ width:"100%", height:"100%", display:"block",
         touchAction:"none", cursor: uiMode === "intervene" ? "crosshair" : "grab" }} />
-      {/* passive status strip */}
-      <div style={{ position:"absolute", top:0, left:0, right:0, padding:"calc(env(safe-area-inset-top, 0px) + 10px) 14px 8px",
-        display:"flex", justifyContent:"space-between", alignItems:"baseline", pointerEvents:"none", paddingRight:18,
+      {/* passive status strip. One column: on narrow screens the first row is
+          allowed to wrap, and the mineral row below it moves down with the
+          flow instead of sitting at a fixed offset for the wrapped text to
+          land on (seen on phone-width WebViews). */}
+      <div style={{ position:"absolute", top:0, left:0, right:0, padding:"calc(env(safe-area-inset-top, 0px) + 10px) 18px 8px 14px",
+        display:"flex", flexDirection:"column", gap:4, pointerEvents:"none",
         color:COL.silt, fontSize:12, fontFamily:mono, textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
-        <span>t {String(ui.tick).padStart(6," ")}  ·  {ui.fps} fps</span>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline",
+        flexWrap:"wrap", columnGap:12, rowGap:2 }}>
+        <span style={{ whiteSpace:"nowrap" }}>t {String(ui.tick).padStart(6," ")}  ·  {ui.fps} fps</span>
         {/* species counts double as view toggles: click to hide a species from the world, click again to show */}
-        <span style={{ pointerEvents:"auto", display:"inline-flex", gap:10 }}>
+        <span style={{ pointerEvents:"auto", display:"inline-flex", gap:10, flexWrap:"wrap",
+          justifyContent:"flex-end", marginLeft:"auto" }}>
           {[...SPECIES.LIVE.map(sp => [sp, GLYPH[sp]]), [7,"◌"], [8,"☀"], [9,"♨"]].map(([sp, glyph]) => {
             const debris = sp === 7, layer = sp >= 8;
             const c = debris ? [158,168,178] : layer ? (sp === 8 ? [200,222,240] : [240,150,110]) : SPECIES_META[sp].rgb;
@@ -3037,10 +3043,9 @@ export default function Microcosm(){
         </span>
       </div>
       {/* mineral audit: bound (in biomass) vs free (dissolved) — the sum is conserved */}
-      <div style={{ position:"absolute", top:"calc(env(safe-area-inset-top, 0px) + 34px)", right:18,
-        display:"flex", alignItems:"center", gap:8, pointerEvents:"none",
-        color:COL.silt, fontSize:11, fontFamily:"ui-monospace, SFMono-Regular, Menlo, monospace",
-        textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:8, alignSelf:"flex-end",
+        flexWrap:"wrap", justifyContent:"flex-end", rowGap:2,
+        fontSize:11, fontFamily:"ui-monospace, SFMono-Regular, Menlo, monospace" }}>
         <span>M</span>
         <span style={{ display:"inline-flex", width:96, height:4, borderRadius:2, overflow:"hidden",
           background:"rgba(11,19,30,0.7)" }}>
@@ -3050,8 +3055,10 @@ export default function Microcosm(){
             background:"rgba(158,168,178,0.65)" }} />
           <span style={{ flex:1, background:"rgba(91,200,232,0.4)" }} />
         </span>
-        <span>{(ui.mineral.b/1000).toFixed(1)}k bound · {(ui.mineral.l/1000).toFixed(1)}k locked · {(ui.mineral.f/1000).toFixed(1)}k free</span>
+        {/* NBSP inside each entry: the summary may wrap, but only between entries */}
+        <span style={{ textAlign:"right" }}>{(ui.mineral.b/1000).toFixed(1)}k{" "}bound · {(ui.mineral.l/1000).toFixed(1)}k{" "}locked · {(ui.mineral.f/1000).toFixed(1)}k{" "}free</span>
         {ui.mineral.add > 0.5 && <span style={{ color:"#F2B24A" }}> +{ui.mineral.add < 950 ? Math.round(ui.mineral.add) : (ui.mineral.add/1000).toFixed(1)+"k"}</span>}
+      </div>
       </div>
       {/* intervene edge tint: unmistakable "you are editing the world" signal */}
       {uiMode === "intervene" && (

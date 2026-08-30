@@ -26,6 +26,9 @@ class MainActivity : Activity() {
         web = WebView(this)
         web.setBackgroundColor(Color.parseColor("#05070C"))
         web.settings.javaScriptEnabled = true
+        // Android multiplies WebView text by the system font-size setting;
+        // the artifact is laid out in CSS px, so pin it to browser behavior.
+        web.settings.textZoom = 100
         // Project rule: no localStorage — DOM storage stays at its default (off).
         web.settings.setSupportZoom(false)
         // Keep every navigation inside the wrapper; the artifact has no
