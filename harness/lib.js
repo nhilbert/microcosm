@@ -63,5 +63,23 @@ function cycleMetrics(seed){ // the 5.2 measurement for one seed, mutation off v
   return { seed, pOff:pOff*20, pOn:pOn*20, phOff:+phaseLag(Do,Go,pOff).frac.toFixed(2), phOn:+phaseLag(Dn,Gn,pOn).frac.toFixed(2),
     cvOff:+cv(off.D).toFixed(2), cvOn:+cv(on.D).toFixed(2), gEnd:+on.gEnd.toFixed(2) }; }
 
+// Movement analysis (MV.0). Tracks are position samples of ONE organism; unwrap removes the torus
+// so displacements accumulate, msd is time-origin-averaged, and msdAlpha is the log-log slope of
+// MSD(tau) over a lag window: ~1 diffusive, ~2 ballistic, ->0 confined. harness/selftest.js guards
+// all three on synthetic tracks (the period estimator's lesson applied in advance).
+function unwrapTrack(xs){ const out=[xs[0]]; for (let i=1;i<xs.length;i++) out.push(out[i-1]+C.wd(xs[i]-xs[i-1])); return out; }
+function msd(xs, ys, maxLag){ // xs/ys already unwrapped
+  const Lmax = Math.min(maxLag, Math.floor(xs.length/2)), out=[];
+  for (let lag=1;lag<=Lmax;lag++){ let s=0,n=0;
+    for (let i=0;i+lag<xs.length;i++){ const dx=xs[i+lag]-xs[i], dy=ys[i+lag]-ys[i]; s+=dx*dx+dy*dy; n++; }
+    out.push(n ? s/n : 0); }
+  return out; }
+function msdAlpha(m, from, to){ // least-squares slope of log MSD vs log tau over lags [from, to] (1-based; defaults: all)
+  const lo = Math.max(1, from||1), hi = Math.min(m.length, to||m.length);
+  let sx=0,sy=0,sxy=0,sxx=0,n=0;
+  for (let lag=lo;lag<=hi;lag++){ const v=m[lag-1]; if (v<=0) continue;
+    const lx=Math.log(lag), ly=Math.log(v); sx+=lx; sy+=ly; sxy+=lx*ly; sxx+=lx*lx; n++; }
+  return n>=3 ? (n*sxy-sx*sy)/((n*sxx-sx*sx)||1) : NaN; }
+
 module.exports = { C, W, P, TRAITS, REC, SPECIES, SEEDS, HORIZON, LOCI, pops, auditM, locusStats, fmtG, start, pin, coreCollapsed,
-  demean, detrend, xcorr, period, phaseLag, cv, series, cycleMetrics };
+  demean, detrend, xcorr, period, phaseLag, cv, series, cycleMetrics, unwrapTrack, msd, msdAlpha };

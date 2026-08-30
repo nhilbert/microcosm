@@ -106,6 +106,7 @@ const SPECIES = {
   APEX: TRAITS.findIndex(T => T.apex),
   MAT: TRAITS.findIndex(T => T.mat),
   LOCI: TRAITS.map((T, sp) => T.locus ? sp : -1).filter(sp => sp >= 0),
+  MOBILE: TRAITS.map((T, sp) => T.live && T.movement !== "sessile" ? sp : -1).filter(sp => sp >= 0), // the movement observatory's row order (MV.0)
   // the Yoshida pair: the evolving prey and the grazer that eats it (harness experiments and gate5)
   PREY: 1, GRAZER: 2,
 };

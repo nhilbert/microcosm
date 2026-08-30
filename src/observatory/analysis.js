@@ -67,7 +67,7 @@ function indicators(){ // labels follow the naming rule: functional first, scien
   }
   let adSum=0, adN=0; // adaptability (6.2): mean locus sd over every (species, locus) with >= 20 alive
   for (let sp=0;sp<7;sp++) if (B[r0+sp] >= 20)
-    TRAITS[sp].loci.forEach((L, k) => { if (k < 2){ adSum += B[r0+(k ? 82 : 49)+sp]; adN++; } });
+    TRAITS[sp].loci.forEach((L, k) => { if (k < LOCUS_CH.length){ adSum += B[r0+LOCUS_CH[k][1]+sp]; adN++; } });
   return {
     adaptability: adN ? +(adSum/adN).toFixed(3) : null, // subtitle: mean heritable variation
     variety: +H.toFixed(2),                      // subtitle: Shannon diversity

@@ -21,5 +21,27 @@ check("antiphase reads as ±0.5", Math.abs(Math.abs(L.phaseLag(a, anti, PER).fra
 check("xcorr of a series with itself at lag 0 is 1", Math.abs(L.xcorr(a, a, 0) - 1) < 1e-9);
 check("cv of a constant series is 0", L.cv([3,3,3,3]) === 0);
 check("LOCI lists exactly the species with a locus", L.LOCI.every(sp => !!L.TRAITS[sp].locus), L.LOCI.map(sp => L.TRAITS[sp].name).join(", "));
+// ---- MV.0 movement estimators on synthetic tracks with known answers ----
+{ const WORLD = L.P.WORLD, T = 4000;
+  // ballistic: straight line at speed 0.7, crossing the torus repeatedly -> unwrap must reconstruct it, alpha ~ 2
+  const bx = Array.from({length:T}, (_,k) => ((k*0.7) % WORLD + WORLD) % WORLD), by = Array.from({length:T}, () => 10);
+  const ux = L.unwrapTrack(bx), uy = L.unwrapTrack(by);
+  check("unwrap reconstructs a straight torus-crossing track", Math.abs((ux[T-1]-ux[0]) - 0.7*(T-1)) < 1e-6, `net ${(ux[T-1]-ux[0]).toFixed(1)} vs ${(0.7*(T-1)).toFixed(1)}`);
+  const aB = L.msdAlpha(L.msd(ux, uy, 50));
+  check("ballistic track reads alpha ~ 2", Math.abs(aB - 2) < 0.05, `got ${aB.toFixed(2)}`);
+  // diffusive: a deterministic LCG random walk, alpha ~ 1
+  let s = 12345; const rnd = () => { s = (s*1664525 + 1013904223) >>> 0; return s/4294967296; };
+  let px = 0, py = 0; const rx=[0], ry=[0];
+  for (let k=1;k<T;k++){ const a = rnd()*2*Math.PI; px += Math.cos(a); py += Math.sin(a); rx.push(px); ry.push(py); }
+  const aD = L.msdAlpha(L.msd(rx, ry, 50));
+  check("random-walk track reads alpha ~ 1", Math.abs(aD - 1) < 0.2, `got ${aD.toFixed(2)}`);
+  // confined: a tethered random walk (Ornstein-Uhlenbeck pull toward a point -- the drift branch's own
+  // shape when taxis holds it) -> MSD saturates; alpha over the tail window ~ 0. (A deterministic orbit
+  // is the wrong model: its MSD is periodic, not a plateau, and the log fit reads the oscillation.)
+  let ox = 0, oy = 0; const tx=[0], ty=[0];
+  for (let k=1;k<T;k++){ ox += -0.2*ox + 2*(rnd()-0.5); oy += -0.2*oy + 2*(rnd()-0.5); tx.push(ox); ty.push(oy); }
+  const aC = L.msdAlpha(L.msd(tx, ty, 60), 25, 60);
+  check("confined track reads alpha ~ 0 past its relaxation", Math.abs(aC) < 0.1, `got ${aC.toFixed(2)}`);
+}
 console.log(fails ? `\n${fails} check(s) FAILED` : "\nall harness self-tests pass");
 process.exit(fails ? 1 : 0);

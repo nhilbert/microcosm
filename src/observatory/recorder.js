@@ -15,6 +15,15 @@
 //  73-74 detritus per warm cell / per ambient cell (7.H.4; all of 65-74 exactly 0 without a warm source)
 //  75-81 second-locus mean per species   82-88 second-locus sd (multi-locus: locus plane 1;
 //        channels 42-55 stay the DISPLAY locus, plane 0, so every calibrated reader keeps its meaning)
+//  89-95 plane-2 locus mean   96-102 plane-2 sd   103-109 plane-3 mean   110-116 plane-3 sd (MV.0:
+//        full MAXLOCI coverage; exactly 0 while no species carries a third locus)
+//  117-140 movement observatory (MV.0), indexed by SPECIES.MOBILE row order (Dri, Cil, Bac, Ven):
+//        117-120 light-gradient alignment (mean cos between motion and W.lg*, over organisms in a lit slope)
+//        121-124 warmth-gradient alignment (same against W.tg*; exactly 0 in an unwarmed world)
+//        125-128 net displacement per tick over the last sample stride (slot-reuse-guarded; 0 on the first sample)
+//        129-132 occupancy entropy over an 8x8 grid, normalized to [0,1] (falling = the species is packing)
+//        133-136 mean energy reserve (en / cap) of organisms in warm cells (dT > 3; exactly 0 without a warm core)
+//        137-140 mean energy reserve of organisms in ambient cells
 // CONTRACT: the recorder is a pure observer — zero PRNG draws, zero
 // mutation of dynamic state. Conformance bit-identity with the recorder
 // running is the standing acceptance test for this whole layer.
@@ -24,19 +33,24 @@
 const DET_ESTAB = [40, 40, 20, 80, 10, 4, 4]; // establishment thresholds per species
 const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0], crash:[0,0,0,0,0,0,0],
   packAwake:false, depleted:false, lockedWarn:false,
-  // heredity detectors run per (species, locus plane): index sp*2 + plane, 2 recorded planes (LOCUS_CH)
-  sweep:new Array(14).fill(0),   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
-  uniform:new Array(14).fill(0),
-  diverse:new Array(14).fill(0), diverseRun:new Array(14).fill(0),   // standing polymorphism: both ends coexist
-  rail:new Array(14).fill(0), railRun:new Array(14).fill(0),           // corridor contact: a locus pinned at its edge (6.2)
-  adapt:new Array(14).fill(0), adaptRun:new Array(14).fill(0),         // local adaptation (7.L): the locus differs between patches
+  // heredity detectors run per (species, locus plane): index sp*4 + plane, MAXLOCI recorded planes (LOCUS_CH)
+  sweep:new Array(28).fill(0),   // +-1 a line is taking over, +-2 it has taken over (sign = direction from g0)
+  uniform:new Array(28).fill(0),
+  diverse:new Array(28).fill(0), diverseRun:new Array(28).fill(0),   // standing polymorphism: both ends coexist
+  rail:new Array(28).fill(0), railRun:new Array(28).fill(0),           // corridor contact: a locus pinned at its edge (6.2)
+  adapt:new Array(28).fill(0), adaptRun:new Array(28).fill(0),         // local adaptation (7.L): the locus differs between patches
   heatRetreat:[0,0,0,0,0,0,0],                              // 7.H.4: a species is thinning out of the warm water
   heatPile:false, heatPileRun:0,                            // 7.H.4: detritus piling up in the warm core (measured 10.1/10.3: x4+ ambient)
-  heatStarve:false, heatStarveRun:0 };                      // 7.H.4: the apex declining while the warmth it feels stays >= 3
+  heatStarve:false, heatStarveRun:0,                        // 7.H.4: the apex declining while the warmth it feels stays >= 3
+  heatTrap:[0,0,0,0,0,0,0], heatTrapRun:[0,0,0,0,0,0,0] };  // MV.0: a species crowding into warm water while its reserve runs below ambient
+// MV.0 movement observatory state: the previous sample's positions, for the net-step channel.
+// Pure observer memory (like recPrev); tick -1 = no previous sample. Slot reuse between samples is
+// excluded by the birth guard: any spawn into a slot stamps W.birth at or after the previous sample.
+const mv = { px: new Float32Array(MAXN), py: new Float32Array(MAXN), ok: new Uint8Array(MAXN), tick: -1 };
 // 7.L patch statistics: nearest sun by toroidal distance (the phototaxis rule), locus mean per patch for one
 // species. Pure reads; `spread` = max - min over patches holding >= 20 individuals (0 with one sun).
 const PATCH_MIN = 20;
-const LOCUS_CH = [[42,49],[75,82]]; // [mean base, sd base] per recorded locus plane
+const LOCUS_CH = [[42,49],[75,82],[89,96],[103,110]]; // [mean base, sd base] per recorded locus plane (MV.0: all MAXLOCI planes)
 function patchMeans(sp, plane){
   const off = (plane||0)*MAXN;
   const K = W.sources.length, n = new Array(K).fill(0), m = new Array(K).fill(0);
@@ -56,6 +70,7 @@ function detect(r, awake){
   detectHeredity(r);
   detectChemistry(r);
   detectHeat(r);
+  detectMove(r);
 }
 // ---- ecology: establishment, wake, extinction, blooms and crashes per species ----
 function detectEcology(r, awake){
@@ -105,7 +120,7 @@ function detectHeredity(r){
   for (let sp=0; sp<7; sp++){
     const loci = TRAITS[sp].loci; if (!loci.length || B[r+sp] < 50) continue;
     for (let kL=0; kL<loci.length && kL<LOCUS_CH.length; kL++){
-    const L = loci[kL], di = sp*2 + kL, off = kL*MAXN;
+    const L = loci[kL], di = sp*4 + kL, off = kL*MAXN; // 4 = LOCUS_CH.length (MV.0: one detector slot per MAXLOCI plane)
     const gated = L.warmGated && !warmWorld;
     const mean = B[r+LOCUS_CH[kL][0]+sp], sd = B[r+LOCUS_CH[kL][1]+sp], name = TRAITS[sp].name;
     let hi=0, lo=0, n=0, railHi=0, railLo=0;
@@ -194,6 +209,27 @@ function detectHeat(r){
   }
   else if (det.heatStarve && felt < 2) det.heatStarve = false;
 }
+// ---- movement (MV.0): the trap detector -- a species concentrating where its budget is negative ----
+// The mechanism-level statistic behind phase7-heat-plan.md §12: the +8 core drew the plankton in and
+// the grazer that followed starved there. Reads only warm-core census (65-72) and the MV.0 reserve
+// channels (133-140), every one exactly 0 without a warm source, so the certified world is silent by
+// construction. The apex is excluded -- its heat story is heatStarve. Thresholds calibrated in
+// harness/move.js against the hot-sun (+8) worlds; the wording claims only what is measured:
+// crowding (share of the population in warm cells) and the reserve gap against the ambient population.
+function detectMove(r){
+  const B = W.rec;
+  const wN = B[r+65];
+  for (let m=0;m<SPECIES.MOBILE.length;m++){
+    const sp = SPECIES.MOBILE[m]; if (sp === SPECIES.APEX) continue;
+    const pop = B[r+sp], inWarm = B[r+66+sp], share = pop > 0 ? inWarm/pop : 0;
+    const wRes = B[r+133+m], aRes = B[r+137+m];
+    const on = wN >= 20 && pop >= 50 && inWarm >= 25 && share >= 0.5 && aRes - wRes >= 0.08;
+    det.heatTrapRun[sp] = on ? det.heatTrapRun[sp]+1 : 0;
+    if (!det.heatTrap[sp] && det.heatTrapRun[sp] >= 10){ det.heatTrap[sp] = 1;
+      pushEvent("heatTrap", sp, TRAITS[sp].name+" is crowding into the warm water and starving there — reserve "+Math.round(wRes*100)+"% inside against "+Math.round(aRes*100)+"% outside."); }
+    else if (det.heatTrap[sp] && (share < 0.3 || aRes - wRes < 0.02)) det.heatTrap[sp] = 0;
+  }
+}
 // ---- chemistry: mineral depletion trend and lock-up level (the K6 detectors) ----
 function detectChemistry(r){
   const B = W.rec, N = REC.N, CH = REC.CH;
@@ -257,6 +293,45 @@ function record(){
   { const cells = P.GRID*P.GRID; // 7.H.4 warm-core census: count, detritus per warm cell / per ambient cell.
     // 74 is gated on a warm core existing, so all of 65-74 are exactly 0 in an unwarmed world.
     B[r+65]=wCells; B[r+73]= wCells ? wDet/wCells : 0; B[r+74]= wCells && cells-wCells ? aDet/(cells-wCells) : 0; }
+  // MV.0 movement observatory (117-140): pure reads over positions, motion state and fields.
+  // Motion direction is the velocity vector for the drifter and the heading for tumble/steer species
+  // (each is what the organism actually moved along this tick). Net step pairs each organism with its
+  // own position at the previous sample; the birth guard excludes newborns and reused slots.
+  { const MB = SPECIES.MOBILE, nM = MB.length, mIdx = [-1,-1,-1,-1,-1,-1,-1];
+    for (let m=0;m<nM;m++) mIdx[MB[m]] = m;
+    const la=new Array(nM).fill(0), ln=new Array(nM).fill(0), ta=new Array(nM).fill(0), tn=new Array(nM).fill(0);
+    const ds=new Array(nM).fill(0), dn=new Array(nM).fill(0), we=new Array(nM).fill(0), wc2=new Array(nM).fill(0);
+    const ae=new Array(nM).fill(0), an=new Array(nM).fill(0), occ=new Array(nM*64).fill(0);
+    const OCELL = P.WORLD/8;
+    for (let i=0;i<W.n;i++){
+      if (!W.alive[i]) continue; const m = mIdx[W.sp[i]]; if (m < 0) continue;
+      const c = cellOf(i), drift = TRAITS[W.sp[i]].movement === "drift";
+      const mx = drift ? W.vx[i] : Math.cos(W.hd[i]), my = drift ? W.vy[i] : Math.sin(W.hd[i]);
+      const mm = Math.hypot(mx,my);
+      if (mm > 1e-6){
+        const lgm = Math.hypot(W.lgx[c],W.lgy[c]);
+        if (lgm > 0){ la[m] += (mx*W.lgx[c]+my*W.lgy[c])/(mm*lgm); ln[m]++; }
+        const tgm = Math.hypot(W.tgx[c],W.tgy[c]);
+        if (tgm > 0){ ta[m] += (mx*W.tgx[c]+my*W.tgy[c])/(mm*tgm); tn[m]++; }
+      }
+      if (mv.tick >= 0 && mv.ok[i] && W.birth[i] < mv.tick){
+        ds[m] += Math.hypot(wd(W.x[i]-mv.px[i]), wd(W.y[i]-mv.py[i])); dn[m]++; }
+      const res = W.en[i]/(P.capMul*W.sz[i]);
+      if (W.temp[c] > 3){ we[m] += res; wc2[m]++; } else { ae[m] += res; an[m]++; }
+      occ[m*64 + (Math.floor(W.y[i]/OCELL)&7)*8 + (Math.floor(W.x[i]/OCELL)&7)]++;
+    }
+    for (let m=0;m<nM;m++){
+      B[r+117+m] = ln[m] ? la[m]/ln[m] : 0;
+      B[r+121+m] = tn[m] ? ta[m]/tn[m] : 0;
+      B[r+125+m] = dn[m] ? ds[m]/(dn[m]*(W.tick - mv.tick)) : 0;
+      let H=0, tot=0; for (let b=0;b<64;b++) tot += occ[m*64+b];
+      if (tot > 0){ for (let b=0;b<64;b++){ const p = occ[m*64+b]/tot; if (p > 0) H -= p*Math.log(p); } }
+      B[r+129+m] = tot > 0 ? H/Math.log(64) : 0;
+      B[r+133+m] = wc2[m] ? we[m]/wc2[m] : 0;
+      B[r+137+m] = an[m] ? ae[m]/an[m] : 0;
+    }
+    mv.px.set(W.x); mv.py.set(W.y); mv.ok.set(W.alive); mv.tick = W.tick;
+  }
   let bM=0; for (let i=0;i<W.n;i++) if (W.alive[i]) bM+=W.mn[i];
   let cM=0, cN2=0;
   for (let k=0;k<W.cN;k++) if (W.cAlive[k]){ cM+=W.cM[k]; cN2++; }

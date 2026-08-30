@@ -2,7 +2,7 @@ const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
 // Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
 // Lives here because W.rec is sized from it; changing CH is a declared rebaseline.
-const REC = { N: 900, STRIDE: 20, CH: 89 };  // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species (7.H); 65-74: warm-core census (7.H.4); 75-88: second-locus mean/sd (multi-locus)
+const REC = { N: 900, STRIDE: 20, CH: 141 }; // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species (7.H); 65-74: warm-core census (7.H.4); 75-88: second-locus mean/sd (multi-locus); 89-116: locus planes 2-3 mean/sd (MV.0); 117-140: movement observatory (MV.0)
 
 // ---------- world state (module singletons; one artifact instance) ----------
 const W = {
