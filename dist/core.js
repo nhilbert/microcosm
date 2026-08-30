@@ -19,7 +19,8 @@ const P = {
   tempAmb: 0,       // ambient warmth (Phase 7 H; the global press is deferred) -- every Q10 factor is exactly 1 at dT = 0
   // Q10 per process (7.H, phase7-heat-plan.md §3): maintenance steeper than photosynthesis (E 0.65 vs 0.32 eV),
   // decomposition in between, handling time shortens, pursuit speed rises less than cost. The separation is the content.
-  q10: { resp: 2.5, photo: 1.6, decomp: 2.0, handling: 0.65, pursuit: 1.3 },
+  // attack (7.H.4): ingestion rises with warmth (Rall E ~0.45 eV) but flatter than maintenance -- the eater still loses.
+  q10: { resp: 2.5, photo: 1.6, decomp: 2.0, handling: 0.65, pursuit: 1.3, attack: 1.8 },
   divPlank: 70, divBenth: 150, shadeMax: 0.95,
   moveCost: 0.003, capMul: 10, invest: 0.5,
   mutSigma: 0.08,  // (settleLimit moved to per-trait rows in 3.0b)
@@ -462,7 +463,7 @@ const CELL = P.WORLD / P.GRID;
 const MAXN = 6000;
 // Observatory ring buffer geometry (channel map documented atop src/observatory/recorder.js).
 // Lives here because W.rec is sized from it; changing CH is a declared rebaseline.
-const REC = { N: 900, STRIDE: 20, CH: 65 };  // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species (7.H)
+const REC = { N: 900, STRIDE: 20, CH: 75 };  // 56-57: locus spread between patches (7.L); 58-64: mean warmth per species (7.H); 65-74: warm-core census (7.H.4)
 
 // ---------- world state (module singletons; one artifact instance) ----------
 const W = {
@@ -485,6 +486,7 @@ const W = {
   // per-cell Q10 factors, all exactly 1 where temp is 0 (7.H): maintenance, photosynthesis, decomposition, handling, pursuit
   qR: new Float32Array(P.GRID * P.GRID).fill(1), qP: new Float32Array(P.GRID * P.GRID).fill(1), qD: new Float32Array(P.GRID * P.GRID).fill(1),
   qH: new Float32Array(P.GRID * P.GRID).fill(1), qS: new Float32Array(P.GRID * P.GRID).fill(1),
+  qA: new Float32Array(P.GRID * P.GRID).fill(1),   // attack/ingestion (7.H.4): bite scales with warmth, flatter than maintenance
   tgx: new Float32Array(P.GRID * P.GRID), tgy: new Float32Array(P.GRID * P.GRID),   // warmth gradient per cell (7.H.2), exactly 0 when flat
   lgx: new Float32Array(P.GRID * P.GRID), lgy: new Float32Array(P.GRID * P.GRID),   // light gradient per cell (7.H.3): what the drifter steers by
   light: new Float32Array(P.GRID * P.GRID),
@@ -758,7 +760,7 @@ function computeTemp(){
     const c = gy*P.GRID+gx; W.temp[c] = v;
     const Q = P.q10, e = v/10; // Math.pow(q, 0) is exactly 1: the certified world's factors stay 1
     W.qR[c] = Math.pow(Q.resp, e); W.qP[c] = Math.pow(Q.photo, e); W.qD[c] = Math.pow(Q.decomp, e);
-    W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e);
+    W.qH[c] = Math.pow(Q.handling, e); W.qS[c] = Math.pow(Q.pursuit, e); W.qA[c] = Math.pow(Q.attack, e);
   }
   // the gradient the organisms sense (7.H.2): central differences on the torus, degrees per world unit
   const G = P.GRID, Tm = W.temp;
@@ -819,6 +821,9 @@ function neighbors(i, radius, cb){
 //  35-41 deaths per species since previous sample
 //  42-48 locus mean per species (Phase 5.1; 0 for species without a locus or with none alive)
 //  49-55 locus standard deviation per species — variance is the fuel gauge of evolution
+//  56-57 locus spread between light patches, mat/plankton (7.L)  58-64 mean warmth experienced per species (7.H)
+//  65    warm-cell count (dT > 3)   66-72 population in warm cells per species
+//  73-74 detritus per warm cell / per ambient cell (7.H.4; all of 65-74 exactly 0 without a warm source)
 // CONTRACT: the recorder is a pure observer — zero PRNG draws, zero
 // mutation of dynamic state. Conformance bit-identity with the recorder
 // running is the standing acceptance test for this whole layer.
@@ -832,7 +837,10 @@ const det = { estab:[0,0,0,0,0,0,0], run:[0,0,0,0,0,0,0], bloom:[0,0,0,0,0,0,0],
   uniform:[0,0,0,0,0,0,0],
   diverse:[0,0,0,0,0,0,0], diverseRun:[0,0,0,0,0,0,0],   // standing polymorphism: both ends coexist
   rail:[0,0,0,0,0,0,0], railRun:[0,0,0,0,0,0,0],           // corridor contact: a locus pinned at its edge (6.2)
-  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0] };         // local adaptation (7.L): the locus differs between light patches
+  adapt:[0,0,0,0,0,0,0], adaptRun:[0,0,0,0,0,0,0],         // local adaptation (7.L): the locus differs between light patches
+  heatRetreat:[0,0,0,0,0,0,0],                              // 7.H.4: a species is thinning out of the warm water
+  heatPile:false, heatPileRun:0,                            // 7.H.4: detritus piling up in the warm core (measured 10.1/10.3: x4+ ambient)
+  heatStarve:false, heatStarveRun:0 };                      // 7.H.4: the apex declining while the warmth it feels stays >= 3
 // 7.L patch statistics: nearest sun by toroidal distance (the phototaxis rule), locus mean per patch for one
 // species. Pure reads; `spread` = max - min over patches holding >= 20 individuals (0 with one sun).
 const PATCH_MIN = 20;
@@ -853,6 +861,7 @@ function detect(r, awake){
   detectEcology(r, awake);
   detectHeredity(r);
   detectChemistry(r);
+  detectHeat(r);
 }
 // ---- ecology: establishment, wake, extinction, blooms and crashes per species ----
 function detectEcology(r, awake){
@@ -944,6 +953,43 @@ function detectHeredity(r){
     }
   }
 }
+// ---- heat (7.H.4): the warm-water narrations, calibrated against the §10 tables of phase7-heat-plan.md ----
+// All three read only warm-core channels (65-74) and warmth felt (58-64), every one exactly 0 without a warm
+// source, so the certified world is silent by construction. Warm = dT > 3, the harness's own cut.
+function detectHeat(r){
+  const B = W.rec, N = REC.N, CH = REC.CH;
+  const wN = B[r+65], cells = P.GRID*P.GRID;
+  // retreat: a species' warm-core count halves against 50 samples (1,000 ticks) ago. Measured 10.1: the hot
+  // sun halves the mat within ~2,000 ticks; 10.4: thermotaxis moves the plankton out at the same pace. The
+  // wording claims only what is measured -- thinning where it is warm, whether by dying or by leaving.
+  if (W.recCount >= 51 && wN >= 20){
+    const r50 = ((W.recHead-50+N)%N)*CH;
+    for (let sp=0; sp<7; sp++){
+      const ago = B[r50+66+sp], now = B[r+66+sp];
+      if (!det.heatRetreat[sp] && ago >= 30 && now <= 0.5*ago){ det.heatRetreat[sp] = 1;
+        pushEvent("heatRetreat", sp, TRAITS[sp].name+" is thinning out of the warm water — down "+Math.round((1-now/Math.max(1,ago))*100)+"% where it is warm."); }
+      else if (det.heatRetreat[sp] && now >= 0.8*Math.max(1,ago)) det.heatRetreat[sp] = 0;
+    }
+  } else if (wN < 20) det.heatRetreat.fill(0);
+  // pile-up: dead matter accumulating in the warm core faster than decomposition eats it. Measured 10.1/10.3:
+  // 3.4-9.7 per warm cell against 0.01-2.4 ambient; healthy cells carry ~2. Needs a real ambient outside
+  // (>= 100 cells) so a global press does not read as a "core".
+  const warmD = B[r+73], ambD = B[r+74];
+  det.heatPileRun = (wN >= 20 && cells - wN >= 100 && warmD >= 4 && warmD >= 2*Math.max(0.2, ambD)) ? det.heatPileRun+1 : 0;
+  if (!det.heatPile && det.heatPileRun >= 10){ det.heatPile = true;
+    pushEvent("heatPile", -1, "Dead matter is piling up in the warm water — "+warmD.toFixed(1)+" per cell against "+ambD.toFixed(1)+" outside."); }
+  else if (det.heatPile && (wN < 20 || warmD < 2)) det.heatPile = false;
+  // apex starving in the heat: warmth felt >= 3 sustained while the pack shrinks. Upkeep scales x2.5^(dT/10)
+  // against a bite at x1.8^(dT/10) -- the mismatch is the mechanism (10.2), the count falling is the evidence.
+  const APX = SPECIES.APEX, felt = B[r+58+APX];
+  det.heatStarveRun = (felt >= 3 && B[r+APX] > 0) ? det.heatStarveRun+1 : 0;
+  if (!det.heatStarve && det.heatStarveRun >= 10 && W.recCount >= 26){
+    const r25 = ((W.recHead-25+N)%N)*CH;
+    if (B[r+APX] < B[r25+APX]){ det.heatStarve = true;
+      pushEvent("heatStarve", APX, "The pack is starving in the heat — upkeep ×"+Math.pow(P.q10.resp, felt/10).toFixed(1)+" against meals that scale flatter."); }
+  }
+  else if (det.heatStarve && felt < 2) det.heatStarve = false;
+}
 // ---- chemistry: mineral depletion trend and lock-up level (the K6 detectors) ----
 function detectChemistry(r){
   const B = W.rec, N = REC.N, CH = REC.CH;
@@ -992,14 +1038,19 @@ function record(){
   // 7.L local adaptation: the locus spread between light patches for the mat (56) and the plankton (57);
   // exactly 0 with one sun. (Measured first as a genotype-light correlation: the wrong instrument -- Solara's
   // locus reads shaded light, which mat density equalises across patches; the patch difference is what moved.)
-  // 7.H: mean warmth experienced per species (58-64); exactly 0 without a warm source
-  { const st = [0,0,0,0,0,0,0], sn = [0,0,0,0,0,0,0];
-    for (let i=0;i<W.n;i++) if (W.alive[i]){ st[W.sp[i]] += W.temp[cellOf(i)]; sn[W.sp[i]]++; }
-    for (let sp=0;sp<7;sp++) B[r+58+sp] = sn[sp] ? st[sp]/sn[sp] : 0; }
+  // 7.H: mean warmth experienced per species (58-64) and warm-core population (66-72); exactly 0 without a warm source
+  { const st = [0,0,0,0,0,0,0], sn = [0,0,0,0,0,0,0], wc = [0,0,0,0,0,0,0];
+    for (let i=0;i<W.n;i++) if (W.alive[i]){ const tv = W.temp[cellOf(i)]; st[W.sp[i]] += tv; sn[W.sp[i]]++; if (tv > 3) wc[W.sp[i]]++; }
+    for (let sp=0;sp<7;sp++){ B[r+58+sp] = sn[sp] ? st[sp]/sn[sp] : 0; B[r+66+sp] = wc[sp]; } }
   B[r+56] = W.sources.length > 1 && TRAITS[SPECIES.MAT].locus ? patchMeans(SPECIES.MAT).spread : 0;
   B[r+57] = W.sources.length > 1 && TRAITS[SPECIES.PREY].locus ? patchMeans(SPECIES.PREY).spread : 0;
-  let fM=0, dM=0;
-  for (let c=0;c<P.GRID*P.GRID;c++){ fM+=W.M[c]; dM+=W.dM[c]; }
+  let fM=0, dM=0, wCells=0, wDet=0, aDet=0;
+  for (let c=0;c<P.GRID*P.GRID;c++){ fM+=W.M[c]; dM+=W.dM[c];
+    const Dc = W.dE[c]+W.dP[c]+W.dM[c];
+    if (W.temp[c] > 3){ wCells++; wDet+=Dc; } else aDet+=Dc; }
+  { const cells = P.GRID*P.GRID; // 7.H.4 warm-core census: count, detritus per warm cell / per ambient cell.
+    // 74 is gated on a warm core existing, so all of 65-74 are exactly 0 in an unwarmed world.
+    B[r+65]=wCells; B[r+73]= wCells ? wDet/wCells : 0; B[r+74]= wCells && cells-wCells ? aDet/(cells-wCells) : 0; }
   let bM=0; for (let i=0;i<W.n;i++) if (W.alive[i]) bM+=W.mn[i];
   let cM=0, cN2=0;
   for (let k=0;k<W.cN;k++) if (W.cAlive[k]){ cM+=W.cM[k]; cN2++; }
@@ -1312,7 +1363,7 @@ function step(){
             W.y[target]=wrap(W.y[target]+Math.sin(ja)*TJ.escape.kick);
             W.vx[target]=Math.cos(ja)*0.5; W.vy[target]=Math.sin(ja)*0.5;
           } else {
-            const bite=Math.min(T.bite, W.en[target] - (TJ.grazeFloor? TJ.grazeFloor*0.99 : 0));
+            const bite=Math.min(T.bite*W.qA[cT], W.en[target] - (TJ.grazeFloor? TJ.grazeFloor*0.99 : 0)); // ingestion warms too (7.H.4, Q10 1.8) -- flatter than upkeep, so the hunter still loses ground
             if(bite>0){
               if(TJ.alarmEmit) W.al[cellOf(target)] += TJ.alarmEmit; // Schreckstoff: injury broadcasts alarm
               const yieldMul = W.cy[target] ? TJ.cystYield : 1;
@@ -1476,6 +1527,7 @@ function initWorld(seed){
   TRAITS.forEach((T, sp) => { if (T.locus){ T.locus.sigma = LOCUS_SHIPPED[sp].sigma; T.locus.curve = LOCUS_SHIPPED[sp].curve; } });
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
   det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0); det.adapt.fill(0); det.adaptRun.fill(0);
+  det.heatRetreat.fill(0); det.heatPile=false; det.heatPileRun=0; det.heatStarve=false; det.heatStarveRun=0;
   recPrev.uptake=recPrev.gpp=recPrev.resp=recPrev.bacRelease=recPrev.corpseToDet=recPrev.egestE=recPrev.deaths=0;
   recPrev.deathsBy.fill(0);
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);

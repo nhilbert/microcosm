@@ -19,7 +19,8 @@ const P = {
   tempAmb: 0,       // ambient warmth (Phase 7 H; the global press is deferred) -- every Q10 factor is exactly 1 at dT = 0
   // Q10 per process (7.H, phase7-heat-plan.md §3): maintenance steeper than photosynthesis (E 0.65 vs 0.32 eV),
   // decomposition in between, handling time shortens, pursuit speed rises less than cost. The separation is the content.
-  q10: { resp: 2.5, photo: 1.6, decomp: 2.0, handling: 0.65, pursuit: 1.3 },
+  // attack (7.H.4): ingestion rises with warmth (Rall E ~0.45 eV) but flatter than maintenance -- the eater still loses.
+  q10: { resp: 2.5, photo: 1.6, decomp: 2.0, handling: 0.65, pursuit: 1.3, attack: 1.8 },
   divPlank: 70, divBenth: 150, shadeMax: 0.95,
   moveCost: 0.003, capMul: 10, invest: 0.5,
   mutSigma: 0.08,  // (settleLimit moved to per-trait rows in 3.0b)

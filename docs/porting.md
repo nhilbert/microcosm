@@ -60,7 +60,11 @@ sized `MAXN = 6000`: parallel `Float32Array`/`Int32Array` columns (`x`, `y`,
 own parallel columns. Light sources are a small array `W.sources` of
 `{x, y, i, sigma}` (Phase 7 L; one to `P.maxSources`); the `light` field is the
 ambient floor plus one toroidal Gaussian per source's light; `temp` is the same
-for warmth (Phase 7 H). Both fields carry per-cell central-difference gradients
+for warmth (Phase 7 H), and from it `computeTemp` derives the per-cell Q10
+factor tables `qR/qP/qD/qH/qS/qA` (maintenance, photosynthesis, decomposition,
+handling, pursuit, attack — `P.q10`), every one exactly 1 where `temp` is 0; a
+port must reproduce `Math.pow(q, dT/10)` per cell, not per organism. Both
+fields carry per-cell central-difference gradients
 (`lgx/lgy`, `tgx/tgy`), and the plankton's phototaxis climbs the *local light
 gradient* (Phase 7 H.3, a declared change from the nearest-sun rule of 7 L) — a
 port must reproduce the gradient arithmetic, not the sun position.
@@ -104,9 +108,12 @@ value.
 Recorder channels 42–48 (locus mean per species) and 49–55 (standard deviation)
 are pure reads over `W.g`; 56–57 (Phase 7 L) hold the locus spread between light
 patches (patch = nearest sun; max − min of patch means over patches holding ≥ 20;
-exactly 0 with one sun) for the mat and the plankton. The sweep and diversity detectors in
-`src/observatory/recorder.js` read those channels plus a share computed
-directly from `W.g`; both are observers and may be reimplemented freely.
+exactly 0 with one sun) for the mat and the plankton; 58–64 (Phase 7 H) the mean
+warmth experienced per species and 65–74 (7 H.4) the warm-core census — warm-cell
+count (dT > 3), population in warm cells per species, detritus per warm and per
+ambient cell — all exactly 0 in an unwarmed world. The sweep, diversity and heat
+detectors in `src/observatory/recorder.js` read those channels plus shares computed
+directly from `W.g`; all are observers and may be reimplemented freely.
 
 ## The write API
 
