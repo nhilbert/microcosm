@@ -1,6 +1,6 @@
 # Phase 7 MV — The Movement Genome (preliminary design)
 
-v0.1 · 2026-08-30 · **DRAFT for owner review** — decisions D1–D7 at the end are open; nothing here ships until they land. Built on docs/movement-genome-research.md (the four-lens research and its §6 synthesis) and the substrate inventory in that document's §1. Owner order context: the UI block (species panel, locus visual grammar) is queued ahead of this phase; the elongation channel this plan uses is delivered there.
+v1.0 · 2026-08-30 · Decisions D1–D7 **resolved** (owner, 2026-08-30) — recorded in §5. Built on docs/movement-genome-research.md (the four-lens research and its §6 synthesis) and the substrate inventory in that document's §1. Owner order context: the UI block (species panel, locus visual grammar) remains queued ahead of this phase, but per D7 nothing in this phase depends on it.
 
 ## 1. Principles (carried in from the research, restated as build rules)
 
@@ -8,7 +8,7 @@ v0.1 · 2026-08-30 · **DRAFT for owner review** — decisions D1–D7 at the en
 2. **Price realized kinematics.** Motion loci ride the existing quadratic-in-realized-velocity cost; navigation loci (set-points, gains) are priced by exposure through the fields, not by upkeep. New harness assertion at every movement corridor rail: energy per realized distance stays monotone (the anti-Sims check).
 3. **Certify in the loop.** Movement corridors are certified across field layouts (shipped sun, hot sun, heater, press, unwarmed), not only genome corners — a movement locus balanced under one geometry is not thereby balanced under another (H.3 corner extinctions are the precedent).
 4. **Instrument before knob.** MV.0 ships the movement observatory and measures reference bands in the shipped world *before* any locus goes live.
-5. **Legibility or explicit exemption.** Every locus passes the 10-second rail test or is designated Observatory-only in its record.
+5. **Legibility or explicit exemption.** Every locus passes the 10-second rail test or is designated Observatory-only in its record. Per D7 the test applies to *motion itself* — path shape, trails, aggregation — not to a body-form channel; movement-strategy loci carry no visual-grammar encoding.
 6. **One structural rule amendment is required** (CONTRIBUTING/genetics-scaling): today "a locus expression may only scale a rate or a probability, never a stock." A set-point locus *shifts a reference*. Proposed amendment: "…scale a rate or a probability **or shift a bounded reference/threshold**, never a stock." `checkLocus` gains a case bounding additive reference spans the way it bounds multipliers. This is an owner-visible rule change (D1 gates the phase; the amendment ships with MV.1).
 
 ## 2. Increments (one at a time, each closed before the next)
@@ -27,7 +27,7 @@ v0.1 · 2026-08-30 · **DRAFT for owner review** — decisions D1–D7 at the en
 **MV.2 — Drifta restlessness locus (rover/sitter).**
 - Name: "Restlessness — exploration vs exploitation." Syndrome expression with fixed signs at the two existing drift draws: noise × (1 + rsSlope·d) and damp pulled toward 1 by a bounded term (rover = stronger kicks, straighter persistence; sitter = the reverse). Exact form is a design-phase measurement (damp is delicate near 1 — the damp term needs a hard cap < 1).
 - Price: automatic — realized-velocity quadratic cost plus predation exposure. The scientific target is **frequency-dependent balance** (research §3.3), a new maintenance mechanism: test by invasion-from-rare in both directions (pin g distribution, seed 5% minority, 8 seeds). Secondary free prediction: spatial sorting after seeding events (allele frequency vs. distance from population core).
-- Takes Drifta to 4 loci = MAXLOCI. Elongation grammar channel binds here (delivered by the UI block; see D7).
+- Takes Drifta to 4 loci = MAXLOCI. Per D7 no body-form channel: the rover/sitter difference must read from the tracks themselves (rail-vs-rail 10-second test on motion), with the Observatory as backstop.
 
 **MV.3 — Bacillus search-style locus (tumble).**
 - Name: "Search style — run length." Expression at the existing tumble-threshold draw: tumbleLow/High × (1 − tumbleSlope·d) (g high = smoother/longer runs, g low = twitchier/tighter). The most literal genotype→controller mapping in biology (che circuit).
@@ -36,7 +36,7 @@ v0.1 · 2026-08-30 · **DRAFT for owner review** — decisions D1–D7 at the en
 **MV.4 — Cilio warmth-preference unblinding.**
 - Give Cilio a small fixed thermo gain (measured, ~0.2–0.3) governed by a heritable set-point locus, idle-branch only, draw-free — evolution pricing what hard-coding got wrong (3/8 core loss when fed hunters walked away from prey). Venator stays excluded (N≈25 drift-dominated; the genetics-phase honesty rule extends).
 
-**Deferred, with re-entry conditions**: speed loci (re-enter with the elongation grammar shipped and MV.1–2 records closed); boldness/flee-threshold (re-enter when a diversifying story is wanted for Cilio); protean escape-angle (re-enter after a measured pursuit arms race exists); heritable plasticity rate (re-enter only as its own declared phase — research §3.4 honesty note applies until then).
+**Deferred, with re-entry conditions**: speed loci (re-enter with MV.1–2 records closed; whether the reserved elongation channel accompanies a speed locus is a grammar decision taken at that increment); boldness/flee-threshold (re-enter when a diversifying story is wanted for Cilio); protean escape-angle (re-enter after a measured pursuit arms race exists); heritable plasticity rate (re-enter only as its own declared phase — research §3.4 honesty note applies until then).
 
 ## 3. Harness
 
@@ -46,15 +46,15 @@ v0.1 · 2026-08-30 · **DRAFT for owner review** — decisions D1–D7 at the en
 
 The flagship's expected first result at shipped σ is that evolution does **not** outrun the trap — the phase's honest deliverable is a world that can finally be *asked*, plus the measured escape threshold if one exists in the legal σ range. Inherited set-points are recorded as the model's known departure from biology (which learns them — research §3.4) in this plan, before measurement, the way the Yoshida non-reproduction was recorded.
 
-## 5. Decisions needed (owner)
+## 5. Decisions (resolved — owner, 2026-08-30)
 
-- **D1 — Phase scope and order.** Ship MV.0→MV.1 first (set-point flagship; scientifically mandated by the trap record, but its expected first result is a null — an honest "no rescue at σ 0.03") vs. leading with MV.2 (rover/sitter: a positive, visible polymorphism story, faster payoff, weaker mandate). *Recommendation: MV.0→MV.1; the trap is this phase's founding problem and the null is a finding.* Devil's advocate, stated plainly: if the σ sweep shows no escape anywhere in [0, 0.12], MV.1 ships a locus whose headline is that it cannot do the one thing it was built for — the owner should decide now whether that is acceptable as the flagship, because it is the *likely* outcome per the research.
-- **D2 — Recorder extension.** 2→4 locus planes (+14 channels) + movement metrics (+~15) + trap detector, with the declared hash rebind. Required before *any* Drifta or Bacillus movement locus (both carry 2 loci already). *Recommendation: yes, in MV.0, once.*
-- **D3 — Set-point span at the rails.** tprefSpan sized so the low rail physically clears the +8 core (escape possible by construction, ±2-ish) vs. biologically modest (±1, escape possibly impossible regardless of σ). *Recommendation: escape-capable rails — otherwise the flagship experiment tests nothing; biological modesty is preserved by σ, not by the corridor.*
-- **D4 — Shipped σ for MV.1.** Standard 0.03 with the sweep as measurement (recommended), or ship whatever σ the sweep shows escapes (if any) — which would be tuning the world to rescue itself, against rule 6. *Recommendation: 0.03; the sweep is reported, not shipped.*
-- **D5 — The tumble-cost inconsistency.** Bacillus pays flat `T.speed²` per tick regardless of realized motion (unlike drift/steer's realized-velocity pricing). Fix to realized pricing (declared ecology change + full re-acceptance) before MV.3, or leave and record. *Recommendation: measure first in MV.0 (how large is the distortion?), decide with data at MV.3 entry.*
-- **D6 — Hunter unblinding in scope?** MV.4 reverses a shipped safety decision (`thermo: 0`) behind a locus. In this phase, or deferred to its own block after MV.1's verdict on set-point loci? *Recommendation: keep in phase but last, contingent on MV.1's record.*
-- **D7 — Grammar sequencing.** Elongation = mobility is reserved but the UI grammar increment is queued *before* this phase; MV.2 assumes it exists. Confirm the ordering holds (grammar first), or MV.2 ships Observatory-only and the elongation binding follows. *Recommendation: grammar first, as queued.*
+- **D1 — Phase order: MV.0→MV.1, the set-point flagship leads.** The devil's-advocate case (a likely null at shipped σ) was put to the owner and accepted in advance: no rescue at σ 0.03 is an honest finding, and the phase's deliverable is the asked question plus the measured escape threshold, if one exists in [0, 0.12].
+- **D2 — Recorder extension: approved as proposed.** 2→4 locus planes, movement metrics, trap detector; one declared hash rebind in MV.0.
+- **D3 — Escape-capable rails.** tprefSpan sized so the low rail physically clears the +8 core (≈±2); biological modesty is carried by σ, not by the corridor.
+- **D4 — σ 0.03 ships.** The sweep {0.03–0.12} is reported, never shipped; the world is not tuned to rescue itself.
+- **D5 — Tumble cost: measure first.** MV.0 quantifies the flat-cost distortion; the fix-or-record decision is taken at MV.3 entry, with data.
+- **D6 — MV.4 stays in phase, last**, contingent on MV.1's record.
+- **D7 — No visual grammar for movement-strategy loci.** The owner expects movement loci to be visible from behaviour itself; the 10-second rail test applies to motion (path shape, trails, aggregation), and a locus that fails it is Observatory-carried, not given a body channel. The elongated↔circular reservation for speed/mobility (grammar decision, 2026-08-30) stays recorded for a possible future speed locus, but nothing in this phase binds to it and the phase no longer sequences behind the UI grammar increment.
 
 ## 6. Risks
 
