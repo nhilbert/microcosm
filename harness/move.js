@@ -226,5 +226,72 @@ if (flag("--patch")){
   console.log(`patch spread >= 0.10 on ${spreads.filter(v=>v>=0.10).length}/8 seeds (${8-spreads.length} without a measurable warm-patch population)`);
 }
 
-if (!flag("--metrics") && !flag("--trap") && !flag("--d5") && !flag("--escape") && !flag("--patch"))
-  console.log("usage: node harness/move.js --metrics | --trap [--a 8] | --d5 | --escape [--a 8] [--sweep] | --patch [--a 10]");
+if (flag("--surface")){
+  // MV.2 pre-measurement (design phase, zero core edits): the persistence surface of the drift walk.
+  // Drifta's damp/noise are set harness-side per run (the --nothermo pattern; initWorld does not
+  // restore them, so every run sets both explicitly). Read through the MV.0 channels + MSD cohort:
+  // this is what sizes the rover/sitter slopes BEFORE anything becomes heritable.
+  const T1 = TRAITS[SPECIES.PREY], D0 = T1.damp, N0 = T1.noise;
+  const configs = [];
+  for (const d of [0.90, 0.93, 0.96, 0.98, 0.99]) configs.push({ label: "damp "+d+(d===D0?" *":""), damp: d, noise: N0 });
+  for (const nz of [0.045, 0.135, 0.18]) configs.push({ label: "noise "+nz, damp: D0, noise: nz });
+  configs.push({ label: "rover d.98 n.135", damp: 0.98, noise: 0.135 }); // the syndrome corner, both signs up
+  configs.push({ label: "sitter d.93 n.045", damp: 0.93, noise: 0.045 });
+  const SEEDS4 = [11, 44, 55, 88];
+  const m = MB.indexOf(SPECIES.PREY);
+  console.log("=== MV.2 pre-measurement: Drifta persistence surface (4 seeds x 18k; shipped damp "+D0+" noise "+N0+" marked *) ===");
+  console.log("config             | core | med pops S/D/C/B/V      | netStep     | entropy     | MSD alpha | Drifta deaths");
+  for (const cfg of configs){
+    const rows = [];
+    for (const s of SEEDS4){
+      L.start(s, true); T1.damp = cfg.damp; T1.noise = cfg.noise;
+      let tracks = null, lost = -1, nsMin = Infinity, nsMax = -Infinity, oeMin = Infinity, oeMax = -Infinity;
+      for (let t=1;t<=HORIZON;t++){
+        C.step();
+        if (t === AT) tracks = makeCohort(30);
+        if (t % REC.STRIDE === 0){ if (tracks) sampleCohort(tracks);
+          if (t > AT){ const ns = chan(125+m), oe = chan(129+m);
+            if (ns < nsMin) nsMin = ns; if (ns > nsMax) nsMax = ns;
+            if (oe < oeMin) oeMin = oe; if (oe > oeMax) oeMax = oe; } }
+        if (lost < 0 && L.coreCollapsed(L.pops(), t)) lost = t;
+      }
+      rows.push({ lost, p: L.pops(), ns: [nsMin, nsMax], oe: [oeMin, oeMax],
+        alpha: cohortAlpha(tracks, SPECIES.PREY).alpha, dD: W.flows.deathsBy[SPECIES.PREY] });
+    }
+    T1.damp = D0; T1.noise = N0;
+    const md = xs => { const a = xs.filter(v => !Number.isNaN(v)).sort((x,y)=>x-y); return a.length ? a[Math.floor(a.length/2)] : NaN; };
+    console.log(`${cfg.label.padEnd(19)}| ${rows.filter(r=>r.lost<0).length}/4  | ${[0,1,2,3,6].map(sp=>md(rows.map(r=>r.p[sp]))).join("/").padEnd(24)}| ${f(Math.min(...rows.map(r=>r.ns[0])))}..${f(Math.max(...rows.map(r=>r.ns[1])))} | ${f(Math.min(...rows.map(r=>r.oe[0])))}..${f(Math.max(...rows.map(r=>r.oe[1])))} | ${f(md(rows.map(r=>r.alpha)))}      | ${md(rows.map(r=>r.dD))}`);
+  }
+}
+
+if (flag("--invade")){
+  // Invasion-from-rare machinery (MV.2's frequency-dependence test, validated first on an existing
+  // locus). --invade sp,plane[,gA,gB]: at t=3000 the species' living population is set 95% resident /
+  // 5% invader in slot order (deterministic; the lib.pin precedent for harness genome writes), sigma
+  // stays shipped, and the minority-classified share is reported every 3k ticks -- then the mirror
+  // start. A price-balanced locus should show frequency-INdependent fate; a frequency-balanced one
+  // (rover/sitter) should return toward the middle from both rare starts.
+  const arg = (args[args.indexOf("--invade")+1] || "1,0").split(",").map(Number);
+  const sp = arg[0], plane = arg[1] || 0, gA = arg[2] === undefined ? 0.8 : arg[2], gB = arg[3] === undefined ? 0.2 : arg[3];
+  console.log(`=== invasion from rare: ${TRAITS[sp].name} plane ${plane}, 95%/5% at t=${AT}, both directions (8 seeds) ===`);
+  for (const [res, inv] of [[gA, gB], [gB, gA]]){
+    console.log(`\nresident g=${res} / invader g=${inv} at 5%:`);
+    console.log("seed | invader share at t=3k 6k 9k 12k 15k 18k | pop 18k");
+    for (const s of SEEDS){
+      L.start(s, true);
+      const off = plane*C.MAXN, shares = [];
+      for (let t=1;t<=HORIZON;t++){
+        if (t === AT){ let k = 0;
+          for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ W.g[off+i] = (k % 20 === 0) ? inv : res; k++; } }
+        C.step();
+        if (t % 3000 === 0 && t >= AT){ let n = 0, ninv = 0;
+          for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ n++; if (Math.abs(W.g[off+i]-inv) < Math.abs(W.g[off+i]-res)) ninv++; }
+          shares.push(n ? ninv/n : NaN); }
+      }
+      console.log(`${s}   | ${shares.map(v => Number.isNaN(v) ? " -  " : v.toFixed(2)).join(" ")} | ${L.pops()[sp]}`);
+    }
+  }
+}
+
+if (!flag("--metrics") && !flag("--trap") && !flag("--d5") && !flag("--escape") && !flag("--patch") && !flag("--surface") && !flag("--invade"))
+  console.log("usage: node harness/move.js --metrics | --trap [--a 8] | --d5 | --escape [--a 8] [--sweep] | --patch [--a 10] | --surface | --invade sp,plane[,gA,gB]");
