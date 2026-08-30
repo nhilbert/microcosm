@@ -43,6 +43,7 @@ const P = {
   WORLD: 1024, GRID: 64,
   sunSigma: 210, sunI: 1.0, ambient: 0.03,   // defaults for the shipped sun and for every sun the player adds (7.L)
   maxSources: 4,    // energy sources (W.sources): light i and warmth a per source; the shipped world has one sun, centred
+  maxWalls: 8,      // walls (7.W): face barriers with light/warmth/flow transmission and per-species passage
   tempAmb: 0,       // ambient warmth (Phase 7 H; the global press is deferred) -- every Q10 factor is exactly 1 at dT = 0
   // Q10 per process (7.H, phase7-heat-plan.md §3): maintenance steeper than photosynthesis (E 0.65 vs 0.32 eV),
   // decomposition in between, handling time shortens, pursuit speed rises less than cost. The separation is the content.
@@ -553,6 +554,16 @@ const W = {
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
   events: [], eventLog: [], lightDirty: false,
   sources: [{ x: P.WORLD / 2, y: P.WORLD / 2, i: P.sunI, a: 0, sigma: P.sunSigma }],  // energy sources (7.L/7.H): light i, warmth a
+  // Walls (7.W): thin barriers on cell boundaries. W.walls holds the drawn strokes; compileWalls()
+  // (the only writer) stamps them into per-FACE property planes -- vertical faces indexed by the LEFT
+  // cell, horizontal by the TOP cell. An open face is pass = all bits, every transmission exactly 1,
+  // and W.wallsOn false short-circuits every wall branch: the certified world's arithmetic bit for bit.
+  walls: [], wallsOn: false,
+  wfPassV: new Int32Array(P.GRID * P.GRID).fill(-1), wfPassH: new Int32Array(P.GRID * P.GRID).fill(-1),
+  wfLtV: new Float32Array(P.GRID * P.GRID).fill(1), wfLtH: new Float32Array(P.GRID * P.GRID).fill(1),
+  wfHtV: new Float32Array(P.GRID * P.GRID).fill(1), wfHtH: new Float32Array(P.GRID * P.GRID).fill(1),
+  wfFlV: new Float32Array(P.GRID * P.GRID).fill(1), wfFlH: new Float32Array(P.GRID * P.GRID).fill(1),
+  wShade: new Float32Array(P.GRID * P.GRID).fill(1),  // occluded/unoccluded light ratio per cell (UI honesty layer; 1 without walls)
   temp: new Float32Array(P.GRID * P.GRID),   // warmth above ambient per cell (7.H); exactly 0 without a warm source
   // per-cell Q10 factors, all exactly 1 where temp is 0 (7.H): maintenance, photosynthesis, decomposition, handling, pursuit
   qR: new Float32Array(P.GRID * P.GRID).fill(1), qP: new Float32Array(P.GRID * P.GRID).fill(1), qD: new Float32Array(P.GRID * P.GRID).fill(1),
@@ -720,6 +731,29 @@ function applyEvent(ev){
       if (ev.a !== undefined) s.a = Math.max(-8, Math.min(15, +ev.a));
       if (ev.sigma !== undefined) s.sigma = Math.max(90, Math.min(300, +ev.sigma));
       computeLight(); computeTemp(); W.lightDirty = true; done && done({ prev }); break; }
+    // Walls (7.W, docs/phase7-walls-plan.md): face barriers -- light/warmth/flow transmission and
+    // per-species passage. Draw-free, like sources: they change the future stream only through ecology.
+    case "wallAdd": {
+      if (W.walls.length >= P.maxWalls) break;
+      const wl = makeWall(ev); if (!wl) break;   // stroke snapped to nothing
+      const k = ev.at === undefined ? W.walls.length : Math.max(0, Math.min(W.walls.length, ev.at|0)); // `at` restores an undone removal at its old index
+      W.walls.splice(k, 0, wl);
+      compileWalls(); computeLight(); computeTemp(); W.lightDirty = true;
+      done && done({ k }); break; }
+    case "wallRemove": {
+      const k = ev.k|0; if (!W.walls[k]) break;
+      const s = W.walls.splice(k, 1)[0];
+      compileWalls(); computeLight(); computeTemp(); W.lightDirty = true;
+      done && done({ k, snap: { x0:s.x0, y0:s.y0, dx:s.dx, dy:s.dy, lt:s.lt, ht:s.ht, fl:s.fl, pass:s.pass } }); break; }
+    case "wallSet": {
+      const wl = W.walls[ev.k|0]; if (!wl) break;
+      const prev = { lt: wl.lt, ht: wl.ht, fl: wl.fl, pass: wl.pass };
+      if (ev.lt !== undefined) wl.lt = Math.max(0, Math.min(1, +ev.lt || 0));
+      if (ev.ht !== undefined) wl.ht = Math.max(0, Math.min(1, +ev.ht || 0));
+      if (ev.fl !== undefined) wl.fl = Math.max(0, Math.min(1, +ev.fl || 0));
+      if (ev.pass !== undefined) wl.pass = ev.pass|0;
+      compileWalls(); computeLight(); computeTemp(); W.lightDirty = true;
+      done && done({ prev }); break; }
     case "feed": {
       const i = ev.i; if (!(W.alive[i] && W.gen[i] === ev.gen)) break;
       const cap = P.capMul*W.sz[i], before = W.en[i];
@@ -759,14 +793,110 @@ function queueEvent(ev){
   W.events.push(ev);
 }
 
+// ---------- Walls (7.W): face barriers (docs/phase7-walls-plan.md) ----------
+// A wall is a player stroke snapped to grid corners and rasterized into a 4-connected staircase of
+// cell-boundary edges (integer Bresenham over corners) -- infinitely thin, so nothing is ever "inside"
+// a wall. Everything here is draw-free. Face indices: vertical face between (x,y) and (x+1,y) lives at
+// y*G+x (the LEFT cell); horizontal face between (x,y) and (x,y+1) at y*G+x (the TOP cell); a wall
+// object stores horizontal faces offset by G*G to keep one list.
+function makeWall(ev){
+  // The stroke is a start point plus the DRAG VECTOR (dx,dy) -- not a second endpoint, because the
+  // minimal-image rule would flip any stroke longer than half the world. A full-height wall is one
+  // stroke with |dy| = WORLD, closing on itself around the torus.
+  const G=P.GRID;
+  const x0=wrap(+ev.x0||0), y0=wrap(+ev.y0||0);
+  const kx0=Math.round(x0/CELL), ky0=Math.round(y0/CELL);
+  const cd=v=>Math.round(Math.max(-P.WORLD,Math.min(P.WORLD,+v||0))/CELL); // one wrap at most: past that the staircase would overwrite itself
+  const dkx=cd(ev.dx), dky=cd(ev.dy);
+  const ax=Math.abs(dkx), ay=Math.abs(dky);
+  if(ax+ay===0) return null;                       // snapped to a point: no wall
+  const sx=dkx>0?1:-1, sy=dky>0?1:-1;
+  const faces=[], path=[[kx0,ky0]];
+  let ix=0, iy=0;
+  while(ix!==ax||iy!==ay){
+    // midpoint rule: step the axis whose normalized progress is behind (pure integer, deterministic)
+    const stepX = iy===ay || (ix!==ax && (2*ix+1)*ay <= (2*iy+1)*ax);
+    const kx=kx0+ix*sx, ky=ky0+iy*sy;
+    if(stepX){ faces.push(G*G + ((ky-1)&(G-1))*G + ((sx>0?kx:kx-1)&(G-1))); ix++; } // edge along row-line ky
+    else     { faces.push(((sy>0?ky:ky-1)&(G-1))*G + ((kx-1)&(G-1))); iy++; }      // edge along column-line kx
+    path.push([kx0+ix*sx, ky0+iy*sy]);
+  }
+  const cl=(v,d)=>v===undefined?d:Math.max(0,Math.min(1,+v||0));
+  return { x0:wrap(kx0*CELL), y0:wrap(ky0*CELL), dx:dkx*CELL, dy:dky*CELL,
+    lt:cl(ev.lt,0), ht:cl(ev.ht,0), fl:cl(ev.fl,0), pass:ev.pass===undefined?0:(ev.pass|0),
+    faces, path };
+}
+function compileWalls(){ // the only writer of the face planes; later walls win on shared faces
+  const N=P.GRID*P.GRID;
+  W.wfPassV.fill(-1); W.wfPassH.fill(-1);
+  W.wfLtV.fill(1); W.wfLtH.fill(1); W.wfHtV.fill(1); W.wfHtH.fill(1); W.wfFlV.fill(1); W.wfFlH.fill(1);
+  W.wallsOn = W.walls.length > 0;
+  if(!W.wallsOn){ W.wShade.fill(1); return; }
+  for(const wl of W.walls) for(const f of wl.faces){
+    if(f>=N){ const c=f-N; W.wfPassH[c]=wl.pass; W.wfLtH[c]=wl.lt; W.wfHtH[c]=wl.ht; W.wfFlH[c]=wl.fl; }
+    else    { W.wfPassV[f]=wl.pass; W.wfLtV[f]=wl.lt; W.wfHtV[f]=wl.ht; W.wfFlV[f]=wl.fl; }
+  }
+}
+// Passage: a step's x (or y) component is dropped when any face it crosses refuses the bodyTag.
+function xPassBlocked(tag, x, y, dx){
+  const G=P.GRID, row=(Math.floor(y/CELL)&(G-1))*G;
+  const c0=Math.floor(x/CELL), c1=Math.floor((x+dx)/CELL);
+  if(dx>0){ for(let cc=c0;cc<c1;cc++)    if(!(W.wfPassV[row+(cc&(G-1))]&tag)) return true; }
+  else    { for(let cc=c0-1;cc>=c1;cc--) if(!(W.wfPassV[row+(cc&(G-1))]&tag)) return true; }
+  return false;
+}
+function yPassBlocked(tag, x, y, dy){
+  const G=P.GRID, col=Math.floor(x/CELL)&(G-1);
+  const r0=Math.floor(y/CELL), r1=Math.floor((y+dy)/CELL);
+  if(dy>0){ for(let rr=r0;rr<r1;rr++)    if(!(W.wfPassH[(rr&(G-1))*G+col]&tag)) return true; }
+  else    { for(let rr=r0-1;rr>=r1;rr--) if(!(W.wfPassH[(rr&(G-1))*G+col]&tag)) return true; }
+  return false;
+}
+// Reachability along the L-path (x leg at the start row, then y leg at the end column) -- the same
+// geometry the axis-separated mover walks, so "can target" and "can get there" agree.
+function pathBlocked(tag, x, y, dx, dy){
+  return xPassBlocked(tag,x,y,dx) || yPassBlocked(tag,x+dx,y,dy);
+}
+function moveOrg(i, dx, dy){ // THE position write for organism motion; draw-free; slides along walls
+  if(!W.wallsOn){ W.x[i]=wrap(W.x[i]+dx); W.y[i]=wrap(W.y[i]+dy); return; }
+  const tag=TRAITS[W.sp[i]].bodyTag;
+  if(!xPassBlocked(tag,W.x[i],W.y[i],dx)) W.x[i]=wrap(W.x[i]+dx);
+  if(!yPassBlocked(tag,W.x[i],W.y[i],dy)) W.y[i]=wrap(W.y[i]+dy);
+}
+// Product of a face-transmission plane over every boundary crossed by the minimal-image segment from
+// (x0,y0) along (dx,dy). A product is order-free, so the two axes walk their crossings independently.
+function marchMul(x0, y0, dx, dy, AV, AH){
+  const G=P.GRID; let m=1;
+  if(dx!==0){
+    const s=dx>0?1:-1, c0=Math.floor(x0/CELL), c1=Math.floor((x0+dx)/CELL);
+    for(let cc=c0; cc!==c1; cc+=s){
+      const t=((s>0?cc+1:cc)*CELL-x0)/dx;
+      const row=Math.floor((y0+t*dy)/CELL)&(G-1);
+      m*=AV[row*G+((s>0?cc:cc-1)&(G-1))];
+      if(m===0) return 0;
+    }
+  }
+  if(dy!==0){
+    const s=dy>0?1:-1, r0=Math.floor(y0/CELL), r1=Math.floor((y0+dy)/CELL);
+    for(let rr=r0; rr!==r1; rr+=s){
+      const t=((s>0?rr+1:rr)*CELL-y0)/dy;
+      const col=Math.floor((x0+t*dx)/CELL)&(G-1);
+      m*=AH[((s>0?rr:rr-1)&(G-1))*G+col];
+      if(m===0) return 0;
+    }
+  }
+  return m;
+}
+
 function diffuseM(){
   const G=P.GRID, M=W.M, T=W.Mtmp, k=P.mDiff*0.25;
+  const FV=W.wfFlV, FH=W.wfFlH; // face flow transmission (7.W): exactly 1 on open faces, so the flux-pair form is the shipped stencil bit for bit
   for(let y=0;y<G;y++){
     const yu=((y-1+G)%G)*G, yd=((y+1)%G)*G, y0=y*G;
     for(let x=0;x<G;x++){
       const xl=(x-1+G)%G, xr=(x+1)%G;
       const c=y0+x, m=M[c];
-      T[c]=m + k*((M[y0+xl]-m)+(M[y0+xr]-m)+(M[yu+x]-m)+(M[yd+x]-m));
+      T[c]=m + k*(FV[y0+xl]*(M[y0+xl]-m)+FV[c]*(M[y0+xr]-m)+FH[yu+x]*(M[yu+x]-m)+FH[c]*(M[yd+x]-m));
     }
   }
   M.set(T);
@@ -782,7 +912,7 @@ function diffuseM(){
     for(let x=0;x<G;x++){
       const xl=(x-1+G)%G, xr=(x+1)%G;
       const c=y0+x, v=S[c];
-      ST[c]=(v + ks*((S[y0+xl]-v)+(S[y0+xr]-v)+(S[yu+x]-v)+(S[yd+x]-v)))*P.scentDecay;
+      ST[c]=(v + ks*(FV[y0+xl]*(S[y0+xl]-v)+FV[c]*(S[y0+xr]-v)+FH[yu+x]*(S[yu+x]-v)+FH[c]*(S[yd+x]-v)))*P.scentDecay;
     }
   }
   S.set(ST);
@@ -793,22 +923,29 @@ function diffuseM(){
     for(let x=0;x<G;x++){
       const xl=(x-1+G)%G, xr=(x+1)%G;
       const c=y0+x, v=A[c];
-      AT[c]=(v + ka*((A[y0+xl]-v)+(A[y0+xr]-v)+(A[yu+x]-v)+(A[yd+x]-v)))*0.85;
+      AT[c]=(v + ka*(FV[y0+xl]*(A[y0+xl]-v)+FV[c]*(A[y0+xr]-v)+FH[yu+x]*(A[yu+x]-v)+FH[c]*(A[yd+x]-v)))*0.85;
     }
   }
   A.set(AT);
 }
 // Irradiance adds: the field is the ambient floor plus one toroidal Gaussian per source's light. Draw-free.
+// Walls (7.W) occlude each source's term by the product of light transmissions over faces crossed on the
+// minimal-image ray; the ambient floor is a floor, not a source, and passes. W.wShade keeps the honest
+// occluded/unoccluded ratio for the painted light layer. Without walls the arithmetic is the shipped one.
 function computeLight(){
-  const S = W.sources;
+  const S = W.sources, on = W.wallsOn;
   for (let gy = 0; gy < P.GRID; gy++) for (let gx = 0; gx < P.GRID; gx++){
     const cx=(gx+0.5)*CELL, cyy=(gy+0.5)*CELL;
-    let v = P.ambient;
+    let v = P.ambient, v0 = P.ambient;
     for (let k = 0; k < S.length; k++){
       const s = S[k], dx=wd(cx-s.x), dy=wd(cyy-s.y);
-      v += s.i * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+      const g = s.i * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+      if (on){ v0 += g; v += g * marchMul(s.x, s.y, dx, dy, W.wfLtV, W.wfLtH); }
+      else v += g;
     }
-    W.light[gy*P.GRID+gx] = v * P.lightMul;
+    const c = gy*P.GRID+gx;
+    W.light[c] = v * P.lightMul;
+    if (on) W.wShade[c] = v0 > 0 ? v/v0 : 1;
   }
   // the gradient the drifter senses (7.H.3, declared change): central differences on the torus, light per world unit
   const G = P.GRID, Lt = W.light;
@@ -821,14 +958,16 @@ function computeLight(){
 // Warmth above ambient (7.H): the same Gaussians, each source's `a` (negative = a cold source). Static like
 // light, recomputed on events only. Sources with a = 0 are skipped so the shipped world's field is exactly 0.
 function computeTemp(){
-  const S = W.sources;
+  const S = W.sources, on = W.wallsOn; // walls (7.W) conduct each source's warmth by their ht per crossed face
   for (let gy = 0; gy < P.GRID; gy++) for (let gx = 0; gx < P.GRID; gx++){
     const cx=(gx+0.5)*CELL, cyy=(gy+0.5)*CELL;
     let v = P.tempAmb;
     for (let k = 0; k < S.length; k++){
       const s = S[k]; if (s.a === 0) continue;
       const dx=wd(cx-s.x), dy=wd(cyy-s.y);
-      v += s.a * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+      let g = s.a * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+      if (on) g *= marchMul(s.x, s.y, dx, dy, W.wfHtV, W.wfHtH);
+      v += g;
     }
     const c = gy*P.GRID+gx; W.temp[c] = v;
     const Q = P.q10, e = v/10; // Math.pow(q, 0) is exactly 1: the certified world's factors stay 1
@@ -1320,6 +1459,10 @@ function impact(entry){
 //   5. Heredity draws one mutation kick PER LOCUS, in TRAITS[sp].loci
 //      order, at every division (sigma > 0 and P.mutation only). Adding,
 //      removing or reordering a species' loci is a declared ecology change.
+//   6. Walls (7.W) draw NOTHING: movement blocking, the hunt filter and
+//      the field transmissions are draw-free and gated on W.wallsOn --
+//      a world without walls runs the certified arithmetic bit for bit;
+//      a walled world diverges only through ecology, like a moved sun.
 // Modification protocol: after ANY edit to this file, run
 //   `node conform.js`   (2 seeds x 3000 ticks, ~3 s)
 // A changed fingerprint is fine only when an ecology change is the
@@ -1405,7 +1548,7 @@ function step(){
         W.vx[i] += T.thermo*sgn*W.tgx[cT]; W.vy[i] += T.thermo*sgn*W.tgy[cT]; }
       const s=Math.hypot(W.vx[i],W.vy[i]);
       if(s>T.driftSpeed){ W.vx[i]*=T.driftSpeed/s; W.vy[i]*=T.driftSpeed/s; }
-      W.x[i]=wrap(W.x[i]+W.vx[i]); W.y[i]=wrap(W.y[i]+W.vy[i]);
+      moveOrg(i, W.vx[i], W.vy[i]); // 7.W: slides along walls; identical writes without them
       cost += P.moveCost*(W.vx[i]*W.vx[i]+W.vy[i]*W.vy[i])*W.sz[i]*T.moveCostMul;
     }
     else if(T.movement==="tumble"){ // run-and-tumble chemotaxis along the detritus gradient
@@ -1416,7 +1559,7 @@ function step(){
       W.mem[i]=here;
       if(R()<pT) W.hd[i]=R()*6.283;
       const tor = T.torpor && W.en[i] < T.torpor*cap ? 0.6 : 1;
-      W.x[i]=wrap(W.x[i]+Math.cos(W.hd[i])*T.speed*tor); W.y[i]=wrap(W.y[i]+Math.sin(W.hd[i])*T.speed*tor);
+      moveOrg(i, Math.cos(W.hd[i])*T.speed*tor, Math.sin(W.hd[i])*T.speed*tor);
       cost += P.moveCost*T.speed*T.speed*W.sz[i]*tor;
     }
     else if(T.movement==="steer"){ // pursuit forager
@@ -1436,6 +1579,7 @@ function step(){
           if(W.sp[j]===W.sp[i]){ if(d<T.interfRadius) nearKin++; return; }
           if(!(T.diet & TJ.bodyTag)) return;
           if(TJ.grazeFloor && W.en[j]<=TJ.grazeFloor) return;
+          if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], ddx, ddy)) return; // 7.W: prey beyond a face this hunter cannot cross is out of reach -- and out of mind (no wall-camping, no through-mesh bites)
           const pref = d*TJ.pursuitPenalty;
           if(pref<best){ best=pref; tx=ddx; ty=ddy; found=true; target=j; }
         });
@@ -1473,8 +1617,7 @@ function step(){
           }
           if(TJ.escape && R()<escP){ // escape jink: prey darts away, contact broken
             const ja=R()*6.283;
-            W.x[target]=wrap(W.x[target]+Math.cos(ja)*TJ.escape.kick);
-            W.y[target]=wrap(W.y[target]+Math.sin(ja)*TJ.escape.kick);
+            moveOrg(target, Math.cos(ja)*TJ.escape.kick, Math.sin(ja)*TJ.escape.kick); // 7.W: a jink cannot cross a wall the prey cannot pass
             W.vx[target]=Math.cos(ja)*0.5; W.vy[target]=Math.sin(ja)*0.5;
           } else {
             const bite=Math.min(T.bite*W.qA[cT], W.en[target] - (TJ.grazeFloor? TJ.grazeFloor*0.99 : 0)); // ingestion warms too (7.H.4, Q10 1.8) -- flatter than upkeep, so the hunter still loses ground
@@ -1522,7 +1665,7 @@ function step(){
         else if(W.bst[i]<0) W.bst[i]++;
         else if(found && best>W.sz[i]+6 && best<T.burst.range){ W.bst[i]=T.burst.dur; speed*=T.burst.mul; W.bst[i]--; }
       }
-      W.x[i]=wrap(W.x[i]+Math.cos(W.hd[i])*speed); W.y[i]=wrap(W.y[i]+Math.sin(W.hd[i])*speed);
+      moveOrg(i, Math.cos(W.hd[i])*speed, Math.sin(W.hd[i])*speed);
       cost += P.moveCost*speed*speed*W.sz[i] + T.interfCost*nearKin;
       if(torpid) cost*=0.7;
     }
@@ -1583,7 +1726,8 @@ function step(){
       const childE = W.en[i]*P.invest;
       const childM = W.mn[i]*P.invest;
       const childP = W.pr[i]*P.invest;
-      const nx=wrap(W.x[i]+(R()-0.5)*T.spread), ny=wrap(W.y[i]+(R()-0.5)*T.spread);
+      let nx=wrap(W.x[i]+(R()-0.5)*T.spread), ny=wrap(W.y[i]+(R()-0.5)*T.spread);
+      if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], wd(nx-W.x[i]), wd(ny-W.y[i]))){ nx=W.x[i]; ny=W.y[i]; } // 7.W: dispersal blocked -- the child settles beside the parent (draws above already spent)
       if(T.settleLimited){
         const c=(Math.floor(ny/CELL)&(P.GRID-1))*P.GRID+(Math.floor(nx/CELL)&(P.GRID-1));
         const crowd = T.layer==="fungal" ? W.fB[c] : W.bB[c];
@@ -1650,6 +1794,7 @@ function initWorld(seed){
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);
   for (const k in W.flows) W.flows[k] = (k==="deathsBy") ? [0,0,0,0,0,0,0] : 0;
   W.sources.length = 0; W.sources.push({ x: P.WORLD/2, y: P.WORLD/2, i: P.sunI, a: 0, sigma: P.sunSigma }); // one sun, centred (like P.lightMul)
+  W.walls.length = 0; compileWalls(); // a fresh world has no walls (7.W)
   computeLight(); computeTemp();
   const nearSun = rad => { const a=R()*6.283, r=Math.sqrt(R())*rad;
     return [wrap(W.sources[0].x+Math.cos(a)*r), wrap(W.sources[0].y+Math.sin(a)*r)]; };

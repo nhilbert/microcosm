@@ -124,9 +124,13 @@ fingerprints must be identical; the coreHash rebind is declared with this plan.
 
 ## 5. Events (the only write path)
 
-- `wallAdd { x0,y0,x1,y1, lt?, ht?, fl?, pass?, at? }` → snap, rasterize, insert
+- `wallAdd { x0,y0, dx,dy, lt?, ht?, fl?, pass?, at? }` → snap, rasterize, insert
   (`at` restores an undone removal), recompile + recompute light/temp. Rejected when
-  `W.walls.length >= P.maxWalls` (8) or the stroke snaps to nothing.
+  `W.walls.length >= P.maxWalls` (8) or the stroke snaps to nothing. The stroke is a
+  start point plus the DRAG VECTOR — an endpoint pair would be flipped by the
+  minimal-image rule for strokes longer than half the world; |dx|,|dy| clamp to one
+  wrap, so a full-height wall is a single stroke with |dy| = WORLD, closing on
+  itself around the torus (found by the seal smoke test, 2026-08-30).
 - `wallRemove { k }` → splice, snap returned for undo.
 - `wallSet { k, lt?, ht?, fl?, pass? }` → clamped, prev returned for undo.
 

@@ -88,6 +88,29 @@ function applyEvent(ev){
       if (ev.a !== undefined) s.a = Math.max(-8, Math.min(15, +ev.a));
       if (ev.sigma !== undefined) s.sigma = Math.max(90, Math.min(300, +ev.sigma));
       computeLight(); computeTemp(); W.lightDirty = true; done && done({ prev }); break; }
+    // Walls (7.W, docs/phase7-walls-plan.md): face barriers -- light/warmth/flow transmission and
+    // per-species passage. Draw-free, like sources: they change the future stream only through ecology.
+    case "wallAdd": {
+      if (W.walls.length >= P.maxWalls) break;
+      const wl = makeWall(ev); if (!wl) break;   // stroke snapped to nothing
+      const k = ev.at === undefined ? W.walls.length : Math.max(0, Math.min(W.walls.length, ev.at|0)); // `at` restores an undone removal at its old index
+      W.walls.splice(k, 0, wl);
+      compileWalls(); computeLight(); computeTemp(); W.lightDirty = true;
+      done && done({ k }); break; }
+    case "wallRemove": {
+      const k = ev.k|0; if (!W.walls[k]) break;
+      const s = W.walls.splice(k, 1)[0];
+      compileWalls(); computeLight(); computeTemp(); W.lightDirty = true;
+      done && done({ k, snap: { x0:s.x0, y0:s.y0, dx:s.dx, dy:s.dy, lt:s.lt, ht:s.ht, fl:s.fl, pass:s.pass } }); break; }
+    case "wallSet": {
+      const wl = W.walls[ev.k|0]; if (!wl) break;
+      const prev = { lt: wl.lt, ht: wl.ht, fl: wl.fl, pass: wl.pass };
+      if (ev.lt !== undefined) wl.lt = Math.max(0, Math.min(1, +ev.lt || 0));
+      if (ev.ht !== undefined) wl.ht = Math.max(0, Math.min(1, +ev.ht || 0));
+      if (ev.fl !== undefined) wl.fl = Math.max(0, Math.min(1, +ev.fl || 0));
+      if (ev.pass !== undefined) wl.pass = ev.pass|0;
+      compileWalls(); computeLight(); computeTemp(); W.lightDirty = true;
+      done && done({ prev }); break; }
     case "feed": {
       const i = ev.i; if (!(W.alive[i] && W.gen[i] === ev.gen)) break;
       const cap = P.capMul*W.sz[i], before = W.en[i];

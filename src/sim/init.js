@@ -21,6 +21,7 @@ function initWorld(seed){
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);
   for (const k in W.flows) W.flows[k] = (k==="deathsBy") ? [0,0,0,0,0,0,0] : 0;
   W.sources.length = 0; W.sources.push({ x: P.WORLD/2, y: P.WORLD/2, i: P.sunI, a: 0, sigma: P.sunSigma }); // one sun, centred (like P.lightMul)
+  W.walls.length = 0; compileWalls(); // a fresh world has no walls (7.W)
   computeLight(); computeTemp();
   const nearSun = rad => { const a=R()*6.283, r=Math.sqrt(R())*rad;
     return [wrap(W.sources[0].x+Math.cos(a)*r), wrap(W.sources[0].y+Math.sin(a)*r)]; };
@@ -42,5 +43,6 @@ function initWorld(seed){
 if (typeof module !== "undefined" && module.exports !== undefined){
   module.exports = { P, W, R, TRAITS, TAG, REC, SPECIES, LOCUS_DEFAULTS, normalizeTraits, indicators, impact, cellOf, diffuseM, wrap, wd, spawn, killOrg, computeLight, computeTemp, rebuild,
     cellLight, neighbors, step, initWorld, resetWorld, applyEvent, drainEvents,
-    queueEvent, mulberry32, CELL, MAXN, MAXLOCI };
+    queueEvent, mulberry32, CELL, MAXN, MAXLOCI,
+    makeWall, compileWalls, marchMul, pathBlocked };
 }

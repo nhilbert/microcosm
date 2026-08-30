@@ -16,6 +16,7 @@ const P = {
   WORLD: 1024, GRID: 64,
   sunSigma: 210, sunI: 1.0, ambient: 0.03,   // defaults for the shipped sun and for every sun the player adds (7.L)
   maxSources: 4,    // energy sources (W.sources): light i and warmth a per source; the shipped world has one sun, centred
+  maxWalls: 8,      // walls (7.W): face barriers with light/warmth/flow transmission and per-species passage
   tempAmb: 0,       // ambient warmth (Phase 7 H; the global press is deferred) -- every Q10 factor is exactly 1 at dT = 0
   // Q10 per process (7.H, phase7-heat-plan.md §3): maintenance steeper than photosynthesis (E 0.65 vs 0.32 eV),
   // decomposition in between, handling time shortens, pursuit speed rises less than cost. The separation is the content.

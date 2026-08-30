@@ -21,6 +21,16 @@ const W = {
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
   events: [], eventLog: [], lightDirty: false,
   sources: [{ x: P.WORLD / 2, y: P.WORLD / 2, i: P.sunI, a: 0, sigma: P.sunSigma }],  // energy sources (7.L/7.H): light i, warmth a
+  // Walls (7.W): thin barriers on cell boundaries. W.walls holds the drawn strokes; compileWalls()
+  // (the only writer) stamps them into per-FACE property planes -- vertical faces indexed by the LEFT
+  // cell, horizontal by the TOP cell. An open face is pass = all bits, every transmission exactly 1,
+  // and W.wallsOn false short-circuits every wall branch: the certified world's arithmetic bit for bit.
+  walls: [], wallsOn: false,
+  wfPassV: new Int32Array(P.GRID * P.GRID).fill(-1), wfPassH: new Int32Array(P.GRID * P.GRID).fill(-1),
+  wfLtV: new Float32Array(P.GRID * P.GRID).fill(1), wfLtH: new Float32Array(P.GRID * P.GRID).fill(1),
+  wfHtV: new Float32Array(P.GRID * P.GRID).fill(1), wfHtH: new Float32Array(P.GRID * P.GRID).fill(1),
+  wfFlV: new Float32Array(P.GRID * P.GRID).fill(1), wfFlH: new Float32Array(P.GRID * P.GRID).fill(1),
+  wShade: new Float32Array(P.GRID * P.GRID).fill(1),  // occluded/unoccluded light ratio per cell (UI honesty layer; 1 without walls)
   temp: new Float32Array(P.GRID * P.GRID),   // warmth above ambient per cell (7.H); exactly 0 without a warm source
   // per-cell Q10 factors, all exactly 1 where temp is 0 (7.H): maintenance, photosynthesis, decomposition, handling, pursuit
   qR: new Float32Array(P.GRID * P.GRID).fill(1), qP: new Float32Array(P.GRID * P.GRID).fill(1), qD: new Float32Array(P.GRID * P.GRID).fill(1),
