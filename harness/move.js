@@ -87,7 +87,7 @@ if (flag("--metrics")){
 if (flag("--trap")){
   const a = num("--a", 8);
   console.log(`=== trap detector calibration: warmth +${a} on the shipped sun at t=${AT} (evolving, 8 seeds) ===`);
-  console.log("per species: max share of population in warm cells · max reserve gap (amb - warm) while share >= 0.5 · heatTrap fire tick · extinction tick");
+  console.log("per species: max warmth felt · min reserve (pop >= 50) · heatTrap fire tick · extinction tick");
   // Reports the REAL detector (recorder heatTrap) with the raw statistics behind it. Calibration
   // history: the first (gap) statistic died against this measurement -- under +8 the warm region covers
   // the whole inhabited area, share saturates at 1.0 and no ambient population remains to contrast
