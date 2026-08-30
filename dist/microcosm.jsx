@@ -2464,11 +2464,20 @@ function drawMetabolism(g, wpx, hpx){
 // over time, the founder value as a dashed line, amber intervention markers. Bottom: histogram
 // of the living population now, bars in the genotype tint. Variance is drawn deliberately large:
 // it is the fuel gauge of evolution, and a sweep is visible as the ribbon narrowing while it moves.
-function drawTraits(g, wpx, hpx){
-  g.fillStyle = "#0B131E"; g.fillRect(0, 0, wpx, hpx);
-  const bands = []; // one band per (species, locus): the multi-locus page
+// One band per (species, locus). The canvas is sized by its parent to TRAIT_BAND_H per band and
+// scrolls vertically (a phone screen holds ~3 bands; the world now grows loci faster than pixels —
+// the old fixed-height split made every band overflow into the next one's header). The stats live
+// on a second header line: right-aligning them collided with the title at phone widths.
+const TRAIT_BAND_H = 160;
+function traitBandList(){
+  const bands = [];
   for (const sp of SPECIES.LOCI){ if (TRAITS[sp].apex) continue;
     TRAITS[sp].loci.forEach((_, k) => { if (k < LOCUS_CH.length) bands.push([sp, k]); }); }
+  return bands;
+}
+function drawTraits(g, wpx, hpx){
+  g.fillStyle = "#0B131E"; g.fillRect(0, 0, wpx, hpx);
+  const bands = traitBandList();
   const n = W.recCount;
   if (!bands.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
   const bandH = hpx / bands.length;
@@ -2476,9 +2485,10 @@ function drawTraits(g, wpx, hpx){
     const L = TRAITS[sp].loci[kL], c = SPECIES_META[sp].rgb, col = "rgb("+c[0]+","+c[1]+","+c[2]+")";
     const mCh = LOCUS_CH[kL][0]+sp, sCh = LOCUS_CH[kL][1]+sp;
     const top = bi*bandH, padL = 34, padR = 10;
-    // vertical budget per band: header 22, ribbon, 24 for the patch marks, histogram, 26 for its labels
-    const histH = Math.max(20, Math.round(bandH*0.28)), ribH = Math.max(30, bandH - 22 - 24 - histH - 26);
-    const ribT = top + 22, histT = ribT + ribH + 24;
+    // vertical budget per band (sums to bandH at 160): title 14 + stats line 20, ribbon, 24 for the
+    // patch marks, histogram, 26 for its labels
+    const histH = Math.max(20, Math.round(bandH*0.26)), ribH = Math.max(30, bandH - 34 - 24 - histH - 26);
+    const ribT = top + 34, histT = ribT + ribH + 24;
     const cw = wpx - padL - padR;
     g.font = "11px ui-monospace, Menlo, monospace";
     g.fillStyle = col; g.fillText(SPECIES_META[sp].name + " · " + L.label.toLowerCase(), padL, top + 14);
@@ -2508,7 +2518,7 @@ function drawTraits(g, wpx, hpx){
       if (W.sources.length > 1){ const pm = patchMeans(sp, kL); // 7.L: by patch, only when there is more than one sun
         const parts = pm.n.map((k, j) => k >= PATCH_MIN ? pm.mean[j].toFixed(2) : null).filter(Boolean);
         if (parts.length > 1) lab += " · by sun " + parts.join(" | "); }
-      g.fillStyle = "#B8C5D1"; g.fillText(lab, padL+cw-g.measureText(lab).width, top+14);
+      g.fillStyle = "#B8C5D1"; g.font = "10px ui-monospace, Menlo, monospace"; g.fillText(lab, padL, top+27);
     } else { g.fillStyle="#5E7386"; g.fillText("gathering history…", padL+6, ribT+ribH/2); }
     // histogram of the living population
     const BINS = 24, hist = new Float32Array(BINS); let tot=0;
@@ -2634,7 +2644,7 @@ function DataMode({ docked }){
     if (!s) return;
     const dx = e.clientX - s.x;
     if (Math.abs(dx) > 64 && performance.now() - s.t < 600)
-      setPage(p => Math.max(0, Math.min(4, p + (dx < 0 ? 1 : -1))));
+      setPage(p => Math.max(0, Math.min(PAGE_TITLES.length-1, p + (dx < 0 ? 1 : -1))));
   };
   const n = W.recCount;
   const k = (scrub !== null && n>0) ? Math.min(scrub, n-1) : (n>0 ? n-1 : 0);
@@ -2660,11 +2670,22 @@ function DataMode({ docked }){
               color:"#B8C5D1", fontFamily:"inherit" }}>{logScale ? "log" : "lin"}</button>
         )}
       </div>
-      {page === 3 ? <HealthPage /> : page === 4 ? <EventsPage /> : (
+      {page === 3 ? <HealthPage /> : page === 4 ? <EventsPage /> : page === 5 ? (
+        // Traits scrolls: the canvas takes TRAIT_BAND_H per (species, locus) band — a phone shows ~3
+        // bands at a time — and the legend rides in the same scroll region. touchAction pan-y keeps
+        // vertical scrolling native while the pointer handlers still catch the horizontal page swipe.
+        <div style={{ flex:1, minHeight:0, overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+          <canvas ref={cRef} onPointerDown={e => { e.stopPropagation(); swDown(e); }}
+            onPointerUp={swUp}
+            style={{ width:"100%", height: Math.max(1, traitBandList().length)*TRAIT_BAND_H,
+              display:"block", touchAction:"pan-y" }} />
+          <TraitsLegend />
+        </div>
+      ) : (
         <canvas ref={cRef} onPointerDown={e => { e.stopPropagation(); swDown(e); onScrub(e); }}
           onPointerMove={e => e.buttons && onScrub(e)}
           onPointerUp={e => { swUp(e); setScrub(null); }}
-          style={{ width:"100%", height: page===5 ? (docked ? "62%" : "58%") : docked ? "38%" : "46%", minHeight:170,
+          style={{ width:"100%", height: docked ? "38%" : "46%", minHeight:170,
             touchAction:"none", cursor: page===0 ? "col-resize" : "default" }} />
       )}
       {page === 0 && (
@@ -2683,7 +2704,6 @@ function DataMode({ docked }){
           <span style={{color:"rgb(91,200,232)"}}>● dissolved</span>
         </div>
       )}
-      {page === 5 && <TraitsLegend />}
       {page === 2 && (
         <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 14px", padding:"8px 16px", fontSize:12 }}>
           <span style={{color:"rgb(140,230,170)"}}>● production (GPP)</span>
