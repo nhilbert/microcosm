@@ -91,9 +91,11 @@ All of them build on `harness/lib.js`; add new measurements there rather than
 copying loops between scripts, and give any new estimator a case in
 `harness/selftest.js` — that file runs inside `npm test`.
 
-**Heredity changes.** A locus expression may only scale a rate or a probability,
-never a stock, and must reduce to exactly the bare trait at `g0` (that identity is
-what keeps the silent genome bit-identical). After any change to a locus:
+**Heredity changes.** A locus expression may only scale a rate or a probability
+or shift a bounded reference/threshold (amended MV.1, owner decision D1-D4:
+a set-point is a reference, checked at both rails by `checkLocus` the way
+multipliers are), never a stock, and must reduce to exactly the bare trait at
+`g0` (that identity is what keeps the silent genome bit-identical). After any change to a locus:
 `npm run conform` must show the *silent* fingerprints identical and only the
 *evolving* ones changed; recapture both `conform` and `yoshida` baselines with the
 declared reason; then `tune`, `corridor` and `gate5`.

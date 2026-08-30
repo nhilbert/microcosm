@@ -97,7 +97,12 @@ function step(){
       W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + px;
       W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + py;
       if (T.thermo && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2 thermotaxis: down the discomfort gradient |dT - tpref| (draw-free; skipped in a flat field)
-        const sgn = dT > T.topt ? -1 : dT < T.topt ? 1 : 0;
+        // MV.1 (declared change): the set-point is heritable -- tpref = topt + tprefSpan*(g - g0) summed
+        // over the loci carrying tprefSpan, in locus order; exactly topt at g0. The §12 trap decision made
+        // real: evolution, not a reprice, owns the set-point that walked the swarm into the +8 core.
+        let tp = T.topt;
+        for (let k=0;k<T.loci.length;k++){ const Lk = T.loci[k]; if (Lk.tprefSpan) tp += Lk.tprefSpan*(W.g[k*MAXN+i]-Lk.g0); }
+        const sgn = dT > tp ? -1 : dT < tp ? 1 : 0;
         W.vx[i] += T.thermo*sgn*W.tgx[cT]; W.vy[i] += T.thermo*sgn*W.tgy[cT]; }
       const s=Math.hypot(W.vx[i],W.vy[i]);
       if(s>T.driftSpeed){ W.vx[i]*=T.driftSpeed/s; W.vy[i]*=T.driftSpeed/s; }

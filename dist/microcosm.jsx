@@ -153,6 +153,16 @@ const SPECIES_ROWS = [
         "loWord": "quick-burning",
         "hiTrait": "warm upkeep relief",
         "loTrait": "warm intake"
+      },
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "tprefSpan": 4,
+        "label": "Warmth preference",
+        "hiWord": "warm-seeking",
+        "loWord": "cool-seeking",
+        "hiTrait": "warmer set-point",
+        "loTrait": "cooler set-point"
       }
     ],
     "topt": 9,
@@ -469,7 +479,7 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //              warmth-SCALED gain (photosynthesis for the drifter, decomposition for the decomposer)
 //              x (1 - warmGainSlope*(g-g0)*dT/10). Both exactly 1 at dT <= 0: a locus expressing only
 //              these is warmth-gated (warmGated, derived) -- invisible until the world warms.
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, curve: 0 };
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, tprefSpan: 0, curve: 0 };
 // Multi-locus (Phase 7): a species row carries `locus` (its first, display locus) and optionally
 // `loci: [...]` for the rest; the loader flattens both into t.loci, ordered — LOCUS ORDER IS PART OF
 // THE RNG CONTRACT (one mutation draw per locus, in order, at every division). t.locus stays an alias
@@ -485,7 +495,7 @@ function normalizeTraits(rows){
     for (const L of t.loci){
       for (const k in LOCUS_DEFAULTS) if (L[k] === undefined) L[k] = LOCUS_DEFAULTS[k];
       L.warmGated = !(L.escSlope || L.kpSlope || L.catchSlope || L.kbSlope || L.lightSlope || L.rateSlope || L.effSlope)
-        && !!(L.warmSlope || L.warmGainSlope); // expressed only through warmth: the narration detectors stay silent in an unwarmed world
+        && !!(L.warmSlope || L.warmGainSlope || L.tprefSpan); // expressed only through warmth (a set-point needs a temp gradient): the narration detectors stay silent in an unwarmed world
       checkLocus(t, L);
     }
     t.locus = t.loci.length ? t.loci[0] : null;
@@ -506,7 +516,10 @@ function checkLocus(t, L){
       escape: t.escape ? (t.escape.p + L.escSlope*d - t.escape.p*L.curve*d*d)/t.escape.p : 1 };
     for (const k in mults) if (!(mults[k] >= LOCUS_MULT_MIN && mults[k] <= LOCUS_MULT_MAX)) bad.push(k+"@g="+g+"="+mults[k].toFixed(2));
   }
-  if (bad.length) throw new Error("locus on "+t.name+" expresses a multiplier outside ["+LOCUS_MULT_MIN+","+LOCUS_MULT_MAX+"]: "+bad.join(" "));
+  // A reference-shifting locus (MV.1): the set-point must stay inside the species' thermal niche at both rails
+  if (L.tprefSpan){ const tLo = t.topt - L.tprefSpan*L.g0, tHi = t.topt + L.tprefSpan*(1-L.g0);
+    if (!(tLo >= 0 && tHi <= t.ctmax)) bad.push("tpref["+tLo.toFixed(1)+".."+tHi.toFixed(1)+"] outside [0,"+t.ctmax+"]"); }
+  if (bad.length) throw new Error("locus on "+t.name+" expresses a multiplier outside ["+LOCUS_MULT_MIN+","+LOCUS_MULT_MAX+"] or an out-of-niche reference: "+bad.join(" "));
 }
 // ---------- the species table: src/sim/species.json, inlined by tools/build.py as SPECIES_ROWS ----------
 // Row order is the species index and part of the RNG contract; never reorder. Tag names resolve to
@@ -691,7 +704,7 @@ function applyEvent(ev){
     case "locus": {
       const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].loci[ev.locus|0]; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break; // ev.locus: which locus (default 0, the display locus)
       const prev = Lc[ev.key];
-      const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : [0, 1.5]; // slopes are prices: bounded too
+      const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : ev.key === "tprefSpan" ? [0, 8] : [0, 1.5]; // slopes are prices: bounded too; a reference span is degrees, not a multiplier
       Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));
       done && done({ prev }); break; }
     // Energy sources (7.L/7.H): light i (0-1.5) and warmth a (-8..15) per source. Never fewer than one
@@ -1486,7 +1499,12 @@ function step(){
       W.vx[i]=W.vx[i]*T.damp + (R()-0.5)*T.noise + px;
       W.vy[i]=W.vy[i]*T.damp + (R()-0.5)*T.noise + py;
       if (T.thermo && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2 thermotaxis: down the discomfort gradient |dT - tpref| (draw-free; skipped in a flat field)
-        const sgn = dT > T.topt ? -1 : dT < T.topt ? 1 : 0;
+        // MV.1 (declared change): the set-point is heritable -- tpref = topt + tprefSpan*(g - g0) summed
+        // over the loci carrying tprefSpan, in locus order; exactly topt at g0. The §12 trap decision made
+        // real: evolution, not a reprice, owns the set-point that walked the swarm into the +8 core.
+        let tp = T.topt;
+        for (let k=0;k<T.loci.length;k++){ const Lk = T.loci[k]; if (Lk.tprefSpan) tp += Lk.tprefSpan*(W.g[k*MAXN+i]-Lk.g0); }
+        const sgn = dT > tp ? -1 : dT < tp ? 1 : 0;
         W.vx[i] += T.thermo*sgn*W.tgx[cT]; W.vy[i] += T.thermo*sgn*W.tgy[cT]; }
       const s=Math.hypot(W.vx[i],W.vy[i]);
       if(s>T.driftSpeed){ W.vx[i]*=T.driftSpeed/s; W.vy[i]*=T.driftSpeed/s; }
@@ -2450,13 +2468,13 @@ function drawTraits(g, wpx, hpx){
   g.fillStyle = "#0B131E"; g.fillRect(0, 0, wpx, hpx);
   const bands = []; // one band per (species, locus): the multi-locus page
   for (const sp of SPECIES.LOCI){ if (TRAITS[sp].apex) continue;
-    TRAITS[sp].loci.forEach((_, k) => { if (k < 2) bands.push([sp, k]); }); }
+    TRAITS[sp].loci.forEach((_, k) => { if (k < LOCUS_CH.length) bands.push([sp, k]); }); }
   const n = W.recCount;
   if (!bands.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
   const bandH = hpx / bands.length;
   bands.forEach(([sp, kL], bi) => {
     const L = TRAITS[sp].loci[kL], c = SPECIES_META[sp].rgb, col = "rgb("+c[0]+","+c[1]+","+c[2]+")";
-    const mCh = (kL ? 75 : 42)+sp, sCh = (kL ? 82 : 49)+sp;
+    const mCh = LOCUS_CH[kL][0]+sp, sCh = LOCUS_CH[kL][1]+sp;
     const top = bi*bandH, padL = 34, padR = 10;
     // vertical budget per band: header 22, ribbon, 24 for the patch marks, histogram, 26 for its labels
     const histH = Math.max(20, Math.round(bandH*0.28)), ribH = Math.max(30, bandH - 22 - 24 - histH - 26);
@@ -2519,8 +2537,8 @@ function TraitsLegend(){
   const r = ((W.recHead-1+REC.N)%REC.N)*REC.CH;
   const rows = [];
   for (const sp of SPECIES.LOCI){ if (TRAITS[sp].apex) continue;
-    TRAITS[sp].loci.forEach((L, kL) => { if (kL >= 2) return;
-      const c = SPECIES_META[sp].rgb, mean = W.rec[r+(kL?75:42)+sp], sd = W.rec[r+(kL?82:49)+sp];
+    TRAITS[sp].loci.forEach((L, kL) => { if (kL >= LOCUS_CH.length) return;
+      const c = SPECIES_META[sp].rgb, mean = W.rec[r+LOCUS_CH[kL][0]+sp], sd = W.rec[r+LOCUS_CH[kL][1]+sp];
       let hi=0, tot=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ tot++; if (W.g[kL*MAXN+i] > L.g0+0.05) hi++; }
       rows.push(<span key={sp+"·"+kL} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
         ● {SPECIES_META[sp].name} {L.label.toLowerCase()} {mean.toFixed(2)} ±{sd.toFixed(2)} · {L.hiWord} {tot ? Math.round(100*hi/tot) : 0}%</span>);

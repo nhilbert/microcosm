@@ -48,7 +48,7 @@ const CORPSIVORE_DEFAULTS = { minMass: 0, maxMass: 1e9, dietOnly: false };
 //              warmth-SCALED gain (photosynthesis for the drifter, decomposition for the decomposer)
 //              x (1 - warmGainSlope*(g-g0)*dT/10). Both exactly 1 at dT <= 0: a locus expressing only
 //              these is warmth-gated (warmGated, derived) -- invisible until the world warms.
-const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, curve: 0 };
+const LOCUS_DEFAULTS = { sigma: 0, escSlope: 0, kpSlope: 0, catchSlope: 0, kbSlope: 0, lightSlope: 0, rateSlope: 0, effSlope: 0, warmSlope: 0, warmGainSlope: 0, tprefSpan: 0, curve: 0 };
 // Multi-locus (Phase 7): a species row carries `locus` (its first, display locus) and optionally
 // `loci: [...]` for the rest; the loader flattens both into t.loci, ordered — LOCUS ORDER IS PART OF
 // THE RNG CONTRACT (one mutation draw per locus, in order, at every division). t.locus stays an alias
@@ -64,7 +64,7 @@ function normalizeTraits(rows){
     for (const L of t.loci){
       for (const k in LOCUS_DEFAULTS) if (L[k] === undefined) L[k] = LOCUS_DEFAULTS[k];
       L.warmGated = !(L.escSlope || L.kpSlope || L.catchSlope || L.kbSlope || L.lightSlope || L.rateSlope || L.effSlope)
-        && !!(L.warmSlope || L.warmGainSlope); // expressed only through warmth: the narration detectors stay silent in an unwarmed world
+        && !!(L.warmSlope || L.warmGainSlope || L.tprefSpan); // expressed only through warmth (a set-point needs a temp gradient): the narration detectors stay silent in an unwarmed world
       checkLocus(t, L);
     }
     t.locus = t.loci.length ? t.loci[0] : null;
@@ -85,7 +85,10 @@ function checkLocus(t, L){
       escape: t.escape ? (t.escape.p + L.escSlope*d - t.escape.p*L.curve*d*d)/t.escape.p : 1 };
     for (const k in mults) if (!(mults[k] >= LOCUS_MULT_MIN && mults[k] <= LOCUS_MULT_MAX)) bad.push(k+"@g="+g+"="+mults[k].toFixed(2));
   }
-  if (bad.length) throw new Error("locus on "+t.name+" expresses a multiplier outside ["+LOCUS_MULT_MIN+","+LOCUS_MULT_MAX+"]: "+bad.join(" "));
+  // A reference-shifting locus (MV.1): the set-point must stay inside the species' thermal niche at both rails
+  if (L.tprefSpan){ const tLo = t.topt - L.tprefSpan*L.g0, tHi = t.topt + L.tprefSpan*(1-L.g0);
+    if (!(tLo >= 0 && tHi <= t.ctmax)) bad.push("tpref["+tLo.toFixed(1)+".."+tHi.toFixed(1)+"] outside [0,"+t.ctmax+"]"); }
+  if (bad.length) throw new Error("locus on "+t.name+" expresses a multiplier outside ["+LOCUS_MULT_MIN+","+LOCUS_MULT_MAX+"] or an out-of-niche reference: "+bad.join(" "));
 }
 // ---------- the species table: src/sim/species.json, inlined by tools/build.py as SPECIES_ROWS ----------
 // Row order is the species index and part of the RNG contract; never reorder. Tag names resolve to

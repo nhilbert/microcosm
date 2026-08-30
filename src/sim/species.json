@@ -75,6 +75,16 @@
         "loWord": "quick-burning",
         "hiTrait": "warm upkeep relief",
         "loTrait": "warm intake"
+      },
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "tprefSpan": 4,
+        "label": "Warmth preference",
+        "hiWord": "warm-seeking",
+        "loWord": "cool-seeking",
+        "hiTrait": "warmer set-point",
+        "loTrait": "cooler set-point"
       }
     ],
     "topt": 9,

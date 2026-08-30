@@ -218,13 +218,13 @@ function drawTraits(g, wpx, hpx){
   g.fillStyle = "#0B131E"; g.fillRect(0, 0, wpx, hpx);
   const bands = []; // one band per (species, locus): the multi-locus page
   for (const sp of SPECIES.LOCI){ if (TRAITS[sp].apex) continue;
-    TRAITS[sp].loci.forEach((_, k) => { if (k < 2) bands.push([sp, k]); }); }
+    TRAITS[sp].loci.forEach((_, k) => { if (k < LOCUS_CH.length) bands.push([sp, k]); }); }
   const n = W.recCount;
   if (!bands.length){ g.fillStyle="#5E7386"; g.font="11px ui-monospace, Menlo, monospace"; g.fillText("no heritable traits in this world", 12, 24); return; }
   const bandH = hpx / bands.length;
   bands.forEach(([sp, kL], bi) => {
     const L = TRAITS[sp].loci[kL], c = SPECIES_META[sp].rgb, col = "rgb("+c[0]+","+c[1]+","+c[2]+")";
-    const mCh = (kL ? 75 : 42)+sp, sCh = (kL ? 82 : 49)+sp;
+    const mCh = LOCUS_CH[kL][0]+sp, sCh = LOCUS_CH[kL][1]+sp;
     const top = bi*bandH, padL = 34, padR = 10;
     // vertical budget per band: header 22, ribbon, 24 for the patch marks, histogram, 26 for its labels
     const histH = Math.max(20, Math.round(bandH*0.28)), ribH = Math.max(30, bandH - 22 - 24 - histH - 26);
@@ -287,8 +287,8 @@ function TraitsLegend(){
   const r = ((W.recHead-1+REC.N)%REC.N)*REC.CH;
   const rows = [];
   for (const sp of SPECIES.LOCI){ if (TRAITS[sp].apex) continue;
-    TRAITS[sp].loci.forEach((L, kL) => { if (kL >= 2) return;
-      const c = SPECIES_META[sp].rgb, mean = W.rec[r+(kL?75:42)+sp], sd = W.rec[r+(kL?82:49)+sp];
+    TRAITS[sp].loci.forEach((L, kL) => { if (kL >= LOCUS_CH.length) return;
+      const c = SPECIES_META[sp].rgb, mean = W.rec[r+LOCUS_CH[kL][0]+sp], sd = W.rec[r+LOCUS_CH[kL][1]+sp];
       let hi=0, tot=0; for (let i=0;i<W.n;i++) if (W.alive[i] && W.sp[i]===sp){ tot++; if (W.g[kL*MAXN+i] > L.g0+0.05) hi++; }
       rows.push(<span key={sp+"·"+kL} style={{ color:"rgb("+c[0]+","+c[1]+","+c[2]+")" }}>
         ● {SPECIES_META[sp].name} {L.label.toLowerCase()} {mean.toFixed(2)} ±{sd.toFixed(2)} · {L.hiWord} {tot ? Math.round(100*hi/tot) : 0}%</span>);

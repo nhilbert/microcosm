@@ -58,7 +58,7 @@ function applyEvent(ev){
     case "locus": {
       const Lc = TRAITS[ev.sp] && TRAITS[ev.sp].loci[ev.locus|0]; if (!Lc || !(ev.key in LOCUS_DEFAULTS)) break; // ev.locus: which locus (default 0, the display locus)
       const prev = Lc[ev.key];
-      const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : [0, 1.5]; // slopes are prices: bounded too
+      const lim = ev.key === "sigma" ? [0, 0.12] : ev.key === "curve" ? [-0.5, 0.8] : ev.key === "tprefSpan" ? [0, 8] : [0, 1.5]; // slopes are prices: bounded too; a reference span is degrees, not a multiplier
       Lc[ev.key] = Math.max(lim[0], Math.min(lim[1], +ev.v || 0));
       done && done({ prev }); break; }
     // Energy sources (7.L/7.H): light i (0-1.5) and warmth a (-8..15) per source. Never fewer than one
