@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The world's own colors (CLAUDE.md color grammar): mat green ring for the
+     Solara core, pale plankton dots, and the glacier-blue Venator spearhead
+     [168,214,244]. No amber — that is the player's hand, not the world's. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- soft mat disc -->
+    <path android:fillColor="#1E4D33"
+        android:pathData="M54,54 m-22,0 a22,22 0 1,1 44,0 a22,22 0 1,1 -44,0" />
+    <path android:fillColor="#3E8A55"
+        android:pathData="M54,54 m-15,0 a15,15 0 1,1 30,0 a15,15 0 1,1 -30,0" />
+    <!-- plankton -->
+    <path android:fillColor="#BFE3C9"
+        android:pathData="M40,44 m-2.4,0 a2.4,2.4 0 1,1 4.8,0 a2.4,2.4 0 1,1 -4.8,0" />
+    <path android:fillColor="#BFE3C9"
+        android:pathData="M63,62 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0" />
+    <path android:fillColor="#BFE3C9"
+        android:pathData="M50,66 m-1.6,0 a1.6,1.6 0 1,1 3.2,0 a1.6,1.6 0 1,1 -3.2,0" />
+    <!-- Venator spearhead, heading up-right -->
+    <path android:fillColor="#A8D6F4"
+        android:pathData="M70,32 L60,46 L66,44 L64,52 Z" />
+</vector>

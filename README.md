@@ -80,6 +80,14 @@ npm test        # build + syntax check + conformance
 Nothing in `dev/` ships. It exists so a browser has something to load; the
 artifact is unaffected by it.
 
+To run it **on an Android phone**: the Releases page carries a rolling
+**Microcosm APK (latest)** (tag `apk-latest`), rebuilt by CI from the current
+artifact on every relevant push. Download `microcosm.apk` on the phone and
+install it. The wrapper in `android/` is a dependency-free WebView shell —
+the sim still runs as JS; `docs/android-wrapper.md` has the details and the
+decisions (offline, no permissions, no localStorage, committed identity-only
+keystore).
+
 ## The harnesses
 
 The simulation core is pure, deterministic and framework-free — no DOM, no

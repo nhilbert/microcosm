@@ -1,0 +1,69 @@
+name: Android APK
+
+# Builds the WebView wrapper around the current artifact and publishes the
+# APK two ways: as a run artifact, and attached to the rolling "apk-latest"
+# release — the release asset is a direct download link a phone can open.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "src/**"
+      - "android/**"
+      - "tools/build-app.js"
+      - "tools/build.py"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android-apk.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    name: Build & publish APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: npm install --no-audit --no-fund
+
+      - name: Build web assets (artifact -> single HTML)
+        run: node tools/build-app.js
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build signed APK
+        run: gradle -p android assembleRelease -PversionCode=${{ github.run_number }} --no-daemon
+
+      - name: Collect APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk microcosm.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: microcosm-apk
+          path: microcosm.apk
+
+      - name: Update the rolling apk-latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: Microcosm APK (latest)
+          prerelease: true
+          files: microcosm.apk
+          body: |
+            Rolling build of the Android wrapper around the current artifact.
+            Open this page on the phone, download `microcosm.apk`, and install
+            it (Android will ask once to allow installs from the browser).
+            Later builds install over this one — same signature, rising
+            version code. See docs/android-wrapper.md.
