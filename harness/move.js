@@ -304,14 +304,17 @@ if (flag("--pheno")){
   for (const s of SEEDS){
     L.start(s, true);
     for (let t=1;t<=12000;t++) C.step();
+    // Grazing turnover is brutal: a first draft demanded 40 samples of 60 organisms and got 0-5
+    // survivors per seed. 300 ticks (15 samples) of a 250-strong cohort is what the prey's real
+    // lifespan supports, and net step over 300 ticks is still the phenotype.
     const tr = []; const off = KL*C.MAXN;
-    for (let i=0;i<W.n && tr.length<60;i++) if (W.alive[i] && W.sp[i]===SPECIES.PREY && !W.cy[i])
+    for (let i=0;i<W.n && tr.length<250;i++) if (W.alive[i] && W.sp[i]===SPECIES.PREY && !W.cy[i])
       tr.push({ i, birth: W.birth[i], g: W.g[off+i], xs:[W.x[i]], ys:[W.y[i]], done:false });
-    for (let t=1;t<=1500;t++){ C.step();
+    for (let t=1;t<=600;t++){ C.step();
       if (t % REC.STRIDE === 0) for (const k of tr){ if (k.done) continue;
         if (!W.alive[k.i] || W.birth[k.i] !== k.birth){ k.done = true; continue; }
         k.xs.push(W.x[k.i]); k.ys.push(W.y[k.i]); } }
-    const done = tr.filter(k => k.xs.length >= 40).map(k => {
+    const done = tr.filter(k => k.xs.length >= 15).map(k => {
       const ux = L.unwrapTrack(k.xs), uy = L.unwrapTrack(k.ys);
       return { g: k.g, ns: Math.hypot(ux[ux.length-1]-ux[0], uy[uy.length-1]-uy[0])/((k.xs.length-1)*REC.STRIDE) }; });
     if (done.length < 10){ console.log(`${s}   | ${done.length} — too few survivors`); continue; }
