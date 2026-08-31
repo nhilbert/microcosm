@@ -25,6 +25,8 @@
     "heat:gate": "npm run build && node harness/heat.js --gate",
     "move": "npm run build && node harness/move.js --metrics",
     "move:trap": "npm run build && node harness/move.js --trap",
+    "walls": "npm run build && node harness/walls.js",
+    "walls:all": "npm run build && node harness/walls.js --open --seal --hideout --shade",
     "apk:assets": "node tools/build-app.js",
     "selftest": "node harness/selftest.js",
     "yoshida:capture": "npm run build && node harness/yoshida.js --capture",

@@ -127,7 +127,13 @@ settings (Phase 6) are events too — `mutation` (`P.mutation`) and `locus`
 `sigma` changes the future PRNG stream exactly as the sun lever does; replay
 must apply them at their ticks. The suns (Phase 7 L) are events as well —
 `source {k,x,y}`, `sourceAdd {x,y,i?,a?,sigma?,at?}`, `sourceRemove {k}`, `sourceSet {k,i?,a?,sigma?}`
-— none of them draws; they change the stream only through ecology.
+— none of them draws; they change the stream only through ecology. Walls (Phase 7 W,
+docs/phase7-walls-plan.md) follow the same rules — `wallAdd {x0,y0,dx,dy,lt?,ht?,fl?,pass?,at?}`
+(the stroke is a start point plus the DRAG VECTOR, snapped to grid corners and
+rasterized by an integer midpoint walk that is part of the contract),
+`wallRemove {k}`, `wallSet {k,lt?,ht?,fl?,pass?}` — draw-free; a world with
+`W.walls` empty must be bit-identical to a build without the feature, and
+`harness/walls.js --open` proves the transparent wall is exactly no wall.
 
 ## Proving a port correct
 
