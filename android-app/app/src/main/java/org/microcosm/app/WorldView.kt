@@ -7,6 +7,8 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.math.hypot
 import kotlin.math.min
 
 /**
@@ -41,12 +43,39 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var card: String = ""
         private set
 
-    // The core is single-threaded and lives on the render thread, so a tap cannot read it directly.
-    // It is queued here and picked up at the top of the loop.
+    // The core is single-threaded and lives on the render thread, so nothing outside may touch it.
+    // Taps and levers are queued here and picked up at the top of the loop.
     @Volatile private var pendingTapX = Float.NaN
     @Volatile private var pendingTapY = Float.NaN
+    @Volatile private var pendingLongX = Float.NaN
+    @Volatile private var pendingLongY = Float.NaN
+    private val commands = ConcurrentLinkedQueue<() -> Unit>()
     private var selI = -1
     private var selGen = 0
+
+    /** Observe looks; Intervene touches. Amber marks the hand, and only in Intervene. */
+    @Volatile var intervene = false
+    /** The armed one-shot wall tool: the next drag draws a wall instead of panning. */
+    @Volatile var wallArmed = false
+    /** The species the long-press picker will seed, set by the shell before the press lands. */
+    @Volatile var seedSpecies = -1
+    /** The selected sun, or -1. Dragging moves it while it is selected. */
+    @Volatile var sunSel = -1
+    /** Published for the shell: what is selected, and what could be put back. */
+    @Volatile var selSpecies = -1
+        private set
+    @Volatile var undoKind = 0
+        private set
+    @Volatile var undoSpecies = -1
+        private set
+
+    /** Amber pour rings: the hand's touch, fading. Screen space, like the browser's. */
+    private class Pour(val sx: Float, val sy: Float, val t: Long)
+    private val pours = ArrayList<Pour>()
+    private var wallDrag: FloatArray? = null
+
+    /** Run something against the core on the render thread, where the core may be touched. */
+    fun post(cmd: () -> Unit) { commands.add(cmd) }
 
     private var thread: Thread? = null
     @Volatile private var running = false
@@ -83,6 +112,19 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         override fun onDown(e: MotionEvent): Boolean = true
         override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
             if (scaleDetector.isInProgress) return true
+            // Drawing a wall and dragging a sun both take the drag away from the camera: the hand
+            // is on the world, not on the view.
+            if (wallArmed && e1 != null) {
+                wallDrag = floatArrayOf(e1.x, e1.y, e2.x, e2.y)
+                return true
+            }
+            if (intervene && sunSel >= 0) {
+                val k = sunSel
+                val wx = wrapWorld(cam.x + (e2.x - width / 2.0) / cam.z)
+                val wy = wrapWorld(cam.y + (e2.y - height / 2.0) / cam.z)
+                post { Native.evSource(k, wx, wy) }
+                return true
+            }
             cam.x = wrapWorld(cam.x + dx / cam.z)
             cam.y = wrapWorld(cam.y + dy / cam.z)
             return true
@@ -92,12 +134,31 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             pendingTapY = e.y
             return true
         }
+        override fun onLongPress(e: MotionEvent) {
+            pendingLongX = e.x
+            pendingLongY = e.y
+        }
     })
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         performClick()
         scaleDetector.onTouchEvent(e)
         tapDetector.onTouchEvent(e)
+        if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) {
+            val d = wallDrag
+            wallDrag = null
+            if (d != null && wallArmed) {
+                wallArmed = false
+                val x0 = wrapWorld(cam.x + (d[0] - width / 2.0) / cam.z)
+                val y0 = wrapWorld(cam.y + (d[1] - height / 2.0) / cam.z)
+                val x1 = cam.x + (d[2] - width / 2.0) / cam.z
+                val y1 = cam.y + (d[3] - height / 2.0) / cam.z
+                // wallAdd takes the stroke as a VECTOR, not two endpoints: a long stroke is
+                // minimal-imaged across the seam rather than wrapped the long way round
+                post { Native.evWallAdd(x0, y0, x1 - (cam.x + (d[0] - width / 2.0) / cam.z),
+                    y1 - (cam.y + (d[1] - height / 2.0) / cam.z), 0.0, 0.0, 0.0, 0) }
+            }
+        }
         return true
     }
 
@@ -108,14 +169,40 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         return if (m < 0) m + Renderer.WORLD else m
     }
 
-    /** Runs on the render thread, where the core may be read. */
-    private fun takeTap() {
+    /** Runs on the render thread, where the core may be touched. */
+    private fun takeInput() {
+        while (true) (commands.poll() ?: break).invoke()
+
+        val lx = pendingLongX
+        if (!lx.isNaN()) {
+            val ly = pendingLongY
+            pendingLongY = Float.NaN
+            pendingLongX = Float.NaN
+            val sp = seedSpecies
+            if (intervene && sp >= 0) {
+                Native.evSpawnPack(sp, worldX(lx), worldY(ly))
+                pours.add(Pour(lx, ly, System.nanoTime()))
+            }
+        }
+
         val sx = pendingTapX
-        val sy = pendingTapY
         if (sx.isNaN()) return
+        val sy = pendingTapY
+        pendingTapY = Float.NaN
         pendingTapX = Float.NaN
-        val wx = wrapWorld(cam.x + (sx - width / 2.0) / cam.z)
-        val wy = wrapWorld(cam.y + (sy - height / 2.0) / cam.z)
+        val wx = worldX(sx)
+        val wy = worldY(sy)
+
+        // In Intervene, a tap near a sun grips it; a tap on open water pours mineral there.
+        if (intervene) {
+            val k = nearestSun(sx, sy)
+            if (k >= 0) { sunSel = k; return }
+            if (Native.pick(wx, wy, Native.pickRadius(cam.z, 0)) == 0) {
+                Native.evFertilize(wx, wy, 40.0)
+                pours.add(Pour(sx, sy, System.nanoTime()))
+                return
+            }
+        }
         if (Native.pick(wx, wy, Native.pickRadius(cam.z, 0)) == 0) {
             selI = -1
             return
@@ -125,6 +212,36 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         selI = Native.pickAt(0, 0).toInt()
         selGen = Native.pickAt(0, 1).toInt()
     }
+
+    private fun worldX(sx: Float) = wrapWorld(cam.x + (sx - width / 2.0) / cam.z)
+    private fun worldY(sy: Float) = wrapWorld(cam.y + (sy - height / 2.0) / cam.z)
+
+    /** The sun under the thumb, within 44 px, or -1. */
+    private fun nearestSun(sx: Float, sy: Float): Int {
+        var best = -1
+        var bd = 44.0
+        for (k in 0 until Native.sourceCount()) {
+            val dx = wrapDelta(Native.sourceNum(k, 0) - cam.x) * cam.z + width / 2.0 - sx
+            val dy = wrapDelta(Native.sourceNum(k, 1) - cam.y) * cam.z + height / 2.0 - sy
+            val d = hypot(dx, dy)
+            if (d < bd) { bd = d; best = k }
+        }
+        return best
+    }
+
+    private fun wrapDelta(d: Double): Double {
+        var v = d
+        if (v > Renderer.WORLD / 2) v -= Renderer.WORLD
+        if (v < -Renderer.WORLD / 2) v += Renderer.WORLD
+        return v
+    }
+
+    /** Feed and kill act on what is selected, so the shell does not need the slot index. */
+    fun feedSelected() = post { if (selI >= 0) Native.evFeed(selI, selGen, 0.35) }
+    fun killSelected() = post {
+        if (selI >= 0) { Native.evKill(selI, selGen); selI = -1 }
+    }
+    fun undoLast() = post { Native.undo() }
 
     override fun run() {
         Native.boot()
@@ -151,7 +268,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 continue
             }
 
-            takeTap()
+            takeInput()
             if (speed > 0) acc += dt * speed
             val maxSteps = if (speed >= 16) 9 else if (speed >= 4) 5 else 3
             var steps = 0
@@ -175,6 +292,10 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 Native.tick(), popLine(), cam.z, frameMs, buildMs, renderer.orgN,
             )
             card = renderer.cardText(selI, selGen)
+            selSpecies = if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0)
+                Native.org(selI, 1).toInt() else -1
+            undoKind = Native.undoKind()
+            undoSpecies = Native.undoSpecies()
         }
     }
 
@@ -190,7 +311,20 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     private fun paintOnce(alpha: Double): Long {
         val c: Canvas = holder.lockHardwareCanvas() ?: return 0
         try {
-            return renderer.draw(c, cam, width.toFloat(), height.toFloat(), alpha, hidden, selI, selGen)
+            val n = renderer.draw(c, cam, width.toFloat(), height.toFloat(), alpha, hidden, selI, selGen)
+            // amber last, and only in Intervene: it marks the hand, never the world
+            if (intervene) {
+                val now = System.nanoTime()
+                pours.removeAll { (now - it.t) / 7e8 >= 1.0 }
+                val ring = FloatArray(pours.size * 3)
+                for ((q, p) in pours.withIndex()) {
+                    ring[q * 3] = p.sx
+                    ring[q * 3 + 1] = p.sy
+                    ring[q * 3 + 2] = ((now - p.t) / 7e8).toFloat()
+                }
+                renderer.paintHand(c, ring, wallDrag, sunSel, cam, width.toFloat(), height.toFloat())
+            }
+            return n
         } finally {
             holder.unlockCanvasAndPost(c)
         }

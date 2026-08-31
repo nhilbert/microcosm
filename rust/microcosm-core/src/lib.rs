@@ -65,6 +65,9 @@ pub struct Sim {
     pub grammar: Vec<Option<frame::Grammar>>,
     /// Scratch for one GRID x GRID RGBA field.
     pub frame_field: Vec<u8>,
+    /// What it would take to put the world back after the last lever (see events.rs). One slot,
+    /// like the browser's five-second undo.
+    pub undo: events::Undo,
     /// The shipped evolution settings, captured once at load; `init_world` restores them.
     locus_shipped: Vec<Vec<Locus>>,
 }
@@ -92,6 +95,7 @@ impl Sim {
             frame: frame::Frame::default(),
             grammar: frame::grammar(&tr2),
             frame_field: vec![0; NCELL * 4],
+            undo: events::Undo::None,
             locus_shipped,
         }
     }

@@ -71,6 +71,9 @@ compare(`the level API's surface`, "fingerprint-levels.js", ["600"]);
 // the world-tile vector lists. Against dist/core.js the harness reads the grammar out of the
 // render layer, which is what the core's frame builder was transliterated from.
 compare(`the visual grammar`, "fingerprint-frame.js", []);
+// Undo (A.3). The browser inverts a lever with an explicit inverse event; the Rust core inverts
+// from a slot it keeps itself. Two mechanisms, one arithmetic — so the worlds must agree.
+compare(`undo puts the world back`, "fingerprint-undo.js", []);
 
 console.log(fails === 0
   ? "PORT CHECK PASS (bit-identical)"

@@ -247,6 +247,100 @@ pub extern "system" fn Java_org_microcosm_app_Native_sourceNum(
     abi::mc_source_get(k, field)
 }
 
+/// What the last lever left to undo: 0 nothing, else the code of `events::Undo`.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_undoKind(_env: JNIEnv, _this: JObject) -> jint {
+    abi::mc_undo_kind()
+}
+
+/// The species a feed / kill / seeding undo concerns, so the chip can name it. -1 otherwise.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_undoSpecies(_env: JNIEnv, _this: JObject) -> jint {
+    abi::mc_undo_species()
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_undo(_env: JNIEnv, _this: JObject) {
+    abi::mc_undo();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_undoClear(_env: JNIEnv, _this: JObject) {
+    abi::mc_undo_clear();
+}
+
+/// The levers, as events. Every one is undoable through the slot above.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evFertilize(
+    _env: JNIEnv, _this: JObject, x: jdouble, y: jdouble, amount: jdouble,
+) {
+    abi::mc_event_fertilize(x, y, amount, 0);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evLightMul(_env: JNIEnv, _this: JObject, v: jdouble) {
+    abi::mc_event_light_mul(v, 0);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evSpawnPack(
+    _env: JNIEnv, _this: JObject, sp: jint, x: jdouble, y: jdouble,
+) {
+    abi::mc_event_spawn_pack(sp, x, y, 0);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evFeed(
+    _env: JNIEnv, _this: JObject, i: jint, gen: jint, frac: jdouble,
+) {
+    abi::mc_event_feed(i, gen, frac, 0);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evKill(_env: JNIEnv, _this: JObject, i: jint, gen: jint) {
+    abi::mc_event_kill(i, gen, 0);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evSource(
+    _env: JNIEnv, _this: JObject, k: jint, x: jdouble, y: jdouble,
+) {
+    abi::mc_event_source(k, x, y, 0);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evSourceSet(
+    _env: JNIEnv, _this: JObject, k: jint, i: jdouble, a: jdouble, sigma: jdouble,
+) {
+    abi::mc_event_source_set(k, i, 1, a, 1, sigma, 1, 0);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evSourceAdd(
+    _env: JNIEnv, _this: JObject, x: jdouble, y: jdouble, i: jdouble, a: jdouble, sigma: jdouble,
+) {
+    abi::mc_event_source_add(x, y, i, 1, a, 1, sigma, 1, -1, 0);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evSourceRemove(_env: JNIEnv, _this: JObject, k: jint) {
+    abi::mc_event_source_remove(k, 0);
+}
+
+#[allow(clippy::too_many_arguments)]
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evWallAdd(
+    _env: JNIEnv, _this: JObject, x0: jdouble, y0: jdouble, dx: jdouble, dy: jdouble,
+    lt: jdouble, ht: jdouble, fl: jdouble, pass: jint,
+) {
+    abi::mc_event_wall_add(x0, y0, dx, dy, lt, ht, fl, pass, -1, 0);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evWallRemove(_env: JNIEnv, _this: JObject, k: jint) {
+    abi::mc_event_wall_remove(k, 0);
+}
+
 /// `id`: 0 LOD_Z, 1 TINT_BINS, 2 organism stride, 3 corpse stride. Read rather than copied, so the
 /// LOD threshold has one definition rather than one per platform.
 #[no_mangle]

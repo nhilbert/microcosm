@@ -101,6 +101,29 @@ object Native {
     /** which: 0 species name; 10+k a locus label, 20+k its high word, 30+k its low word. */
     external fun traitText(sp: Int, which: Int): String
 
+    // ---- undo (A.3) ----
+    /** What the last lever left to undo: 0 nothing, else the code of the core's Undo enum. */
+    external fun undoKind(): Int
+
+    /** The species a feed / kill / seeding undo concerns, so the chip can name it. -1 otherwise. */
+    external fun undoSpecies(): Int
+    external fun undo()
+    external fun undoClear()
+
+    // ---- the levers (A.3). Every one is undoable through the slot above. ----
+    external fun evFertilize(x: Double, y: Double, amount: Double)
+    external fun evLightMul(v: Double)
+    external fun evSpawnPack(sp: Int, x: Double, y: Double)
+    external fun evFeed(i: Int, gen: Int, frac: Double)
+    external fun evKill(i: Int, gen: Int)
+    external fun evSource(k: Int, x: Double, y: Double)
+    external fun evSourceSet(k: Int, i: Double, a: Double, sigma: Double)
+    external fun evSourceAdd(x: Double, y: Double, i: Double, a: Double, sigma: Double)
+    external fun evSourceRemove(k: Int)
+    external fun evWallAdd(x0: Double, y0: Double, dx: Double, dy: Double,
+                           lt: Double, ht: Double, fl: Double, pass: Int)
+    external fun evWallRemove(k: Int)
+
     external fun sourceCount(): Int
 
     /** field: 0 x, 1 y, 2 i, 3 a, 4 sigma. */

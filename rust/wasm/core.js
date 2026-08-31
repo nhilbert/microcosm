@@ -359,6 +359,12 @@ Object.defineProperty(LVL, "failWhy", { get(){
 // harness/fingerprint-frame.js compares the two bit for bit; the painting stays per platform.
 const SHAPE_NAMES = ["nucleus", "dot", "tri", "square", "ray"];
 const LOD_Z = X.mc_frame_const(0);
+// Undo lives in the core: the inverse of the last lever, one slot deep, like the browser's
+// five-second chip. `undoKind()` is 0 when there is nothing to put back.
+const undoKind = () => X.mc_undo_kind();
+const undoSpecies = () => X.mc_undo_species();
+const undo = () => { X.mc_undo(); sync(); };
+const undoClear = () => X.mc_undo_clear();
 const pickRadius = (z, tight) => X.mc_pick_radius(z, tight ? 1 : 0);
 function pickCandidates(wx, wy, rad){
   const n = X.mc_pick(wx, wy, rad), out = [];
@@ -435,6 +441,7 @@ module.exports = {
   LEVELS, LEVEL_ROWS: LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter,
   levelAllows, levelPourOk, levelNotePour, levelNarration,
   markPrev, makeGrammar, bucketSpec, frameOf, TINT_BINS: 7, LOD_Z, pickRadius, pickCandidates,
+  undo, undoKind, undoSpecies, undoClear,
   fieldCarpet, fieldMineral, fieldCorpsePall, fieldShade,
   sunGlows, sunMarks, heatGlows, heatMarks, wallStrokes,
 };

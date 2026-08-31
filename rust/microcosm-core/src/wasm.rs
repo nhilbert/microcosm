@@ -1236,3 +1236,33 @@ pub extern "C" fn mc_species_flag(sp: i32, which: i32) -> i32 {
         _ => 0,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Undo (M5.1 A.3). The inverses live in the core (events.rs) rather than crossing as payloads:
+// a snapshot marshalled out and back is a second representation of world state, and avoiding a
+// second representation of anything is what this port is for.
+
+/// What the last lever left to undo. 0 nothing, else the `Undo::code` of events.rs.
+#[no_mangle]
+pub extern "C" fn mc_undo_kind() -> i32 {
+    s().undo.code()
+}
+
+/// The species a feed / kill / seeding undo concerns, so a shell can name it. -1 otherwise.
+#[no_mangle]
+pub extern "C" fn mc_undo_species() -> i32 {
+    let sim = s();
+    sim.undo.species(sim)
+}
+
+/// Put the world back, and clear the slot. An undo is not itself undoable.
+#[no_mangle]
+pub extern "C" fn mc_undo() {
+    crate::events::apply_undo(s());
+}
+
+/// Forget the pending undo without applying it — what the browser's five-second timer does.
+#[no_mangle]
+pub extern "C" fn mc_undo_clear() {
+    s().undo = crate::events::Undo::None;
+}

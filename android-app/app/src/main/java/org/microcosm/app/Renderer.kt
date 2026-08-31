@@ -169,6 +169,54 @@ class Renderer {
         return buildNanos
     }
 
+    /**
+     * Amber: the player's hand, and nothing else (rule 7). Pour rings fading, the wall the current
+     * drag would build, and a ring on every sun with the gripped one brighter. Drawn above the
+     * world, never additive, and only in Intervene.
+     *
+     * `pours` is (screen x, screen y, age 0..1) triples.
+     */
+    fun paintHand(c: Canvas, pours: FloatArray, wallDrag: FloatArray?, sunSel: Int,
+                  cam: Camera, vw: Float, vh: Float) {
+        flat.style = Paint.Style.STROKE
+        var q = 0
+        while (q + 2 < pours.size) {
+            val age = pours[q + 2]
+            flat.color = Color.argb(((0.7f * (1f - age)) * 255).toInt().coerceIn(0, 255), 242, 178, 74)
+            flat.strokeWidth = 2f
+            c.drawCircle(pours[q], pours[q + 1], 10f + age * 34f, flat)
+            q += 3
+        }
+        // every sun wears a ring in Intervene; the gripped one wears a brighter one
+        for (k in 0 until Native.sourceCount()) {
+            val sx = (vw / 2 + wd(Native.sourceNum(k, 0) - cam.x) * cam.z).toFloat()
+            val sy = (vh / 2 + wd(Native.sourceNum(k, 1) - cam.y) * cam.z).toFloat()
+            val on = k == sunSel
+            flat.color = Color.argb(if (on) 255 else 230, 242, 178, 74)
+            flat.strokeWidth = if (on) 2.5f else 1.5f
+            c.drawCircle(sx, sy, 16f, flat)
+            flat.color = Color.argb(if (on) 128 else 77, 242, 178, 74)
+            flat.strokeWidth = 6f
+            c.drawCircle(sx, sy, 22f, flat)
+        }
+        if (wallDrag != null) {
+            flat.color = Color.argb(230, 242, 178, 74)
+            flat.strokeWidth = 2.2f
+            c.drawLine(wallDrag[0], wallDrag[1], wallDrag[2], wallDrag[3], flat)
+            flat.style = Paint.Style.FILL
+            c.drawCircle(wallDrag[0], wallDrag[1], 3f, flat)
+        }
+        flat.style = Paint.Style.FILL
+    }
+
+    /** Toroidal minimal image, as the core's `wd`. */
+    private fun wd(d: Double): Double {
+        var v = d
+        if (v > WORLD / 2) v -= WORLD
+        if (v < -WORLD / 2) v += WORLD
+        return v
+    }
+
     /** The specimen card's text, built where the core can be read: on the render thread. */
     fun cardText(selI: Int, selGen: Int): String {
         if (selI < 0 || Native.frameSel(selI, selGen, 0) == 0.0) return ""

@@ -270,6 +270,34 @@ it.
 Not ported: the browser's species *chips* when several species sit under one thumb. Nearest wins
 here. That ambiguity affordance is UI, and it is recorded rather than quietly dropped.
 
+## 5e. A.3 — the levers, 2026-08-31
+
+Intervene mode: a tap on open water pours mineral, a tap near a sun grips it (and a drag then moves
+it), a long-press seeds the species chosen from the picker, feed and kill act on the selection, the
+wall tool arms once and the next drag draws a stroke. Amber appears only in Intervene and only on
+the hand's own marks — pour rings, the sun rings, the wall preview — never on the world.
+
+**Undo moved into the core, and that is the interesting part.** The browser inverts a lever by
+sending an explicit inverse event carrying a payload its `done` callback captured — `unfeed{delta}`,
+`revive{snap}`, `unspawnPack{snap}`, `unfertilize{snap}`. That is exactly why the undo events were
+left out of M3: marshalling a snapshot out to Kotlin and back would be a *second representation of
+world state*, and avoiding a second representation of anything is the whole point of this port. So
+`events.rs` keeps a one-slot `Undo` — one slot, because the browser offers a single five-second
+chip and nothing deeper — captured where the lever lands and applied by `mc_undo()`.
+
+Two mechanisms, one arithmetic, so **`harness/fingerprint-undo.js`** drives each lever on both
+cores, inverts it each core's own way, runs on 300 ticks, and compares the whole world as raw bits —
+positions, energies, the fields, and the PRNG's own state. Ten inverses: fertilize, lightMul,
+spawnPack, feed, kill, sourceAdd, sourceSet, source-moved, wallAdd, wallSet. **Identical.** That
+includes the awkward one: `revive` reclaims the corpse's mineral, tops up from the water, and
+spends a heading draw in `spawn` — get any of the three wrong and the world stays plausible while
+the bits diverge. A self-check also proves a second undo does nothing, so the slot is really one
+deep. The gate runs inside `port:check`.
+
+Not ported yet, recorded rather than dropped: the Evolution panel (mutation on/off, per-locus rates
+and curvature, the price sliders and presets). Its events — `mutation`, `locus` — are in the ABI
+already; it needs the panel, and it belongs with the Data pages' chrome rather than with the levers.
+
 ## 6. Open, and honestly so
 
 - **The web artifact's `frameOf` is a second implementation until it isn't.** A.0 leaves the JS
