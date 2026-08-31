@@ -219,6 +219,16 @@ const SPECIES_ROWS = [
         "loWord": "kill-and-move",
         "hiTrait": "search at the kill",
         "loTrait": "swift departure"
+      },
+      {
+        "g0": 0.5,
+        "sigma": 0.03,
+        "tprefSpan": 4,
+        "label": "Warmth preference",
+        "hiWord": "warm-seeking",
+        "loWord": "cool-seeking",
+        "hiTrait": "warmer set-point",
+        "loTrait": "cooler set-point"
       }
     ],
     "locus": {
@@ -234,7 +244,7 @@ const SPECIES_ROWS = [
     },
     "topt": 5,
     "ctmax": 10,
-    "thermo": 0
+    "thermo": 0.25
   },
   {
     "name": "Bacillus",
@@ -1656,7 +1666,13 @@ function step(){
         }
         W.hd[i]+=(R()-0.5)*0.5*pcT2;
         if (T.thermo && !hungry && (W.tgx[cT] !== 0 || W.tgy[cT] !== 0)){ // 7.H.2: an idle, fed hunter turns toward its preferred warmth; hunger overrides (Hedgecock)
-          const sgn = dT > T.topt ? -1 : 1, ta = Math.atan2(sgn*W.tgy[cT], sgn*W.tgx[cT]);
+          // MV.4 (declared): the hunter is unblinded -- gain 0.25, and the set-point is heritable
+          // (tprefSpan, like MV.1). H.2's fixed set-point walked fed hunters off their prey (3/8);
+          // "the hunters stay blind until the movement genome can price a set-point for them" -- this
+          // is that price: selection, not a constant, owns where a fed hunter idles. Draw-free.
+          let tp = T.topt;
+          for (let k=0;k<nL;k++){ const Lk = loci[k]; if (Lk.tprefSpan) tp += Lk.tprefSpan*(W.g[k*MAXN+i]-Lk.g0); }
+          const sgn = dT > tp ? -1 : 1, ta = Math.atan2(sgn*W.tgy[cT], sgn*W.tgx[cT]);
           let da=ta-W.hd[i]; while(da>Math.PI)da-=6.283; while(da<-Math.PI)da+=6.283;
           W.hd[i]+=Math.max(-T.turnRate*0.5, Math.min(T.turnRate*0.5, da)); }
         speed=(hungry? T.speed*0.7 : T.speed*0.3)*(torpid?0.75:1)*pcS;
