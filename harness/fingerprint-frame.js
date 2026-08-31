@@ -24,6 +24,7 @@ const { W, P, TRAITS, SPECIES, MAXN, CELL, cellOf, wd, wrap, makeWall } = C;
 const F = C.frameOf ? C : (() => {
   const src = fs.readFileSync(path.join(ROOT, "src", "ui-render.js"), "utf8");
   const names = ["makeGrammar", "bucketSpec", "frameOf", "TINT_BINS", "LOD_Z",
+    "pickRadius", "pickCandidates",
     "fieldCarpet", "fieldMineral", "fieldCorpsePall", "fieldShade",
     "sunGlows", "sunMarks", "heatGlows", "heatMarks", "wallStrokes"];
   // `document` is never touched by the grammar half of the file — only by makeSprite and
@@ -85,6 +86,16 @@ function report(label){
   for (const m of F.heatMarks()) console.log(`  heatMark x ${h(m.x)} y ${h(m.y)} warm ${m.warm}`);
   for (const wl of F.wallStrokes())
     console.log(`  wall a ${h(wl.a)} dashed ${wl.dashed} pts ${wl.pts.length} ${sha(Buffer.from(Float64Array.from(wl.pts.flat()).buffer))}`);
+  // selection: the tap radius, and which organism is under the thumb
+  for (const z of [0.45, 1.0, 3.0]) for (const tight of [false, true]){
+    const rad = F.pickRadius(z, tight);
+    const hits = [];
+    for (const [wx, wy] of [[512, 512], [400, 600], [30, 990], [1000, 12]]){
+      const c = F.pickCandidates(wx, wy, rad);
+      hits.push(`(${wx},${wy}) n=${c.length}` + (c.length ? ` first ${c[0][1]}@${h(c[0][0])}` : ""));
+    }
+    console.log(`  pick z ${z} ${tight ? "tight" : "loose"} rad ${h(rad)}  ${hits.join("  ")}`);
+  }
   for (const [hlabel, hidden] of HIDDEN){
     for (let v = 0; v < VIEWS.length; v++){
       const fr = F.frameOf(VIEWS[v], hidden, G);

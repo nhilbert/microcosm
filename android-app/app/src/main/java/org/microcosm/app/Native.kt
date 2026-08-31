@@ -74,6 +74,33 @@ object Native {
     external fun wallNum(k: Int, field: Int): Double
     external fun wallPt(k: Int, q: Int, axis: Int): Double
 
+    // ---- selection and read-out (A.2) ----
+    /** The tap radius for a zoom: tight = 1 after the loupe, 0 for a thumb. */
+    external fun pickRadius(z: Double, tight: Int): Double
+
+    /** Candidates within `rad` of a world point, nearest first. Returns how many. */
+    external fun pick(wx: Double, wy: Double, rad: Double): Int
+
+    /** field: 0 slot index, 1 generation, 2 species, 3 squared distance. */
+    external fun pickAt(k: Int, field: Int): Double
+
+    /** field: 0 still valid, 1 sx, 2 sy, 3 radius — through the last frame's view. */
+    external fun frameSel(i: Int, gen: Int, field: Int): Double
+
+    /**
+     * One organism. field: 0 alive, 1 species, 2 generation, 3 x, 4 y, 5 energy, 6 size,
+     * 7 bound mineral, 8 birth tick, 9 dormant, 10 heading, 20+k genotype of locus plane k.
+     */
+    external fun org(i: Int, field: Int): Double
+
+    external fun locusCount(sp: Int): Int
+
+    /** which: 0 live, 1 apex, 2 the mat. Saves a shell keeping its own table of who is in play. */
+    external fun speciesFlag(sp: Int, which: Int): Int
+
+    /** which: 0 species name; 10+k a locus label, 20+k its high word, 30+k its low word. */
+    external fun traitText(sp: Int, which: Int): String
+
     external fun sourceCount(): Int
 
     /** field: 0 x, 1 y, 2 i, 3 a, 4 sigma. */

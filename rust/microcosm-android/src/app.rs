@@ -257,3 +257,103 @@ pub extern "system" fn Java_org_microcosm_app_Native_frameConst(
 ) -> jdouble {
     abi::mc_frame_const(id)
 }
+
+// ---------------------------------------------------------------------------
+// Selection and read-out (A.2). Text crosses as a Java String rather than a buffer: these are read
+// when a card opens, not per frame.
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_pickRadius(
+    _env: JNIEnv,
+    _this: JObject,
+    z: jdouble,
+    tight: jint,
+) -> jdouble {
+    abi::mc_pick_radius(z, tight)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_pick(
+    _env: JNIEnv,
+    _this: JObject,
+    wx: jdouble,
+    wy: jdouble,
+    rad: jdouble,
+) -> jint {
+    abi::mc_pick(wx, wy, rad) as jint
+}
+
+/// `field`: 0 slot index, 1 generation, 2 species, 3 squared distance.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_pickAt(
+    _env: JNIEnv,
+    _this: JObject,
+    k: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_pick_at(k.max(0) as u32, field)
+}
+
+/// `field`: 0 still valid, 1 sx, 2 sy, 3 radius — through the view the last frame was built for.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_frameSel(
+    _env: JNIEnv,
+    _this: JObject,
+    i: jint,
+    gen: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_frame_sel(i, gen, field)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_org(
+    _env: JNIEnv,
+    _this: JObject,
+    i: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_org(i, field)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_locusCount(
+    _env: JNIEnv,
+    _this: JObject,
+    sp: jint,
+) -> jint {
+    abi::mc_locus_count(sp) as jint
+}
+
+/// `which`: 0 the species name; 10+k a locus label, 20+k its high word, 30+k its low word.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_traitText(
+    env: JNIEnv,
+    _this: JObject,
+    sp: jint,
+    which: jint,
+) -> jni::sys::jstring {
+    let ptr = abi::mc_trait_text_ptr(sp, which) as *const u8;
+    let len = abi::mc_trait_text_len(sp, which) as usize;
+    let text = if len == 0 {
+        ""
+    } else {
+        // SAFETY: the pointer addresses a &'static str in the trait table.
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(ptr, len)) }
+    };
+    match env.new_string(text) {
+        Ok(v) => v.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// `which`: 0 live, 1 apex, 2 the mat.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_speciesFlag(
+    _env: JNIEnv,
+    _this: JObject,
+    sp: jint,
+    which: jint,
+) -> jint {
+    abi::mc_species_flag(sp, which)
+}

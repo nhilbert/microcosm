@@ -473,6 +473,11 @@ pub struct Frame {
     pub corpse_n: usize,
     pub pops: [i32; 7],
     pub mn_bound: f64,
+    /// The view the last frame was built for, so a selection can be projected without the shell
+    /// having to hand the camera back.
+    pub view: View,
+    /// Scratch for `pick`.
+    pub cand: Vec<(f64, usize)>,
 }
 
 impl Default for Frame {
@@ -484,6 +489,11 @@ impl Default for Frame {
             corpse_n: 0,
             pops: [0; 7],
             mn_bound: 0.0,
+            view: View {
+                cam_x: 0.0, cam_y: 0.0, vw: 0.0, vh: 0.0, z: 1.0,
+                hw: 0.0, hh: 0.0, alpha: 1.0, lod_z: LOD_Z,
+            },
+            cand: Vec::new(),
         }
     }
 }
@@ -496,6 +506,7 @@ pub fn frame_of(
     hidden: &[bool; 10],
 ) {
     let cull = 40.0;
+    f.view = *v;
     f.pops = [0; 7];
     let mut n = 0usize;
     let mut mn_bound = 0.0f64;
@@ -586,4 +597,52 @@ pub fn frame_of(
         }
     }
     f.corpse_n = m;
+}
+
+// ---------------------------------------------------------------------------
+// Selection. Grammar, because the radius and the tie-breaking decide *which* organism a thumb
+// lands on, and the two platforms must not disagree about that.
+
+/// Every live organism within `rad` of a world point, nearest first. Raw positions, not the
+/// interpolated ones: a tap picks what is there, not what is being drawn on the way there.
+/// Ties keep slot order, because both `Array.prototype.sort` and `sort_by` are stable.
+pub fn pick(w: &World, wx: f64, wy: f64, rad: f64, out: &mut Vec<(f64, usize)>) {
+    out.clear();
+    let rr = rad * rad;
+    for i in 0..w.n_slots() {
+        if w.alive[i] == 0 {
+            continue;
+        }
+        let dx = wd(w.x[i] as f64 - wx);
+        let dy = wd(w.y[i] as f64 - wy);
+        let d2 = dx * dx + dy * dy;
+        if d2 < rr {
+            out.push((d2, i));
+        }
+    }
+    out.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+}
+
+/// The tap radius the browser uses: loose for a thumb, tight after the loupe.
+pub fn pick_radius(z: f64, tight: bool) -> f64 {
+    if tight {
+        (10.0 / z).max(7.0)
+    } else {
+        (24.0 / z).max(14.0)
+    }
+}
+
+/// The selected organism's ring: interpolated screen position and radius, or `None` once the slot
+/// has been recycled — the generation guard is what stops a selection following a dead index.
+pub fn sel_screen(w: &World, i: usize, gen: u16, v: &View) -> Option<(f64, f64, f64)> {
+    if i >= w.n_slots() || w.alive[i] == 0 || w.gen[i] != gen {
+        return None;
+    }
+    let ix = w.px[i] as f64 + wd(w.x[i] as f64 - w.px[i] as f64) * v.alpha;
+    let iy = w.py[i] as f64 + wd(w.y[i] as f64 - w.py[i] as f64) * v.alpha;
+    Some((
+        v.hw + wd(ix - v.cam_x) * v.z,
+        v.hh + wd(iy - v.cam_y) * v.z,
+        (w.sz[i] as f64 * 2.6 * v.z).max(14.0),
+    ))
 }

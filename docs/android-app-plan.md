@@ -77,7 +77,7 @@ right.
 |---|---|---|
 | **A.0** ✅ | The frame builder: `frame.rs` in the crate, `frameOf` in the JS render layer, and the cross-implementation gate | the visual grammar is one definition, and the two agree bit for bit |
 | **A.1** ✅ | Kotlin shell: SurfaceView render thread, JNI to the frame builder, painter for the display list; a device build that reports ms/frame by zoom and population | the renderer's real budget on hardware — the number M5.0 left open |
-| **A.2** | Camera and gestures: pan, pinch, tap-select, long-press; the status strip and the specimen card | the world is navigable |
+| **A.2** ✅ | Camera and gestures: pan, pinch, tap-select, long-press; the status strip and the specimen card | the world is navigable |
 | **A.3** | Intervene: sun drag and press, mineral pour, feed/kill, the seeding picker, walls — each an event, undoable, impact-carded | the levers, with their provenance intact |
 | **A.4** | Data mode: the five pages against the ported `indicators` | the Observatory on the phone |
 | **A.5** | Experiments: start screen, prediction step, HUD, verdicts (the level API is already ported) | the ladder is playable |
@@ -241,6 +241,34 @@ canvas will not filter a 16x upscale, the fields are now prescaled 4x on a softw
 filtering is not in doubt (~262k pixels per tick, measured as a `fields` row in the benchmark).
 That is a fix if the hardware path was the problem and a disproof if it was not: if the blocks are
 unchanged in the next screenshot, they were never the carpet.
+
+## 5d. A.2 — shipped, 2026-08-31
+
+Pan by dragging, pinch to zoom (0.25x–6x), tap to select. The tap is queued rather than handled
+where it lands: the core is single-threaded and lives on the render thread, so a selection that
+reached into it from the UI thread would be a race waiting for a busy frame. Everything the shell
+displays — the census, the specimen card — is built on the render thread and published as a string.
+
+**Selection became grammar, and the gate covers it.** Which organism a thumb lands on is a decision
+— the radius (`max(24/z, 14)` loose, `max(10/z, 7)` tight) and the nearest-first tie-breaking —
+and the two platforms must not disagree about it. So `pick` moved into `frame.rs`, the browser's
+inline hit test in `ui.jsx` was replaced by a call to the same `pickCandidates` in `ui-render.js`,
+and `harness/fingerprint-frame.js` now compares candidate counts and the winning slot across three
+zooms, both radii and four world points. Identical. Ties keep slot order on both sides, because
+`Array.prototype.sort` and `sort_by` are both stable.
+
+**Names are read, never retyped.** The species names and the locus words (label, high word, low
+word) come out of the trait rows through the ABI, so the card says "a tougher line" in the same
+words the Observatory narrates with. Same for the status strip's colours (the core's bucket table)
+and for which species are in play (`speciesFlag`) — a shell that kept its own list of live species
+would be a table to forget to update.
+
+The status strip's chips toggle the same `hidden` bitmask the frame builder culls with, so hiding a
+species costs nothing extra: the display list simply stops carrying it, and the census still counts
+it.
+
+Not ported: the browser's species *chips* when several species sit under one thumb. Nearest wins
+here. That ambiguity affordance is UI, and it is recorded rather than quietly dropped.
 
 ## 6. Open, and honestly so
 

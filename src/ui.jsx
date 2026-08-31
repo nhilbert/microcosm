@@ -127,16 +127,9 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       return best; };
     const doSelect = (cxp, cyp, tight) => {
       const wxp = wrap(cam.x + (cxp - vw/2)/cam.z), wyp = wrap(cam.y + (cyp - vh/2)/cam.z);
-      const rad = tight ? Math.max(10/cam.z, 7) : Math.max(24/cam.z, 14);
-      const cand = [];
-      for (let i=0;i<W.n;i++){
-        if (!W.alive[i]) continue;
-        const dx = wd(W.x[i]-wxp), dy = wd(W.y[i]-wyp), d2 = dx*dx+dy*dy;
-        if (d2 < rad*rad) cand.push([d2, i]);
-      }
+      const cand = pickCandidates(wxp, wyp, pickRadius(cam.z, tight));
       if (!cand.length){ sel.i = -1; follow = false;
         clearTimeout(chipTimer); setUi(u => ({ ...u, card: null, chips: null })); return; }
-      cand.sort((a,b) => a[0]-b[0]);
       const species = new Set(cand.map(c => W.sp[c[1]]));
       // Same-species neighbors are interchangeable for inspection -> take nearest.
       // Chips appear only for true ambiguity: multiple SPECIES under the thumb.

@@ -359,6 +359,12 @@ Object.defineProperty(LVL, "failWhy", { get(){
 // harness/fingerprint-frame.js compares the two bit for bit; the painting stays per platform.
 const SHAPE_NAMES = ["nucleus", "dot", "tri", "square", "ray"];
 const LOD_Z = X.mc_frame_const(0);
+const pickRadius = (z, tight) => X.mc_pick_radius(z, tight ? 1 : 0);
+function pickCandidates(wx, wy, rad){
+  const n = X.mc_pick(wx, wy, rad), out = [];
+  for (let k = 0; k < n; k++) out.push([X.mc_pick_at(k, 3), X.mc_pick_at(k, 0)]);
+  return out;
+}
 function markPrev(){ X.mc_mark_prev(); }
 function makeGrammar(){
   X.mc_frame_grammar_build();
@@ -428,7 +434,7 @@ module.exports = {
   indicators, impact: notYet("impact"),
   LEVELS, LEVEL_ROWS: LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter,
   levelAllows, levelPourOk, levelNotePour, levelNarration,
-  markPrev, makeGrammar, bucketSpec, frameOf, TINT_BINS: 7, LOD_Z,
+  markPrev, makeGrammar, bucketSpec, frameOf, TINT_BINS: 7, LOD_Z, pickRadius, pickCandidates,
   fieldCarpet, fieldMineral, fieldCorpsePall, fieldShade,
   sunGlows, sunMarks, heatGlows, heatMarks, wallStrokes,
 };

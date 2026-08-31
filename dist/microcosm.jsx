@@ -3149,6 +3149,22 @@ function bucketSpec(G, sp, tb, mb){
   });
 }
 
+// ---- selection ----
+// Grammar too: the radius and the tie-breaking decide WHICH organism a thumb lands on, and the
+// platforms must not disagree about that. Raw positions, not interpolated ones — a tap picks what
+// is there, not what is being drawn on the way there. Ties keep slot order (sort is stable).
+function pickRadius(z, tight){ return tight ? Math.max(10/z, 7) : Math.max(24/z, 14); }
+function pickCandidates(wx, wy, rad){
+  const cand = [], rr = rad*rad;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i]) continue;
+    const dx = wd(W.x[i]-wx), dy = wd(W.y[i]-wy), d2 = dx*dx+dy*dy;
+    if (d2 < rr) cand.push([d2, i]);
+  }
+  cand.sort((a, b) => a[0]-b[0]);
+  return cand;
+}
+
 // ---- the display list ----
 // Organism record (8 doubles): kind, sx, sy, r, sp, bucket, hd, flags.
 //   kind 0 dormant cyst | 1 bacteria dot-LOD | 2 sprite | 3 sprite, heading-aligned | 4 ghost ray
@@ -4163,16 +4179,9 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       return best; };
     const doSelect = (cxp, cyp, tight) => {
       const wxp = wrap(cam.x + (cxp - vw/2)/cam.z), wyp = wrap(cam.y + (cyp - vh/2)/cam.z);
-      const rad = tight ? Math.max(10/cam.z, 7) : Math.max(24/cam.z, 14);
-      const cand = [];
-      for (let i=0;i<W.n;i++){
-        if (!W.alive[i]) continue;
-        const dx = wd(W.x[i]-wxp), dy = wd(W.y[i]-wyp), d2 = dx*dx+dy*dy;
-        if (d2 < rad*rad) cand.push([d2, i]);
-      }
+      const cand = pickCandidates(wxp, wyp, pickRadius(cam.z, tight));
       if (!cand.length){ sel.i = -1; follow = false;
         clearTimeout(chipTimer); setUi(u => ({ ...u, card: null, chips: null })); return; }
-      cand.sort((a,b) => a[0]-b[0]);
       const species = new Set(cand.map(c => W.sp[c[1]]));
       // Same-species neighbors are interchangeable for inspection -> take nearest.
       // Chips appear only for true ambiguity: multiple SPECIES under the thumb.

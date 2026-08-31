@@ -2,6 +2,9 @@ package org.microcosm.app
 
 import android.content.Context
 import android.graphics.Canvas
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import kotlin.math.min
@@ -34,6 +37,17 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var stats: String = ""
         private set
 
+    /** The specimen card's text, or empty when nothing is selected. Published once a frame. */
+    @Volatile var card: String = ""
+        private set
+
+    // The core is single-threaded and lives on the render thread, so a tap cannot read it directly.
+    // It is queued here and picked up at the top of the loop.
+    @Volatile private var pendingTapX = Float.NaN
+    @Volatile private var pendingTapY = Float.NaN
+    private var selI = -1
+    private var selGen = 0
+
     private var thread: Thread? = null
     @Volatile private var running = false
     private lateinit var renderer: Renderer
@@ -56,6 +70,61 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     }
 
     fun benchmark() { benchRequest = true }
+
+    // ---- gestures ----
+    // Drag pans, pinch zooms, a tap selects. Long-press is where A.3's seeding picker will go.
+    private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScale(d: ScaleGestureDetector): Boolean {
+            cam.z = (cam.z * d.scaleFactor).coerceIn(0.25, 6.0)
+            return true
+        }
+    })
+    private val tapDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(e: MotionEvent): Boolean = true
+        override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+            if (scaleDetector.isInProgress) return true
+            cam.x = wrapWorld(cam.x + dx / cam.z)
+            cam.y = wrapWorld(cam.y + dy / cam.z)
+            return true
+        }
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
+            pendingTapX = e.x
+            pendingTapY = e.y
+            return true
+        }
+    })
+
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        performClick()
+        scaleDetector.onTouchEvent(e)
+        tapDetector.onTouchEvent(e)
+        return true
+    }
+
+    override fun performClick(): Boolean = super.performClick()
+
+    private fun wrapWorld(v: Double): Double {
+        val m = v % Renderer.WORLD
+        return if (m < 0) m + Renderer.WORLD else m
+    }
+
+    /** Runs on the render thread, where the core may be read. */
+    private fun takeTap() {
+        val sx = pendingTapX
+        val sy = pendingTapY
+        if (sx.isNaN()) return
+        pendingTapX = Float.NaN
+        val wx = wrapWorld(cam.x + (sx - width / 2.0) / cam.z)
+        val wy = wrapWorld(cam.y + (sy - height / 2.0) / cam.z)
+        if (Native.pick(wx, wy, Native.pickRadius(cam.z, 0)) == 0) {
+            selI = -1
+            return
+        }
+        // Nearest wins. The browser also offers species chips when several species are under the
+        // thumb; that ambiguity affordance is UI and has not been ported yet.
+        selI = Native.pickAt(0, 0).toInt()
+        selGen = Native.pickAt(0, 1).toInt()
+    }
 
     override fun run() {
         Native.boot()
@@ -82,6 +151,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 continue
             }
 
+            takeTap()
             if (speed > 0) acc += dt * speed
             val maxSteps = if (speed >= 16) 9 else if (speed >= 4) 5 else 3
             var steps = 0
@@ -104,6 +174,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             stats = "t %d   %s   z %.2f\n%.1f ms/frame  (core %.2f)  %d drawn".format(
                 Native.tick(), popLine(), cam.z, frameMs, buildMs, renderer.orgN,
             )
+            card = renderer.cardText(selI, selGen)
         }
     }
 
@@ -112,11 +183,14 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         return "S %d  D %d  C %d  B %d  V %d".format(p[0], p[1], p[2], p[3], p[6])
     }
 
+    /** Last frame's census, for the status strip. Safe to read from the UI thread. */
+    fun popOf(sp: Int): Int = if (::renderer.isInitialized) renderer.pops[sp] else 0
+
     /** One frame. Returns the nanoseconds the core spent building the display list. */
     private fun paintOnce(alpha: Double): Long {
         val c: Canvas = holder.lockHardwareCanvas() ?: return 0
         try {
-            return renderer.draw(c, cam, width.toFloat(), height.toFloat(), alpha, hidden)
+            return renderer.draw(c, cam, width.toFloat(), height.toFloat(), alpha, hidden, selI, selGen)
         } finally {
             holder.unlockCanvasAndPost(c)
         }

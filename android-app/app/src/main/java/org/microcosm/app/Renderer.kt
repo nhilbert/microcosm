@@ -53,6 +53,17 @@ class Renderer {
     private val dst = RectF()
     private val rayPath = Path()
 
+    /**
+     * Species names and locus words, read once from the trait rows. They belong to the traits, not
+     * to any renderer — the browser reads the same strings — so they are fetched, never retyped.
+     */
+    val speciesName = Array(7) { Native.traitText(it, 0) }
+    val locusText = Array(7) { sp ->
+        Array(Native.locusCount(sp)) { k ->
+            arrayOf(Native.traitText(sp, 10 + k), Native.traitText(sp, 20 + k), Native.traitText(sp, 30 + k))
+        }
+    }
+
     /** Census from the last frame: what a HUD or a status strip reads. */
     val pops = IntArray(7)
     var orgN = 0
@@ -94,7 +105,8 @@ class Renderer {
      * Build the display list and paint it. Returns nanoseconds spent in the core, so the caller can
      * tell a slow frame builder from a slow painter — the whole question A.1 exists to answer.
      */
-    fun draw(c: Canvas, cam: Camera, vw: Float, vh: Float, alpha: Double, hidden: Int): Long {
+    fun draw(c: Canvas, cam: Camera, vw: Float, vh: Float, alpha: Double, hidden: Int,
+             selI: Int = -1, selGen: Int = 0): Long {
         val t0 = System.nanoTime()
         Native.frameBuild(
             cam.x, cam.y, vw.toDouble(), vh.toDouble(), cam.z,
@@ -139,7 +151,38 @@ class Renderer {
 
         paintOrganisms(c)
         paintCorpses(c)
+        // The selection ring is an affordance, above the world and never additive. Slate, not
+        // amber: amber is the player's hand on the world, and looking is not touching.
+        if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0) {
+            val sx = Native.frameSel(selI, selGen, 1).toFloat()
+            val sy = Native.frameSel(selI, selGen, 2).toFloat()
+            val rr = Native.frameSel(selI, selGen, 3).toFloat()
+            flat.style = Paint.Style.STROKE
+            flat.color = Color.argb(242, 201, 215, 227)
+            flat.strokeWidth = 1.5f
+            c.drawCircle(sx, sy, rr, flat)
+            flat.color = Color.argb(64, 201, 215, 227)
+            flat.strokeWidth = 5f
+            c.drawCircle(sx, sy, rr + 4f, flat)
+            flat.style = Paint.Style.FILL
+        }
         return buildNanos
+    }
+
+    /** The specimen card's text, built where the core can be read: on the render thread. */
+    fun cardText(selI: Int, selGen: Int): String {
+        if (selI < 0 || Native.frameSel(selI, selGen, 0) == 0.0) return ""
+        val sp = Native.org(selI, 1).toInt()
+        val sb = StringBuilder(speciesName[sp])
+        if (Native.org(selI, 9) != 0.0) sb.append("   · dormant")
+        sb.append("\nenergy %.1f   size %.1f   mineral %.2f".format(
+            Native.org(selI, 5), Native.org(selI, 6), Native.org(selI, 7)))
+        sb.append("\nage %d ticks".format(Native.tick() - Native.org(selI, 8).toLong()))
+        for (k in locusText[sp].indices) {
+            val t = locusText[sp][k]
+            sb.append("\n%-14s %.2f   %s ↔ %s".format(t[0], Native.org(selI, 20 + k), t[2], t[1]))
+        }
+        return sb.toString()
     }
 
     private fun paintOrganisms(c: Canvas) {
@@ -241,5 +284,9 @@ class Renderer {
     }
 }
 
-/** Where the player is looking. Pan and pinch arrive in A.2; A.1 drives it programmatically. */
-class Camera(var x: Double = 512.0, var y: Double = 512.0, var z: Double = 1.0)
+/** Where the player is looking. Written by the gesture handlers, read by the render thread. */
+class Camera {
+    @Volatile var x: Double = 512.0
+    @Volatile var y: Double = 512.0
+    @Volatile var z: Double = 1.0
+}

@@ -1094,3 +1094,145 @@ pub extern "C" fn mc_frame_wall_pt(k: u32, q: u32, axis: i32) -> f64 {
         None => f64::NAN,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Selection and read-out (M5.1 A.2). The tap radius and the tie-breaking are grammar — which
+// organism a thumb lands on must not differ between platforms — so they live in frame.rs and this
+// only carries the answers across.
+
+/// Candidates within `rad` of a world point, nearest first. Returns how many.
+#[no_mangle]
+pub extern "C" fn mc_pick(wx: f64, wy: f64, rad: f64) -> u32 {
+    let sim = s();
+    let Sim { frame, w, .. } = sim;
+    crate::frame::pick(w, wx, wy, rad, &mut frame.cand);
+    frame.cand.len() as u32
+}
+
+/// The tap radius for a zoom: `tight` after the loupe, loose for a thumb.
+#[no_mangle]
+pub extern "C" fn mc_pick_radius(z: f64, tight: i32) -> f64 {
+    crate::frame::pick_radius(z, tight != 0)
+}
+
+/// `field`: 0 slot index, 1 generation, 2 species, 3 squared distance.
+#[no_mangle]
+pub extern "C" fn mc_pick_at(k: u32, field: i32) -> f64 {
+    let sim = s();
+    let (d2, i) = match sim.frame.cand.get(k as usize) {
+        Some(v) => *v,
+        None => return f64::NAN,
+    };
+    match field {
+        0 => i as f64,
+        1 => sim.w.gen[i] as f64,
+        2 => sim.w.sp[i] as f64,
+        3 => d2,
+        _ => f64::NAN,
+    }
+}
+
+/// The selection ring, projected through the view the last frame was built for.
+/// `field`: 0 still valid (0/1), 1 sx, 2 sy, 3 radius.
+#[no_mangle]
+pub extern "C" fn mc_frame_sel(i: i32, gen: i32, field: i32) -> f64 {
+    let sim = s();
+    if i < 0 {
+        return if field == 0 { 0.0 } else { f64::NAN };
+    }
+    let view = sim.frame.view;
+    match crate::frame::sel_screen(&sim.w, i as usize, gen as u16, &view) {
+        None => if field == 0 { 0.0 } else { f64::NAN },
+        Some((sx, sy, r)) => match field {
+            0 => 1.0,
+            1 => sx,
+            2 => sy,
+            3 => r,
+            _ => f64::NAN,
+        },
+    }
+}
+
+/// One organism's read-out, for the specimen card. `field`: 0 alive, 1 species, 2 generation,
+/// 3 x, 4 y, 5 energy, 6 size, 7 bound mineral, 8 birth tick, 9 dormant, 10 heading,
+/// 20+k genotype of locus plane k.
+#[no_mangle]
+pub extern "C" fn mc_org(i: i32, field: i32) -> f64 {
+    let sim = s();
+    if i < 0 || i as usize >= sim.w.n_slots() {
+        return f64::NAN;
+    }
+    let i = i as usize;
+    let w = &sim.w;
+    match field {
+        0 => w.alive[i] as f64,
+        1 => w.sp[i] as f64,
+        2 => w.gen[i] as f64,
+        3 => w.x[i] as f64,
+        4 => w.y[i] as f64,
+        5 => w.en[i] as f64,
+        6 => w.sz[i] as f64,
+        7 => w.mn[i] as f64,
+        8 => w.birth[i] as f64,
+        9 => w.cy[i] as f64,
+        10 => w.hd[i] as f64,
+        20..=23 => w.g[(field - 20) as usize * crate::params::MAXN + i] as f64,
+        _ => f64::NAN,
+    }
+}
+
+/// Names come from the trait rows, not from a second table in each renderer. `which`: 0 the
+/// species name; for a locus, 10+k the axis label, 20+k the high word, 30+k the low word.
+fn trait_text(sp: i32, which: i32) -> &'static str {
+    let sim = s();
+    let t = match sim.tr.get(sp as usize) {
+        Some(t) => t,
+        None => return "",
+    };
+    if which == 0 {
+        return t.name;
+    }
+    let (base, k) = (which / 10, (which % 10) as usize);
+    match t.loci.get(k) {
+        None => "",
+        Some(l) => match base {
+            1 => l.label,
+            2 => l.hi_word,
+            3 => l.lo_word,
+            _ => "",
+        },
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mc_trait_text_ptr(sp: i32, which: i32) -> usize {
+    trait_text(sp, which).as_ptr() as usize
+}
+
+#[no_mangle]
+pub extern "C" fn mc_trait_text_len(sp: i32, which: i32) -> u32 {
+    trait_text(sp, which).len() as u32
+}
+
+#[no_mangle]
+pub extern "C" fn mc_locus_count(sp: i32) -> u32 {
+    let sim = s();
+    sim.tr.get(sp as usize).map_or(0, |t| t.loci.len()) as u32
+}
+
+/// Species flags, so a shell does not need its own table of which species are in play.
+/// `which`: 0 live, 1 apex, 2 the mat.
+#[no_mangle]
+pub extern "C" fn mc_species_flag(sp: i32, which: i32) -> i32 {
+    let sim = s();
+    let t = match sim.tr.get(sp as usize) {
+        Some(t) => t,
+        None => return 0,
+    };
+    match which {
+        0 => t.live as i32,
+        1 => t.apex as i32,
+        2 => (sim.reg.mat == sp) as i32,
+        _ => 0,
+    }
+}
