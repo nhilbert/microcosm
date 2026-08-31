@@ -862,3 +862,216 @@ pub extern "C" fn mc_level_meter(row: u32, field: i32) -> f64 {
         _ => f64::NAN,
     }
 }
+
+// ---------------------------------------------------------------------------
+// The frame builder (M5.1). The display list crosses as raw f64 buffers the shell reads directly
+// out of linear memory; the small vector lists (glows, wall strokes) cross field by field, since
+// they are read once per layer redraw rather than per frame.
+
+/// `W.px.set(W.x); W.py.set(W.y)` — the shell marks the previous tick's positions before stepping,
+/// so a frame can interpolate between ticks. Deliberately NOT done inside the tick: `px`/`py` are
+/// the renderer's, and moving them into `step()` would change what the frozen oracle does.
+#[no_mangle]
+pub extern "C" fn mc_mark_prev() {
+    let sim = s();
+    sim.w.px.copy_from_slice(&sim.w.x);
+    sim.w.py.copy_from_slice(&sim.w.y);
+}
+
+/// Recompute the sprite bucket table from the current trait rows. A snapshot, like the browser's.
+#[no_mangle]
+pub extern "C" fn mc_frame_grammar_build() {
+    let sim = s();
+    sim.grammar = crate::frame::grammar(&sim.tr);
+}
+
+/// `field`: 0 tintPlane, 1 morphPlane, 2 outlinePlane, 3 roundPlane, 4 tN, 5 mN. Returns -1 for a
+/// species with no grammar (every field), which is how the shell knows to use the plain sprite.
+#[no_mangle]
+pub extern "C" fn mc_frame_grammar(sp: i32, field: i32) -> f64 {
+    let sim = s();
+    let gr = match sim.grammar.get(sp as usize).and_then(|g| *g) {
+        Some(gr) => gr,
+        None => return -1.0,
+    };
+    match field {
+        0 => gr.tint_plane as f64,
+        1 => gr.morph_plane as f64,
+        2 => gr.outline_plane as f64,
+        3 => gr.round_plane as f64,
+        4 => gr.t_n as f64,
+        5 => gr.m_n as f64,
+        _ => f64::NAN,
+    }
+}
+
+/// One bucket's sprite parameters. `field`: 0 r, 1 g, 2 b, 3 shape (0 nucleus, 1 dot, 2 tri,
+/// 3 square, 4 ray), 4 scale, 5 outline, 6 round.
+#[no_mangle]
+pub extern "C" fn mc_frame_spec(sp: i32, tb: i32, mb: i32, field: i32) -> f64 {
+    use crate::frame::Shape::*;
+    let sim = s();
+    if sp < 0 || sp as usize >= sim.grammar.len() {
+        return f64::NAN;
+    }
+    let spec = crate::frame::bucket_spec(&sim.grammar, sp as usize, tb.max(0) as usize, mb.max(0) as usize);
+    match field {
+        0 => spec.rgb[0] as f64,
+        1 => spec.rgb[1] as f64,
+        2 => spec.rgb[2] as f64,
+        3 => match spec.shape {
+            Nucleus => 0.0,
+            Dot => 1.0,
+            Tri => 2.0,
+            Square => 3.0,
+            Ray => 4.0,
+        },
+        4 => spec.scale,
+        5 => spec.outline,
+        6 => spec.round,
+        _ => f64::NAN,
+    }
+}
+
+/// Build one frame. `hidden` is a bitmask: bits 0-6 species, bit 7 debris, bits 8-9 the light and
+/// heat layers (which the shell paints, not this).
+#[allow(clippy::too_many_arguments)]
+#[no_mangle]
+pub extern "C" fn mc_frame_build(
+    cam_x: f64,
+    cam_y: f64,
+    vw: f64,
+    vh: f64,
+    z: f64,
+    hw: f64,
+    hh: f64,
+    alpha: f64,
+    lod_z: f64,
+    hidden: i32,
+) {
+    let sim = s();
+    let mut h = [false; 10];
+    for (k, v) in h.iter_mut().enumerate() {
+        *v = hidden & (1 << k) != 0;
+    }
+    let v = crate::frame::View { cam_x, cam_y, vw, vh, z, hw, hh, alpha, lod_z };
+    let Sim { frame, w, grammar, .. } = sim;
+    crate::frame::frame_of(frame, w, grammar, &v, &h);
+}
+
+#[no_mangle]
+pub extern "C" fn mc_frame_org_ptr() -> u32 {
+    s().frame.org.as_ptr() as u32
+}
+
+#[no_mangle]
+pub extern "C" fn mc_frame_corpse_ptr() -> u32 {
+    s().frame.corpse.as_ptr() as u32
+}
+
+/// `field`: 0 orgN, 1 corpseN, 2 mnBound, 10+sp population.
+#[no_mangle]
+pub extern "C" fn mc_frame_num(field: i32) -> f64 {
+    let f = &s().frame;
+    match field {
+        0 => f.org_n as f64,
+        1 => f.corpse_n as f64,
+        2 => f.mn_bound,
+        10..=16 => f.pops[(field - 10) as usize] as f64,
+        _ => f64::NAN,
+    }
+}
+
+/// Fill the scratch field buffer and return a pointer to it. `which`: 0 mat carpet, 1 dissolved
+/// mineral, 2 corpse pall, 3 wall shade. Always GRID*GRID*4 RGBA bytes.
+#[no_mangle]
+pub extern "C" fn mc_frame_field(which: i32) -> u32 {
+    let sim = s();
+    let Sim { frame_field, w, tr, reg, .. } = sim;
+    match which {
+        0 => crate::frame::field_carpet(w, tr, reg, frame_field),
+        1 => crate::frame::field_mineral(w, frame_field),
+        2 => crate::frame::field_corpse_pall(w, frame_field),
+        3 => crate::frame::field_shade(w, frame_field),
+        _ => {}
+    }
+    frame_field.as_ptr() as u32
+}
+
+fn glow_list(which: i32) -> Vec<crate::frame::Glow> {
+    let w = &s().w;
+    if which == 0 { crate::frame::sun_glows(w) } else { crate::frame::heat_glows(w) }
+}
+
+fn mark_list(which: i32) -> Vec<crate::frame::Mark> {
+    let w = &s().w;
+    if which == 0 { crate::frame::sun_marks(w) } else { crate::frame::heat_marks(w) }
+}
+
+/// `which`: 0 sun glows, 1 heat glows, 2 sun marks, 3 heat marks.
+#[no_mangle]
+pub extern "C" fn mc_frame_glow_count(which: i32) -> u32 {
+    if which < 2 { glow_list(which).len() as u32 } else { mark_list(which - 2).len() as u32 }
+}
+
+/// `field`: 0 x, 1 y, 2 r, 3 a, 4 warm. Marks carry x, y and warm only.
+#[no_mangle]
+pub extern "C" fn mc_frame_glow(which: i32, k: u32, field: i32) -> f64 {
+    if which < 2 {
+        let l = glow_list(which);
+        let g = match l.get(k as usize) {
+            Some(g) => *g,
+            None => return f64::NAN,
+        };
+        match field {
+            0 => g.x,
+            1 => g.y,
+            2 => g.r,
+            3 => g.a,
+            4 => g.warm as i32 as f64,
+            _ => f64::NAN,
+        }
+    } else {
+        let l = mark_list(which - 2);
+        let m = match l.get(k as usize) {
+            Some(m) => *m,
+            None => return f64::NAN,
+        };
+        match field {
+            0 => m.x,
+            1 => m.y,
+            4 => m.warm as i32 as f64,
+            _ => f64::NAN,
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mc_frame_wall_count() -> u32 {
+    crate::frame::wall_strokes(&s().w).len() as u32
+}
+
+/// `field`: 0 alpha, 1 dashed, 2 point count.
+#[no_mangle]
+pub extern "C" fn mc_frame_wall(k: u32, field: i32) -> f64 {
+    let l = crate::frame::wall_strokes(&s().w);
+    let wl = match l.get(k as usize) {
+        Some(wl) => wl,
+        None => return f64::NAN,
+    };
+    match field {
+        0 => wl.a,
+        1 => wl.dashed as i32 as f64,
+        2 => wl.pts.len() as f64,
+        _ => f64::NAN,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mc_frame_wall_pt(k: u32, q: u32, axis: i32) -> f64 {
+    let l = crate::frame::wall_strokes(&s().w);
+    match l.get(k as usize).and_then(|wl| wl.pts.get(q as usize)) {
+        Some(p) => if axis == 0 { p.0 } else { p.1 },
+        None => f64::NAN,
+    }
+}

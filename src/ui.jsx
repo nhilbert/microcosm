@@ -432,7 +432,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = COL.abyss; ctx.fillRect(0, 0, vw, vh);
       const z = cam.z, hw = vw/2, hh = vh/2, k = P.WORLD/512;
-      const view = { cam, vw, vh, z, hw, hh, alpha, dpr, LOD_Z };
+      const view = { camX: cam.x, camY: cam.y, vw, vh, z, hw, hh, alpha, dpr, lodZ: LOD_Z };
       // tiled light and heat layers (view toggles: slots 8 and 9 of `hidden`)
       const tlx = cam.x - hw/z, tly = cam.y - hh/z;
       for (let ky = Math.floor(tly/P.WORLD); (ky*P.WORLD) < tly + vh/z; ky++)
@@ -453,10 +453,13 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
           if (z < LOD_Z && !hiddenRef.current[7]) ctx.drawImage(CC, dx0, dy0, P.WORLD*z, P.WORLD*z);
           if (W.wallsOn) ctx.drawImage(WB, dx0, dy0, P.WORLD*z, P.WORLD*z); // walls above the carpet, below the swimmers (7.W)
         }
-      // organisms: saturating "screen" composition instead of unbounded addition
-      const { pops, mnBound } = drawOrganisms(ctx, view, hiddenRef.current, S);
+      // the display list first (grammar), then the painting: organisms use a saturating "screen"
+      // composition instead of unbounded addition
+      const F = frameOf(view, hiddenRef.current, S.grammar);
+      paintOrganisms(ctx, F, S);
       drawPours(ctx, pours, performance.now());
-      drawCorpses(ctx, view, hiddenRef.current[7]);
+      paintCorpses(ctx, F);
+      const { pops, mnBound } = F;
       W.pops = pops;
 
       if (mode === "intervene"){

@@ -501,9 +501,10 @@ The port is complete: core, observatory, save/load, three targets, all proven, w
 the handover done. What remains is product work and two loose ends.
 
 1. **M5.1 — the app.** Kotlin/Compose over a SurfaceView render thread, full
-   parity, save/load wired to `AtomicFile`. The longest milestone by far: ~3,400
+   parity, save/load wired to `AtomicFile`. The longest milestone by far: ~2,700
    lines of JSX behaviour, the visual grammar, the Data pages, the levels shell.
-   It deserves its own increment plan. The toolchain and the JNI path underneath
+   **Planned in docs/android-app-plan.md** (increments A.0–A.6, two owner
+   decisions recorded); A.0, the shared frame builder, is shipped. The toolchain and the JNI path underneath
    it are now proven, and the core sustains 250× against a UI that caps at 16× —
    so the render path, not the simulation, is what that plan has to think about.
 2. **Finish the observatory**: `impact()` is what is left. It reads `W.evLog`,

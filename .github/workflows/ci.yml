@@ -45,6 +45,13 @@ jobs:
             exit 1
           fi
 
+      # Both are in `npm test`; CI runs the steps individually, so they need naming here too.
+      - name: Player-language gate
+        run: node harness/prose.js
+
+      - name: Render smoke (the painting path runs)
+        run: node harness/render-smoke.js
+
   acceptance:
     name: Ecology acceptance (manual, ~40 min)
     runs-on: ubuntu-latest

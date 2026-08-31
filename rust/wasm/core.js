@@ -354,6 +354,67 @@ Object.defineProperty(LVL, "failWhy", { get(){
   return n === 0 ? "" : DEC.decode(new Uint8Array(MEM.buffer, X.mc_level_fail_why_ptr(), n));
   }, enumerable: true });
 
+// ---------- the frame builder (M5.1) ----------
+// The visual grammar, from the core. `src/ui-render.js` carries the reference implementation and
+// harness/fingerprint-frame.js compares the two bit for bit; the painting stays per platform.
+const SHAPE_NAMES = ["nucleus", "dot", "tri", "square", "ray"];
+function markPrev(){ X.mc_mark_prev(); }
+function makeGrammar(){
+  X.mc_frame_grammar_build();
+  const out = [];
+  for (let sp = 0; sp < 7; sp++){
+    const tN = X.mc_frame_grammar(sp, 4);
+    if (tN < 0){ out.push(null); continue; }
+    out.push({ tintPlane: X.mc_frame_grammar(sp, 0), morphPlane: X.mc_frame_grammar(sp, 1),
+      outlinePlane: X.mc_frame_grammar(sp, 2), roundPlane: X.mc_frame_grammar(sp, 3),
+      tN, mN: X.mc_frame_grammar(sp, 5) });
+  }
+  return out;
+}
+function bucketSpec(_G, sp, tb, mb){
+  const f = k => X.mc_frame_spec(sp, tb, mb, k);
+  return { rgb: [f(0), f(1), f(2)], shape: SHAPE_NAMES[f(3)], scale: f(4), outline: f(5), round: f(6) };
+}
+const FRAME = { org: null, corpse: null, orgN: 0, corpseN: 0, pops: [0,0,0,0,0,0,0], mnBound: 0 };
+function frameOf(view, hidden, _G){
+  let mask = 0;
+  for (let k = 0; k < 10; k++) if (hidden[k]) mask |= 1 << k;
+  X.mc_frame_build(view.camX, view.camY, view.vw, view.vh, view.z, view.hw, view.hh, view.alpha, view.lodZ, mask);
+  sync();
+  FRAME.orgN = X.mc_frame_num(0);
+  FRAME.corpseN = X.mc_frame_num(1);
+  FRAME.mnBound = X.mc_frame_num(2);
+  for (let sp = 0; sp < 7; sp++) FRAME.pops[sp] = X.mc_frame_num(10 + sp);
+  FRAME.org = new Float64Array(MEM.buffer, X.mc_frame_org_ptr(), MAXN * 8);
+  FRAME.corpse = new Float64Array(MEM.buffer, X.mc_frame_corpse_ptr(), 1500 * 4);
+  return FRAME;
+}
+const frameField = (which, out) => { out.set(new Uint8Array(MEM.buffer, X.mc_frame_field(which), GRID*GRID*4)); };
+const fieldCarpet     = out => frameField(0, out);
+const fieldMineral    = out => frameField(1, out);
+const fieldCorpsePall = out => frameField(2, out);
+const fieldShade      = out => frameField(3, out);
+function glowList(which){
+  const n = X.mc_frame_glow_count(which), g = (k, f) => X.mc_frame_glow(which, k, f), out = [];
+  for (let k = 0; k < n; k++) out.push(which < 2
+    ? { x: g(k,0), y: g(k,1), r: g(k,2), a: g(k,3), warm: g(k,4) !== 0 }
+    : { x: g(k,0), y: g(k,1), warm: g(k,4) !== 0 });
+  return out;
+}
+const sunGlows  = () => glowList(0).map(g => ({ x: g.x, y: g.y, r: g.r, a: g.a }));
+const heatGlows = () => glowList(1).map(g => ({ x: g.x, y: g.y, r: g.r, m: g.a, warm: g.warm }));
+const sunMarks  = () => glowList(2).map(m => ({ x: m.x, y: m.y }));
+const heatMarks = () => glowList(3);
+function wallStrokes(){
+  const n = X.mc_frame_wall_count(), out = [];
+  for (let k = 0; k < n; k++){
+    const np = X.mc_frame_wall(k, 2), pts = [];
+    for (let q = 0; q < np; q++) pts.push([X.mc_frame_wall_pt(k, q, 0), X.mc_frame_wall_pt(k, q, 1)]);
+    out.push({ a: X.mc_frame_wall(k, 0), dashed: X.mc_frame_wall(k, 1) !== 0, pts });
+  }
+  return out;
+}
+
 // Still JS-only: impact(). Fail loudly rather than let a gate quietly measure nothing.
 const notYet = name => () => {
   throw new Error(`wasm core: ${name} is not ported yet (docs/android-port-plan.md) — run this harness against dist/core.js`);
@@ -366,4 +427,7 @@ module.exports = {
   indicators, impact: notYet("impact"),
   LEVELS, LEVEL_ROWS: LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter,
   levelAllows, levelPourOk, levelNotePour, levelNarration,
+  markPrev, makeGrammar, bucketSpec, frameOf, TINT_BINS: 7,
+  fieldCarpet, fieldMineral, fieldCorpsePall, fieldShade,
+  sunGlows, sunMarks, heatGlows, heatMarks, wallStrokes,
 };

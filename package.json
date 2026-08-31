@@ -37,12 +37,14 @@
     "conform:core:capture": "node harness/conform-core.js --capture",
     "port:check": "node tools/port-check.js",
     "port:levels": "MC_CORE=$PWD/rust/wasm/core.js node harness/levels.js",
+    "frame": "npm run build && node harness/fingerprint-frame.js",
+    "smoke": "npm run build && node harness/render-smoke.js",
     "test:port": "npm run wasm && npm run conform:core && npm run port:check && npm run port:snapshot && MC_CORE=$PWD/rust/wasm/core.js node harness/k6gate.js && npm run port:levels",
     "port:math": "cd rust/microcosm-core && cargo run --release --quiet --bin xcheck-math --",
     "port:snapshot": "cd rust/microcosm-core && cargo run --release --quiet --bin snapshot",
     "selftest": "node harness/selftest.js",
     "yoshida:capture": "npm run build && node harness/yoshida.js --capture",
-    "test": "npm run build && npm run syntax && node harness/selftest.js && node harness/conform.js && node harness/prose.js",
+    "test": "npm run build && npm run syntax && node harness/selftest.js && node harness/conform.js && node harness/prose.js && node harness/render-smoke.js",
     "test:full": "npm run test && npm run tune && npm run gate && node harness/gate5.js && node harness/corridor.js --rails --fuzz && node harness/levels.js"
   },
   "devDependencies": {

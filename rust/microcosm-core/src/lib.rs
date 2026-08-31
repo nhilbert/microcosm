@@ -15,6 +15,7 @@
 
 pub mod events;
 pub mod fields;
+pub mod frame;
 pub mod jsnum;
 pub mod levels;
 pub mod levels_gen;
@@ -57,6 +58,13 @@ pub struct Sim {
     pub obs: observatory::Observatory,
     /// The running learning level, if any (see levels.rs). Session state, not world state.
     pub lvl: levels::Lvl,
+    /// The display list a shell paints (see frame.rs), reused between frames.
+    pub frame: frame::Frame,
+    /// The sprite bucket table. A snapshot, like the browser's: it is taken when a shell asks for
+    /// it, not per frame, so changing a price slider mid-run does not silently re-bin the world.
+    pub grammar: Vec<Option<frame::Grammar>>,
+    /// Scratch for one GRID x GRID RGBA field.
+    pub frame_field: Vec<u8>,
     /// The shipped evolution settings, captured once at load; `init_world` restores them.
     locus_shipped: Vec<Vec<Locus>>,
 }
@@ -71,6 +79,7 @@ impl Sim {
     pub fn new() -> Sim {
         let p = Params::default();
         let tr = species_gen::species_table();
+        let tr2 = tr.clone();
         let reg = Registry::build(&tr);
         let locus_shipped = tr.iter().map(|t| t.loci.clone()).collect();
         Sim {
@@ -80,6 +89,9 @@ impl Sim {
             reg,
             obs: observatory::Observatory::new(),
             lvl: levels::Lvl::default(),
+            frame: frame::Frame::default(),
+            grammar: frame::grammar(&tr2),
+            frame_field: vec![0; NCELL * 4],
             locus_shipped,
         }
     }
