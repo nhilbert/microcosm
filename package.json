@@ -24,12 +24,13 @@
     "light:gate": "npm run build && node harness/light.js --gate",
     "heat:gate": "npm run build && node harness/heat.js --gate",
     "walls": "npm run build && node harness/walls.js",
+    "levels": "npm run build && node harness/levels.js",
     "walls:all": "npm run build && node harness/walls.js --open --seal --hideout --shade",
     "apk:assets": "node tools/build-app.js",
     "selftest": "node harness/selftest.js",
     "yoshida:capture": "npm run build && node harness/yoshida.js --capture",
     "test": "npm run build && npm run syntax && node harness/selftest.js && node harness/conform.js",
-    "test:full": "npm run test && npm run tune && npm run gate && node harness/gate5.js && node harness/corridor.js --rails --fuzz"
+    "test:full": "npm run test && npm run tune && npm run gate && node harness/gate5.js && node harness/corridor.js --rails --fuzz && node harness/levels.js"
   },
   "devDependencies": {
     "esbuild": "^0.28.0",
