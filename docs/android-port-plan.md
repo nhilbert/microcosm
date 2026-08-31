@@ -229,8 +229,80 @@ deliverable or base64-embedded WASM — decide when M6 starts, not before.
   memory (views + proxy cover it; audit every harness for direct `TRAITS`
   writes in M2).
 
-## 7. Immediate next steps
+## 7. Status — what is built and measured (2026-08-31)
 
-M0 in this order, each conform-checked: `W.rngState` + `W.seed`; the TRAITS
-restore fix; the Node pin; the trace capture. Then M1's two prototypes — and
-the go/no-go numbers go in this file, next to the estimates they test.
+**M0 done.** `W.rngState` + `W.seed` exposed in the JS reference (behaviour-neutral;
+all four fingerprints identical, baseline rebound). Node pinned to 22 in
+`package.json` with a runtime probe in `conform.js` (`Math.pow(10,-5) !== 1e-5`
+on fdlibm-era V8) so a wrong engine explains itself instead of just failing.
+**One M0 item was deliberately dropped**: "fix the TRAITS locus restore leak" was
+wrong. `heat.js --thermal` sets `warmSlope`/`warmGainSlope` *before* `start()` and
+depends on them surviving `initWorld`; restoring all locus keys would have
+silently broken that price sweep. Semantics kept, and the port replicates them.
+
+**M1 done, except the phone.** `src/math/` is self-contained and **bit-identical to
+V8 12.4 on all seven functions across 200,000 samples each** — sin, cos, exp, pow,
+atan2, hypot, sqrt, 0 mismatches, exact bit equality. Built from the `libm` crate
+with per-architecture dispatch disabled, plus four replacements found by
+measurement: fdlibm's `rem_pio2` (prec 2, not MUSL's 1), fdlibm's `k_cos` (the `qx`
+correction MUSL dropped), fdlibm's `k_sin` association, and V8's undocumented 2016
+`pow` change — it divides by the entire denominator where fdlibm subtracts after
+dividing. `hypot` is a Torque builtin in V8, not libm, and was transliterated from
+`math.tq`. Full record: `rust/microcosm-core/src/math/MATH-PROVENANCE.md`.
+**Still owed: the on-device ARM64 trace replay and the phone perf probe.** Neither
+is possible in this container; the go/no-go on ×2 therefore remains open, and the
+speedups below are desktop measurements.
+
+**M2 done.** `rust/microcosm-core` is the sim: world, fields, walls, diffusion,
+light/temp, events, founding, the tick. Bit-exact against the JS core on:
+
+| check | result |
+|---|---|
+| world fingerprint, 1 / 20 / 100 / 500 / 3,000 / 18,000 ticks | identical (raw IEEE754 bits) |
+| all 8 acceptance seeds × 18,000 ticks × silent+evolving | identical |
+| scripted events (every event type) + scenario founding | identical |
+| `tune2`, 8 seeds × 18,000, through the real harness | **byte-identical output** |
+
+The fingerprints carry the bits of every accumulator *and the final PRNG state*, so
+agreement means both implementations consumed the same draws in the same order.
+One real translation bug was found, by bisecting per organism: `for (let i=0; i<W.n; i++)`
+re-reads `W.n` every iteration and `spawn()` grows it, so a child born this tick is
+processed this tick. Hoisting the bound — the obvious Rust translation — left every
+newborn unstepped while the parents stayed bit-identical.
+
+**M3 done** (except the read-outs). `src/observatory.rs` carries the 141-channel
+recorder and every detector. Over 6,000 ticks: all per-channel sums bit-identical
+and all narrated events matching on tick, type, species, locus and text. **The K6
+gate passes on the ported core with byte-identical output.** Still JS-only:
+`indicators`, `impact` and the level API.
+
+**The WASM bridge works.** `MC_CORE=rust/wasm/core.js` points the existing harnesses
+at the ported core, unchanged. `npm run port:check` is the whole comparison in one
+command.
+
+**Save/load shipped early** (it was M5). Versioned flat-binary snapshot in the core:
+715 KB raw, 202 KB gzipped for a 1,200-tick world. Proved by resumption — 2,000
+ticks resumed from a load equal the same 2,000 never interrupted; a re-save of a
+loaded world is byte-identical to the original; corrupt and truncated files are
+refused rather than half-loaded.
+
+**Measured speed (x86-64, not the phone):** 4 × 18,000 ticks native 44.5 s vs
+115.5 s in Node (**×2.6**); 4 × 3,000 ticks 5.1 s vs 16.1 s (**×3.1**); `tune2`
+through WASM 54.8 s vs 132.3 s (**×2.4**). Inside the ×2–5 the plan predicted, and
+the ×3–6 organism-loop estimate looks about right — but WASM and native are not the
+phone, and the M1 go/no-go still wants an on-device number.
+
+## 8. Next
+
+1. **On-device (M1 remainder)**: replay the math trace on ARM64, and run the perf
+   probe on a mid-range phone. Until then the Android bit-exactness claim is
+   inferred, not measured.
+2. **Finish M3**: `indicators`, `impact`, the level API — then the heat, light,
+   gate5 and levels gates can all run on the ported core.
+3. **M4 handover**: rebind the baselines against the Rust core's hash, rewrite
+   `docs/porting.md` (the crate becomes the spec; frozen `dist/core.js` + Node 22
+   becomes the historical oracle), teach CI to build the crate and run the
+   harnesses on WASM, then lift the freeze.
+4. **M5 the app**: Kotlin/Compose over a SurfaceView render thread, full parity,
+   with save/load wired to `AtomicFile`. The longest milestone by far — the visual
+   grammar and the Data pages deserve their own increment plan when it starts.
