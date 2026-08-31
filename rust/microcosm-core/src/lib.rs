@@ -23,6 +23,7 @@ pub mod math;
 pub mod math;
 pub mod observatory;
 pub mod params;
+pub mod probe;
 pub mod rng;
 pub mod snapshot;
 pub mod species_gen;
