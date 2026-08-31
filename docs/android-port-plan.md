@@ -282,7 +282,7 @@ byte for byte with the same harness on the JavaScript core:
 |---|---|
 | K6 (Observatory narrates the strangulation) | **ALL CRITERIA PASS**, identical output |
 | gate5 (the Observatory narrates the evolution) | **ALL CRITERIA PASS**; seed-22 Yoshida baseline reproduced exactly (pOff 4860, pOn 6680) |
-| heat (7.H.4 warm-water narrations) | **ALL 3 PASS**: hot-sun pile-up 8/8, thinning 8/8 for Dri/Cil/Bac, press starve 8/8 always ahead of the extinction, control silent |
+| heat (7.H.4 warm-water narrations) | **ALL 3 PASS**, byte-identical output: hot-sun pile-up 8/8, thinning 8/8 for Dri/Cil/Bac, press starve 8/8 always ahead of the extinction, control silent |
 | light (7.L patch adaptation) | identical output to the JavaScript core, criterion 2 (control silent, channels exactly 0) PASS |
 
 The heat gate also found a real gap rather than a difference: a harness that pokes
