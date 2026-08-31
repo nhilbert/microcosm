@@ -10,7 +10,7 @@
 //! resized (`Frame::default`, `Sim::frame_field`), so the pointers stay valid for the process's
 //! life — which is what makes handing them to the JVM safe.
 
-use jni::objects::{JByteBuffer, JObject};
+use jni::objects::{JByteArray, JByteBuffer, JObject};
 use jni::sys::{jdouble, jint, jlong};
 use jni::JNIEnv;
 
@@ -547,4 +547,163 @@ pub extern "system" fn Java_org_microcosm_app_Native_sysEventText(
         Ok(v) => v.into_raw(),
         Err(_) => std::ptr::null_mut(),
     }
+}
+
+// ---------------------------------------------------------------------------
+// The learning levels (A.5). The table crosses once as JSON — the player text is the bulk of a
+// level and marshalling it field by field would buy nothing — and everything the runtime decides
+// crosses as numbers. All of it touches the core: render thread only.
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelsJson(
+    env: JNIEnv,
+    _this: JObject,
+) -> jni::sys::jstring {
+    let ptr = abi::mc_levels_json_ptr() as *const u8;
+    let len = abi::mc_levels_json_len() as usize;
+    // SAFETY: a &'static str in the generated level table.
+    let text = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(ptr, len)) };
+    match env.new_string(text) {
+        Ok(v) => v.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelCount(_env: JNIEnv, _this: JObject) -> jint {
+    abi::mc_level_count() as jint
+}
+
+/// `predicted` is the option the player committed to before the run, or -1 if they skipped it.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelStart(
+    _env: JNIEnv,
+    _this: JObject,
+    idx: jint,
+    predicted: jint,
+) {
+    abi::mc_level_start(idx, predicted);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelRestart(_env: JNIEnv, _this: JObject) {
+    abi::mc_level_restart();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelStop(_env: JNIEnv, _this: JObject) {
+    abi::mc_level_stop();
+}
+
+/// Runs the verdict loop. 0 idle, 1 running, 2 passed, 3 failed.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelCheck(_env: JNIEnv, _this: JObject) -> jint {
+    abi::mc_level_check()
+}
+
+/// `field`: 0 state, 1 level index, 2 run, 3 seenS, 4 predicted, 5 pours left (-1 unlimited).
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelNum(
+    _env: JNIEnv,
+    _this: JObject,
+    field: jint,
+) -> jdouble {
+    abi::mc_level_num(field)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelFailWhy(
+    env: JNIEnv,
+    _this: JObject,
+) -> jni::sys::jstring {
+    let ptr = abi::mc_level_fail_why_ptr() as *const u8;
+    let len = abi::mc_level_fail_why_len() as usize;
+    let text = if len == 0 {
+        ""
+    } else {
+        // SAFETY: a &'static str in the level table.
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(ptr, len)) }
+    };
+    match env.new_string(text) {
+        Ok(v) => v.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// `what`: 0 pours, 1 seed, 2 sources, 3 walls, 4 evolution.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelAllows(
+    _env: JNIEnv,
+    _this: JObject,
+    what: jint,
+) -> jint {
+    abi::mc_level_allows(what)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelPourOk(_env: JNIEnv, _this: JObject) -> jint {
+    abi::mc_level_pour_ok()
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelNotePour(
+    _env: JNIEnv,
+    _this: JObject,
+    d: jint,
+) {
+    abi::mc_level_note_pour(d);
+}
+
+/// The index into the event feed of the freshest event this level narrates, or -1.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelNarration(_env: JNIEnv, _this: JObject) -> jint {
+    abi::mc_level_narration()
+}
+
+/// One meter row. `field`: 0 value, 1 has-goal, 2 goal, 3 direction.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelMeter(
+    _env: JNIEnv,
+    _this: JObject,
+    row: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_level_meter(row.max(0) as u32, field)
+}
+
+// ---------------------------------------------------------------------------
+// Save and load (A.6). The bytes cross as a Java byte array, which is one copy each way for a
+// 700 KB world — a rounding error against writing the file, and it keeps the shell free to hand
+// the array straight to AtomicFile.
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_save<'a>(
+    env: JNIEnv<'a>,
+    _this: JObject,
+) -> jni::sys::jbyteArray {
+    let n = abi::mc_save() as usize;
+    let ptr = abi::mc_snap_ptr() as *const u8;
+    // SAFETY: the core's own snapshot buffer, valid until the next save or load.
+    let bytes = unsafe { std::slice::from_raw_parts(ptr, n) };
+    match env.byte_array_from_slice(bytes) {
+        Ok(v) => v.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// 1 when the world was taken, 0 when the file is not one of ours or is truncated.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_load(
+    env: JNIEnv,
+    _this: JObject,
+    data: JByteArray,
+) -> jint {
+    let bytes = match env.convert_byte_array(&data) {
+        Ok(v) => v,
+        Err(_) => return 0,
+    };
+    let dst = abi::mc_snap_reserve(bytes.len() as u32) as *mut u8;
+    // SAFETY: mc_snap_reserve just sized the buffer to exactly this length.
+    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len()) };
+    abi::mc_load()
 }

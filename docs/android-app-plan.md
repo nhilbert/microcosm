@@ -80,8 +80,8 @@ right.
 | **A.2** ✅ | Camera and gestures: pan, pinch, tap-select, long-press; the status strip and the specimen card | the world is navigable |
 | **A.3** | Intervene: sun drag and press, mineral pour, feed/kill, the seeding picker, walls — each an event, undoable, impact-carded | the levers, with their provenance intact |
 | **A.4** ✅ | Data mode: the five pages against the ported `indicators` | the Observatory on the phone |
-| **A.5** | Experiments: start screen, prediction step, HUD, verdicts (the level API is already ported) | the ladder is playable |
-| **A.6** | Save/load wired to `AtomicFile` (the snapshot format is already ported and proved) | the feature that motivated the port |
+| **A.5** ✅ | Experiments: start screen, prediction step, HUD, verdicts (the level API is already ported) | the ladder is playable |
+| **A.6** ✅ | Save/load wired to `AtomicFile` (the snapshot format is already ported and proved) | the feature that motivated the port |
 
 `impact()` lands in A.3: it reads the UI's event log, which is why it was deferred out of M3.
 
@@ -314,6 +314,32 @@ cost of copying it is not worth the cost of thinking about the race.
 Deferred and recorded: the Traits page (per-locus ribbons and histograms), the amber intervention
 markers on the charts (they need the UI's own intervention log, which arrives with `impact()`), and
 scrubbing.
+
+## 5g. A.5 and A.6 — the ladder, and the saved world, 2026-08-31
+
+**A.5.** The experiments are a list, every one open, none gated behind another — the browser's rule.
+Choosing one shows its question, its briefing and its goal; then the prediction step, which is
+committed before the run and contrasted after, never graded. The objective chip lives in the top
+stack's flow rather than over the world, so it can grow to as many lines as it needs without
+covering anything. The verdict card carries the debrief, the fail reason in the level's own words,
+and — when a prediction was made — what the player said and the reflection for it.
+
+The apparatus gates are real: `levelAllows` decides whether a tap grips a sun or seeds a species,
+and `levelPourOk`/`levelNotePour` spend the level's mineral budget. The runtime is the core's, so
+the verdicts are the same ones `harness/levels.js` proves identical on both cores, and they are
+counted in recorder samples — the same at any speed.
+
+The level *table* is parsed from the JSON the core hands over, which is the same bytes
+`src/observatory/levels.json` carries. The shell reads player text and meter labels out of it; every
+predicate is the core's.
+
+**A.6.** `AtomicFile` writes to a shadow and renames, so a world half-written is a world not
+written and the previous save survives a crash mid-write. The snapshot format is `snapshot.rs`'s,
+proved by resumption since M3 — this only moves the bytes, and the save and the load both happen on
+the render thread, because a snapshot taken mid-tick would be a torn world and the tick is there.
+A bad file is refused rather than half-loaded, which the snapshot gate already covers.
+
+One slot for now. Naming saves is chrome; the format carries its own version.
 
 ## 6. Open, and honestly so
 

@@ -44,6 +44,11 @@ class MainActivity : Activity() {
     private lateinit var dataText: TextView
     private lateinit var dataTitle: TextView
     private var dataPage = 0
+    private lateinit var levelChip: TextView
+    private lateinit var verdict: TextView
+    private val levels by lazy { Level.all() }
+    private var running: Level? = null
+    private var lastVerdict = 0
     private val chips = ArrayList<TextView>()
     private val ui = Handler(Looper.getMainLooper())
 
@@ -74,6 +79,7 @@ class MainActivity : Activity() {
             undoChip.visibility = if (world.undoKind != 0) ViewGroup.VISIBLE else ViewGroup.GONE
             undoChip.text = undoLabel(world.undoKind, world.undoSpecies)
             if (world.dataOpen) refreshData()
+            showLevel()
             world.report?.let {
                 reportView.text = it
                 reportView.visibility = ViewGroup.VISIBLE
@@ -116,6 +122,17 @@ class MainActivity : Activity() {
             strip.addView(chip)
         }
         top.addView(strip)
+
+        // The experiment's objective, in the top stack's flow rather than over it: it never covers
+        // the world, however many lines it grows to.
+        levelChip = TextView(this).apply {
+            setTextColor(Color.parseColor("#C9D7E3"))
+            textSize = 11f
+            typeface = Typeface.MONOSPACE
+            setPadding(0, 10, 0, 0)
+            visibility = ViewGroup.GONE
+        }
+        top.addView(levelChip)
         top.setBackgroundColor(Color.parseColor("#D00B131E"))
         root.addView(top, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.TOP })
 
@@ -177,6 +194,8 @@ class MainActivity : Activity() {
             world.speed = s
         })
         bar.addView(button("mode") { world.intervene = !world.intervene }.also { modeButton = it })
+        bar.addView(button("save") { saveOrLoad() })
+        bar.addView(button("exp") { experimentPicker() })
         bar.addView(button("data") {
             world.dataOpen = true
             dataPanel.visibility = ViewGroup.VISIBLE
@@ -221,6 +240,19 @@ class MainActivity : Activity() {
         dataPanel.addView(button("close") { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE })
         root.addView(dataPanel, FrameLayout.LayoutParams(MATCH, MATCH))
 
+        // The verdict card: what happened, and why, in the level's own words.
+        verdict = TextView(this).apply {
+            setTextColor(Color.parseColor("#C9D7E3"))
+            setBackgroundColor(Color.parseColor("#F00B131E"))
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            setPadding(32, 32, 32, 32)
+            visibility = ViewGroup.GONE
+            setOnClickListener { visibility = ViewGroup.GONE }
+        }
+        root.addView(ScrollView(this).apply { addView(verdict) },
+            FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.CENTER })
+
         reportView = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
             setBackgroundColor(Color.parseColor("#F00B131E"))
@@ -254,6 +286,119 @@ class MainActivity : Activity() {
     )
 
     private fun shortName(sp: Int) = Native.traitText(sp, 0).take(3)
+
+    /**
+     * Save and load — the feature the whole port was for.
+     *
+     * `AtomicFile` writes to a shadow and renames, so a world half-written is a world not written:
+     * the previous save survives a crash or a battery death mid-write. One slot for now; naming
+     * saves is chrome, and the format carries its own version.
+     */
+    private fun saveFile() = android.util.AtomicFile(java.io.File(filesDir, "world.mcsm"))
+
+    private fun saveOrLoad() {
+        val f = saveFile()
+        val has = f.baseFile.exists()
+        val items = if (has) arrayOf("save the world", "load the saved world") else arrayOf("save the world")
+        AlertDialog.Builder(this)
+            .setTitle("Saved world")
+            .setItems(items) { _, k ->
+                if (k == 0) world.save { bytes ->
+                    var out: java.io.FileOutputStream? = null
+                    try {
+                        out = f.startWrite()
+                        out.write(bytes)
+                        f.finishWrite(out)
+                        toast("Saved — %d KB".format(bytes.size / 1024))
+                    } catch (e: Exception) {
+                        if (out != null) f.failWrite(out)
+                        toast("Could not save: ${e.message}")
+                    }
+                } else {
+                    val bytes = try { f.readFully() } catch (e: Exception) { null }
+                    if (bytes == null) toast("Could not read the saved world")
+                    else world.load(bytes) { ok ->
+                        toast(if (ok) "Loaded" else "That file is not a Microcosm world")
+                    }
+                }
+            }
+            .setNegativeButton("cancel", null)
+            .show()
+    }
+
+    private fun toast(s: String) =
+        android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_SHORT).show()
+
+    /** The start screen, as a list: every experiment open, none of them gated behind another. */
+    private fun experimentPicker() {
+        val names = levels.map { "E${it.n}  ${it.title} — ${it.science}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Experiments")
+            .setItems(names) { _, k -> briefing(levels[k]) }
+            .setNeutralButton("sandbox") { _, _ ->
+                world.stopLevel()
+                running = null
+                lastVerdict = 0
+            }
+            .show()
+    }
+
+    /** The briefing, then the prediction. Committing is never graded — it is there to be contrasted. */
+    private fun briefing(l: Level) {
+        AlertDialog.Builder(this)
+            .setTitle("E${l.n}  ${l.title}")
+            .setMessage("${l.question}\n\n${l.briefing}\n\nGoal: ${l.goalText}")
+            .setPositiveButton("begin") { _, _ -> predict(l) }
+            .setNegativeButton("back", null)
+            .show()
+    }
+
+    private fun predict(l: Level) {
+        val opts = l.predictOptions
+        if (opts.isEmpty()) { begin(l, -1); return }
+        AlertDialog.Builder(this)
+            .setTitle(l.predictPrompt)
+            .setItems(opts.toTypedArray()) { _, k -> begin(l, k) }
+            .setNegativeButton("skip") { _, _ -> begin(l, -1) }
+            .show()
+    }
+
+    private fun begin(l: Level, predicted: Int) {
+        running = l
+        lastVerdict = 0
+        verdict.visibility = ViewGroup.GONE
+        world.startLevel(levels.indexOf(l), predicted, l.meterLabels, l.meterUnits, l.deadline)
+        world.speed = 1.0
+    }
+
+    /** The objective chip while it runs, and the verdict card the moment it settles. */
+    private fun showLevel() {
+        val l = running
+        val st = world.levelState
+        if (l == null || st == 0) {
+            levelChip.visibility = ViewGroup.GONE
+            return
+        }
+        levelChip.visibility = ViewGroup.VISIBLE
+        val head = "E${l.n} ${l.title}   ${l.goalText}"
+        val narrated = world.levelNarration
+        levelChip.text = head + "\n" + world.levelHud + (if (narrated.isEmpty()) "" else "\n⚑ $narrated")
+        if (st != lastVerdict && st >= 2) {
+            lastVerdict = st
+            val passed = st == 2
+            val sb = StringBuilder(if (passed) "✓ ${l.title}" else "✕ ${l.title}")
+            if (!passed && world.levelWhy.isNotEmpty()) sb.append("\n\n").append(world.levelWhy)
+            sb.append("\n\n").append(if (passed) l.debriefPass else l.debriefFail)
+            // F1: contrast the prediction, never grade it
+            val p = world.levelPredicted
+            val reflect = l.predictReflect
+            if (p >= 0 && p < reflect.size) sb.append("\n\nYou predicted: ").append(l.predictOptions[p])
+                .append("\n").append(reflect[p])
+            sb.append("\n\n(tap to dismiss · \"exp\" to run it again)")
+            verdict.text = sb.toString()
+            verdict.visibility = ViewGroup.VISIBLE
+        }
+    }
 
     private val PAGE_TITLES = listOf(
         "Populations — every line a species, on a log axis",

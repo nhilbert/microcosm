@@ -1266,3 +1266,55 @@ pub extern "C" fn mc_undo() {
 pub extern "C" fn mc_undo_clear() {
     s().undo = crate::events::Undo::None;
 }
+
+// ---------------------------------------------------------------------------
+// Save and load (M5.1 A.6). The snapshot format is snapshot.rs's, proved by resumption since M3;
+// this only moves the bytes. Saving parks them in a buffer the shell reads; loading fills the same
+// buffer and asks the core to take it.
+
+static mut SNAP: Vec<u8> = Vec::new();
+
+#[allow(static_mut_refs)]
+fn snap() -> &'static mut Vec<u8> {
+    unsafe { &mut SNAP }
+}
+
+/// Serialise the world and return how many bytes are waiting in the buffer.
+#[no_mangle]
+pub extern "C" fn mc_save() -> u32 {
+    let bytes = s().save();
+    let b = snap();
+    b.clear();
+    b.extend_from_slice(&bytes);
+    b.len() as u32
+}
+
+/// Make room for `n` incoming bytes and return where to write them.
+#[no_mangle]
+pub extern "C" fn mc_snap_reserve(n: u32) -> usize {
+    let b = snap();
+    b.clear();
+    b.resize(n as usize, 0);
+    b.as_ptr() as usize
+}
+
+#[no_mangle]
+pub extern "C" fn mc_snap_ptr() -> usize {
+    snap().as_ptr() as usize
+}
+
+#[no_mangle]
+pub extern "C" fn mc_snap_len() -> u32 {
+    snap().len() as u32
+}
+
+/// Take the buffer's bytes as the world. 1 on success, 0 when the file is not one of ours or is
+/// truncated — a refusal, never a half-loaded world.
+#[no_mangle]
+pub extern "C" fn mc_load() -> i32 {
+    let bytes = snap().clone();
+    match s().load(&bytes) {
+        Ok(()) => 1,
+        Err(_) => 0,
+    }
+}

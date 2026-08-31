@@ -72,6 +72,36 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var undoSpecies = -1
         private set
 
+    // ---- the learning levels (A.5) ----
+    // The runtime is the core's (levels.rs) and its verdicts are counted in recorder samples, so
+    // they are identical at any speed — which is why the check runs here, once a frame, rather than
+    // on a UI timer.
+    @Volatile var levelState = 0
+        private set
+    @Volatile var levelHud: String = ""
+        private set
+    @Volatile var levelWhy: String = ""
+        private set
+    @Volatile var levelNarration: String = ""
+        private set
+    /** The option committed before the run, or -1. Published, because the UI thread must not read the core. */
+    @Volatile var levelPredicted = -1
+        private set
+    /** The level's own labels and units, handed over by the shell when it starts one. */
+    @Volatile var meterLabels: Array<String> = emptyArray()
+    @Volatile var meterUnits: Array<String> = emptyArray()
+    @Volatile var levelDeadline = 0L
+
+    fun startLevel(idx: Int, predicted: Int, labels: Array<String>, units: Array<String>, deadline: Long) = post {
+        meterLabels = labels
+        meterUnits = units
+        levelDeadline = deadline
+        Native.levelStart(idx, predicted)
+        selI = -1
+    }
+    fun restartLevel() = post { Native.levelRestart(); selI = -1 }
+    fun stopLevel() = post { Native.levelStop(); levelState = 0; levelHud = "" }
+
     // ---- Data mode (A.4) ----
     // Everything here is produced on the render thread and published. `indicators()` and the event
     // feed mutate the core while computing, so reading them from the UI thread would be a race on
@@ -199,7 +229,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             pendingLongY = Float.NaN
             pendingLongX = Float.NaN
             val sp = seedSpecies
-            if (intervene && sp >= 0) {
+            if (intervene && sp >= 0 && Native.levelAllows(1) != 0) {
                 Native.evSpawnPack(sp, worldX(lx), worldY(ly))
                 pours.add(Pour(lx, ly, System.nanoTime()))
             }
@@ -215,11 +245,18 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
 
         // In Intervene, a tap near a sun grips it; a tap on open water pours mineral there.
         if (intervene) {
-            val k = nearestSun(sx, sy)
-            if (k >= 0) { sunSel = k; return }
+            // An experiment hands out its own apparatus: a level's sky may not be editable and its
+            // mineral is budgeted. `levelAllows` is open outside a level.
+            if (Native.levelAllows(2) != 0) {
+                val k = nearestSun(sx, sy)
+                if (k >= 0) { sunSel = k; return }
+            }
             if (Native.pick(wx, wy, Native.pickRadius(cam.z, 0)) == 0) {
-                Native.evFertilize(wx, wy, 40.0)
-                pours.add(Pour(sx, sy, System.nanoTime()))
+                if (Native.levelAllows(0) != 0 && Native.levelPourOk() != 0) {
+                    Native.evFertilize(wx, wy, 40.0)
+                    Native.levelNotePour(1)
+                    pours.add(Pour(sx, sy, System.nanoTime()))
+                }
                 return
             }
         }
@@ -262,6 +299,17 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         if (selI >= 0) { Native.evKill(selI, selGen); selI = -1 }
     }
     fun undoLast() = post { Native.undo() }
+
+    // ---- save and load (A.6) ----
+    // Both run on the render thread, then hand the result back on the UI thread: a snapshot taken
+    // mid-tick would be a torn world, and the tick is here.
+    fun save(onDone: (ByteArray) -> Unit) = post { val b = Native.save(); ui.post { onDone(b) } }
+    fun load(bytes: ByteArray, onDone: (Boolean) -> Unit) = post {
+        val ok = Native.load(bytes) != 0
+        if (ok) { selI = -1; Native.markPrev(); renderer.onTilesChanged() }
+        ui.post { onDone(ok) }
+    }
+    private val ui = android.os.Handler(android.os.Looper.getMainLooper())
 
     override fun run() {
         Native.boot()
@@ -317,7 +365,37 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             undoKind = Native.undoKind()
             undoSpecies = Native.undoSpecies()
             if (dataOpen && dataFrame++ % 15 == 0) publishData()
+            publishLevel()
         }
+    }
+
+    /** The verdict, the meters and the level's latest narrated line. Render thread only. */
+    private fun publishLevel() {
+        val st = Native.levelCheck()
+        levelState = st
+        if (st == 0) { levelHud = ""; return }
+        val sb = StringBuilder()
+        for (k in meterLabels.indices) {
+            val v = Native.levelMeter(k, 0)
+            if (v.isNaN()) continue
+            val unit = meterUnits.getOrElse(k) { "" }
+            sb.append(meterLabels[k]).append(' ')
+                .append(if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v))
+                .append(unit)
+            if (Native.levelMeter(k, 1) != 0.0) {
+                val dir = Native.levelMeter(k, 3)
+                sb.append(if (dir < 0) " → ≤ " else " / ")
+                    .append(Native.levelMeter(k, 2).toLong()).append(unit)
+            }
+            sb.append("   ")
+        }
+        val left = Native.levelNum(5)
+        if (left >= 0) sb.append("pours left ").append(left.toInt())
+        levelHud = "t ${Native.tick()}/$levelDeadline   $sb"
+        levelWhy = if (st == 3) Native.levelFailWhy() else ""
+        levelPredicted = Native.levelNum(4).toInt()
+        val nk = Native.levelNarration()
+        levelNarration = if (nk >= 0) Native.sysEventText(nk, 1) else ""
     }
 
     /** Copy the channels the charts need, and write out the two text pages. Render thread only. */

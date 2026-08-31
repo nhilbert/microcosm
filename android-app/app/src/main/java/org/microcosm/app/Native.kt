@@ -150,6 +150,39 @@ object Native {
     /** which: 0 the event type, 1 the narration text. */
     external fun sysEventText(i: Int, which: Int): String
 
+    // ---- the learning levels (A.5) ----
+    /** The whole level table as JSON — the same bytes src/observatory/levels.json carries. */
+    external fun levelsJson(): String
+    external fun levelCount(): Int
+
+    /** `predicted` is the option committed before the run, or -1 if the step was skipped. */
+    external fun levelStart(idx: Int, predicted: Int)
+    external fun levelRestart()
+    external fun levelStop()
+
+    /** Runs the verdict loop. 0 idle, 1 running, 2 passed, 3 failed. */
+    external fun levelCheck(): Int
+
+    /** field: 0 state, 1 level index, 2 run, 3 seenS, 4 predicted, 5 pours left (-1 unlimited). */
+    external fun levelNum(field: Int): Double
+    external fun levelFailWhy(): String
+
+    /** what: 0 pours, 1 seed, 2 sources, 3 walls, 4 evolution. */
+    external fun levelAllows(what: Int): Int
+    external fun levelPourOk(): Int
+    external fun levelNotePour(d: Int)
+    external fun levelNarration(): Int
+
+    /** One meter row. field: 0 value, 1 has-goal, 2 goal, 3 direction. */
+    external fun levelMeter(row: Int, field: Int): Double
+
+    // ---- save and load (A.6) ----
+    /** The world as a versioned snapshot. The format is the core's, proved by resumption since M3. */
+    external fun save(): ByteArray
+
+    /** 1 when the world was taken, 0 when the file is not one of ours or is truncated. */
+    external fun load(data: ByteArray): Int
+
     external fun sourceCount(): Int
 
     /** field: 0 x, 1 y, 2 i, 3 a, 4 sigma. */
