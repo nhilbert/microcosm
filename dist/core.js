@@ -601,7 +601,10 @@ const W = {
   flee: new Int16Array(MAXN), bst: new Int16Array(MAXN),
   pc: new Int16Array(MAXN),   // post-capture program timer (MV-C): ticks left in the two-phase after-kill window; expresses nothing at g0
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
-  n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
+  // PRNG state lives HERE, not in a closure: a save must be able to read and restore it, and the
+  // port stores it in the same place (docs/android-port-plan.md M0). rngState is the mulberry32
+  // integer state; seed is provenance (the world can name the seed it was founded on).
+  n: 0, freeList: [], tick: 0, initialized: false, rngState: P.SEED|0, seed: P.SEED,
   events: [], eventLog: [], lightDirty: false,
   sources: [{ x: P.WORLD / 2, y: P.WORLD / 2, i: P.sunI, a: 0, sigma: P.sunSigma }],  // energy sources (7.L/7.H): light i, warmth a
   // Walls (7.W): thin barriers on cell boundaries. W.walls holds the drawn strokes; compileWalls()
@@ -642,7 +645,12 @@ const W = {
   cE: new Float32Array(1500), cP: new Float32Array(1500), cM: new Float32Array(1500),
   cSz: new Float32Array(1500), cSp: new Uint8Array(1500),
 };
-const R = () => W.rng();
+// mulberry32 inlined over W.rngState — the same ops in the same order as the closure form in
+// params.js (which stays, as the factory for independent streams like corridor.js's sampler),
+// so the world's stream is bit-identical while its state is now snapshot-visible.
+const R = () => { let a = W.rngState|0; a = a + 0x6D2B79F5 | 0; W.rngState = a;
+  let t = Math.imul(a^a>>>15, 1|a); t = t + Math.imul(t^t>>>7, 61|t) ^ t;
+  return ((t^t>>>14)>>>0)/4294967296; };
 const wrap = v => { v %= P.WORLD; return v < 0 ? v + P.WORLD : v; };
 const wd = d => { if (d > P.WORLD / 2) d -= P.WORLD; if (d < -P.WORLD / 2) d += P.WORLD; return d; };
 
@@ -2306,7 +2314,7 @@ function resetWorld(){
 }
 function initWorld(seed, sc){
   if (W.initialized) return; W.initialized = true;
-  W.rng = mulberry32(seed === undefined ? P.SEED : seed);
+  W.seed = seed === undefined ? P.SEED : seed; W.rngState = W.seed|0;
   W.n=0; W.freeList.length=0; W.alive.fill(0); W.tick=0;
   W.M.fill(sc && sc.M0 !== undefined ? sc.M0 : P.M0); W.dE.fill(0); W.dP.fill(0); W.dM.fill(0); W.sc.fill(0); W.al.fill(0);
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
