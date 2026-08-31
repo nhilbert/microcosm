@@ -33,5 +33,6 @@ for(const x of [1e300,-1e300,1e16,123456.789,0.5,1,2,3,Math.PI/2,1e-300]){
   emit('sin',[x],Math.sin(x));emit('cos',[x],Math.cos(x));
 }
 emit('pow',[10,-5],Math.pow(10,-5));
-fs.writeFileSync('trace.txt',out.join('\n')+'\n');
+// output path as argv[2]; the trace is ~72 MB and regenerable, so keep it out of the repo
+fs.writeFileSync(process.argv[2] || 'trace.txt', out.join('\n')+'\n');
 console.log('wrote',out.length,'lines');
