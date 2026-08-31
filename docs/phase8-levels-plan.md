@@ -132,6 +132,11 @@ cannot fake the pass because Bacillus establishment is part of the goal.
 
 ## 4. The deferred ladder (arcs B–D)
 
+> **Superseded in detail (2026-08-31): docs/phase8-ladder-design.md** — the researched
+> design principles, the gate-learnings inventory, premise probes on the
+> post-movement core, framework increments F1–F6, and full specs for levels 4–12
+> live there. The sketch below stands as the original scope record.
+
 Each future level ships one at a time, through the same gate, with its numbers added
 here first. Concepts are anchored to findings this project has already measured.
 
