@@ -387,7 +387,19 @@ x86-64**, the number the phone's result should be read against.
 
 **Not verified locally: the Gradle build.** The Android plugin repositories are
 unreachable from this container — the *existing, working* `android/` project fails
-identically — so this is the environment, not the configuration. CI proves it.
+identically — so this is the environment, not the configuration.
+
+**CI settled it, first run** (run 33427511375): host self-check pass, `cargo-ndk`
+cross-compile of both crates to `aarch64-linux-android` **linked cleanly**, the
+APK assembled and signed, and a 3.3 MB `microcosm-probe.apk` published to the
+rolling `probe-latest` release. The toolchain end of M5.0 is therefore proven; the
+NDK link — the step most likely to surprise — worked without a single fix.
+
+**What remains is one person, one phone.** Install the APK, read the screen, paste
+the numbers back. If the four fingerprints say `identical`, ARM64 bit-exactness
+stops being inferred and §7's caveat comes out of this document. The tick rate
+replaces the ×2–5 estimate with a measurement, and is read against the x86-64
+figure the same probe produces: **0.464 ms/tick, 2,155 ticks/s, 215× speed**.
 
 What the device run will settle: if the fingerprints match, the ARM64
 bit-exactness claim stops being inferred; and the tick rate answers the M1
