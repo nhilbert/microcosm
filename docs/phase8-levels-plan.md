@@ -130,6 +130,33 @@ grazers and hunters only move matter between bodies, so wrong seedings fail hone
 (a hard fail fires if the producers are wiped out). Pours are unbudgeted: pouring
 cannot fake the pass because Bacillus establishment is part of the goal.
 
+### Level 4 · The Gardener — competition and the keystone consumer (shipped 2026-08-31)
+
+First level of the ladder implementation (phase8-ladder-design.md), shipped together
+with framework increments **F1 (prediction step — commit-then-contrast, never graded;
+retrofitted to levels 1–3)** and **F2 (in-level Observatory narration — a per-level
+sysEvent filter in the HUD)**. F3–F6 stay deferred to the levels that need them.
+
+World: Solara 20 + Drifta 120, M0 0.5, seed 101 (the probed asymmetric-suppression
+world). Goal: Solara ≥ 250 sustained by t=12,000; hard-fail if either producer hits
+zero. Apparatus: 8 pours, seeding open. Calibrated on the perf core:
+
+| run | S t=8000 | S t=12000 | D trough | verdict |
+|---|---|---|---|---|
+| null | 53 | 67 | — | FAIL |
+| 8 pours on the mat | 48 | 64 (D 1094 > null's 1031) | — | FAIL — **the pours feed the bloom** |
+| Cilio pack t=2000 | 332 | 313 | 55 | PASS ~t=6800 |
+| Cilio pack t=4000 | 322 | 387 | 17 | PASS ~t=7400 |
+| Cilio pack t=7000 | 58 | 388 | 24 | PASS ~t=10300 |
+| 3 packs t=4000 | 304 | 305 | 55 | PASS (overdose forgiven — the *choice* of lever is the lesson) |
+
+Design notes from calibration: the planned Drifta co-floor (≥20 in the pass
+predicate) was dropped — the honest rescue itself drives D to 17 at the trough;
+extinction stays the only Drifta fail. The twist needs no machinery: the gardener's
+starvation and the bloom's return happen inside the same run and are narrated by the
+existing extinction/crash events through F2. Harness: 4 cases (null, t=4000,
+late-t=7000, mat-pours), gate 13/13 ALL PASS.
+
 ## 4. The deferred ladder (arcs B–D)
 
 > **Superseded in detail (2026-08-31): docs/phase8-ladder-design.md** — the researched

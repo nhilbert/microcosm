@@ -25,6 +25,8 @@ for (let k = 0; k < 10; k++){ const t = 600 + k * 300;
   farPours[t]  = pour(30 + k * 90, 990);
 }
 const dimPours = {}; for (let k = 0; k < 10; k++) dimPours[600 + k * 300] = nearPours[600 + k * 300];
+const matPours = {}; for (let k = 0; k < 8; k++) matPours[800 + k * 400] = pour(512 + ((k % 3) - 1) * 80, 512 + (((k / 3) | 0) % 3 - 1) * 80);
+const graze = t => ({ [t]: () => C.applyEvent({ type: "spawnPack", sp: 2, x: 512, y: 480 }) });
 
 const CASES = [
   ["light",   "null: wait under the dim sun",        null,                                             "failed"],
@@ -36,6 +38,10 @@ const CASES = [
   ["cycle",   "null: let the mud keep it all",       null,                                             "failed"],
   ["cycle",   "strategy: seed Bacillus at t=6000",   { 6000: () => C.applyEvent({ type: "spawnPack", sp: 3, x: 512, y: 470 }) }, "passed"],
   ["cycle",   "strategy: seed Bacillus early (t=1000)", { 1000: () => C.applyEvent({ type: "spawnPack", sp: 3, x: 512, y: 470 }) }, "passed"],
+  ["garden",  "null: let the bloom keep the water",  null,       "failed"],
+  ["garden",  "strategy: seed the grazer at t=4000", graze(4000), "passed"],
+  ["garden",  "strategy: a late grazer (t=7000)",    graze(7000), "passed"],
+  ["garden",  "wrong: eight pours on the mat",       matPours,   "failed"],
 ];
 
 let ok = true;

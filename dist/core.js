@@ -1640,7 +1640,7 @@ function impact(entry){
 //     initWorld scenario (draw-free when absent) and applyEvent. A level
 //     world is its own world, like a moved sun — no conformance claim.
 // ============================================================
-const LVL = { def: null, state: "idle", run: 0, seenS: 0, pourLeft: 0, failWhy: "" };
+const LVL = { def: null, state: "idle", run: 0, seenS: 0, pourLeft: 0, failWhy: "", predicted: -1 };
 
 // one recorder sample, `back` samples before the latest (pure ring-buffer reads)
 function lvlSample(back){
@@ -1650,7 +1650,7 @@ function lvlSample(back){
     lockShare: (B[r+16] + B[r+17]) / Math.max(1, total) };
 }
 
-function levelStart(def){
+function levelStart(def, predicted){
   P.mutation = false;   // experiments run on the certified silent world; the sandbox restores true
   P.lightMul = 1.0;
   resetWorld();
@@ -1658,8 +1658,16 @@ function levelStart(def){
   if (def.world.lightMul !== undefined) applyEvent({ type: "lightMul", v: def.world.lightMul });
   LVL.def = def; LVL.state = "running"; LVL.run = 0; LVL.seenS = 0; LVL.failWhy = "";
   LVL.pourLeft = def.apparatus.pours === true ? Infinity : (def.apparatus.pours | 0);
+  LVL.predicted = predicted === undefined ? -1 : predicted; // F1: committed before the run; contrast, never grade
 }
-function levelRestart(){ const d = LVL.def; if (d) levelStart(d); }
+function levelRestart(){ const d = LVL.def, p = LVL.predicted; if (d) levelStart(d, p); }
+// F2: the freshest Observatory event of a type this level narrates (pure read; null outside a level)
+function levelNarration(){
+  const def = LVL.def; if (!def || !def.narrate) return null;
+  for (let k = W.sysEvents.length - 1; k >= 0; k--)
+    if (def.narrate.indexOf(W.sysEvents[k].type) >= 0) return W.sysEvents[k];
+  return null;
+}
 function levelStop(){ LVL.def = null; LVL.state = "idle"; }
 // apparatus gates the UI consults; everything open outside a level
 function levelAllows(what){
@@ -1708,6 +1716,12 @@ const LEVELS = [
       "Left alone, the mat starves at any size — light is this world's only income. " +
       "Your instrument is the ☀ lever in Intervene mode.",
     goalText: "Establish the mat — 400 Solara, held",
+    predict: { prompt: "Twenty founders under a weak sun. If you only watch, what happens?",
+      options: ["The mat grows slowly, but it gets there", "It starves at any size — light is the income",
+                "It grows until the water's mineral runs out"],
+      reflect: ["Patience was not the missing ingredient: below its break-even light the mat loses energy at every size, so time alone never saves it.",
+                "Exactly what the energy bars showed: photosynthesis below upkeep, at any population size.",
+                "Mineral never got the chance to matter — the energy books failed first, long before the water emptied."] },
     world: { seed: 101, found: SOLO_MAT, lightMul: 0.5 },
     apparatus: { pours: true, seed: false, sources: false, walls: false, evolution: false },
     deadline: 8000, sustain: 10,
@@ -1734,6 +1748,12 @@ const LEVELS = [
       "give. You carry ten doses of mineral: tap open water in Intervene mode to pour one. Where you pour " +
       "decides whether they feed the mat or the empty sea.",
     goalText: "Grow the mat past 600 on ten pours",
+    predict: { prompt: "The sun is already at its maximum. What will ten doses of mineral do?",
+      options: ["Placement won't matter — mixing spreads them anyway", "They help only where the mat can drink them first",
+                "Nothing — light must still be the problem"],
+      reflect: ["Mixing does spread them — measured here at roughly a fifth of the pace the mat needed. The dark-shore doses arrived, but late.",
+                "The transport books agree: mineral moves slowly, and the mat drinks what lands beside it.",
+                "The lever was pinned at its ceiling the whole time — the scarcest ingredient ruled, and it was not light."] },
     world: { seed: 202, found: SOLO_MAT, M0: 0.4, lightMul: 1.6 },
     apparatus: { pours: 10, seed: false, sources: false, walls: false, evolution: false },
     deadline: 9000, sustain: 10,
@@ -1761,6 +1781,12 @@ const LEVELS = [
       "brings it back. Something is missing from this world. Long-press open water in Intervene mode to " +
       "seed a species — choose the right one.",
     goalText: "Close the cycle — locked mineral under 20%, recyclers established, mat 1000+",
+    predict: { prompt: "The mat is thriving. Where is the free mineral going?",
+      options: ["Nowhere — a healthy pond cycles by itself", "Into the dead — and it stays there",
+                "The living mat is hoarding all of it"],
+      reflect: ["Cycling is work, and nobody in this world was doing it — matter flowed downhill into the mud and stopped.",
+                "The chemistry page agrees: the locked share climbed, tick after tick, until something ate the dead.",
+                "Bodies held part of it — but the mud held more, and the mud gives nothing back on its own."] },
     world: { seed: 101, found: SOLO_MAT },
     apparatus: { pours: true, seed: "all", sources: false, walls: false, evolution: false },
     deadline: 14000, sustain: 10,
@@ -1781,9 +1807,43 @@ const LEVELS = [
         "mat, where the dead are.",
     },
   },
+  {
+    key: "garden", n: 4,
+    title: "The Gardener", science: "Competitive exclusion · keystone grazing",
+    question: "The water is poor and the bloom owns it. Can the meadow be saved?",
+    briefing: "Poor water, and the quick plankton owns it: Drifta's uptake outraces the mat's, and the " +
+      "meadow starves at the bottom of a bright pond. You carry eight doses of mineral, and the seeding " +
+      "bench is open. Choose your instrument.",
+    goalText: "Rescue the mat — 250 Solara, held",
+    predict: { prompt: "What could save the mat?",
+      options: ["Pour minerals — feed the mat directly", "Seed a grazer — the bloom's enemy is the meadow's friend",
+                "Nothing — the quick always win"],
+      reflect: ["The bloom's uptake outraces the mat's, so every pour fed the bloom first — measured here: eight doses left the mat under 70 while the plankton grew fatter.",
+                "The keystone bet: pressure on the winner is the only lever that opens space for the loser.",
+                "They do win the water — until something eats them. Competition has more than one referee."] },
+    world: { seed: 101, found: { 0: 20, 1: 120, 2: 0, 3: 0, 6: 0 }, M0: 0.5 },
+    apparatus: { pours: 8, seed: "all", sources: false, walls: false, evolution: false },
+    deadline: 12000, sustain: 10,
+    narrate: ["estab", "extinct", "crashev", "bloom"],
+    pass: S => S.pop(0) >= 250,
+    failNow: S => S.pop(0) === 0 ? "The last Solara died — the meadow is gone."
+      : S.pop(1) === 0 ? "The bloom is gone — exterminated, not gardened. That is not the rescue this pond needed." : "",
+    timeoutWhy: "The mat never rose past 250 — the bloom held the water to the end. Minerals feed whoever " +
+      "drinks fastest; only pressure on the bloom itself opens space below it.",
+    meter: S => [{ label: "Solara", v: S.pop(0), goal: 250 }, { label: "Drifta", v: S.pop(1) }],
+    debrief: {
+      pass: "Cilio ate the bloom, and the mat took the light and mineral the bloom released — a keystone " +
+        "consumer holds open the space its prey would otherwise close (Paine's classic result, in your own " +
+        "pond). Now keep watching: in water this poor the gardener eats itself out of a job. When the bloom " +
+        "is down, Cilio starves away — and the bloom creeps back. A keystone is a job, and jobs need wages.",
+      fail: "The bloom kept the water. Feeding the loser cannot work here — the plankton's uptake outraces " +
+        "the mat's, so every pour reached the bloom first. The lever that works points the other way: " +
+        "seed the bloom's grazer and let pressure from above open space below.",
+    },
+  },
 ];
 
-// __LEVELS_NOTE__ deferred arcs (species interactions, environment, evolution): see docs/phase8-levels-plan.md.
+// __LEVELS_NOTE__ deferred arcs (L5-L12): specs in docs/phase8-ladder-design.md; each enters through the honesty gate.
 // ============================================================
 // THE RNG-ORDER CONTRACT (read before editing anything below)
 //
@@ -2221,5 +2281,5 @@ if (typeof module !== "undefined" && module.exports !== undefined){
     cellLight, neighbors, step, initWorld, resetWorld, applyEvent, drainEvents,
     queueEvent, mulberry32, CELL, MAXN, MAXLOCI,
     makeWall, compileWalls, marchMul, pathBlocked,
-    LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelAllows, levelPourOk, levelNotePour };
+    LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelAllows, levelPourOk, levelNotePour, levelNarration };
 }

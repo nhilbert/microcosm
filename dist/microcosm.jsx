@@ -1667,7 +1667,7 @@ function impact(entry){
 //     initWorld scenario (draw-free when absent) and applyEvent. A level
 //     world is its own world, like a moved sun — no conformance claim.
 // ============================================================
-const LVL = { def: null, state: "idle", run: 0, seenS: 0, pourLeft: 0, failWhy: "" };
+const LVL = { def: null, state: "idle", run: 0, seenS: 0, pourLeft: 0, failWhy: "", predicted: -1 };
 
 // one recorder sample, `back` samples before the latest (pure ring-buffer reads)
 function lvlSample(back){
@@ -1677,7 +1677,7 @@ function lvlSample(back){
     lockShare: (B[r+16] + B[r+17]) / Math.max(1, total) };
 }
 
-function levelStart(def){
+function levelStart(def, predicted){
   P.mutation = false;   // experiments run on the certified silent world; the sandbox restores true
   P.lightMul = 1.0;
   resetWorld();
@@ -1685,8 +1685,16 @@ function levelStart(def){
   if (def.world.lightMul !== undefined) applyEvent({ type: "lightMul", v: def.world.lightMul });
   LVL.def = def; LVL.state = "running"; LVL.run = 0; LVL.seenS = 0; LVL.failWhy = "";
   LVL.pourLeft = def.apparatus.pours === true ? Infinity : (def.apparatus.pours | 0);
+  LVL.predicted = predicted === undefined ? -1 : predicted; // F1: committed before the run; contrast, never grade
 }
-function levelRestart(){ const d = LVL.def; if (d) levelStart(d); }
+function levelRestart(){ const d = LVL.def, p = LVL.predicted; if (d) levelStart(d, p); }
+// F2: the freshest Observatory event of a type this level narrates (pure read; null outside a level)
+function levelNarration(){
+  const def = LVL.def; if (!def || !def.narrate) return null;
+  for (let k = W.sysEvents.length - 1; k >= 0; k--)
+    if (def.narrate.indexOf(W.sysEvents[k].type) >= 0) return W.sysEvents[k];
+  return null;
+}
 function levelStop(){ LVL.def = null; LVL.state = "idle"; }
 // apparatus gates the UI consults; everything open outside a level
 function levelAllows(what){
@@ -1735,6 +1743,12 @@ const LEVELS = [
       "Left alone, the mat starves at any size — light is this world's only income. " +
       "Your instrument is the ☀ lever in Intervene mode.",
     goalText: "Establish the mat — 400 Solara, held",
+    predict: { prompt: "Twenty founders under a weak sun. If you only watch, what happens?",
+      options: ["The mat grows slowly, but it gets there", "It starves at any size — light is the income",
+                "It grows until the water's mineral runs out"],
+      reflect: ["Patience was not the missing ingredient: below its break-even light the mat loses energy at every size, so time alone never saves it.",
+                "Exactly what the energy bars showed: photosynthesis below upkeep, at any population size.",
+                "Mineral never got the chance to matter — the energy books failed first, long before the water emptied."] },
     world: { seed: 101, found: SOLO_MAT, lightMul: 0.5 },
     apparatus: { pours: true, seed: false, sources: false, walls: false, evolution: false },
     deadline: 8000, sustain: 10,
@@ -1761,6 +1775,12 @@ const LEVELS = [
       "give. You carry ten doses of mineral: tap open water in Intervene mode to pour one. Where you pour " +
       "decides whether they feed the mat or the empty sea.",
     goalText: "Grow the mat past 600 on ten pours",
+    predict: { prompt: "The sun is already at its maximum. What will ten doses of mineral do?",
+      options: ["Placement won't matter — mixing spreads them anyway", "They help only where the mat can drink them first",
+                "Nothing — light must still be the problem"],
+      reflect: ["Mixing does spread them — measured here at roughly a fifth of the pace the mat needed. The dark-shore doses arrived, but late.",
+                "The transport books agree: mineral moves slowly, and the mat drinks what lands beside it.",
+                "The lever was pinned at its ceiling the whole time — the scarcest ingredient ruled, and it was not light."] },
     world: { seed: 202, found: SOLO_MAT, M0: 0.4, lightMul: 1.6 },
     apparatus: { pours: 10, seed: false, sources: false, walls: false, evolution: false },
     deadline: 9000, sustain: 10,
@@ -1788,6 +1808,12 @@ const LEVELS = [
       "brings it back. Something is missing from this world. Long-press open water in Intervene mode to " +
       "seed a species — choose the right one.",
     goalText: "Close the cycle — locked mineral under 20%, recyclers established, mat 1000+",
+    predict: { prompt: "The mat is thriving. Where is the free mineral going?",
+      options: ["Nowhere — a healthy pond cycles by itself", "Into the dead — and it stays there",
+                "The living mat is hoarding all of it"],
+      reflect: ["Cycling is work, and nobody in this world was doing it — matter flowed downhill into the mud and stopped.",
+                "The chemistry page agrees: the locked share climbed, tick after tick, until something ate the dead.",
+                "Bodies held part of it — but the mud held more, and the mud gives nothing back on its own."] },
     world: { seed: 101, found: SOLO_MAT },
     apparatus: { pours: true, seed: "all", sources: false, walls: false, evolution: false },
     deadline: 14000, sustain: 10,
@@ -1808,9 +1834,43 @@ const LEVELS = [
         "mat, where the dead are.",
     },
   },
+  {
+    key: "garden", n: 4,
+    title: "The Gardener", science: "Competitive exclusion · keystone grazing",
+    question: "The water is poor and the bloom owns it. Can the meadow be saved?",
+    briefing: "Poor water, and the quick plankton owns it: Drifta's uptake outraces the mat's, and the " +
+      "meadow starves at the bottom of a bright pond. You carry eight doses of mineral, and the seeding " +
+      "bench is open. Choose your instrument.",
+    goalText: "Rescue the mat — 250 Solara, held",
+    predict: { prompt: "What could save the mat?",
+      options: ["Pour minerals — feed the mat directly", "Seed a grazer — the bloom's enemy is the meadow's friend",
+                "Nothing — the quick always win"],
+      reflect: ["The bloom's uptake outraces the mat's, so every pour fed the bloom first — measured here: eight doses left the mat under 70 while the plankton grew fatter.",
+                "The keystone bet: pressure on the winner is the only lever that opens space for the loser.",
+                "They do win the water — until something eats them. Competition has more than one referee."] },
+    world: { seed: 101, found: { 0: 20, 1: 120, 2: 0, 3: 0, 6: 0 }, M0: 0.5 },
+    apparatus: { pours: 8, seed: "all", sources: false, walls: false, evolution: false },
+    deadline: 12000, sustain: 10,
+    narrate: ["estab", "extinct", "crashev", "bloom"],
+    pass: S => S.pop(0) >= 250,
+    failNow: S => S.pop(0) === 0 ? "The last Solara died — the meadow is gone."
+      : S.pop(1) === 0 ? "The bloom is gone — exterminated, not gardened. That is not the rescue this pond needed." : "",
+    timeoutWhy: "The mat never rose past 250 — the bloom held the water to the end. Minerals feed whoever " +
+      "drinks fastest; only pressure on the bloom itself opens space below it.",
+    meter: S => [{ label: "Solara", v: S.pop(0), goal: 250 }, { label: "Drifta", v: S.pop(1) }],
+    debrief: {
+      pass: "Cilio ate the bloom, and the mat took the light and mineral the bloom released — a keystone " +
+        "consumer holds open the space its prey would otherwise close (Paine's classic result, in your own " +
+        "pond). Now keep watching: in water this poor the gardener eats itself out of a job. When the bloom " +
+        "is down, Cilio starves away — and the bloom creeps back. A keystone is a job, and jobs need wages.",
+      fail: "The bloom kept the water. Feeding the loser cannot work here — the plankton's uptake outraces " +
+        "the mat's, so every pour reached the bloom first. The lever that works points the other way: " +
+        "seed the bloom's grazer and let pressure from above open space below.",
+    },
+  },
 ];
 
-// __LEVELS_NOTE__ deferred arcs (species interactions, environment, evolution): see docs/phase8-levels-plan.md.
+// __LEVELS_NOTE__ deferred arcs (L5-L12): specs in docs/phase8-ladder-design.md; each enters through the honesty gate.
 // ============================================================
 // THE RNG-ORDER CONTRACT (read before editing anything below)
 //
@@ -4695,6 +4755,7 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
   const meters = S ? def.meter(S) : [];
   const col = st === "passed" ? "rgb(70,214,140)" : st === "failed" ? "rgb(226,96,96)" : "rgba(148,166,184,0.55)";
   const next = LEVELS[LEVELS.indexOf(def) + 1];
+  const [asking, setAsking] = React.useState(false); // F1 for the Next button: commit before the next world runs
   const btn = solid => ({ padding:"9px 14px", borderRadius:10, cursor:"pointer", fontSize:12.5, fontWeight:600,
     border:"1px solid rgba(148,166,184,0.45)", background: solid ? "rgba(201,215,227,0.16)" : "transparent",
     color:"#C9D7E3" });
@@ -4714,11 +4775,16 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
             t {tick}/{def.deadline}</span>
         </div>
         <div style={{ marginTop:2, display:"flex", gap:12, flexWrap:"wrap", color:"#8FA3B5" }}>
-          {meters.map(m => { const met = m.dir === -1 ? m.v <= m.goal : m.v >= m.goal; return (
+          {meters.map(m => {
+            if (m.goal === undefined) return <span key={m.label}>{m.label} {m.v}{m.unit || ""}</span>; // info-only
+            const met = m.dir === -1 ? m.v <= m.goal : m.v >= m.goal; return (
             <span key={m.label} style={{ color: met ? "rgb(70,214,140)" : "#C9D7E3" }}>
               {m.label} {m.v}{m.unit || ""} {m.dir === -1 ? "→ ≤" : "/"} {m.goal}{m.unit || ""}</span> ); })}
           {LVL.pourLeft !== Infinity && <span style={{ color: LVL.pourLeft ? "#C9D7E3" : "rgb(226,170,150)" }}>pours left {LVL.pourLeft}</span>}
         </div>
+        {(() => { const ev = levelNarration(); return ev ? ( // F2: the Observatory's latest relevant word
+          <div style={{ marginTop: 3, color: "#8FA3B5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            ⚑ {ev.text}</div> ) : null; })()}
       </div>
       {/* verdict card */}
       {(st === "passed" || st === "failed") && !dismissed && (
@@ -4734,16 +4800,36 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
             {st === "failed" && LVL.failWhy && (
               <div style={{ marginTop:10, fontSize:12.5, color:"rgb(226,170,150)", lineHeight:1.55 }}>{LVL.failWhy}</div>
             )}
+            {def.predict && LVL.predicted >= 0 && ( // F1: contrast the committed prediction, never grade it
+              <div style={{ marginTop:10, fontSize:12, lineHeight:1.55, padding:"8px 10px", borderRadius:10,
+                background:"rgba(94,115,134,0.14)", color:"#C9D7E3" }}>
+                <span style={{ color:"#8FA3B5" }}>Your prediction — </span>
+                “{def.predict.options[LVL.predicted]}”
+                <div style={{ marginTop:4, color:"#8FA3B5" }}>{def.predict.reflect[LVL.predicted]}</div>
+              </div>
+            )}
             <div style={{ marginTop:10, fontSize:12.5, lineHeight:1.6 }}>
               {st === "passed" ? def.debrief.pass : def.debrief.fail}</div>
+            {asking && next && next.predict ? (
+              <div style={{ marginTop:14 }}>
+                <div style={{ fontSize:12.5, fontWeight:600 }}>{next.title} — before you start:</div>
+                <div style={{ fontSize:12, color:"#8FA3B5", marginTop:3, lineHeight:1.5 }}>{next.predict.prompt}</div>
+                <div style={{ display:"grid", gap:6, marginTop:8 }}>
+                  {next.predict.options.map((o, i) => (
+                    <button key={i} className="mc-hit" style={{ ...btn(false), textAlign:"left", fontWeight:500 }}
+                      onClick={() => onLevel(next, i)}>{o}</button>))}
+                </div>
+              </div>
+            ) : (
             <div style={{ display:"flex", gap:8, marginTop:16, flexWrap:"wrap" }}>
               {st === "failed" && <button className="mc-hit" style={btn(true)}
                 onClick={() => { setDismissed(false); prevSt.current = "running"; onRetry(); }}>Try again</button>}
               {st === "passed" && next && <button className="mc-hit" style={btn(true)}
-                onClick={() => onLevel(next)}>Next: {next.title} →</button>}
+                onClick={() => next.predict ? setAsking(true) : onLevel(next)}>Next: {next.title} →</button>}
               <button className="mc-hit" style={btn(false)} onClick={onExit}>Experiments</button>
               <button className="mc-hit" style={btn(false)} onClick={() => setDismissed(true)}>Keep observing</button>
             </div>
+            )}
           </div>
         </div>
       )}
@@ -4753,9 +4839,33 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
 
 function StartScreen({ badges, onSandbox, onLevel }){
   const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
+  const [pending, setPending] = React.useState(null); // F1: a level chosen, its prediction not yet committed
   const card = { display:"block", width:"100%", textAlign:"left", padding:"14px 16px", borderRadius:14,
     background:"rgba(21,34,51,0.75)", border:"1px solid rgba(94,115,134,0.35)",
     color:"#C9D7E3", cursor:"pointer", font:"inherit" };
+  const pick = def => def.predict ? setPending(def) : onLevel(def);
+  if (pending) return (
+    <div style={{ position:"fixed", inset:0, background:"#0B131E", overflowY:"auto",
+      fontFamily:"system-ui, -apple-system, sans-serif", userSelect:"none", WebkitUserSelect:"none" }}>
+      <div style={{ maxWidth:460, margin:"0 auto",
+        padding:"calc(env(safe-area-inset-top, 0px) + 64px) 20px calc(env(safe-area-inset-bottom, 0px) + 32px)" }}>
+        <div style={{ fontSize:11, letterSpacing:1.4, color:"#5E7386", fontFamily:mono }}>EXPERIMENT {pending.n} · BEFORE YOU START</div>
+        <div style={{ fontSize:20, fontWeight:700, marginTop:6, color:"#C9D7E3" }}>{pending.title}</div>
+        <div style={{ fontSize:13, color:"#8FA3B5", marginTop:14, lineHeight:1.6 }}>{pending.predict.prompt}</div>
+        <div style={{ display:"grid", gap:10, marginTop:14 }}>
+          {pending.predict.options.map((o, i) => (
+            <button key={i} className="mc-hit" onClick={() => { const d = pending; setPending(null); onLevel(d, i); }}
+              style={{ ...card, fontSize:13.5, lineHeight:1.5 }}>{o}</button>))}
+        </div>
+        <button className="mc-hit" onClick={() => setPending(null)}
+          style={{ marginTop:18, padding:"8px 12px", borderRadius:10, border:"none", background:"transparent",
+            color:"#5E7386", fontSize:12, cursor:"pointer" }}>← back</button>
+        <div style={{ fontSize:11, color:"#5E7386", marginTop:14, lineHeight:1.5 }}>
+          Commit to a guess — the experiment will answer it. Predictions are never graded; the verdict
+          only contrasts what you expected with what the pond did.</div>
+      </div>
+    </div>
+  );
   return (
     <div style={{ position:"fixed", inset:0, background:"#0B131E", overflowY:"auto",
       fontFamily:"system-ui, -apple-system, sans-serif", userSelect:"none", WebkitUserSelect:"none" }}>
@@ -4775,7 +4885,7 @@ function StartScreen({ badges, onSandbox, onLevel }){
           EXPERIMENTS · learn the pond by running it</div>
         <div style={{ display:"grid", gap:10 }}>
           {LEVELS.map(def => (
-            <button key={def.key} className="mc-hit" onClick={() => onLevel(def)} style={card}>
+            <button key={def.key} className="mc-hit" onClick={() => pick(def)} style={card}>
               <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
                 <span style={{ fontSize:11, color:"#5E7386", fontFamily:mono }}>{def.n}</span>
                 <span style={{ fontSize:15, fontWeight:600 }}>{def.title}</span>
@@ -4813,7 +4923,7 @@ export default function MicrocosmApp(){
     setBadges(b => b[LVL.def.key] ? b : { ...b, [LVL.def.key]: true }); };
   const enterSandbox = () => { harvest(); levelStop(); P.mutation = true; resetWorld(); initWorld();
     setRunId(r => r + 1); setView("world"); };
-  const enterLevel = def => { harvest(); levelStart(def); setRunId(r => r + 1); setView("world"); };
+  const enterLevel = (def, predicted) => { harvest(); levelStart(def, predicted); setRunId(r => r + 1); setView("world"); };
   const exit = () => { harvest(); levelStop(); setView("menu"); };
   return view === "menu"
     ? <StartScreen badges={badges} onSandbox={enterSandbox} onLevel={enterLevel} />
