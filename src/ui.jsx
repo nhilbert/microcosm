@@ -3,7 +3,7 @@
 // Adding a sun is never energy-neutral; the sun card says by how much, honestly.
 const LIGHT_REF = { v: 0 };
 const lightInput = () => { let t = 0; const L = W.light; for (let c = 0; c < L.length; c++) t += L[c]; return t; };
-export default function Microcosm(){
+function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow) lives in src/ui-levels.jsx
   const canvasRef = useRef(null);
   const [ui, setUi] = useState({ tick: 0, fps: 0, pops: [0,0,0,0,0,0,0], speed: 1, card: null, mineral: { b: 0, f: 0, l: 0, add: 0 }, lightMul: 1, spawnPick: null, srcSel: -1, wallSel: -1, wallArm: false });
   const [detent, setDetent] = useState(0); // 0 peek, 1 half, 2 full
@@ -18,7 +18,8 @@ export default function Microcosm(){
 
   useEffect(() => {
     initWorld();
-    if (!LIGHT_REF.v) LIGHT_REF.v = lightInput();
+    // the reference is the shipped sky (one sun, lever 1): don't capture it from a level's dimmed world
+    if (!LIGHT_REF.v && P.lightMul === 1 && W.sources.length === 1) LIGHT_REF.v = lightInput();
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -194,12 +195,13 @@ export default function Microcosm(){
       },
       pushUndoExt: (label, fn) => pushUndo(label, fn),
       // 7.L suns: every change is an event (logged, undoable); a layout is one intervention
-      selectSource: k => { srcSel = k; if (k >= 0) wallSel = -1;
+      selectSource: k => { if (k >= 0 && !levelAllows("sources")) return; // an experiment's sky is not editable
+        srcSel = k; if (k >= 0) wallSel = -1;
         setUi(u => ({ ...u, srcSel: k, wallSel: k >= 0 ? -1 : u.wallSel })); },
       // 7.W walls: select, arm the one-shot drawing tool, add from a drag, remove -- all events, all undoable
       selectWall: k => { wallSel = k; if (k >= 0) srcSel = -1;
         setUi(u => ({ ...u, wallSel: k, srcSel: k >= 0 ? -1 : u.srcSel })); },
-      armWall: () => { if (W.walls.length >= P.maxWalls) return;
+      armWall: () => { if (W.walls.length >= P.maxWalls || !levelAllows("walls")) return;
         wallArm = true; wallDrag = null;
         actionsRef.current.selectSource(-1); actionsRef.current.selectWall(-1);
         setUi(u => ({ ...u, wallArm: true })); },
@@ -224,7 +226,7 @@ export default function Microcosm(){
       },
       removeSelWall: () => { if (wallSel >= 0) actionsRef.current.removeWall(wallSel); },
       addSourceAt: (wx, wy, sx, sy, kind) => { // kind: "sun" (light 1) or "heat" (dark, warmth +10)
-        if (W.sources.length >= P.maxSources) return;
+        if (W.sources.length >= P.maxSources || !levelAllows("sources")) return;
         if (sx !== undefined) pours.push({ sx, sy, t: performance.now() });
         logIv("sourceAdd");
         const ch = kind === "heat" ? { i: 0, a: 10, sigma: 130 } : {};
@@ -257,8 +259,11 @@ export default function Microcosm(){
         pushUndo(label + " · Undo", () => { logIv("undo"); apply(prev); actionsRef.current.selectSource(-1); });
       },
       reset: () => {
-        P.mutation = true; // a fresh world starts with the shipped settings (locus settings are restored by initWorld)
-        resetWorld(); initWorld((Math.random()*1e9)|0);
+        if (LVL.def){ levelRestart(); } // during an experiment, reset re-runs the experiment (same world, same seed)
+        else {
+          P.mutation = true; // a fresh world starts with the shipped settings (locus settings are restored by initWorld)
+          resetWorld(); initWorld((Math.random()*1e9)|0);
+        }
         sel.i = -1; follow = false; srcSel = -1; wallSel = -1; wallArm = false; wallDrag = null;
         undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
         cam.x = W.sources[0].x; cam.y = W.sources[0].y;
@@ -267,6 +272,7 @@ export default function Microcosm(){
           mineral: { b:0, f:0, l:0, add:0 }, lightMul: 1, srcSel: -1, wallSel: -1, wallArm: false }));
       },
       seedAt: (sp, wx, wy, sx, sy) => {
+        if (!levelAllows("seed")) return;
         const nm = SPECIES_META[sp].name;
         pours.push({ sx, sy, t: performance.now() });
         logIv("seed");
@@ -359,7 +365,8 @@ export default function Microcosm(){
           logIv("source");
           const k = srcDrag.k;
           pushUndo("Moved the sun · Undo", () => { logIv("undo"); queueEvent({ type:"source", k, x: ox, y: oy }); });
-        } else if (p && !p.moved && !wasPinch && pointers.size === 0 && performance.now() - p.t >= 350){
+        } else if (p && !p.moved && !wasPinch && pointers.size === 0 && performance.now() - p.t >= 350
+                   && (levelAllows("seed") || levelAllows("sources") || levelAllows("walls"))){
           const wx2 = wrap(cam.x + (p.sx - vw/2)/cam.z), wy2 = wrap(cam.y + (p.sy - vh/2)/cam.z);
           setUi(us => ({ ...us, spawnPick: { sx: p.sx, sy: p.sy, x: wx2, y: wy2 } }));
         } else if (p && !p.moved && !wasPinch && pointers.size === 0 && performance.now() - p.t < 350){
@@ -369,13 +376,13 @@ export default function Microcosm(){
           else if (wk >= 0) actionsRef.current.selectWall(wk === wallSel ? -1 : wk);    // tap a wall: its card (7.W)
           else if (srcSel >= 0) actionsRef.current.selectSource(-1);                    // tap water with a sun selected: just let go
           else if (wallSel >= 0) actionsRef.current.selectWall(-1);                     // likewise a wall
-          else {
-            // fertilize pulse: tap open water to pour mineral there
+          else if (levelPourOk()){
+            // fertilize pulse: tap open water to pour mineral there (levels may budget pours; undo refunds)
             const fx = wrap(cam.x + (p.sx - vw/2)/cam.z), fy = wrap(cam.y + (p.sy - vh/2)/cam.z);
             pours.push({ sx: p.sx, sy: p.sy, t: performance.now() });
-            logIv("pour");
+            logIv("pour"); levelNotePour(1);
             queueEvent({ type:"fertilize", x: fx, y: fy, amount: 40, done: snap => {
-              pushUndo("Poured mineral · Undo", () => { logIv("undo"); queueEvent({ type:"unfertilize", snap }); });
+              pushUndo("Poured mineral · Undo", () => { logIv("undo"); levelNotePour(-1); queueEvent({ type:"unfertilize", snap }); });
             }});
           }
         }
@@ -465,6 +472,7 @@ export default function Microcosm(){
       frames++;
       if (now - fpsT > 500){ fps = Math.round(frames*1000/(now-fpsT)); frames = 0; fpsT = now; }
       if (now - uiT > 500){ uiT = now;
+        levelCheck(); // verdicts are counted in recorder samples, so UI speed cannot change them
         let mFree = 0, mLocked = 0; const MF = W.M, DM = W.dM;
         for (let c = 0; c < MF.length; c++){ mFree += MF[c]; mLocked += DM[c]; }
         let corpses = 0;
@@ -649,9 +657,13 @@ export default function Microcosm(){
       )}
       {uiMode === "data" && !desktop && <DataMode />}
       <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()} card={sheetUp} />
+      {/* Phase 8: back-to-menu control and, during an experiment, the objective HUD + verdict (src/ui-levels.jsx) */}
+      <HomeButton onExit={onExit} />
+      <LevelStage tick={ui.tick} desktop={desktop} panelW={panelW} onExit={onExit} onLevel={onLevel}
+        onRetry={() => actionsRef.current.reset && actionsRef.current.reset()} />
       {/* sun-intensity press lever (intervene mode) */}
       {uiMode === "intervene" && (
-        <div style={{ position:"absolute", top:64, left:"50%", transform:"translateX(-50%)",
+        <div style={{ position:"absolute", top: LVL.def ? 112 : 64, left:"50%", transform:"translateX(-50%)",
           padding:"6px 12px", borderRadius:12,
           background:"rgba(11,19,30,0.72)", border:"1px solid rgba(242,178,74,0.35)", zIndex:5 }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -670,10 +682,11 @@ export default function Microcosm(){
             style={{ width: 130, accentColor: "#F2B24A" }} />
           </div>
           <div style={{ fontSize:10, color:"rgba(242,178,74,0.75)", marginTop:4, whiteSpace:"nowrap" }}>
-            drag → source · tap → pour · tap source/wall → card · hold → seed · sun · heat · wall</div>
+            {LVL.def ? "drag → sun · tap → pour" + (levelAllows("seed") ? " · hold → seed" : "")
+                     : "drag → source · tap → pour · tap source/wall → card · hold → seed · sun · heat · wall"}</div>
         </div>
       )}
-      {uiMode === "intervene" && (
+      {uiMode === "intervene" && levelAllows("evolution") && (
         <EvolutionPanel desktop={desktop} mono={mono}
           onLog={(type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
             actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt(label + " · Undo", undoFn); }} />
@@ -684,21 +697,21 @@ export default function Microcosm(){
           top: Math.max(96, ui.spawnPick.sy - 76),
           display:"flex", flexWrap:"wrap", gap:6, padding:8, borderRadius:14, maxWidth: vp.vw - panelW - 16, boxSizing:"border-box",
           background:"rgba(11,19,30,0.94)", border:"1px solid rgba(242,178,74,0.45)" }}>
-          {SPECIES.LIVE.map(sp => { const c = SPECIES_META[sp].rgb; return (
+          {(levelAllows("seed") ? SPECIES.LIVE : []).map(sp => { const c = SPECIES_META[sp].rgb; return (
             <button key={sp}
               onClick={() => actionsRef.current.seedAt(sp, ui.spawnPick.x, ui.spawnPick.y, ui.spawnPick.sx, ui.spawnPick.sy)}
               style={{ padding:"7px 9px", borderRadius:10, fontSize:11, border:"none",
                 background:"rgba(21,34,51,0.95)", color:`rgb(${c[0]},${c[1]},${c[2]})`,
                 fontFamily:"ui-monospace, Menlo, monospace" }}>
               ● {SPECIES_META[sp].name}</button> ); })}
-          {W.sources.length < P.maxSources && ["sun","heat"].map(kind => (
+          {levelAllows("sources") && W.sources.length < P.maxSources && ["sun","heat"].map(kind => (
             <button key={kind} onClick={() => { actionsRef.current.addSourceAt(ui.spawnPick.x, ui.spawnPick.y, ui.spawnPick.sx, ui.spawnPick.sy, kind);
                 setUi(us => ({ ...us, spawnPick: null })); }}
               style={{ padding:"7px 9px", borderRadius:10, fontSize:11, border:"1px solid rgba(242,178,74,0.45)",
                 background:"rgba(21,34,51,0.95)", color:"#F2B24A", fontFamily:"ui-monospace, Menlo, monospace" }}>
               {kind === "sun" ? "☀ Sun" : "♨ Heat"}</button>
           ))}
-          {W.walls.length < P.maxWalls && (
+          {levelAllows("walls") && W.walls.length < P.maxWalls && (
             <button onClick={() => { actionsRef.current.armWall(); setUi(us => ({ ...us, spawnPick: null })); }}
               style={{ padding:"7px 9px", borderRadius:10, fontSize:11, border:"1px solid rgba(242,178,74,0.45)",
                 background:"rgba(21,34,51,0.95)", color:"#F2B24A", fontFamily:"ui-monospace, Menlo, monospace" }}>
