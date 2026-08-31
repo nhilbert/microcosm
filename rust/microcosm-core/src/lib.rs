@@ -26,6 +26,7 @@ pub mod rng;
 pub mod species_gen;
 pub mod step;
 pub mod traits;
+pub mod wasm;
 pub mod world;
 
 use params::*;

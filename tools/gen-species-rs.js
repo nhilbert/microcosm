@@ -124,3 +124,11 @@ const dest = path.join(__dirname, "..", "rust", "microcosm-core", "src", "specie
 fs.mkdirSync(path.dirname(dest), { recursive: true });
 fs.writeFileSync(dest, out);
 console.log(`wrote ${dest}  (${NSP} species, ${out.length} bytes)`);
+
+// The same normalized rows as JSON, for the WASM shim's TRAITS mirror. Emitted here, from the same
+// source, so the Rust table and the shim's view of it cannot drift. Numeric locus fields are
+// re-bound to live WASM accessors by the shim; everything else (names, labels, flags) is static.
+const jsonDest = path.join(__dirname, "..", "rust", "wasm", "species-normalized.json");
+fs.mkdirSync(path.dirname(jsonDest), { recursive: true });
+fs.writeFileSync(jsonDest, JSON.stringify(TRAITS, null, 1));
+console.log(`wrote ${jsonDest}`);

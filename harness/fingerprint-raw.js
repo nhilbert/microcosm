@@ -45,6 +45,8 @@ function fingerprint(seed, mutation){
   return `pops=[${p.join(",")}] posSum=${h(sx)} enSum=${h(se)} mnSum=${h(sm)} gSum=${h(sg)} fieldM=${h(fM)} auditM=${h(am)} lightSum=${h(li)} tempSum=${h(tp)} rngState=${W.rngState|0} tick=${W.tick} n=${W.n}`;
 }
 
+// Default: the two conformance seeds. Pass a comma-separated list to widen it to tune2's eight.
+const SEEDS = (process.argv[3] || "11,88").split(",").map(s => parseInt(s, 10));
 for (const [mode, mut] of [["silent", false], ["evolving", true]])
-  for (const seed of [11, 88])
+  for (const seed of SEEDS)
     console.log(`${mode} ${seed} ${fingerprint(seed, mut)}`);

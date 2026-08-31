@@ -12,7 +12,7 @@ license = "GPL-3.0-or-later"
 stub-math = []
 
 [lib]
-crate-type = ["lib"]
+crate-type = ["lib", "cdylib"]
 
 [profile.release]
 # Determinism first: no fast-math exists in stable Rust, and FMA contraction is not a legal

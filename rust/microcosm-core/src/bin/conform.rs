@@ -89,9 +89,16 @@ fn main() {
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(3000);
+    // Default: the two conformance seeds. Pass a comma-separated list to widen it to tune2's eight.
+    let seeds: Vec<i32> = std::env::args()
+        .nth(2)
+        .unwrap_or_else(|| "11,88".to_string())
+        .split(',')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
     let mut sim = Sim::new();
     for (mode, mut_on) in [("silent", false), ("evolving", true)] {
-        for seed in [11, 88] {
+        for &seed in &seeds {
             println!(
                 "{} {} {}",
                 mode,

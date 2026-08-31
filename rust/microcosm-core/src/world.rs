@@ -173,6 +173,21 @@ pub struct World {
 
 impl World {
     pub fn new(p: &Params) -> World {
+        let mut w = World::alloc(p);
+        // Pre-reserve everything that can grow during a run. The columns are allocated once and
+        // never resized, but these are not — and under WASM an allocation that grows linear memory
+        // detaches every typed-array view the JS shim holds. Reserving here means a normal run
+        // never grows memory at all; the shim still re-syncs defensively.
+        w.free_list.reserve(MAXN);
+        w.c_free.reserve(MAXCORPSE);
+        w.events.reserve(256);
+        w.event_log.reserve(4096);
+        w.sources.reserve(8);
+        w.walls.reserve(16);
+        w
+    }
+
+    fn alloc(p: &Params) -> World {
         World {
             x: vec![0.0; MAXN],
             y: vec![0.0; MAXN],
