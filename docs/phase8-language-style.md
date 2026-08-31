@@ -1,6 +1,8 @@
 # Player language — the style guide
 
-v1.0 · 2026-08-31 · Governs every word a player reads: level text (briefing, prediction,
+v1.1 · 2026-08-31 · Enforced: `harness/prose.js` runs inside `npm test` and rejects
+any level text over the §4 budgets, the banned list, or the §5 term ladder. The v1.0
+rewrite queue (§9) is done — all shipped text passes. Governs every word a player reads: level text (briefing, prediction,
 goal, verdict, reflections), HUD lines, Observatory narrations, cards, and future UI
 copy. Written after levels 1–5 shipped; §9 audits those texts against these rules and
 queues the fixes. The Data pages and harness output are instruments, not prose — they
@@ -79,9 +81,13 @@ to the bone. Not a teacher, not a mascot, not a poet.
 | debrief | ≤ 5 sentences, ≤ 75 words | what you did → what the pond did → the name, once → one look ahead |
 
 Readability targets for every body text (briefing, debriefs, reflects, fails):
-**average ≤ 14 words per sentence, no sentence over 20, Flesch–Kincaid grade ≤ 8.**
-The audit script (§9) computes all three; run it on any new level before the honesty
-gate.
+**no sentence over 20 words, Flesch–Kincaid grade ≤ 8 (checked on texts of 25+
+words).** `harness/prose.js` enforces the word budgets, the sentence cap, the FK
+ceiling, the banned list, and the term ladder — inside `npm test`, so no level ships
+prose the budgets reject. The sentence *counts* in the table are shape guidance, not
+enforced: the L5 rewrite (§9) showed that eight tiny sentences can beat five long
+ones for this reader, and the caps that matter are per-sentence length and total
+words.
 
 ## 5. The term ladder
 
@@ -192,9 +198,14 @@ Worked example of the standard (L5 debrief pass, rewritten to §4/§5):
 > grazing keeps mineral moving. Eaten, returned to the water, taken up again. All
 > your pouring couldn't do that. This pond was never hungry. It was unfinished."
 
-Follow-up (own increment, before L6 text is written): rewrite the eight flagged texts
-to §4/§5, re-run the audit clean, and promote the audit script into `harness/` so no
-future level ships prose the budgets reject.
+**Done (2026-08-31, Phase 8.5)**: the promoted gate (`harness/prose.js`, in
+`npm test`) initially convicted **32 violations** across levels 1–5 — more than this
+manual audit found, which is the point of promoting it. All texts rewritten to
+§4/§5; the gate now passes clean, and the level verdicts were re-proven unchanged
+(the honesty gate is text-independent by construction). Notable casualties: "Paine",
+"Liebig", "equilibrium", "population", and "uptake outraces" are gone from player
+text; the K6 aside left L3's debrief; the L5 worked rewrite above shipped verbatim
+(minus one merged sentence).
 
 ## 10. The ten-second checklist for any new player text
 
