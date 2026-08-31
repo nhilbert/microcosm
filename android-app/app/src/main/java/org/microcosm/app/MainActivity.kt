@@ -61,7 +61,7 @@ class MainActivity : Activity() {
         for (s in doubleArrayOf(0.0, 1.0, 4.0, 16.0)) bar.addView(button(if (s == 0.0) "pause" else "${s.toInt()}x") {
             world.speed = s
         })
-        bar.addView(button("benchmark") {
+        bar.addView(button("bench") {
             reportView.visibility = ViewGroup.GONE
             world.speed = 0.0
             world.benchmark()
@@ -79,6 +79,17 @@ class MainActivity : Activity() {
         }
         val scroll = ScrollView(this).apply { addView(reportView) }
         root.addView(scroll, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.CENTER })
+
+        // targetSdk 35 draws edge to edge on Android 15, so without this the HUD sits under the
+        // clock and the buttons under the gesture pill — which is exactly what the first device
+        // screenshots showed.
+        @Suppress("DEPRECATION")
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            hud.setPadding(24, insets.systemWindowInsetTop + 24, 24, 24)
+            bar.setPadding(12, 12, 12, insets.systemWindowInsetBottom + 12)
+            insets
+        }
+        root.requestApplyInsets()
 
         setContentView(root)
     }

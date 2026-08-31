@@ -123,41 +123,62 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     }
 
     /**
-     * The measurement A.1 exists for: how much of a frame is the core, and how much is the paint,
-     * at every zoom the player can reach. The world is held still (no stepping) so the population
-     * is the same for every row and the zoom is the only thing that varies.
+     * The measurement A.1 exists for. The first version of this reported one number per zoom and
+     * every row came back at exactly 16.6 ms — which was the display's refresh interval, not the
+     * cost of anything: `unlockCanvasAndPost` blocks until the next vblank, so a frame that takes
+     * 2 ms and a frame that takes 16 ms both read 16.67. It measured waiting.
+     *
+     * So the timing is split three ways. `core` is the frame builder; `record` is the CPU time
+     * Kotlin spends issuing draw commands; `present` is lock plus post — the GPU flush and the wait
+     * for vblank, which is vsync-bound and therefore a floor, not a cost. Work is core + record;
+     * everything else is the display setting the pace.
      */
     private fun runBenchmark(): String {
         val sb = StringBuilder()
         val savedZ = cam.z
-        // a full pond first: the shipped world settles near 1,800 organisms by t=3,000
-        val target = 3000L
+        // a full pond first (untimed), then a fixed window timed wherever the world has got to —
+        // the earlier version timed "run until t=3,000", which on a second press was already true
+        // and divided by nothing
+        while (Native.tick() < 3000L) { Native.markPrev(); Native.step() }
+        val window = 1000
         val t0 = System.nanoTime()
-        while (Native.tick() < target) { Native.markPrev(); Native.step() }
+        repeat(window) { Native.markPrev(); Native.step() }
         val simMs = (System.nanoTime() - t0) / 1e6
-        val ticks = target.coerceAtLeast(1L)
         sb.append("BENCHMARK — %dx%d px\n".format(width, height))
         sb.append("sim: %d ticks in %.0f ms = %.3f ms/tick (%.0fx real time)\n\n"
-            .format(ticks, simMs, simMs / ticks, TICK_MS / (simMs / ticks)))
-        sb.append(" zoom   drawn    core   paint   total   fps\n")
+            .format(window, simMs, simMs / window, TICK_MS / (simMs / window)))
+        sb.append(" zoom  drawn    core  record present   work\n")
         for (z in doubleArrayOf(0.35, 0.6, 0.9, 1.4, 2.2)) {
             cam.z = z
             repeat(10) { paintOnce(1.0) } // warm the pipeline before timing it
-            var build = 0L
-            var total = 0L
+            var core = 0L
+            var record = 0L
+            var present = 0L
             val n = 60
             repeat(n) {
-                val s = System.nanoTime()
-                build += paintOnce(1.0)
-                total += System.nanoTime() - s
+                val t1 = System.nanoTime()
+                val c = holder.lockHardwareCanvas()
+                if (c != null) {
+                    val t2 = System.nanoTime()
+                    core += renderer.draw(c, cam, width.toFloat(), height.toFloat(), 1.0, hidden)
+                    val t3 = System.nanoTime()
+                    holder.unlockCanvasAndPost(c)
+                    record += t3 - t2
+                    present += (t2 - t1) + (System.nanoTime() - t3)
+                }
             }
-            val totalMs = total / 1e6 / n
-            val buildMs = build / 1e6 / n
-            sb.append("%5.2f  %6d  %6.2f  %6.2f  %6.2f  %4.0f\n".format(
-                z, renderer.orgN, buildMs, totalMs - buildMs, totalMs, 1000.0 / totalMs))
+            val coreMs = core / 1e6 / n
+            val recordMs = record / 1e6 / n - coreMs // `record` brackets the core call too
+            val presentMs = present / 1e6 / n
+            sb.append("%5.2f %6d  %6.2f  %6.2f  %6.2f  %5.2f\n".format(
+                z, renderer.orgN, coreMs, recordMs, presentMs, coreMs + recordMs))
         }
         cam.z = savedZ
-        sb.append("\ncore = the frame builder (frame.rs); paint = Canvas.")
+        sb.append("\ncore    the frame builder (frame.rs)")
+        sb.append("\nrecord  CPU time issuing draw commands")
+        sb.append("\npresent lock + post: GPU flush and the wait for vblank — vsync-bound,")
+        sb.append("\n        so it is a floor set by the display, not a cost")
+        sb.append("\nwork    core + record. Headroom is 16.7 / work at 60 Hz.")
         return sb.toString()
     }
 }

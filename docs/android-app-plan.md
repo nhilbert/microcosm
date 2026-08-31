@@ -163,6 +163,49 @@ APKs were shipping a second, entirely unused copy of the core beside the JNI lib
 links it statically. The build scripts now drop it: the packaged APK fell from 1,333,553 to
 989,193 bytes, measured like for like on the two CI artifacts.
 
+## 5c. A.1 on the phone — measured 2026-08-31 (Fairphone 5, 1224x2700)
+
+It renders. The torus tiling repeats correctly, the mat carpet, the plankton glows, the Cilio
+triangles, the corpse husks, the cysts, the sun's mark and its glow are all there and look like the
+browser's.
+
+```
+sim   3000 ticks / 1148 ms = 0.383 ms/tick = 261x real time
+
+ zoom   drawn    core   paint   total   fps
+ 0.35    1837    0.15   16.52   16.67    60
+ 0.60    1837    0.13   16.53   16.66    60
+ 0.90    1837    0.10   16.56   16.66    60
+ 1.40    1836    0.09   16.56   16.65    60
+ 2.20    1834    0.09   16.58   16.67    60
+```
+
+**What this establishes.** The simulation reads 0.383 ms/tick, 261x real time — corroborating
+M5.0's 0.400 ms/tick from the diagnostics probe, now from inside the app on the same phone. The
+frame builder costs **0.09–0.16 ms**, under 1% of a 60 Hz frame; it rises as the zoom falls,
+because fewer organisms are culled, which is the internal consistency one wants from a new
+instrument. And the app holds **a locked 60 fps at ~1,834 organisms at every zoom**, which is the
+answer to "can it render the pond": yes, without dropping a frame.
+
+**What it does not establish, and the instrument was at fault.** Every `total` came back at
+16.6–16.7 ms — the display's refresh interval, to two decimal places, at every zoom. That is not a
+measurement of anything: `unlockCanvasAndPost` blocks until the next vblank, so a frame costing
+2 ms and a frame costing 16 ms both read 16.67. The "paint" column was measuring *waiting*. The
+paint cost is therefore only bounded above (≤ 16.7 ms) and the headroom is unknown.
+
+Two smaller faults in the same run. The sim timing was written as "run until t=3,000 and time it",
+so a second press of the button timed an empty loop and reported 180,072,029x real time. And the
+five zoom rows drew 1837, 1837, 1837, 1836, 1834 organisms — this world is clustered around the
+sun, so zooming changed sprite size and fill but barely changed the instance count; the sweep did
+not vary the load it was meant to vary.
+
+**Fixed in the next build.** The timing splits three ways — `core` (the frame builder), `record`
+(CPU time issuing draw commands), `present` (lock + post: GPU flush and the vblank wait, a floor
+set by the display rather than a cost) — so work and waiting are separated and headroom is
+`16.7 / work`. The sim window is now a fixed 1,000 ticks timed wherever the world has got to. And
+targetSdk 35 draws edge to edge on Android 15, which is why the HUD sat under the clock and the
+buttons under the gesture pill; the insets are applied now.
+
 ## 6. Open, and honestly so
 
 - **The web artifact's `frameOf` is a second implementation until it isn't.** A.0 leaves the JS

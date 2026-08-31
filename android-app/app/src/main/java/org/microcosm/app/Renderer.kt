@@ -39,7 +39,14 @@ class Renderer {
     private val screen = Paint(Paint.FILTER_BITMAP_FLAG).apply {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
     }
-    private val plain = Paint(Paint.FILTER_BITMAP_FLAG)
+    // The per-cell fields are 64x64 upscaled to the whole world tile, so filtering is what keeps
+    // the mat carpet from reading as hard squares. The browser sets imageSmoothingEnabled for the
+    // same reason. Set on the instance as well as through the flag, because the flag alone has been
+    // unreliable across versions.
+    private val plain = Paint(Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
+        isFilterBitmap = true
+        isDither = true
+    }
     private val flat = Paint(Paint.ANTI_ALIAS_FLAG)
     private val src = Rect(0, 0, Layers.GRID, Layers.GRID)
     private val srcTile = Rect(0, 0, Layers.TILE, Layers.TILE)
