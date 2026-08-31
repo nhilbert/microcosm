@@ -708,3 +708,18 @@ pub extern "C" fn mc_ind_venator(field: i32) -> f64 {
         _ => f64::NAN,
     }
 }
+
+/// Recompute the light field (and its gradients). Needed when a harness changes `P.lightMul` or
+/// `P.tempAmb` directly rather than through an event — the events already recompute for themselves.
+#[no_mangle]
+pub extern "C" fn mc_compute_light() {
+    let sim = s();
+    crate::fields::compute_light(&mut sim.w, &sim.p);
+}
+
+/// Recompute the warmth field, its gradients and the per-cell Q10 tables.
+#[no_mangle]
+pub extern "C" fn mc_compute_temp() {
+    let sim = s();
+    crate::fields::compute_temp(&mut sim.w, &sim.p);
+}

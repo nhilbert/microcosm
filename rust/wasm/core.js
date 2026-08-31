@@ -223,6 +223,10 @@ function initWorld(seed, sc){
   sync();
 }
 function step(){ X.mc_step(); sync(); }
+// The field recomputes. A harness that pokes P.tempAmb or P.lightMul directly (heat.js, light.js)
+// has to ask for these; every event that changes a source or a wall already does it internally.
+function computeLight(){ X.mc_compute_light(); sync(); }
+function computeTemp(){ X.mc_compute_temp(); sync(); }
 
 // Events. `queue` mirrors queueEvent (applied at the next tick boundary, with the coalescing
 // rules); applyEvent applies immediately, as in the JS.
@@ -294,7 +298,7 @@ const notYet = name => () => {
 
 module.exports = {
   W, P, TRAITS, TAG, REC, SPECIES, MAXN, MAXLOCI, CELL,
-  resetWorld, initWorld, step, queueEvent, applyEvent,
+  resetWorld, initWorld, step, queueEvent, applyEvent, computeLight, computeTemp,
   wrap, wd, cellOf, mulberry32,
   indicators, impact: notYet("impact"),
   levelCheck: notYet("levelCheck"), levelStart: notYet("levelStart"),
