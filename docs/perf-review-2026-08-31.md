@@ -157,6 +157,45 @@ on a many-core machine — no single lever gets there, and the first two rows de
 part of the felt improvement (corridor:full from ~2.7 h to ~10–20 min) at a tiny fraction of the
 cost and none of the risk.
 
+## Results — increments A and B shipped (2026-08-31, same day, post-MV.4 main)
+
+The movement genome (MV.3/MV.4) merged between review and implementation, growing the corridor to
+11 (species, locus) pairs → 192 rail runs (3.46M ticks); the baseline single run on that main was
+30.5 s / 18k ticks. Against that:
+
+**Increment A — parallel harnesses** (`harness/pool.js`; corridor + tune2). One fresh process per
+run (a cold module load: no cross-run state can leak — the strongest form of the reset guarantee
+the Phase 6 sigma incident argued for), results printed in sequential order and format. `MC_JOBS`
+caps the workers. Proven, not assumed: the parallel corridor's `--sample 2` output (16 runs) is
+**byte-identical** to the old sequential harness on the same dist, and parallel tune2's per-seed
+lines likewise (8/8).
+
+**Increment B — bit-identical core pass**, all four edits from §4 plus the inlined hunt scan,
+proven by the conform ritual (silent + evolving, seeds 11/88 all identical; baseline rebound with
+this declared reason; the transparent-wall proof `walls.js --open` additionally runs the two
+diffusion bodies against each other: PASS, bit-identical). Post-pass profile: `neighbors` gone
+from the hot list (the hunt lives inline), diffusion 8.2% → 5.2%, the same 6k-tick workload takes
+24% fewer samples.
+
+| measurement | before | after | factor |
+|---|---|---|---|
+| one 18k run, single core | 30.5 s | 25.4 s | ×1.20 |
+| conform | 18.8 s | 15.3 s | ×1.23 |
+| tune2 (8 seeds) | 273.7 s | **68.6 s** | ×4.0 |
+| test:full (incl. corridor rails+fuzz, 200 runs) | ~2 h 20 m (extrapolated) | **41 m 43 s** | ~×3.4 |
+
+All gates green after the pass: conform bit-identical (no NOTE), tune2 8/8, K6 gate ALL PASS,
+gate5 ALL PASS, corridor rails+fuzz CERTIFIED (200 runs, 11 loci), levels ALL PASS, walls ALL PASS.
+CPU utilization during the battery: 134 CPU-minutes in 41.7 wall-minutes (×3.2 of 4 cores).
+
+The ×1.20 single-thread is at the low end of §4's ×1.5–2 projection — the movement genome added
+per-organism locus loops the pass does not touch, and the remaining time is genuine per-organism
+arithmetic (`Math.hypot`, `cos`/`sin`, the locus expression loops) that cannot be reduced
+bit-identically. The remaining levers toward the 100× goal are unchanged from §7: more cores
+(this container has 4; the factor is ~the core count) and, when the Android port starts anyway,
+a measured native core behind `MC_CORE`. The declared micro-changes (hypot → sqrt forms) still
+wait for the next declared ecology change.
+
 ## Suggested order (each its own increment, per working rule 9)
 
 1. Parallel runner for corridor + gates (harness-only, zero risk, biggest felt win).
