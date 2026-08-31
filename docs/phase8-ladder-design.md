@@ -170,6 +170,13 @@ same-seed A/B (F6) has actually run.
   packs — *calibrate*).
 
 ### L5 · Boom and Bust — consumer–resource cycles and the myth of balance
+
+> **Overturned at calibration (2026-08-31)** — the apexless core settles instead of
+> cycling, every knife candidate below was forgiven by measurement, and the paradox
+> of enrichment returned a definitive null at 3,000 M. L5 shipped instead as **The
+> Richer Pond** (top-down structure vs bottom-up inputs); full record in
+> phase8-levels-plan.md §3. The cycles lesson migrates to the full world (L6's
+> orbit). This spec stands as the design-history record.
 - **Science subtitle**: Consumer–resource cycles · disturbance and stability.
 - **Question**: Nothing is attacking the pond — so why do the numbers keep swinging?
 - **Misconception targeted**: a healthy ecosystem holds still; a crashing population

@@ -27,6 +27,11 @@ for (let k = 0; k < 10; k++){ const t = 600 + k * 300;
 const dimPours = {}; for (let k = 0; k < 10; k++) dimPours[600 + k * 300] = nearPours[600 + k * 300];
 const matPours = {}; for (let k = 0; k < 8; k++) matPours[800 + k * 400] = pour(512 + ((k % 3) - 1) * 80, 512 + (((k / 3) | 0) % 3 - 1) * 80);
 const graze = t => ({ [t]: () => C.applyEvent({ type: "spawnPack", sp: 2, x: 512, y: 480 }) });
+const grazeL5 = { 3000: () => C.applyEvent({ type: "spawnPack", sp: 2, x: 512, y: 470 }) };
+const grazeL5x3 = { 3000: () => { for (const [x, y] of [[470, 512], [554, 512], [512, 470]])
+  C.applyEvent({ type: "spawnPack", sp: 2, x, y }); } };
+const soupOnly = {}; for (let k = 0; k < 30; k++)
+  soupOnly[3000 + k * 150] = pour(512 + ((k % 3) - 1) * 60, 512 + (((k / 3) | 0) % 3 - 1) * 60);
 
 const CASES = [
   ["light",   "null: wait under the dim sun",        null,                                             "failed"],
@@ -42,6 +47,10 @@ const CASES = [
   ["garden",  "strategy: seed the grazer at t=4000", graze(4000), "passed"],
   ["garden",  "strategy: a late grazer (t=7000)",    graze(7000), "passed"],
   ["garden",  "wrong: eight pours on the mat",       matPours,   "failed"],
+  ["richer",  "null: a stable pond stays a poor pond", null,      "failed"],
+  ["richer",  "strategy: seed the missing grazer (t=3000)", grazeL5, "passed"],
+  ["richer",  "robustness: three packs at once",     grazeL5x3,  "passed"],
+  ["richer",  "wrong: thirty pours, no grazer",      soupOnly,   "failed"],
 ];
 
 let ok = true;

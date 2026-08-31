@@ -1868,9 +1868,49 @@ const LEVELS = [
         "seed the bloom's grazer and let pressure from above open space below.",
     },
   },
+  {
+    key: "richer", n: 5,
+    title: "The Richer Pond", science: "Top-down structure · bottom-up inputs",
+    question: "This pond is stable and full of plankton. Can you make it richer?",
+    briefing: "A bloom, a mat, decomposers — and nobody eating anybody. Mineral is unlimited this time, " +
+      "and the seeding bench is open. The goal is a richer pond: a meadow past 1,300 with every species " +
+      "alive. Decide what this pond is actually missing.",
+    goalText: "A richer pond — 1,300 Solara, everyone alive",
+    predict: { prompt: "What does a pond need to become richer?",
+      options: ["More input — pour mineral into the water", "A missing eater — restructure who eats whom",
+                "Both — inputs and structure together"],
+      reflect: ["Inputs alone sank into the bloom: thirty doses left the meadow near 900 and the water no " +
+                  "richer. A pond's ceiling is set by its structure, not by its soup.",
+                "The structural bet: a grazer turns standing bloom into flowing matter — and the meadow " +
+                  "nearly doubles.",
+                "Both works — but the experiment shows which half was necessary: pours alone failed, the " +
+                  "grazer alone succeeded."] },
+    world: { seed: 202, found: { 0: 120, 1: 500, 2: 0, 3: 60, 6: 0 } },
+    apparatus: { pours: true, seed: "all", sources: false, walls: false, evolution: false },
+    deadline: 17000, sustain: 10,
+    narrate: ["estab", "crashev", "bloom", "extinct"],
+    pass: S => S.pop(0) >= 1250 && S.pop(2) >= 20,
+    failNow: S => S.pop(0) === 0 ? "The meadow is gone — richer was the goal, and everything died at the bottom."
+      : S.pop(1) === 0 ? "The plankton is gone — grazed to nothing. A structure with a hole in it feeds no one." : "",
+    timeoutWhy: "The pond stayed poor. Everything you poured sank into the standing bloom — nothing turned " +
+      "it over. Richness needed an eater, not an input.",
+    meter: S => [{ label: "Solara", v: S.pop(0), goal: 1250 }, { label: "Cilio", v: S.pop(2), goal: 20 },
+                 { label: "Drifta", v: S.pop(1) }],
+    debrief: {
+      pass: "The grazer restructured the pond, and the pond got richer — the meadow near-doubled while " +
+        "the bloom fell to a quarter and held. Grazing turned standing plankton into flowing matter: " +
+        "eaten, excreted, recycled, and taken up again by the mat the bloom used to shade and starve. " +
+        "Top-down structure set the ceiling that bottom-up pouring never touched — this pond was never " +
+        "hungry, it was unfinished. And note what the crash was: not a catastrophe, but the system " +
+        "finding its richer arrangement.",
+      fail: "More soup did not make a richer pond. The bloom drank every pour and stood still — standing " +
+        "stock is not flow, and richness lives in the flow. What this pond was missing had a mouth: seed " +
+        "the grazer and let structure do what input could not.",
+    },
+  },
 ];
 
-// __LEVELS_NOTE__ deferred arcs (L5-L12): specs in docs/phase8-ladder-design.md; each enters through the honesty gate.
+// __LEVELS_NOTE__ deferred arcs (L6-L12): specs in docs/phase8-ladder-design.md; each enters through the honesty gate.
 // ============================================================
 // THE RNG-ORDER CONTRACT (read before editing anything below)
 //
