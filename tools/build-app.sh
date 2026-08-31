@@ -28,6 +28,11 @@ echo "==> cargo ndk ($ABI)"
 cd "$ROOT/rust/microcosm-android"
 cargo ndk -t "$ABI" -o "$JNILIBS" build --release
 
-echo
+
+# microcosm-core is built as ["lib", "cdylib"] — the cdylib is what the WASM target needs, and
+# cargo-ndk copies every cdylib it finds. libmicrocosm.so already links the core statically, so the
+# second copy is dead weight in the APK. Drop it rather than ship it.
+find "$JNILIBS" -name 'libmicrocosm_core.so' -delete
+
 echo "built:"
 find "$JNILIBS" -name '*.so' -exec ls -l {} \; | awk '{printf "  %8d  %s\n", $5, $9}'
