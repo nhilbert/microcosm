@@ -195,6 +195,34 @@ Misconception targeted: "more resources always mean more growth" — the pond wa
 hungry, it was unfinished. Harness: 4 cases, gate 17/17 ALL PASS. Prediction chips
 map to pour/structure/both with reflections carrying the measured numbers.
 
+### Level 6 · A Head Full of Hunters — the energy pyramid (shipped 2026-08-31)
+
+World: full core minus Venator (S 120, D 500, C 12, B 60), seed 101, rich. Goal:
+Venator ≥ 4 held for 7,000 ticks (sustain 350 samples), deadline 15,000; hard-fail
+when a once-present pack hits zero (the first stateful predicate — `LVL.mem`, still
+sample-driven and deterministic). Text is the first written under the enforced
+style gate.
+
+Calibration (V per 100 ticks, seed 101, 18k horizon):
+
+| run | longest V≥4 stretch | Vmax | outcome | verdict |
+|---|---|---|---|---|
+| null | 0 | 0 | no hunter | FAIL (timeout) |
+| one pack t=2,000 | 15,300 | 40 | alive at 18k (V 21) | PASS ~t=9,700 |
+| one pack t=4,000 | 12,000 | 34 | **extinct at t=18,000** | PASS ~t=11,700 — then the late death |
+| one pack t=6,000 | 11,300 | 34 | alive at 18k (V 22) | pass-capable |
+| two packs t=4,000 | **5,400** | 9 | extinct t=11,300 | FAIL — never holds long enough |
+| two packs t=6,000 | 12,100 | 35 | alive at 18k (V 24) | uncertified; overstock is timing-specific |
+
+Two honest notes carried into the wording: the overstock collapse is *pinned* (two
+packs released together at t=4,000, the harness case), not universal — the reflect
+says packs released "into the same water" strip it together; and the t=4,000 single
+pack dies AFTER its pass (the known late-apex-loss character of this world), which
+makes the debrief's closing line — "always one bad season from gone" — literally
+true on the level's own seed for a player who keeps watching. The sustain margin
+between the doomed double (5,400) and the pass bar (7,000) is 1,600 ticks. Gate
+21/21 ALL PASS.
+
 ## 4. The deferred ladder (arcs B–D)
 
 > **Superseded in detail (2026-08-31): docs/phase8-ladder-design.md** — the researched

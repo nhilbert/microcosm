@@ -1640,7 +1640,8 @@ function impact(entry){
 //     initWorld scenario (draw-free when absent) and applyEvent. A level
 //     world is its own world, like a moved sun — no conformance claim.
 // ============================================================
-const LVL = { def: null, state: "idle", run: 0, seenS: 0, pourLeft: 0, failWhy: "", predicted: -1 };
+const LVL = { def: null, state: "idle", run: 0, seenS: 0, pourLeft: 0, failWhy: "", predicted: -1,
+  mem: {} }; // per-run scratch for stateful predicates (e.g. "extinct AFTER being present"); sample-driven, so deterministic
 
 // one recorder sample, `back` samples before the latest (pure ring-buffer reads)
 function lvlSample(back){
@@ -1659,6 +1660,7 @@ function levelStart(def, predicted){
   LVL.def = def; LVL.state = "running"; LVL.run = 0; LVL.seenS = 0; LVL.failWhy = "";
   LVL.pourLeft = def.apparatus.pours === true ? Infinity : (def.apparatus.pours | 0);
   LVL.predicted = predicted === undefined ? -1 : predicted; // F1: committed before the run; contrast, never grade
+  LVL.mem = {};
 }
 function levelRestart(){ const d = LVL.def, p = LVL.predicted; if (d) levelStart(d, p); }
 // F2: the freshest Observatory event of a type this level narrates (pure read; null outside a level)
@@ -1691,7 +1693,7 @@ function levelCheck(){
     if (news > REC.N) news = REC.N;
     for (let k = news - 1; k >= 0 && L.state === "running"; k--){
       const S = lvlSample(k);
-      const why = def.failNow ? def.failNow(S) : "";
+      const why = def.failNow ? def.failNow(S, L.mem) : "";
       if (why){ L.state = "failed"; L.failWhy = why; break; }
       L.run = def.pass(S) ? L.run + 1 : 0;
       if (L.run >= (def.sustain || 10)) L.state = "passed";
@@ -1872,9 +1874,47 @@ const LEVELS = [
         "pouring can't.",
     },
   },
+  {
+    key: "hunters", n: 6,
+    title: "A Head Full of Hunters", science: "Energy pyramid · apex predators",
+    question: "The pond is rich. How many hunters can it feed?",
+    briefing: "A full pond: meadow, bloom, grazers, recyclers — and no hunter yet. Venator waits on " +
+      "your seeding bench. Found a pack that lasts.",
+    goalText: "A lasting pack — 4+ hunters, held long",
+    predict: { prompt: "You're adding a top hunter. How many packs would you release?",
+      options: ["Two packs — twice as safe", "One pack — all this pond can spare",
+                "None can live here at all"],
+      reflect: ["Twice the hunters meant twice the hunger. Packs released into the same water strip it " +
+                  "together — and starve together.",
+                "Right. Hunters live on what the pond can spare, and even a rich pond spares little.",
+                "A pack can live here. But only a small one, fed by the whole pond below it."] },
+    world: { seed: 101, found: { 0: 120, 1: 500, 2: 12, 3: 60, 6: 0 } },
+    apparatus: { pours: true, seed: "all", sources: false, walls: false, evolution: false },
+    deadline: 15000, sustain: 350, // V >= 4 held for 7,000 ticks: the doomed double-pack's best stretch is 5,400
+    narrate: ["wake", "estab", "extinct", "crashev"],
+    pass: S => S.pop(6) >= 4,
+    failNow: (S, M) => {
+      if (S.pop(6) > 0) M.v = 1;
+      if (M.v && S.pop(6) === 0) return "The pack is gone. It ate through what the pond could spare — " +
+        "the top of a pond is a narrow ledge.";
+      if (S.pop(2) === 0) return "The grazers are gone. Nothing now stands between the hunters and starving.";
+      return "";
+    },
+    timeoutWhy: "No lasting pack took hold. A hunter eats a lot and breeds slowly — seed early, and seed small.",
+    meter: S => [{ label: "Venator", v: S.pop(6), goal: 4 }, { label: "Cilio", v: S.pop(2) }],
+    debrief: {
+      pass: "Your pack holds — a few hunters riding a wave of grazers, riding a wave of plankton. " +
+        "Count the layers: hundreds of plankton feed a hundred grazers feed a handful of hunters. " +
+        "Every meal loses most of its energy on the way up. That is the food chain's price, and why " +
+        "the top is always small — and always one bad season from gone.",
+      fail: "Hunters don't run out of courage — they run out of prey. The pond only makes so many " +
+        "grazers, and every extra mouth shrinks each hunter's share. Try one pack, seeded early, and " +
+        "give it room.",
+    },
+  },
 ];
 
-// __LEVELS_NOTE__ deferred arcs (L6-L12): specs in docs/phase8-ladder-design.md; each enters through the honesty gate.
+// __LEVELS_NOTE__ deferred arcs (L7-L12): specs in docs/phase8-ladder-design.md; each enters through the honesty gate.
 // ============================================================
 // THE RNG-ORDER CONTRACT (read before editing anything below)
 //

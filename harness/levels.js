@@ -32,6 +32,9 @@ const grazeL5x3 = { 3000: () => { for (const [x, y] of [[470, 512], [554, 512], 
   C.applyEvent({ type: "spawnPack", sp: 2, x, y }); } };
 const soupOnly = {}; for (let k = 0; k < 30; k++)
   soupOnly[3000 + k * 150] = pour(512 + ((k % 3) - 1) * 60, 512 + (((k / 3) | 0) % 3 - 1) * 60);
+const vpack = t => ({ [t]: () => C.applyEvent({ type: "spawnPack", sp: 6, x: 512, y: 512 }) });
+const vtwo = t => ({ [t]: () => { C.applyEvent({ type: "spawnPack", sp: 6, x: 490, y: 512 });
+                                  C.applyEvent({ type: "spawnPack", sp: 6, x: 534, y: 512 }); } });
 
 const CASES = [
   ["light",   "null: wait under the dim sun",        null,                                             "failed"],
@@ -51,6 +54,10 @@ const CASES = [
   ["richer",  "strategy: seed the missing grazer (t=3000)", grazeL5, "passed"],
   ["richer",  "robustness: three packs at once",     grazeL5x3,  "passed"],
   ["richer",  "wrong: thirty pours, no grazer",      soupOnly,   "failed"],
+  ["hunters", "null: a pond with no top",            null,        "failed"],
+  ["hunters", "strategy: one pack at t=4000",        vpack(4000), "passed"],
+  ["hunters", "strategy: one pack early (t=2000)",   vpack(2000), "passed"],
+  ["hunters", "wrong: two packs at once (t=4000)",   vtwo(4000),  "failed"],
 ];
 
 let ok = true;
