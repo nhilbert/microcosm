@@ -88,6 +88,14 @@ the sim still runs as JS; `docs/android-wrapper.md` has the details and the
 decisions (offline, no permissions, no localStorage, committed identity-only
 keystore).
 
+A second, separate APK — **Microcosm native probe** (tag `probe-latest`, built
+from `android-native/`) — runs the *Rust* core natively through JNI and prints
+what it measures: whether the certified world reproduces bit-for-bit on ARM64,
+whether the math matches V8's own results, whether a saved world resumes
+identically, and how fast the core ticks on that device. It is a diagnostics
+screen, not the game, and it installs alongside the sandbox app without touching
+it. Background: `docs/android-port-plan.md` §8.
+
 ## The harnesses
 
 The simulation core is pure, deterministic and framework-free — no DOM, no
