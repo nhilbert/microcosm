@@ -21,7 +21,8 @@
 //      a world without walls runs the certified arithmetic bit for bit;
 //      a walled world diverges only through ecology, like a moved sun.
 // Modification protocol: after ANY edit to this file, run
-//   `node conform.js`   (2 seeds x 3000 ticks, ~3 s)
+//   `node conform.js`   (2 seeds x 2 genomes x 3000 ticks; the perf review caught this
+//   note claiming ~3 s when the tick had grown 6x past it — time it, don't trust it)
 // A changed fingerprint is fine only when an ecology change is the
 // declared intent — then re-capture with `node conform.js --capture`
 // and re-run the full 8-seed harness (tune2.js) before shipping.
@@ -70,7 +71,7 @@ function step(){
     if (dT > 0) for (let k=0;k<nL;k++){ const L=loci[k]; if (L.warmSlope !== 0 || L.warmGainSlope !== 0){
       const d=W.g[k*MAXN+i]-L.g0, hw=dT*0.1;
       wR *= 1 - L.warmSlope*d*hw; wA *= 1 - L.warmGainSlope*d*hw; } }
-    let cost = T.kb*kbG*Math.pow(W.sz[i],0.75)*W.qR[cT]*wR; // maintenance: Q10 2.5, flattened by the thermal locus
+    let cost = T.kb*kbG*W.szPow[i]*W.qR[cT]*wR; // maintenance: Q10 2.5, flattened by the thermal locus (szPow = sz^0.75 cached at spawn — the same double)
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -147,16 +148,30 @@ function step(){
         if(W.flee[i]>0){ W.flee[i]--; fleeing=true; }
       }
       if(hungry && !fleeing){
-        neighbors(i, T.sense, (j,ddx,ddy,d)=>{
-          if(W.cy[j] && !TRAITS[W.sp[j]].cystYield) return; // cysts of shelterless species are invisible; sheltered ones are half-yield prey
-          const TJ = TRAITS[W.sp[j]];
-          if(W.sp[j]===W.sp[i]){ if(d<T.interfRadius) nearKin++; return; }
-          if(!(T.diet & TJ.bodyTag)) return;
-          if(TJ.grazeFloor && W.en[j]<=TJ.grazeFloor) return;
-          if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], ddx, ddy)) return; // 7.W: prey beyond a face this hunter cannot cross is out of reach -- and out of mind (no wall-camping, no through-mesh bites)
-          const pref = d*TJ.pursuitPenalty;
-          if(pref<best){ best=pref; tx=ddx; ty=ddy; found=true; target=j; }
-        });
+        // The hunt scan, inlined (perf pass 2026-08-31): the same cell walk and arithmetic as
+        // neighbors(), without the per-tick closure and per-candidate call (they were ~20% of the
+        // tick between them), and with the sqrt taken only on candidates that reach a distance
+        // comparison — the same doubles wherever a value is used, so the chosen target, nearKin
+        // and best are bit-identical. Draw-free, like the callback it replaces.
+        const rr=Math.ceil(T.sense/CELL), r2=T.sense*T.sense;
+        const gx=Math.floor(W.x[i]/CELL), gy=Math.floor(W.y[i]/CELL);
+        for(let dy=-rr;dy<=rr;dy++) for(let dx=-rr;dx<=rr;dx++){
+          const c=((gy+dy+P.GRID)%P.GRID)*P.GRID + ((gx+dx+P.GRID)%P.GRID);
+          for(let j=W.hashHead[c]; j>=0; j=W.hashNext[j]){
+            if(j===i||!W.alive[j]) continue;
+            const ddx=wd(W.x[j]-W.x[i]), ddy=wd(W.y[j]-W.y[i]);
+            const d2=ddx*ddx+ddy*ddy;
+            if(d2>r2) continue;
+            if(W.cy[j] && !TRAITS[W.sp[j]].cystYield) continue; // cysts of shelterless species are invisible; sheltered ones are half-yield prey
+            const TJ = TRAITS[W.sp[j]];
+            if(W.sp[j]===W.sp[i]){ if(Math.sqrt(d2)<T.interfRadius) nearKin++; continue; }
+            if(!(T.diet & TJ.bodyTag)) continue;
+            if(TJ.grazeFloor && W.en[j]<=TJ.grazeFloor) continue;
+            if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], ddx, ddy)) continue; // 7.W: prey beyond a face this hunter cannot cross is out of reach -- and out of mind (no wall-camping, no through-mesh bites)
+            const pref = Math.sqrt(d2)*TJ.pursuitPenalty;
+            if(pref<best){ best=pref; tx=ddx; ty=ddy; found=true; target=j; }
+          }
+        }
       }
       let speed;
       if(fleeing){ // run down the alarm gradient, foraging suspended

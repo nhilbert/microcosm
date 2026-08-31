@@ -69,7 +69,18 @@ function normalizeTraits(rows){
     }
     t.locus = t.loci.length ? t.loci[0] : null;
   }
-  return rows;
+  // Hidden-class canonicalization (perf pass 2026-08-31, behavior-neutral): rows and their
+  // sub-objects arrive with per-species key orders, giving V8 one hidden class per species at
+  // every T.x / L.x load site in the step loop (measured ~8% of the tick). Rebuilding every
+  // object with one fixed (sorted) key order makes those sites monomorphic. Pure data plumbing:
+  // same keys, same values, and the locus === loci[0] alias is preserved.
+  const canon = o => { const r = {}; for (const k of Object.keys(o).sort()) r[k] = o[k]; return r; };
+  return rows.map(t => {
+    t.loci = t.loci.map(canon);
+    t.locus = t.loci.length ? t.loci[0] : null;
+    for (const k of ["cyst", "escape", "detritivore", "corpsivore", "flee", "burst"]) if (t[k]) t[k] = canon(t[k]);
+    return canon(t);
+  });
 }
 // Load-time guardrail: every multiplier a locus can express must stay inside [LOCUS_MULT_MIN, LOCUS_MULT_MAX]
 // across the whole corridor, curvature included. A typo in a slope fails here, not in a 54k-tick run.
