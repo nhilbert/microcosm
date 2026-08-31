@@ -1,0 +1,259 @@
+//! The app-facing JNI surface (M5.1) — `org.microcosm.app.Native`.
+//!
+//! Deliberately an adapter over `microcosm_core::wasm`, the same C ABI the browser shim drives,
+//! rather than a second API onto the core. The phone and the browser therefore enter the core
+//! through the identical entry points, and the frame gate that proves the display list also
+//! covers what Kotlin paints.
+//!
+//! The display list and the pixel fields cross as **direct ByteBuffers** over the core's own
+//! buffers: no copy per frame, and no allocation. Those buffers are allocated once and never
+//! resized (`Frame::default`, `Sim::frame_field`), so the pointers stay valid for the process's
+//! life — which is what makes handing them to the JVM safe.
+
+use jni::objects::{JByteBuffer, JObject};
+use jni::sys::{jdouble, jint, jlong};
+use jni::JNIEnv;
+
+use microcosm_core::params::{MAXN, NCELL};
+use microcosm_core::wasm as abi;
+
+const ORG_BYTES: usize = MAXN * microcosm_core::frame::ORG_STRIDE * 8;
+const CORPSE_BYTES: usize = 1500 * microcosm_core::frame::CORPSE_STRIDE * 8;
+const FIELD_BYTES: usize = NCELL * 4;
+
+/// SAFETY: the three buffers below live in `Sim`, which is leaked for the process's life and never
+/// reallocated, so a `ByteBuffer` over them cannot outlive or outgrow its memory.
+unsafe fn wrap<'a>(env: &mut JNIEnv<'a>, ptr: usize, len: usize) -> JByteBuffer<'a> {
+    env.new_direct_byte_buffer(ptr as *mut u8, len)
+        .expect("direct ByteBuffer")
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_boot(_env: JNIEnv, _this: JObject) {
+    abi::mc_boot();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_resetWorld(_env: JNIEnv, _this: JObject) {
+    abi::mc_reset();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_initWorld(
+    _env: JNIEnv,
+    _this: JObject,
+    seed: jint,
+) {
+    abi::mc_init(seed, 1);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_step(_env: JNIEnv, _this: JObject) {
+    abi::mc_step();
+}
+
+/// The renderer's own bookkeeping: remember where everything was, so the next frames can
+/// interpolate between ticks. The shell calls this immediately before `step`, as the browser does.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_markPrev(_env: JNIEnv, _this: JObject) {
+    abi::mc_mark_prev();
+}
+
+/// `id` is the scalar id of the C ABI: 1 tick, 0 n, 50 mutation, 51 lightMul, …
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_scalar(
+    _env: JNIEnv,
+    _this: JObject,
+    id: jint,
+) -> jdouble {
+    abi::mc_scalar(id)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_setScalar(
+    _env: JNIEnv,
+    _this: JObject,
+    id: jint,
+    v: jdouble,
+) {
+    abi::mc_set_scalar(id, v);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_tick(_env: JNIEnv, _this: JObject) -> jlong {
+    abi::mc_scalar(1) as jlong
+}
+
+// ---------------------------------------------------------------------------
+// The frame builder.
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_grammarBuild(_env: JNIEnv, _this: JObject) {
+    abi::mc_frame_grammar_build();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_grammarNum(
+    _env: JNIEnv,
+    _this: JObject,
+    sp: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_frame_grammar(sp, field)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_specNum(
+    _env: JNIEnv,
+    _this: JObject,
+    sp: jint,
+    tb: jint,
+    mb: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_frame_spec(sp, tb, mb, field)
+}
+
+#[allow(clippy::too_many_arguments)]
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_frameBuild(
+    _env: JNIEnv,
+    _this: JObject,
+    cam_x: jdouble,
+    cam_y: jdouble,
+    vw: jdouble,
+    vh: jdouble,
+    z: jdouble,
+    hw: jdouble,
+    hh: jdouble,
+    alpha: jdouble,
+    lod_z: jdouble,
+    hidden: jint,
+) {
+    abi::mc_frame_build(cam_x, cam_y, vw, vh, z, hw, hh, alpha, lod_z, hidden);
+}
+
+/// `field`: 0 orgN, 1 corpseN, 2 mnBound, 10+sp population.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_frameNum(
+    _env: JNIEnv,
+    _this: JObject,
+    field: jint,
+) -> jdouble {
+    abi::mc_frame_num(field)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_orgBuffer<'a>(
+    mut env: JNIEnv<'a>,
+    _this: JObject,
+) -> JByteBuffer<'a> {
+    unsafe { wrap(&mut env, abi::mc_frame_org_ptr(), ORG_BYTES) }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_corpseBuffer<'a>(
+    mut env: JNIEnv<'a>,
+    _this: JObject,
+) -> JByteBuffer<'a> {
+    unsafe { wrap(&mut env, abi::mc_frame_corpse_ptr(), CORPSE_BYTES) }
+}
+
+/// Fill the scratch field buffer. `which`: 0 mat carpet, 1 dissolved mineral, 2 corpse pall,
+/// 3 wall shade. One buffer serves all four, so read it before filling the next.
+/// `fieldBuffer` only addresses it — ask for the buffer once and keep it.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_fieldFill(
+    _env: JNIEnv,
+    _this: JObject,
+    which: jint,
+) {
+    abi::mc_frame_field(which);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_fieldBuffer<'a>(
+    mut env: JNIEnv<'a>,
+    _this: JObject,
+) -> JByteBuffer<'a> {
+    unsafe { wrap(&mut env, abi::mc_frame_field_ptr(), FIELD_BYTES) }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_glowCount(
+    _env: JNIEnv,
+    _this: JObject,
+    which: jint,
+) -> jint {
+    abi::mc_frame_glow_count(which) as jint
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_glowNum(
+    _env: JNIEnv,
+    _this: JObject,
+    which: jint,
+    k: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_frame_glow(which, k.max(0) as u32, field)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_wallCount(
+    _env: JNIEnv,
+    _this: JObject,
+) -> jint {
+    abi::mc_frame_wall_count() as jint
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_wallNum(
+    _env: JNIEnv,
+    _this: JObject,
+    k: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_frame_wall(k.max(0) as u32, field)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_wallPt(
+    _env: JNIEnv,
+    _this: JObject,
+    k: jint,
+    q: jint,
+    axis: jint,
+) -> jdouble {
+    abi::mc_frame_wall_pt(k.max(0) as u32, q.max(0) as u32, axis)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_sourceCount(
+    _env: JNIEnv,
+    _this: JObject,
+) -> jint {
+    abi::mc_scalar(7) as jint
+}
+
+/// `field`: 0 x, 1 y, 2 i, 3 a, 4 sigma.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_sourceNum(
+    _env: JNIEnv,
+    _this: JObject,
+    k: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_source_get(k, field)
+}
+
+/// `id`: 0 LOD_Z, 1 TINT_BINS, 2 organism stride, 3 corpse stride. Read rather than copied, so the
+/// LOD threshold has one definition rather than one per platform.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_frameConst(
+    _env: JNIEnv,
+    _this: JObject,
+    id: jint,
+) -> jdouble {
+    abi::mc_frame_const(id)
+}

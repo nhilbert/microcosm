@@ -320,6 +320,9 @@ function wallStrokes(){
 //   roundness <- feeding/metabolic axes (catchSlope/rateSlope/effSlope): thrifty rounds, keen stays sharp
 // Movement-strategy loci carry NO body channel (owner decision D7) — their display is behaviour.
 const TINT_BINS = 7;
+// Below this zoom: aggregate corpses into the pall layer, draw bacteria as dots. Grammar, so the
+// core carries it too (frame.rs LOD_Z) and the frame gate compares them.
+const LOD_Z = 0.9;
 function makeGrammar(){
   return TRAITS.map((T, sp) => {
     if (!T.loci.length || SHAPES[sp] === "ray" || SHAPES[sp] === "nucleus") return null;
@@ -503,7 +506,6 @@ function makeWorldLayers(){
   const CC = document.createElement("canvas"); CC.width = P.GRID; CC.height = P.GRID;
   const ccx = CC.getContext("2d");
   const ccImg = ccx.createImageData(P.GRID, P.GRID);
-  const LOD_Z = 0.9; // below this zoom: aggregate corpses, draw bacteria as dots
   let carpetTick = -1;
   const updateCarpet = () => {
     if (W.tick === carpetTick) return; carpetTick = W.tick;

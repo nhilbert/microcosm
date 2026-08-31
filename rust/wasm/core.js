@@ -358,6 +358,7 @@ Object.defineProperty(LVL, "failWhy", { get(){
 // The visual grammar, from the core. `src/ui-render.js` carries the reference implementation and
 // harness/fingerprint-frame.js compares the two bit for bit; the painting stays per platform.
 const SHAPE_NAMES = ["nucleus", "dot", "tri", "square", "ray"];
+const LOD_Z = X.mc_frame_const(0);
 function markPrev(){ X.mc_mark_prev(); }
 function makeGrammar(){
   X.mc_frame_grammar_build();
@@ -427,7 +428,7 @@ module.exports = {
   indicators, impact: notYet("impact"),
   LEVELS, LEVEL_ROWS: LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter,
   levelAllows, levelPourOk, levelNotePour, levelNarration,
-  markPrev, makeGrammar, bucketSpec, frameOf, TINT_BINS: 7,
+  markPrev, makeGrammar, bucketSpec, frameOf, TINT_BINS: 7, LOD_Z,
   fieldCarpet, fieldMineral, fieldCorpsePall, fieldShade,
   sunGlows, sunMarks, heatGlows, heatMarks, wallStrokes,
 };

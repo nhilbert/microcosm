@@ -1,0 +1,59 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+}
+
+def vCode = (findProperty("versionCode") ?: "1").toInteger()
+
+android {
+    namespace "org.microcosm.app"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "org.microcosm.app"
+        // API 26 for lockHardwareCanvas(); arm64 only, like the probe — a second ABI would double
+        // the Rust build time in CI for no phone this is aimed at.
+        minSdk 26
+        targetSdk 35
+        versionCode vCode
+        versionName "0.1.0"
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    }
+
+    // The same identity-only keystore as the other two: consecutive sideloaded builds must share a
+    // signature so the phone treats them as updates. It guards nothing.
+    signingConfigs {
+        release {
+            storeFile file("../../android/keystore/microcosm.keystore")
+            storePassword "microcosm"
+            keyAlias "microcosm"
+            keyPassword "microcosm"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ["src/main/jniLibs"]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+// Dependency-free on purpose (A.1): a SurfaceView, a render thread and a Canvas. Compose arrives
+// with the panels in A.2+; nothing here needs it, and a plain build is a fast build.

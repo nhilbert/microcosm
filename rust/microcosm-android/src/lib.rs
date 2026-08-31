@@ -6,6 +6,11 @@
 //!
 //! M5.0 of docs/android-port-plan.md: prove the toolchain and close the two claims that could not
 //! be measured in a container — ARM64 bit-exactness, and the tick rate on real hardware.
+//!
+//! `app` adds the surface the real app drives (M5.1). It is an adapter over `microcosm_core::wasm`,
+//! the same C ABI the browser shim uses, so both platforms enter the core the same way.
+
+pub mod app;
 
 use jni::objects::{JByteArray, JObject};
 use jni::sys::{jint, jstring};

@@ -23,7 +23,7 @@ const { W, P, TRAITS, SPECIES, MAXN, CELL, cellOf, wd, wrap, makeWall } = C;
 // The frame builder: the core's when it has one, otherwise the render layer's.
 const F = C.frameOf ? C : (() => {
   const src = fs.readFileSync(path.join(ROOT, "src", "ui-render.js"), "utf8");
-  const names = ["makeGrammar", "bucketSpec", "frameOf", "TINT_BINS",
+  const names = ["makeGrammar", "bucketSpec", "frameOf", "TINT_BINS", "LOD_Z",
     "fieldCarpet", "fieldMineral", "fieldCorpsePall", "fieldShade",
     "sunGlows", "sunMarks", "heatGlows", "heatMarks", "wallStrokes"];
   // `document` is never touched by the grammar half of the file — only by makeSprite and
@@ -42,6 +42,7 @@ const GRID = P.GRID, FIELD = GRID * GRID * 4;
 const fieldBuf = new Uint8ClampedArray(FIELD);
 const fieldHash = fn => { fieldBuf.fill(0); fn(fieldBuf); return sha(Buffer.from(fieldBuf.buffer, 0, FIELD)); };
 
+console.log(`=== constants === TINT_BINS ${F.TINT_BINS}  LOD_Z ${h(F.LOD_Z)}`);
 console.log("=== sprite bucket table (grammar) ===");
 const G = F.makeGrammar();
 for (let sp = 0; sp < 7; sp++){

@@ -81,7 +81,7 @@ pub extern "C" fn mc_step() {
 
 /// Pointer to an array column, by id. Ids are mirrored in the shim's layout table.
 #[no_mangle]
-pub extern "C" fn mc_ptr(id: i32) -> u32 {
+pub extern "C" fn mc_ptr(id: i32) -> usize {
     let sim = s();
     let w = &mut sim.w;
     let p: *const u8 = match id {
@@ -143,7 +143,7 @@ pub extern "C" fn mc_ptr(id: i32) -> u32 {
         67 => w.c_sp.as_ptr() as *const u8,
         _ => core::ptr::null(),
     };
-    p as u32
+    p as usize
 }
 
 /// Scalar reads. Everything the harnesses reach through `W.` or `P.` that is not a column.
@@ -539,8 +539,8 @@ fn push(ev: Event, queue: i32) {
 // call that could push a new event and reallocate the vector.
 
 #[no_mangle]
-pub extern "C" fn mc_rec_ptr() -> u32 {
-    s().obs.rec.as_ptr() as u32
+pub extern "C" fn mc_rec_ptr() -> usize {
+    s().obs.rec.as_ptr() as usize
 }
 
 #[no_mangle]
@@ -567,14 +567,14 @@ pub extern "C" fn mc_sysev_num(i: u32, field: i32) -> f64 {
 
 /// `which`: 0 the event type, 1 the narration text. UTF-8 bytes.
 #[no_mangle]
-pub extern "C" fn mc_sysev_ptr(i: u32, which: i32) -> u32 {
+pub extern "C" fn mc_sysev_ptr(i: u32, which: i32) -> usize {
     let sim = s();
     let i = i as usize;
     if i >= sim.obs.sys_events.len() {
         return 0;
     }
     let e = &sim.obs.sys_events[i];
-    if which == 0 { e.kind.as_ptr() as u32 } else { e.text.as_ptr() as u32 }
+    if which == 0 { e.kind.as_ptr() as usize } else { e.text.as_ptr() as usize }
 }
 
 #[no_mangle]
@@ -731,8 +731,8 @@ pub extern "C" fn mc_compute_temp() {
 
 /// The level table, verbatim from `src/observatory/levels.json`. UTF-8 bytes.
 #[no_mangle]
-pub extern "C" fn mc_levels_json_ptr() -> u32 {
-    crate::levels_gen::LEVELS_JSON.as_ptr() as u32
+pub extern "C" fn mc_levels_json_ptr() -> usize {
+    crate::levels_gen::LEVELS_JSON.as_ptr() as usize
 }
 
 #[no_mangle]
@@ -795,8 +795,8 @@ pub extern "C" fn mc_level_num(field: i32) -> f64 {
 }
 
 #[no_mangle]
-pub extern "C" fn mc_level_fail_why_ptr() -> u32 {
-    s().lvl.fail_why.as_ptr() as u32
+pub extern "C" fn mc_level_fail_why_ptr() -> usize {
+    s().lvl.fail_why.as_ptr() as usize
 }
 
 #[no_mangle]
@@ -959,14 +959,27 @@ pub extern "C" fn mc_frame_build(
     crate::frame::frame_of(frame, w, grammar, &v, &h);
 }
 
+/// Frame-builder constants a shell would otherwise have to copy. `id`: 0 LOD_Z, 1 TINT_BINS,
+/// 2 the organism record stride, 3 the corpse record stride.
 #[no_mangle]
-pub extern "C" fn mc_frame_org_ptr() -> u32 {
-    s().frame.org.as_ptr() as u32
+pub extern "C" fn mc_frame_const(id: i32) -> f64 {
+    match id {
+        0 => crate::frame::LOD_Z,
+        1 => crate::frame::TINT_BINS as f64,
+        2 => crate::frame::ORG_STRIDE as f64,
+        3 => crate::frame::CORPSE_STRIDE as f64,
+        _ => f64::NAN,
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn mc_frame_corpse_ptr() -> u32 {
-    s().frame.corpse.as_ptr() as u32
+pub extern "C" fn mc_frame_org_ptr() -> usize {
+    s().frame.org.as_ptr() as usize
+}
+
+#[no_mangle]
+pub extern "C" fn mc_frame_corpse_ptr() -> usize {
+    s().frame.corpse.as_ptr() as usize
 }
 
 /// `field`: 0 orgN, 1 corpseN, 2 mnBound, 10+sp population.
@@ -985,7 +998,7 @@ pub extern "C" fn mc_frame_num(field: i32) -> f64 {
 /// Fill the scratch field buffer and return a pointer to it. `which`: 0 mat carpet, 1 dissolved
 /// mineral, 2 corpse pall, 3 wall shade. Always GRID*GRID*4 RGBA bytes.
 #[no_mangle]
-pub extern "C" fn mc_frame_field(which: i32) -> u32 {
+pub extern "C" fn mc_frame_field(which: i32) -> usize {
     let sim = s();
     let Sim { frame_field, w, tr, reg, .. } = sim;
     match which {
@@ -995,7 +1008,7 @@ pub extern "C" fn mc_frame_field(which: i32) -> u32 {
         3 => crate::frame::field_shade(w, frame_field),
         _ => {}
     }
-    frame_field.as_ptr() as u32
+    frame_field.as_ptr() as usize
 }
 
 fn glow_list(which: i32) -> Vec<crate::frame::Glow> {
@@ -1009,6 +1022,12 @@ fn mark_list(which: i32) -> Vec<crate::frame::Mark> {
 }
 
 /// `which`: 0 sun glows, 1 heat glows, 2 sun marks, 3 heat marks.
+/// The scratch field buffer's address, without filling it. A shell wraps this once and keeps it.
+#[no_mangle]
+pub extern "C" fn mc_frame_field_ptr() -> usize {
+    s().frame_field.as_ptr() as usize
+}
+
 #[no_mangle]
 pub extern "C" fn mc_frame_glow_count(which: i32) -> u32 {
     if which < 2 { glow_list(which).len() as u32 } else { mark_list(which - 2).len() as u32 }

@@ -11,8 +11,9 @@ been for some time. **The renderer is the whole performance question**, and this
 be built around that rather than around the sim.
 
 The second measurement is negative and just as load-bearing: **there is no Android SDK and no
-KVM in the development container**. Rust compiles and every headless gate runs; Kotlin compiles
-only in CI; nothing here can display a frame. So a plan that says "port `src/ui-render.js` to
+KVM in the development container**, and the egress policy refuses `dl.google.com`, so one cannot
+be fetched either — that was tried, not assumed. Rust compiles and every headless gate runs;
+Kotlin compiles only in CI; nothing here can display a frame. So a plan that says "port `src/ui-render.js` to
 Compose and check it looks right" is a plan whose verification step does not exist. Whatever is
 written in Kotlin is written blind, and only the owner's phone can say whether it is right.
 
@@ -75,7 +76,7 @@ right.
 | # | what | proves |
 |---|---|---|
 | **A.0** ✅ | The frame builder: `frame.rs` in the crate, `frameOf` in the JS render layer, and the cross-implementation gate | the visual grammar is one definition, and the two agree bit for bit |
-| **A.1** | Kotlin shell: SurfaceView render thread, JNI to the frame builder, painter for the display list; a device build that reports ms/frame by zoom and population | the renderer's real budget on hardware — the number M5.0 left open |
+| **A.1** ✅ | Kotlin shell: SurfaceView render thread, JNI to the frame builder, painter for the display list; a device build that reports ms/frame by zoom and population | the renderer's real budget on hardware — the number M5.0 left open |
 | **A.2** | Camera and gestures: pan, pinch, tap-select, long-press; the status strip and the specimen card | the world is navigable |
 | **A.3** | Intervene: sun drag and press, mineral pour, feed/kill, the seeding picker, walls — each an event, undoable, impact-carded | the levers, with their provenance intact |
 | **A.4** | Data mode: the five pages against the ported `indicators` | the Observatory on the phone |
@@ -113,9 +114,47 @@ which is the failure mode that actually happens. It runs in `npm test` and in CI
 Two gaps stated rather than papered over. `SHAPES` and `SPRITE_SCALE` are still written in both
 languages; they are seven numbers each and the display list carries their consequences (`kind` and
 `r`), so the frame gate catches a disagreement — but they are duplication, and if a third such
-table appears they should become shared data. And the JS `frameOf` is a second implementation by
+table appears they should become shared data. (`LOD_Z` was a third: it came out of
+`makeWorldLayers` to module scope, and the gate now prints it, so a divergence is caught by name
+rather than by consequence.) And the JS `frameOf` is a second implementation by
 design: it is the oracle the gate compares against, and it should be retired in favour of the WASM
 frame builder once the browser build is ready to consume it.
+
+## 5b. A.1 — shipped, 2026-08-31 (unmeasured until it runs on the phone)
+
+`android-app/` is the app: a `SurfaceView` with its own render thread, painting the core's display
+list. Three Android projects now live in the repository under three applicationIds, so none can
+break another: `android/` (the WebView wrapper that ships today), `android-native/` (the M5.0
+diagnostics probe), `android-app/` (this).
+
+The JNI layer, `rust/microcosm-android/src/app.rs`, is an **adapter over `microcosm_core::wasm`** —
+the same C ABI the browser shim drives. The phone and the browser therefore enter the core through
+identical entry points, which is what lets `harness/fingerprint-frame.js` stand behind what Kotlin
+paints. The display list and the pixel fields cross as **direct ByteBuffers** over the core's own
+memory: no copy per frame, no allocation. (This is why the pointer-returning ABI functions now
+return `usize` rather than `u32` — identical on wasm32, correct on 64-bit ARM.)
+
+The Kotlin is painting only, and small by design: `Sprites.kt` builds one 64x64 bitmap per bucket
+from the core's spec; `Layers.kt` turns the four pixel fields into bitmaps and paints the three
+world-tile layers from the glow and wall lists; `Renderer.kt` blits the display list with
+`PorterDuff.Mode.SCREEN`, exactly where the browser uses `globalCompositeOperation: "screen"`;
+`WorldView.kt` carries the browser's tick loop — accumulate, spend at the chosen speed, cap the
+catch-up so a slow frame becomes slow motion rather than a death spiral, interpolate the leftover.
+
+Two details worth recording because they are easy to get silently wrong. Android bitmaps are
+premultiplied and the core writes straight RGBA (matching the browser's ImageData), so the fields
+are repacked through `setPixels`, which does the conversion — 4,096 pixels a field. And Canvas 2D's
+radial gradients have an inner radius that Android's do not, so a stop at fraction `t` of the JS
+gradient is remapped to `(2 + 30t)/32`.
+
+**The benchmark is the increment's point.** It pauses, runs the world to t=3,000, then paints 60
+frames at each of five zoom levels and reports milliseconds per frame split into the core's frame
+builder and the Canvas paint. M5.0 measured the core at 0.400 ms/tick against a UI that capped at
+16x; this says what the renderer's real budget is, and which half of the frame spends it.
+
+**Status: written blind.** None of the Kotlin has been executed. CI compiles it (a new
+`android-app.yml`, publishing a rolling `app-latest` release) and that is the only compiler it has
+seen; whether it *looks* right, and what the numbers are, only the phone can say.
 
 ## 6. Open, and honestly so
 
