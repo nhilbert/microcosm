@@ -337,11 +337,10 @@ scenario fingerprints must match, save/load must resume a world exactly, and the
 gate must narrate identically on the ported core. Node is pinned to 22 in both
 workflows to match `package.json`.
 
-**ARM64, as far as this container can go.** `cargo check --target
-aarch64-linux-android` passes, so the core compiles for the phone's architecture
-with no target-specific problems. That is a compile, not a run: **the on-device
-trace replay and the perf probe are still owed**, and no Android SDK or NDK exists
-here to do them.
+**ARM64 — measured on a device (see §8).** A Fairphone 5 reproduces the four
+certified fingerprints bit-for-bit and replays the V8 math trace with 0 mismatches
+across all seven functions, at 0.400 ms/tick. The Android bit-exactness claim is no
+longer inferred.
 
 **Measured speed (x86-64, not the phone):** 4 × 18,000 ticks native 44.5 s vs
 115.5 s in Node (**×2.6**); 4 × 3,000 ticks 5.1 s vs 16.1 s (**×3.1**); `tune2`
@@ -395,11 +394,41 @@ APK assembled and signed, and a 3.3 MB `microcosm-probe.apk` published to the
 rolling `probe-latest` release. The toolchain end of M5.0 is therefore proven; the
 NDK link — the step most likely to surprise — worked without a single fix.
 
-**What remains is one person, one phone.** Install the APK, read the screen, paste
-the numbers back. If the four fingerprints say `identical`, ARM64 bit-exactness
-stops being inferred and §7's caveat comes out of this document. The tick rate
-replaces the ×2–5 estimate with a measurement, and is read against the x86-64
-figure the same probe produces: **0.464 ms/tick, 2,155 ticks/s, 215× speed**.
+### The device run — Fairphone 5, Android 15, arm64-v8a (2026-08-31)
+
+```
+SIM    silent 11 · silent 88 · evolving 11 · evolving 88   all identical  => bit-exact
+MATH   sin cos exp pow atan2 hypot sqrt   0 mismatches in 80,021 samples  => bit-identical to V8
+SAVE   snapshot 713,103 bytes; resumed 800 ticks identical to the uninterrupted run
+SPEED  2,000 ticks in 0.80 s at 2,032 organisms
+       0.400 ms/tick · 2,501 ticks/s · sustains 250x speed
+```
+
+**ARM64 bit-exactness is measured, not inferred.** The four certified fingerprints
+carry the PRNG state, so the phone consumed the same draws in the same order and
+produced the same doubles as the JavaScript core does on Node 22. The math module
+did what it was built to do: the same bits on a different architecture, from a
+different compiler backend, with no platform libm anywhere. Every "owed" and
+"inferred" qualifier attached to Android in this document is discharged.
+
+**Speed, stated carefully.** On identical work — same world, same 2,000 ticks,
+same 2,032 organisms — the phone is *slightly faster than the x86-64 CI runner*
+(0.400 vs 0.464 ms/tick). Read that as "the runner is a shared cloud vCPU", not as
+"a mid-range phone beats a workstation"; the useful conclusion is that this core is
+not remotely stressed by phone hardware.
+
+What that settles, and what it does not:
+
+- **Settled — the product question.** The core sustains **250×** where the UI's
+  speed control currently tops out at **16×**. The bottleneck is now the renderer
+  and the frame pacing, not the simulation. Higher multipliers, and the
+  fast-forwarding that a loaded save invites, are affordable.
+- **Not measured — the ratio.** Rust versus V8 *on this same phone* was not
+  measured: that needs the JS core timed on the FP5, and the WebView wrapper does
+  not report tick times. The M1 go/no-go was written as "re-decide if the speedup
+  is under ×2", and strictly that test never ran. It no longer gates anything —
+  the core is 15× past the ceiling the UI imposes — but the honest statement is
+  that the *margin* is proven and the *ratio* is not.
 
 What the device run will settle: if the fingerprints match, the ARM64
 bit-exactness claim stops being inferred; and the tick rate answers the M1

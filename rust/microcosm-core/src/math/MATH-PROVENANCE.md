@@ -97,11 +97,10 @@ across 8 seeds × 18,000 ticks, and the K6 gate — all byte-identical output.
 
 ## Residual risk, stated plainly
 
-- Everything above was measured on **x86-64 Linux** and on the **wasm32** build. The routines are
-  pure integer and floating-point arithmetic with no platform dispatch left in them, so an ARM64
-  result that differed would be a compiler bug rather than a design gap — but *"should"* is not
-  *"measured"*. **One on-device ARM64 trace replay is still owed** before the Android app claims
-  bit-exactness (M1 of docs/android-port-plan.md).
+- ~~Owed: an on-device ARM64 replay.~~ **Done, 2026-08-31.** A Fairphone 5 (Android 15,
+  arm64-v8a) replayed a 10,000-sample-per-function trace through this module with **0 mismatches
+  on all seven functions**, and reproduced the four certified 3,000-tick world fingerprints
+  bit-for-bit. Measured on x86-64, wasm32 and ARM64 now; the module does what it was built to do.
 - The reference is pinned. Node ≥ 23 (V8 ≥ 13.2) silently switched `Math.pow` to the host libm, and
   2026 V8 moved sin/cos/exp/atan2 to LLVM-libc's correctly-rounded routines. This module matches
   **V8 12.4**, which is what the project's baselines were captured on. A newer engine is a different
