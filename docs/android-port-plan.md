@@ -434,17 +434,49 @@ What the device run will settle: if the fingerprints match, the ARM64
 bit-exactness claim stops being inferred; and the tick rate answers the M1
 go/no-go with a real number instead of a ×2–5 estimate.
 
-## 9. Next
+## 9. M4 — the handover (done, 2026-08-31)
 
-1. **On-device (M1 remainder)**: replay the math trace on ARM64, and run the perf
-   probe on a mid-range phone. Until then the Android bit-exactness claim is
-   inferred, not measured.
-2. **Finish M3**: `indicators`, `impact`, the level API — then the heat, light,
-   gate5 and levels gates can all run on the ported core.
-3. **M4 handover**: rebind the baselines against the Rust core's hash, rewrite
-   `docs/porting.md` (the crate becomes the spec; frozen `dist/core.js` + Node 22
-   becomes the historical oracle), teach CI to build the crate and run the
-   harnesses on WASM, then lift the freeze.
-4. **M5 the app**: Kotlin/Compose over a SurfaceView render thread, full parity,
-   with save/load wired to `AtomicFile`. The longest milestone by far — the visual
-   grammar and the Data pages deserve their own increment plan when it starts.
+The crate is the simulation. `src/sim/` and `src/observatory/` are the frozen
+historical oracle: read, never extended. The render layer stays JavaScript and
+keeps evolving.
+
+- **`docs/porting.md` rewritten.** It was the contract a port had to honour; it is
+  now the contract the core has to honour, plus the record of what the migration
+  proved.
+- **`harness/conform-core.js` is the certifying harness.** Same discipline as
+  `conform.js` — stored fingerprint, a hash over the Rust sources binding it, a
+  loud NOTE when they disagree, `--capture` always a deliberate act — plus one
+  check the JavaScript side never needed: **native and WASM must produce
+  byte-identical fingerprints**, and it refuses to capture a baseline when they do
+  not. Baseline: hash `c909550c9b4fb60e` over 29 source files.
+- **CLAUDE.md rule 11** turned from a freeze-in-flight into the standing rule.
+- **CI** runs core conformance (failing on a NOTE, as it does for the oracle) and
+  still runs `port:check` against the frozen JavaScript core.
+
+**`port:check` has an expiry date, stated rather than left to be discovered.** It
+passes today, and the first declared ecology change in Rust *will* make it fail.
+That is correct: it then retires into the record — annotated, with the frozen
+fingerprints kept as evidence of the world the two implementations once shared —
+and `conform:core` carries the certification from there. It must not be "fixed" by
+touching `src/sim/`.
+
+## 10. Next
+
+The port is complete: core, observatory, save/load, three targets, all proven, with
+the handover done. What remains is product work and two loose ends.
+
+1. **M5.1 — the app.** Kotlin/Compose over a SurfaceView render thread, full
+   parity, save/load wired to `AtomicFile`. The longest milestone by far: ~3,400
+   lines of JSX behaviour, the visual grammar, the Data pages, the levels shell.
+   It deserves its own increment plan. The toolchain and the JNI path underneath
+   it are now proven, and the core sustains 250× against a UI that caps at 16× —
+   so the render path, not the simulation, is what that plan has to think about.
+2. **Finish the observatory**: `impact()` (needs `evLog`, which the UI writes — so
+   it lands with M5.1) and the level API (needs the level definitions extracted to
+   shared JSON first, so `harness/prose.js` and the term ladder keep binding the
+   same text). Until then the levels gate runs on the oracle.
+3. **The unmeasured ratio.** Rust versus V8 *on the same phone* was never measured;
+   the WebView wrapper does not report tick times. It gates nothing — the margin is
+   15× past the UI's ceiling — but it is the one performance claim in this document
+   that is an inference rather than a measurement, and a small addition to the
+   wrapper would close it.
