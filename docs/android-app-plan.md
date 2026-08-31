@@ -206,6 +206,42 @@ set by the display rather than a cost) — so work and waiting are separated and
 targetSdk 35 draws edge to edge on Android 15, which is why the HUD sat under the clock and the
 buttons under the gesture pill; the insets are applied now.
 
+### A.1's answer, with the instrument fixed (Fairphone 5, 1224x2700, 2,049 organisms)
+
+```
+sim: 1000 ticks in 496 ms = 0.496 ms/tick (201x real time)
+
+ zoom  drawn    core  record present   work
+ 0.35   2049    0.13    1.70   14.78   1.84
+ 0.60   2049    0.10    1.37   15.19   1.47
+ 0.90   2049    0.09    1.62   14.96   1.70
+ 1.40   2047    0.09    1.18   15.39   1.26
+ 2.20   2043    0.09    1.17   15.40   1.26
+```
+
+**The renderer costs 1.26–1.84 ms a frame — 8–11% of a 60 Hz frame, about 9x headroom.** The frame
+builder is 0.09–0.13 ms of that; the rest is Kotlin issuing draw commands. `present` is the vblank
+wait and sums with `work` to 16.6 ms, as it must.
+
+The sim now reads 0.496 ms/tick (201x) rather than the earlier 0.383 (261x), and the lower number
+is the honest one: the fixed window times ticks 3,000–4,000 at 2,049 organisms, where the old
+"run until t=3,000" timed a world that starts nearly empty.
+
+`record` is not monotonic in zoom, and the two bumps are explicable rather than noise. z=0.35 is
+the most expensive (1.70) because the torus tiling covers the viewport with roughly 45 world tiles,
+each blitting up to six layers — the layers, not the organisms, dominate at low zoom. z=0.90 (1.62)
+is the first row at or above `LOD_Z`, where corpses stop being the aggregate pall and become
+individual husks, two circles each. **Deferred optimisation, recorded not taken:** compose the six
+layers into one tile bitmap per tick and blit that once per tile, turning ~270 blits into ~45.
+Nothing needs it at 9x headroom.
+
+**Still open: the mat carpet renders as hard squares** where the browser smooths it, and setting
+`isFilterBitmap` on the Paint did not change it. Rather than guess a third time at why the hardware
+canvas will not filter a 16x upscale, the fields are now prescaled 4x on a software canvas, where
+filtering is not in doubt (~262k pixels per tick, measured as a `fields` row in the benchmark).
+That is a fix if the hardware path was the problem and a disproof if it was not: if the blocks are
+unchanged in the next screenshot, they were never the carpet.
+
 ## 6. Open, and honestly so
 
 - **The web artifact's `frameOf` is a second implementation until it isn't.** A.0 leaves the JS

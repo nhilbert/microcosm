@@ -23,13 +23,27 @@ class Layers {
     companion object {
         const val GRID = 64
         const val TILE = 512
+        /**
+         * The per-cell fields are upscaled 16x to the world tile, and on the device they came back
+         * as hard squares where the browser smooths them — setting `isFilterBitmap` on the Paint
+         * did not change it. Rather than guess again at why the hardware canvas will not filter, the
+         * fields are prescaled 4x here on a software canvas, where filtering is not in doubt. Costs
+         * ~262k filtered pixels per tick, and it settles the question either way: if the next device
+         * screenshot is smooth, the hardware path was the problem; if the blocks are unchanged, they
+         * were never the carpet and the search moves elsewhere.
+         */
+        const val UP = 4
+        const val FIELD = GRID * UP
     }
 
-    // per-cell fields, straight from the core's RGBA buffers
-    val carpet: Bitmap = Bitmap.createBitmap(GRID, GRID, Bitmap.Config.ARGB_8888)
-    val mineral: Bitmap = Bitmap.createBitmap(GRID, GRID, Bitmap.Config.ARGB_8888)
-    val pall: Bitmap = Bitmap.createBitmap(GRID, GRID, Bitmap.Config.ARGB_8888)
-    val shade: Bitmap = Bitmap.createBitmap(GRID, GRID, Bitmap.Config.ARGB_8888)
+    // per-cell fields, prescaled from the core's RGBA buffers
+    val carpet: Bitmap = Bitmap.createBitmap(FIELD, FIELD, Bitmap.Config.ARGB_8888)
+    val mineral: Bitmap = Bitmap.createBitmap(FIELD, FIELD, Bitmap.Config.ARGB_8888)
+    val pall: Bitmap = Bitmap.createBitmap(FIELD, FIELD, Bitmap.Config.ARGB_8888)
+    val shade: Bitmap = Bitmap.createBitmap(FIELD, FIELD, Bitmap.Config.ARGB_8888)
+    private val cell: Bitmap = Bitmap.createBitmap(GRID, GRID, Bitmap.Config.ARGB_8888)
+    private val upPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { isFilterBitmap = true }
+    private val upDst = android.graphics.RectF(0f, 0f, FIELD.toFloat(), FIELD.toFloat())
 
     // world-tile paintings
     val light: Bitmap = Bitmap.createBitmap(TILE, TILE, Bitmap.Config.ARGB_8888)
@@ -59,7 +73,18 @@ class Layers {
                 ((fieldBuf.get(o + 1).toInt() and 0xFF) shl 8) or
                 (fieldBuf.get(o + 2).toInt() and 0xFF)
         }
-        into.setPixels(px, 0, GRID, 0, 0, GRID, GRID)
+        cell.setPixels(px, 0, GRID, 0, 0, GRID, GRID)
+        val g = Canvas(into)
+        g.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+        g.drawBitmap(cell, null, upDst, upPaint)
+    }
+
+    /** Force a refresh and report the nanoseconds it took — the benchmark's `fields` row. */
+    fun timeRefresh(tick: Long): Long {
+        fieldTick = -1L
+        val t = System.nanoTime()
+        refreshFields(tick)
+        return System.nanoTime() - t
     }
 
     /** Once per tick, like the browser's `updateCarpet`. */

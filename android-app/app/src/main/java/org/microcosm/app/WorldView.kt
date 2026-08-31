@@ -147,6 +147,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         sb.append("BENCHMARK — %dx%d px\n".format(width, height))
         sb.append("sim: %d ticks in %.0f ms = %.3f ms/tick (%.0fx real time)\n\n"
             .format(window, simMs, simMs / window, TICK_MS / (simMs / window)))
+        val fieldMs = (0 until 5).minOf { renderer.timeFieldRefresh() } / 1e6
+        sb.append("fields: %.2f ms — repack + upscale, once per advancing tick\n\n".format(fieldMs))
         sb.append(" zoom  drawn    core  record present   work\n")
         for (z in doubleArrayOf(0.35, 0.6, 0.9, 1.4, 2.2)) {
             cam.z = z
@@ -179,6 +181,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         sb.append("\npresent lock + post: GPU flush and the wait for vblank — vsync-bound,")
         sb.append("\n        so it is a floor set by the display, not a cost")
         sb.append("\nwork    core + record. Headroom is 16.7 / work at 60 Hz.")
+        sb.append("\nfields  measured separately: the world is paused here, so no frame")
+        sb.append("\n        below pays it. In play it lands on ticks that advance.")
         return sb.toString()
     }
 }

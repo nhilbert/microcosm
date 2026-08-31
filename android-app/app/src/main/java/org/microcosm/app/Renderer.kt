@@ -48,7 +48,7 @@ class Renderer {
         isDither = true
     }
     private val flat = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val src = Rect(0, 0, Layers.GRID, Layers.GRID)
+    private val src = Rect(0, 0, Layers.FIELD, Layers.FIELD)
     private val srcTile = Rect(0, 0, Layers.TILE, Layers.TILE)
     private val dst = RectF()
     private val rayPath = Path()
@@ -86,6 +86,9 @@ class Renderer {
     }
 
     fun onTilesChanged() = layers.refreshTiles()
+
+    /** Nanoseconds to repack and upscale the four per-cell fields — once per advancing tick. */
+    fun timeFieldRefresh(): Long = layers.timeRefresh(Native.tick())
 
     /**
      * Build the display list and paint it. Returns nanoseconds spent in the core, so the caller can
