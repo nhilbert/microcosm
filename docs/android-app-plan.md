@@ -153,14 +153,15 @@ builder and the Canvas paint. M5.0 measured the core at 0.400 ms/tick against a 
 16x; this says what the renderer's real budget is, and which half of the frame spends it.
 
 **Status: written blind, compiled by CI.** `android-app.yml` builds and publishes a rolling
-`app-latest` release; the first run was green — Kotlin compiled clean, lint passed, APK 1.33 MB.
-That is the *only* compiler this code has seen. Whether it *looks* right, and what the numbers
+`app-latest` release; the first run was green — Kotlin compiled clean, lint passed, APK built and
+published. That is the *only* compiler this code has seen. Whether it *looks* right, and what the numbers
 are, only the phone can say.
 
 The first build also caught something worth keeping: `microcosm-core` is `["lib", "cdylib"]`
 (the cdylib is what the WASM target needs), and `cargo-ndk` copies every cdylib it finds, so both
 APKs were shipping a second, entirely unused copy of the core beside the JNI library that already
-links it statically. The build scripts now drop it.
+links it statically. The build scripts now drop it: the packaged APK fell from 1,333,553 to
+989,193 bytes, measured like for like on the two CI artifacts.
 
 ## 6. Open, and honestly so
 
