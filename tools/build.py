@@ -27,6 +27,7 @@ CORE_PARTS = [
     "src/observatory/recorder.js",  # ring buffer + event detectors (pure observers)
     "src/observatory/analysis.js",  # reference bands, strain, indicators
     "src/observatory/impact.js",    # before/after intervention analysis
+    "src/observatory/levels.js",    # learning levels: definitions + pure-observer verdicts (Phase 8)
     "src/sim/step.js",              # THE RNG-ORDER CONTRACT + the tick
     "src/sim/init.js",              # world setup + the Node export block
 ]
@@ -38,6 +39,7 @@ UI_PARTS = [
     "src/ui-data.jsx",    # Data mode: the Observatory's screen
     "src/ui-reset.jsx",   # reset control
     "src/ui.jsx",         # the Microcosm component
+    "src/ui-levels.jsx",  # start screen, level HUD, the app shell (default export)
 ]
 
 MARKER = "// __NODE_EXPORTS__"
