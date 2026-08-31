@@ -130,7 +130,77 @@ grazers and hunters only move matter between bodies, so wrong seedings fail hone
 (a hard fail fires if the producers are wiped out). Pours are unbudgeted: pouring
 cannot fake the pass because Bacillus establishment is part of the goal.
 
+### Level 4 · The Gardener — competition and the keystone consumer (shipped 2026-08-31)
+
+First level of the ladder implementation (phase8-ladder-design.md), shipped together
+with framework increments **F1 (prediction step — commit-then-contrast, never graded;
+retrofitted to levels 1–3)** and **F2 (in-level Observatory narration — a per-level
+sysEvent filter in the HUD)**. F3–F6 stay deferred to the levels that need them.
+
+World: Solara 20 + Drifta 120, M0 0.5, seed 101 (the probed asymmetric-suppression
+world). Goal: Solara ≥ 250 sustained by t=12,000; hard-fail if either producer hits
+zero. Apparatus: 8 pours, seeding open. Calibrated on the perf core:
+
+| run | S t=8000 | S t=12000 | D trough | verdict |
+|---|---|---|---|---|
+| null | 53 | 67 | — | FAIL |
+| 8 pours on the mat | 48 | 64 (D 1094 > null's 1031) | — | FAIL — **the pours feed the bloom** |
+| Cilio pack t=2000 | 332 | 313 | 55 | PASS ~t=6800 |
+| Cilio pack t=4000 | 322 | 387 | 17 | PASS ~t=7400 |
+| Cilio pack t=7000 | 58 | 388 | 24 | PASS ~t=10300 |
+| 3 packs t=4000 | 304 | 305 | 55 | PASS (overdose forgiven — the *choice* of lever is the lesson) |
+
+Design notes from calibration: the planned Drifta co-floor (≥20 in the pass
+predicate) was dropped — the honest rescue itself drives D to 17 at the trough;
+extinction stays the only Drifta fail. The twist needs no machinery: the gardener's
+starvation and the bloom's return happen inside the same run and are narrated by the
+existing extinction/crash events through F2. Harness: 4 cases (null, t=4000,
+late-t=7000, mat-pours), gate 13/13 ALL PASS.
+
+### Level 5 · The Richer Pond — top-down structure vs bottom-up inputs (shipped 2026-08-31)
+
+**Two designs died against measurement before this one** (the §6 protocol working as
+intended; both recorded here per rule 6):
+
+1. *"Boom and Bust" (cycles) — overturned.* The apexless core does not cycle: after a
+   seeded grazer's founding crash (D 1,961→~280) the world **settles** into a narrow
+   grazed band (D 277–415 for 14,000+ ticks, 3/3 seeds). The consumer–resource-cycles
+   lesson honestly belongs to the full world (tune2's D swings, the Yoshida records)
+   and migrates to L6's orbit. Also measured on the way: **the paradox of enrichment
+   does not reproduce** — 30 pours (1,200 M) and even 75 pours (3,000 M, a third of
+   the world's stock) into the grazed world leave it stable and thriving (C 121–147,
+   S 1,971). The pre-declared twist is cut; the null stands recorded, the
+   Yoshida-non-reproduction precedent.
+2. *Prey-base floor (dose restraint) — overturned.* At 100-tick sampling the Drifta
+   trough tracks **timing more than dose**: one pack at t=400 bottoms at 63 and at
+   t=9,000 at 45, while three packs at t=3,000 bottom at 51 (one pack at t=3,000: 121).
+   A floor would fail reasonable timings and pass the "overstock" it meant to punish —
+   muddled lesson, rejected.
+
+**Shipped design** — the measurement that survived: in the rich apexless world,
+*inputs cannot buy richness but structure can*. Seed 202, full core minus Cilio
+(S 120, D 500, B 60), unlimited pours, seeding open. Goal: Solara ≥ 1,250 AND Cilio
+≥ 20 sustained, by t=17,000; hard-fail on producer or plankton extinction.
+
+| run | S @16k | C @16k | verdict |
+|---|---|---|---|
+| null | ~900 | 0 | FAIL |
+| 30 pours, no grazer | 897 (D 1,851 — the bloom drank it) | 0 | FAIL |
+| one pack t=3,000 | 1,660 | 105 | PASS ~t=9,800 |
+| three packs t=3,000 | 1,606 | 110 | PASS (dose forgiven — structure, not dose, is this level's lesson) |
+| one pack t=6,000 / t=9,000 | 1,378 / 1,435 | 29 / 24 | pass-capable, uncertified (late-seed margins thin) |
+| one pack + 75 pours | 1,971 | 121 | "both" also works; the necessary half was the grazer |
+
+Misconception targeted: "more resources always mean more growth" — the pond was never
+hungry, it was unfinished. Harness: 4 cases, gate 17/17 ALL PASS. Prediction chips
+map to pour/structure/both with reflections carrying the measured numbers.
+
 ## 4. The deferred ladder (arcs B–D)
+
+> **Superseded in detail (2026-08-31): docs/phase8-ladder-design.md** — the researched
+> design principles, the gate-learnings inventory, premise probes on the
+> post-movement core, framework increments F1–F6, and full specs for levels 4–12
+> live there. The sketch below stands as the original scope record.
 
 Each future level ships one at a time, through the same gate, with its numbers added
 here first. Concepts are anchored to findings this project has already measured.

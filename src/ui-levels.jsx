@@ -41,6 +41,7 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
   const meters = S ? def.meter(S) : [];
   const col = st === "passed" ? "rgb(70,214,140)" : st === "failed" ? "rgb(226,96,96)" : "rgba(148,166,184,0.55)";
   const next = LEVELS[LEVELS.indexOf(def) + 1];
+  const [asking, setAsking] = React.useState(false); // F1 for the Next button: commit before the next world runs
   const btn = solid => ({ padding:"9px 14px", borderRadius:10, cursor:"pointer", fontSize:12.5, fontWeight:600,
     border:"1px solid rgba(148,166,184,0.45)", background: solid ? "rgba(201,215,227,0.16)" : "transparent",
     color:"#C9D7E3" });
@@ -60,11 +61,16 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
             t {tick}/{def.deadline}</span>
         </div>
         <div style={{ marginTop:2, display:"flex", gap:12, flexWrap:"wrap", color:"#8FA3B5" }}>
-          {meters.map(m => { const met = m.dir === -1 ? m.v <= m.goal : m.v >= m.goal; return (
+          {meters.map(m => {
+            if (m.goal === undefined) return <span key={m.label}>{m.label} {m.v}{m.unit || ""}</span>; // info-only
+            const met = m.dir === -1 ? m.v <= m.goal : m.v >= m.goal; return (
             <span key={m.label} style={{ color: met ? "rgb(70,214,140)" : "#C9D7E3" }}>
               {m.label} {m.v}{m.unit || ""} {m.dir === -1 ? "→ ≤" : "/"} {m.goal}{m.unit || ""}</span> ); })}
           {LVL.pourLeft !== Infinity && <span style={{ color: LVL.pourLeft ? "#C9D7E3" : "rgb(226,170,150)" }}>pours left {LVL.pourLeft}</span>}
         </div>
+        {(() => { const ev = levelNarration(); return ev ? ( // F2: the Observatory's latest relevant word
+          <div style={{ marginTop: 3, color: "#8FA3B5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            ⚑ {ev.text}</div> ) : null; })()}
       </div>
       {/* verdict card */}
       {(st === "passed" || st === "failed") && !dismissed && (
@@ -80,16 +86,36 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
             {st === "failed" && LVL.failWhy && (
               <div style={{ marginTop:10, fontSize:12.5, color:"rgb(226,170,150)", lineHeight:1.55 }}>{LVL.failWhy}</div>
             )}
+            {def.predict && LVL.predicted >= 0 && ( // F1: contrast the committed prediction, never grade it
+              <div style={{ marginTop:10, fontSize:12, lineHeight:1.55, padding:"8px 10px", borderRadius:10,
+                background:"rgba(94,115,134,0.14)", color:"#C9D7E3" }}>
+                <span style={{ color:"#8FA3B5" }}>Your prediction — </span>
+                “{def.predict.options[LVL.predicted]}”
+                <div style={{ marginTop:4, color:"#8FA3B5" }}>{def.predict.reflect[LVL.predicted]}</div>
+              </div>
+            )}
             <div style={{ marginTop:10, fontSize:12.5, lineHeight:1.6 }}>
               {st === "passed" ? def.debrief.pass : def.debrief.fail}</div>
+            {asking && next && next.predict ? (
+              <div style={{ marginTop:14 }}>
+                <div style={{ fontSize:12.5, fontWeight:600 }}>{next.title} — before you start:</div>
+                <div style={{ fontSize:12, color:"#8FA3B5", marginTop:3, lineHeight:1.5 }}>{next.predict.prompt}</div>
+                <div style={{ display:"grid", gap:6, marginTop:8 }}>
+                  {next.predict.options.map((o, i) => (
+                    <button key={i} className="mc-hit" style={{ ...btn(false), textAlign:"left", fontWeight:500 }}
+                      onClick={() => onLevel(next, i)}>{o}</button>))}
+                </div>
+              </div>
+            ) : (
             <div style={{ display:"flex", gap:8, marginTop:16, flexWrap:"wrap" }}>
               {st === "failed" && <button className="mc-hit" style={btn(true)}
                 onClick={() => { setDismissed(false); prevSt.current = "running"; onRetry(); }}>Try again</button>}
               {st === "passed" && next && <button className="mc-hit" style={btn(true)}
-                onClick={() => onLevel(next)}>Next: {next.title} →</button>}
+                onClick={() => next.predict ? setAsking(true) : onLevel(next)}>Next: {next.title} →</button>}
               <button className="mc-hit" style={btn(false)} onClick={onExit}>Experiments</button>
               <button className="mc-hit" style={btn(false)} onClick={() => setDismissed(true)}>Keep observing</button>
             </div>
+            )}
           </div>
         </div>
       )}
@@ -99,9 +125,33 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
 
 function StartScreen({ badges, onSandbox, onLevel }){
   const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
+  const [pending, setPending] = React.useState(null); // F1: a level chosen, its prediction not yet committed
   const card = { display:"block", width:"100%", textAlign:"left", padding:"14px 16px", borderRadius:14,
     background:"rgba(21,34,51,0.75)", border:"1px solid rgba(94,115,134,0.35)",
     color:"#C9D7E3", cursor:"pointer", font:"inherit" };
+  const pick = def => def.predict ? setPending(def) : onLevel(def);
+  if (pending) return (
+    <div style={{ position:"fixed", inset:0, background:"#0B131E", overflowY:"auto",
+      fontFamily:"system-ui, -apple-system, sans-serif", userSelect:"none", WebkitUserSelect:"none" }}>
+      <div style={{ maxWidth:460, margin:"0 auto",
+        padding:"calc(env(safe-area-inset-top, 0px) + 64px) 20px calc(env(safe-area-inset-bottom, 0px) + 32px)" }}>
+        <div style={{ fontSize:11, letterSpacing:1.4, color:"#5E7386", fontFamily:mono }}>EXPERIMENT {pending.n} · BEFORE YOU START</div>
+        <div style={{ fontSize:20, fontWeight:700, marginTop:6, color:"#C9D7E3" }}>{pending.title}</div>
+        <div style={{ fontSize:13, color:"#8FA3B5", marginTop:14, lineHeight:1.6 }}>{pending.predict.prompt}</div>
+        <div style={{ display:"grid", gap:10, marginTop:14 }}>
+          {pending.predict.options.map((o, i) => (
+            <button key={i} className="mc-hit" onClick={() => { const d = pending; setPending(null); onLevel(d, i); }}
+              style={{ ...card, fontSize:13.5, lineHeight:1.5 }}>{o}</button>))}
+        </div>
+        <button className="mc-hit" onClick={() => setPending(null)}
+          style={{ marginTop:18, padding:"8px 12px", borderRadius:10, border:"none", background:"transparent",
+            color:"#5E7386", fontSize:12, cursor:"pointer" }}>← back</button>
+        <div style={{ fontSize:11, color:"#5E7386", marginTop:14, lineHeight:1.5 }}>
+          Commit to a guess — the experiment will answer it. Predictions are never graded; the verdict
+          only contrasts what you expected with what the pond did.</div>
+      </div>
+    </div>
+  );
   return (
     <div style={{ position:"fixed", inset:0, background:"#0B131E", overflowY:"auto",
       fontFamily:"system-ui, -apple-system, sans-serif", userSelect:"none", WebkitUserSelect:"none" }}>
@@ -121,7 +171,7 @@ function StartScreen({ badges, onSandbox, onLevel }){
           EXPERIMENTS · learn the pond by running it</div>
         <div style={{ display:"grid", gap:10 }}>
           {LEVELS.map(def => (
-            <button key={def.key} className="mc-hit" onClick={() => onLevel(def)} style={card}>
+            <button key={def.key} className="mc-hit" onClick={() => pick(def)} style={card}>
               <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
                 <span style={{ fontSize:11, color:"#5E7386", fontFamily:mono }}>{def.n}</span>
                 <span style={{ fontSize:15, fontWeight:600 }}>{def.title}</span>
@@ -159,7 +209,7 @@ export default function MicrocosmApp(){
     setBadges(b => b[LVL.def.key] ? b : { ...b, [LVL.def.key]: true }); };
   const enterSandbox = () => { harvest(); levelStop(); P.mutation = true; resetWorld(); initWorld();
     setRunId(r => r + 1); setView("world"); };
-  const enterLevel = def => { harvest(); levelStart(def); setRunId(r => r + 1); setView("world"); };
+  const enterLevel = (def, predicted) => { harvest(); levelStart(def, predicted); setRunId(r => r + 1); setView("world"); };
   const exit = () => { harvest(); levelStop(); setView("menu"); };
   return view === "menu"
     ? <StartScreen badges={badges} onSandbox={enterSandbox} onLevel={enterLevel} />
