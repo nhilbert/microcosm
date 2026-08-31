@@ -23,6 +23,7 @@ pub mod math;
 pub mod math;
 pub mod params;
 pub mod rng;
+pub mod snapshot;
 pub mod species_gen;
 pub mod step;
 pub mod traits;

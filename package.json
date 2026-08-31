@@ -33,6 +33,7 @@
     "wasm": "cd rust/microcosm-core && cargo build --release --target wasm32-unknown-unknown",
     "port:fingerprint": "npm run build && node harness/fingerprint-raw.js 3000 && node harness/fingerprint-events.js",
     "port:check": "node tools/port-check.js",
+    "port:snapshot": "cd rust/microcosm-core && cargo run --release --quiet --bin snapshot",
     "selftest": "node harness/selftest.js",
     "yoshida:capture": "npm run build && node harness/yoshida.js --capture",
     "test": "npm run build && npm run syntax && node harness/selftest.js && node harness/conform.js && node harness/prose.js",
