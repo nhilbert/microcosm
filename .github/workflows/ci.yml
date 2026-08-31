@@ -106,7 +106,21 @@ jobs:
           node dev/xcheck/gen.js "$RUNNER_TEMP/trace.txt"
           npm run --silent port:math -- "$RUNNER_TEMP/trace.txt"
 
-      - name: World, events and scenario founding must be bit-identical
+      # The certifying harness for the core after the M4 handover: the fingerprint, the hash of
+      # the Rust sources that binds it, and native-vs-WASM identity (two targets disagreeing means
+      # the core stopped being deterministic across platforms).
+      - name: Core conformance (and native == wasm)
+        run: |
+          out=$(npm run --silent conform:core)
+          echo "$out"
+          if echo "$out" | grep -q "NOTE:"; then
+            echo "::error::conform-core.js printed a NOTE — the core baseline no longer certifies the sources that produce it. Rebind it deliberately; see docs/porting.md."
+            exit 1
+          fi
+
+      # Still the strongest check here, and expected to fail at the first declared ecology change
+      # in Rust — at which point it retires into the record (docs/porting.md §7).
+      - name: The Rust core must still reproduce the frozen JavaScript oracle
         run: npm run --silent port:check
 
       - name: Save/load must resume a world exactly

@@ -34,8 +34,13 @@ fn main() {
         println!("\nMATH — skipped (pass a trace path; make one with dev/xcheck/gen-bin.js)");
     }
 
-    println!("\nSPEED");
-    print!("{}", probe::perf_probe(1000, 2000));
+    // No clock on wasm32-unknown-unknown: Instant has no time source there, so the timing section
+    // is compiled out rather than panicking at runtime.
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        println!("\nSPEED");
+        print!("{}", probe::perf_probe(1000, 2000));
+    }
 
     println!("\n{}", if ok { "SELF-CHECK PASS" } else { "SELF-CHECK FAIL" });
     std::process::exit(if ok { 0 } else { 1 });
