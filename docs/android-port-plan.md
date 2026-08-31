@@ -270,11 +270,38 @@ re-reads `W.n` every iteration and `spawn()` grows it, so a child born this tick
 processed this tick. Hoisting the bound — the obvious Rust translation — left every
 newborn unstepped while the parents stayed bit-identical.
 
-**M3 done** (except the read-outs). `src/observatory.rs` carries the 141-channel
-recorder and every detector. Over 6,000 ticks: all per-channel sums bit-identical
-and all narrated events matching on tick, type, species, locus and text. **The K6
-gate passes on the ported core with byte-identical output.** Still JS-only:
-`indicators`, `impact` and the level API.
+**M3 done** (except `impact` and the level API). `src/observatory.rs` carries the
+141-channel recorder, every detector, and `indicators`/`strainOf` with the measured
+reference bands. Over 6,000 ticks: all per-channel sums bit-identical and all
+narrated events matching on tick, type, species, locus and text.
+
+Gates run against the ported core (`MC_CORE=rust/wasm/core.js`), output compared
+byte for byte with the same harness on the JavaScript core:
+
+| gate | result on the Rust core |
+|---|---|
+| K6 (Observatory narrates the strangulation) | **ALL CRITERIA PASS**, identical output |
+| gate5 (the Observatory narrates the evolution) | **ALL CRITERIA PASS**; seed-22 Yoshida baseline reproduced exactly (pOff 4860, pOn 6680) |
+| heat (7.H.4 warm-water narrations) | **ALL 3 PASS**: hot-sun pile-up 8/8, thinning 8/8 for Dri/Cil/Bac, press starve 8/8 always ahead of the extinction, control silent |
+| light (7.L patch adaptation) | identical output to the JavaScript core, criterion 2 (control silent, channels exactly 0) PASS |
+
+The heat gate also found a real gap rather than a difference: a harness that pokes
+`P.tempAmb` or `P.lightMul` directly has to ask for a field recompute, and the shim
+had no `computeLight`/`computeTemp`. Both are in the ABI now.
+
+**A correction worth keeping in the record.** The first claim that K6 passed on the
+ported core was wrong: `k6gate.js` hardcoded `dist/core.js` and ignored `MC_CORE`,
+so both runs were the JavaScript core and "identical" meant nothing. The tell was
+visible and missed — the gate calls `indicators()`, which the shim did not provide
+and which would have thrown at once had the port really been under test. Fixed by
+making the gate honour `MC_CORE` like every other harness, and by porting
+`indicators`; criterion 3 (Cilio strain CRITICAL, 482 s lead) now genuinely
+exercises it. An audit of every harness for the same mistake found no others.
+
+`impact()` is deliberately deferred: it reads `W.evLog`, which the UI writes, so it
+belongs with M5 rather than here. The level API is deferred too — it needs the level
+definitions extracted to shared JSON first, so `harness/prose.js` and the term
+ladder keep binding the same text.
 
 **The WASM bridge works.** `MC_CORE=rust/wasm/core.js` points the existing harnesses
 at the ported core, unchanged. `npm run port:check` is the whole comparison in one
@@ -285,6 +312,19 @@ command.
 ticks resumed from a load equal the same 2,000 never interrupted; a re-save of a
 loaded world is byte-identical to the original; corrupt and truncated files are
 refused rather than half-loaded.
+
+**CI carries the proof.** `.github/workflows/ci.yml` gained a `port` job that runs
+on every push: the generated species table must be in sync with `species.json`, the
+math must be bit-identical to V8 (trace generated in the job), the world/events/
+scenario fingerprints must match, save/load must resume a world exactly, and the K6
+gate must narrate identically on the ported core. Node is pinned to 22 in both
+workflows to match `package.json`.
+
+**ARM64, as far as this container can go.** `cargo check --target
+aarch64-linux-android` passes, so the core compiles for the phone's architecture
+with no target-specific problems. That is a compile, not a run: **the on-device
+trace replay and the perf probe are still owed**, and no Android SDK or NDK exists
+here to do them.
 
 **Measured speed (x86-64, not the phone):** 4 × 18,000 ticks native 44.5 s vs
 115.5 s in Node (**×2.6**); 4 × 3,000 ticks 5.1 s vs 16.1 s (**×3.1**); `tune2`
