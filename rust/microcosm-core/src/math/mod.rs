@@ -22,9 +22,6 @@
 //! and the accepted result is zero for all seven.
 
 #![allow(clippy::all)]
-// libm's sources carry cfg names from its own build script (assert_no_panic, intrinsics_enabled);
-// they are inert here and their absence is not a problem worth a warning on every build.
-#![allow(unexpected_cfgs)]
 #![allow(unused)]
 
 // ---- the indexing helpers the vendored sources use ----

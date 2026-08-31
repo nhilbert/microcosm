@@ -14,6 +14,18 @@ stub-math = []
 [lib]
 crate-type = ["lib", "cdylib"]
 
+# The vendored libm sources carry cfg names from their own build script. Declaring them keeps the
+# lint useful for real typos instead of blanket-allowing it — and keeps the build output readable,
+# which matters when a CI log is where you find out something went wrong.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(assert_no_panic)',
+    'cfg(x86_no_sse)',
+    'cfg(intrinsics_enabled)',
+    'cfg(f16_enabled)',
+    'cfg(f128_enabled)',
+] }
+
 [profile.release]
 # Determinism first: no fast-math exists in stable Rust, and FMA contraction is not a legal
 # optimization (RFC 3514), so release builds are safe — but keep overflow checks off the hot path
