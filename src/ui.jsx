@@ -524,6 +524,18 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
   const panelKind = !desktop ? null : uiMode === "data" ? "data" : srcOpen ? "src" : wallOpen ? "wall" : ui.card ? "card" : null;
   const panelW = panelKind === "data" ? LAYOUT.panelData
                : (panelKind === "card" || panelKind === "src" || panelKind === "wall") ? LAYOUT.panelCard : 0;
+  // The top stack's height is the one thing full-screen overlays need from it:
+  // it grows with the safe-area inset, a wrapped mineral row and the experiment
+  // chip, so anything that starts under it has to measure, not guess.
+  const topRef = useRef(null);
+  const [topH, setTopH] = useState(0);
+  useEffect(() => {
+    const el = topRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;   // no observer: the fallback offset below stands
+    const ro = new ResizeObserver(() => setTopH(el.offsetHeight));
+    ro.observe(el); setTopH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
   const sheetUp = !desktop && (!!ui.card || srcOpen || wallOpen);        // a bottom sheet is up: lift the controls
   const sheetPad = wallOpen ? 312 : srcOpen ? 262 : 194;
   const srcLog = (type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
@@ -584,7 +596,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
           top-anchored levers. Nothing here carries a fixed offset, so a
           wrapping mineral row or a three-line experiment chip pushes what is
           below it down instead of covering the stats (seen on phone). */}
-      <div style={{ position:"absolute", top:0, left:0, right:0, zIndex:5,
+      <div ref={topRef} style={{ position:"absolute", top:0, left:0, right:0, zIndex:5,
         display:"flex", flexDirection:"column", gap:8, pointerEvents:"none",
         padding:"calc(env(safe-area-inset-top, 0px) + 10px) 0 0" }}>
       {/* passive status strip. One column: on narrow screens the first row is
@@ -706,7 +718,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
         </div>
       </div>
       )}
-      {uiMode === "data" && !desktop && <DataMode />}
+      {uiMode === "data" && !desktop && <DataMode topH={topH} />}
       <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()} card={sheetUp} />
       {/* Phase 8: the experiment verdict card (src/ui-levels.jsx). The objective
           chip and the home control ride in the top stack above. */}
