@@ -62,6 +62,12 @@ pub struct Locus {
     pub curve: f64,
     /// Expressed only through warmth: the narration detectors stay silent in an unwarmed world.
     pub warm_gated: bool,
+    /// Player-facing names for this axis — the observatory narrates with them ("a tougher Drifta
+    /// line is taking over"). Part of the trait row because the words belong to the trait, not to
+    /// any one renderer.
+    pub label: &'static str,
+    pub hi_word: &'static str,
+    pub lo_word: &'static str,
 }
 
 #[derive(Clone, Copy, Debug)]

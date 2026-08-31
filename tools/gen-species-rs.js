@@ -55,7 +55,8 @@ function locus(L) {
     `catch_slope: ${f(L.catchSlope)}, kb_slope: ${f(L.kbSlope)}, light_slope: ${f(L.lightSlope)}, rate_slope: ${f(L.rateSlope)}, ` +
     `eff_slope: ${f(L.effSlope)}, warm_slope: ${f(L.warmSlope)}, warm_gain_slope: ${f(L.warmGainSlope)}, ` +
     `tpref_span: ${f(L.tprefSpan)}, damp_span: ${f(L.dampSpan)}, pc_speed_slope: ${f(L.pcSpeedSlope)}, ` +
-    `pc_turn_slope: ${f(L.pcTurnSlope)}, tumble_slope: ${f(L.tumbleSlope)}, curve: ${f(L.curve)}, warm_gated: ${b(L.warmGated)} }`;
+    `pc_turn_slope: ${f(L.pcTurnSlope)}, tumble_slope: ${f(L.tumbleSlope)}, curve: ${f(L.curve)}, warm_gated: ${b(L.warmGated)}, ` +
+    `label: ${JSON.stringify(L.label || "")}, hi_word: ${JSON.stringify(L.hiWord || "")}, lo_word: ${JSON.stringify(L.loWord || "")} }`;
 }
 
 function opt(v, body) {

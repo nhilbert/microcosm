@@ -10,9 +10,10 @@
 // (`W.n`, `W.tick`, `P.mutation`, …) are accessor properties backed by calls, so they are always
 // live rather than snapshots.
 //
-// Deliberately NOT provided: the observatory surface (`indicators`, `impact`, the level API,
-// `W.rec`). Those are M3 of docs/android-port-plan.md; a harness that needs them still needs the
-// JavaScript core, and asking for one here throws rather than silently returning undefined.
+// The observatory is here too: `W.rec`, `W.recHead/recCount` and `W.sysEvents` (decoded from WASM
+// memory on read). Still absent are the on-demand read-outs built on top of it — `indicators`,
+// `impact` and the level API — which throw rather than silently returning undefined, so a harness
+// that needs them fails loudly instead of quietly measuring nothing.
 const fs = require("fs");
 const path = require("path");
 
@@ -70,6 +71,7 @@ let boundBuffer = null;
 function bindViews(){
   boundBuffer = MEM.buffer;
   for (const [id, name, Ctor, len] of COLS) W[name] = new Ctor(boundBuffer, X.mc_ptr(id), len);
+  if (X.mc_rec_ptr) W.rec = new Float32Array(boundBuffer, X.mc_rec_ptr(), REC.N * REC.CH);
 }
 // WASM memory grows only if the core allocates (a wall's face list, say). Growth detaches every
 // view, so re-bind whenever the buffer identity changes. The core pre-reserves its growable
@@ -79,7 +81,8 @@ bindViews();
 
 // ---------- scalars ----------
 const SC = { n:0, tick:1, cN:2, rngState:3, addedM:4, initialized:5, wallsOn:6,
-  nSources:7, nWalls:8, nEventLog:9, seed:10, nFree:11, lightDirty:12 };
+  nSources:7, nWalls:8, nEventLog:9, seed:10, nFree:11, lightDirty:12,
+  recHead:13, recCount:14 };
 const FLOW = ["uptake","release","excrete","transfer","egestE","egestP","leachM",
   "corpseToDet","bacRelease","gpp","resp","deaths"];
 
@@ -126,6 +129,25 @@ Object.defineProperty(W, "eventLog", { get(){
       return undefined;
     } });
   }, enumerable: true });
+
+// ---------- observatory ----------
+// W.rec is a live view over the recorder ring (allocated once, so the view stays valid);
+// W.sysEvents is rebuilt on read, decoding each event's type and text from WASM memory.
+W.rec = new Float32Array(MEM.buffer, X.mc_rec_ptr(), REC.N * REC.CH);
+const DEC = new TextDecoder();
+const evStr = (i, which) => {
+  const p = X.mc_sysev_ptr(i, which), n = X.mc_sysev_len(i, which);
+  return n === 0 ? "" : DEC.decode(new Uint8Array(MEM.buffer, p, n));
+};
+Object.defineProperty(W, "sysEvents", { get(){
+  const n = X.mc_sysev_count(), out = [];
+  for (let i = 0; i < n; i++){
+    const locus = X.mc_sysev_num(i, 2);
+    const e = { tick: X.mc_sysev_num(i, 0), type: evStr(i, 0), sp: X.mc_sysev_num(i, 1), text: evStr(i, 1) };
+    if (locus >= 0) e.locus = locus;
+    out.push(e);
+  }
+  return out; }, enumerable: true });
 
 // ---------- P ----------
 const P = {

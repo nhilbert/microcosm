@@ -35,7 +35,7 @@ pub fn species_table() -> Vec<Species> {
         burst: None,
         live: true, apex: false, mat: true,
         loci: vec![
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.5, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false }
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.5, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false, label: "Light", hi_word: "shade-tolerant", lo_word: "sun-loving" }
         ],
     },
     // 1: Drifta
@@ -67,10 +67,10 @@ pub fn species_table() -> Vec<Species> {
         burst: None,
         live: true, apex: false, mat: false,
         loci: vec![
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.22, kp_slope: 0.5, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false },
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.4, warm_gain_slope: 0.25, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: true },
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 4.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: true },
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.04, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false }
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.22, kp_slope: 0.5, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false, label: "Defense", hi_word: "tougher", lo_word: "faster-growing" },
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.4, warm_gain_slope: 0.25, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: true, label: "Thermal", hi_word: "heat-tolerant", lo_word: "quick-burning" },
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 4.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: true, label: "Warmth preference", hi_word: "warm-seeking", lo_word: "cool-seeking" },
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.04, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false, label: "Restlessness", hi_word: "roving", lo_word: "settled" }
         ],
     },
     // 2: Cilio
@@ -102,9 +102,9 @@ pub fn species_table() -> Vec<Species> {
         burst: None,
         live: true, apex: false, mat: false,
         loci: vec![
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.4, kb_slope: 0.15, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false },
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.5, pc_turn_slope: 0.8, tumble_slope: 0.0, curve: 0.0, warm_gated: false },
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 4.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: true }
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.4, kb_slope: 0.15, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false, label: "Pursuit", hi_word: "keener", lo_word: "thriftier" },
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.5, pc_turn_slope: 0.8, tumble_slope: 0.0, curve: 0.0, warm_gated: false, label: "Hunting style", hi_word: "kill-and-stay", lo_word: "kill-and-move" },
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 4.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: true, label: "Warmth preference", hi_word: "warm-seeking", lo_word: "cool-seeking" }
         ],
     },
     // 3: Bacillus
@@ -136,9 +136,9 @@ pub fn species_table() -> Vec<Species> {
         burst: None,
         live: true, apex: false, mat: false,
         loci: vec![
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.5, eff_slope: 0.15, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false },
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.4, warm_gain_slope: 0.25, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: true },
-        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.1, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.4, curve: 0.0, warm_gated: false }
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.5, eff_slope: 0.15, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: false, label: "Metabolism", hi_word: "voracious", lo_word: "frugal" },
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.0, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.4, warm_gain_slope: 0.25, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.0, curve: 0.0, warm_gated: true, label: "Thermal", hi_word: "heat-tolerant", lo_word: "quick-burning" },
+        Locus { g0: 0.5, sigma: 0.03, esc_slope: 0.0, kp_slope: 0.0, catch_slope: 0.0, kb_slope: 0.1, light_slope: 0.0, rate_slope: 0.0, eff_slope: 0.0, warm_slope: 0.0, warm_gain_slope: 0.0, tpref_span: 0.0, damp_span: 0.0, pc_speed_slope: 0.0, pc_turn_slope: 0.0, tumble_slope: 0.4, curve: 0.0, warm_gated: false, label: "Search style", hi_word: "smooth-running", lo_word: "twitchy" }
         ],
     },
     // 4: Mycora

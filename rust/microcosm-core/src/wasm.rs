@@ -166,6 +166,8 @@ pub extern "C" fn mc_scalar(id: i32) -> f64 {
         10 => w.seed as f64,
         11 => w.free_list.len() as f64,
         12 => if w.light_dirty { 1.0 } else { 0.0 },
+        13 => sim.obs.head as f64,
+        14 => sim.obs.count as f64,
         20 => f.uptake,
         21 => f.release,
         22 => f.excrete,
@@ -529,6 +531,61 @@ fn push(ev: Event, queue: i32) {
     } else {
         sim.apply_event(ev);
     }
+}
+
+// ---------- observatory ----------
+// The recorder ring is allocated once, so a view over it stays valid. System events carry text,
+// which crosses as a pointer+length into the String's own bytes — read it immediately, before any
+// call that could push a new event and reallocate the vector.
+
+#[no_mangle]
+pub extern "C" fn mc_rec_ptr() -> u32 {
+    s().obs.rec.as_ptr() as u32
+}
+
+#[no_mangle]
+pub extern "C" fn mc_sysev_count() -> u32 {
+    s().obs.sys_events.len() as u32
+}
+
+/// `field`: 0 tick, 1 species, 2 locus plane (-1 when the event carries none).
+#[no_mangle]
+pub extern "C" fn mc_sysev_num(i: u32, field: i32) -> f64 {
+    let sim = s();
+    let i = i as usize;
+    if i >= sim.obs.sys_events.len() {
+        return f64::NAN;
+    }
+    let e = &sim.obs.sys_events[i];
+    match field {
+        0 => e.tick as f64,
+        1 => e.sp as f64,
+        2 => e.locus.map_or(-1.0, |v| v as f64),
+        _ => f64::NAN,
+    }
+}
+
+/// `which`: 0 the event type, 1 the narration text. UTF-8 bytes.
+#[no_mangle]
+pub extern "C" fn mc_sysev_ptr(i: u32, which: i32) -> u32 {
+    let sim = s();
+    let i = i as usize;
+    if i >= sim.obs.sys_events.len() {
+        return 0;
+    }
+    let e = &sim.obs.sys_events[i];
+    if which == 0 { e.kind.as_ptr() as u32 } else { e.text.as_ptr() as u32 }
+}
+
+#[no_mangle]
+pub extern "C" fn mc_sysev_len(i: u32, which: i32) -> u32 {
+    let sim = s();
+    let i = i as usize;
+    if i >= sim.obs.sys_events.len() {
+        return 0;
+    }
+    let e = &sim.obs.sys_events[i];
+    if which == 0 { e.kind.len() as u32 } else { e.text.len() as u32 }
 }
 
 /// A source's fields, for the shim's `W.sources` mirror. `field`: 0 x, 1 y, 2 i, 3 a, 4 sigma.

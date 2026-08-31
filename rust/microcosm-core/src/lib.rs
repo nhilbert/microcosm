@@ -21,6 +21,7 @@ pub mod jsnum;
 pub mod math;
 #[cfg(not(feature = "stub-math"))]
 pub mod math;
+pub mod observatory;
 pub mod params;
 pub mod rng;
 pub mod snapshot;
@@ -49,6 +50,8 @@ pub struct Sim {
     pub p: Params,
     pub tr: Vec<Species>,
     pub reg: Registry,
+    /// The Observatory: a pure observer over the world (see observatory.rs).
+    pub obs: observatory::Observatory,
     /// The shipped evolution settings, captured once at load; `init_world` restores them.
     locus_shipped: Vec<Vec<Locus>>,
 }
@@ -70,6 +73,7 @@ impl Sim {
             p,
             tr,
             reg,
+            obs: observatory::Observatory::new(),
             locus_shipped,
         }
     }
@@ -77,8 +81,13 @@ impl Sim {
     /// One tick. Events are applied at the boundary, before diffusion, exactly as in `step()`.
     pub fn step(&mut self) {
         events::drain_events(self);
-        let Sim { w, p, tr, .. } = self;
+        let Sim { w, p, tr, obs, reg, .. } = self;
         step::step_body(w, p, tr);
+        // `if (W.tick % REC.STRIDE === 0) record()` — the sample lands after the tick counter
+        // advances, and takes zero draws, so it cannot move the stream.
+        if w.tick % REC_STRIDE == 0 {
+            obs.record(w, p, tr, reg);
+        }
     }
 
     pub fn queue_event(&mut self, ev: events::Event) {
@@ -128,6 +137,7 @@ impl Sim {
         }
         self.w.added_m = 0.0;
         self.p.light_mul = 1.0;
+        self.obs.reset();
         // Note: `mutation` is a harness-level switch (like spawn_decomposers) and is deliberately
         // NOT reset here — the UI reset restores it.
 
