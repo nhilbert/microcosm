@@ -17,7 +17,7 @@ function HomeButton({ onExit }){
   return (
     <button aria-label="Back to the start screen"
       onClick={() => { if (armed){ setArmed(false); onExit(); } else setArmed(true); }}
-      style={{ position:"absolute", left:14, top:"calc(env(safe-area-inset-top, 0px) + 46px)", zIndex:6,
+      style={{ flex:"0 0 auto", pointerEvents:"auto",
         width:34, height:34, borderRadius:17,
         background: armed ? "rgba(201,215,227,0.16)" : "rgba(21,34,51,0.8)",
         border: armed ? "1.5px solid rgba(201,215,227,0.7)" : "1px solid rgba(94,115,134,0.4)",
@@ -28,28 +28,25 @@ function HomeButton({ onExit }){
   );
 }
 
-// objective HUD + verdict card for the running experiment; null in the sandbox
-function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
+// the running experiment's status colour, shared by the chip and the verdict card
+function lvlColor(st){
+  return st === "passed" ? "rgb(70,214,140)" : st === "failed" ? "rgb(226,96,96)" : "rgba(148,166,184,0.55)";
+}
+
+// objective chip for the running experiment; null in the sandbox. Lives in the
+// top stack's flow (src/ui.jsx), beside the home control and below the stats —
+// it never overlays them, however many lines it grows to.
+function LevelChip({ tick }){
   const def = LVL.def;
-  const [dismissed, setDismissed] = React.useState(false);
-  const prevSt = React.useRef("running");
   if (!def) return null;
   const st = LVL.state;
-  if (prevSt.current !== st){ prevSt.current = st; if (dismissed) setDismissed(false); }
   const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
   const S = W.recCount ? lvlSample(0) : null;
   const meters = S ? def.meter(S) : [];
-  const col = st === "passed" ? "rgb(70,214,140)" : st === "failed" ? "rgb(226,96,96)" : "rgba(148,166,184,0.55)";
-  const next = LEVELS[LEVELS.indexOf(def) + 1];
-  const [asking, setAsking] = React.useState(false); // F1 for the Next button: commit before the next world runs
-  const btn = solid => ({ padding:"9px 14px", borderRadius:10, cursor:"pointer", fontSize:12.5, fontWeight:600,
-    border:"1px solid rgba(148,166,184,0.45)", background: solid ? "rgba(201,215,227,0.16)" : "transparent",
-    color:"#C9D7E3" });
+  const col = lvlColor(st);
   return (
-    <>
-      {/* objective chip: right of the home control, compact two lines — the sun lever steps below it in intervene mode */}
-      <div style={{ position:"absolute", top:"calc(env(safe-area-inset-top, 0px) + 44px)", left:56, right:12,
-        maxWidth:430, margin:"0 auto", zIndex:5, padding:"6px 11px", borderRadius:12,
+      <div style={{ flex:"1 1 auto", minWidth:0, maxWidth:430,
+        padding:"6px 11px", borderRadius:12,
         background:"rgba(11,19,30,0.82)", border:`1px solid ${col}`,
         color:"#C9D7E3", fontSize:11, fontFamily:mono, pointerEvents:"none" }}>
         <div style={{ display:"flex", gap:8, alignItems:"baseline", whiteSpace:"nowrap" }}>
@@ -72,7 +69,27 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
           <div style={{ marginTop: 3, color: "#8FA3B5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             ⚑ {ev.text}</div> ) : null; })()}
       </div>
-      {/* verdict card */}
+  );
+}
+
+// verdict card for the finished experiment — a full-stage overlay, so it stays
+// outside the top stack
+function LevelVerdict({ onExit, onLevel, onRetry }){
+  const def = LVL.def;
+  const [dismissed, setDismissed] = React.useState(false);
+  const [asking, setAsking] = React.useState(false); // F1 for the Next button: commit before the next world runs
+  const prevSt = React.useRef("running");
+  const st = LVL.state;
+  if (prevSt.current !== st){ prevSt.current = st; if (dismissed) setDismissed(false); }
+  if (!def) return null;
+  const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
+  const col = lvlColor(st);
+  const next = LEVELS[LEVELS.indexOf(def) + 1];
+  const btn = solid => ({ padding:"9px 14px", borderRadius:10, cursor:"pointer", fontSize:12.5, fontWeight:600,
+    border:"1px solid rgba(148,166,184,0.45)", background: solid ? "rgba(201,215,227,0.16)" : "transparent",
+    color:"#C9D7E3" });
+  return (
+    <>
       {(st === "passed" || st === "failed") && !dismissed && (
         <div style={{ position:"absolute", inset:0, zIndex:9, display:"flex", alignItems:"center",
           justifyContent:"center", padding:18, background:"rgba(5,10,17,0.45)" }}>

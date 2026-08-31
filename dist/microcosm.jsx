@@ -4070,12 +4070,20 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
         transition:"right 0.2s ease" }}>
       <canvas ref={canvasRef} style={{ width:"100%", height:"100%", display:"block",
         touchAction:"none", cursor: uiMode === "intervene" ? "crosshair" : "grab" }} />
+      {/* top stack. Everything anchored to the top of the world lives in ONE
+          flow column — status strip, the home/objective row, then the
+          top-anchored levers. Nothing here carries a fixed offset, so a
+          wrapping mineral row or a three-line experiment chip pushes what is
+          below it down instead of covering the stats (seen on phone). */}
+      <div style={{ position:"absolute", top:0, left:0, right:0, zIndex:5,
+        display:"flex", flexDirection:"column", gap:8, pointerEvents:"none",
+        padding:"calc(env(safe-area-inset-top, 0px) + 10px) 0 0" }}>
       {/* passive status strip. One column: on narrow screens the first row is
           allowed to wrap, and the mineral row below it moves down with the
           flow instead of sitting at a fixed offset for the wrapped text to
           land on (seen on phone-width WebViews). */}
-      <div style={{ position:"absolute", top:0, left:0, right:0, padding:"calc(env(safe-area-inset-top, 0px) + 10px) 18px 8px 14px",
-        display:"flex", flexDirection:"column", gap:4, pointerEvents:"none",
+      <div style={{ padding:"0 18px 0 14px",
+        display:"flex", flexDirection:"column", gap:4,
         color:COL.silt, fontSize:12, fontFamily:mono, textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline",
         flexWrap:"wrap", columnGap:12, rowGap:2 }}>
@@ -4117,6 +4125,44 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
         {ui.mineral.add > 0.5 && <span style={{ color:"#F2B24A" }}> +{ui.mineral.add < 950 ? Math.round(ui.mineral.add) : (ui.mineral.add/1000).toFixed(1)+"k"}</span>}
       </div>
       </div>
+      {/* Phase 8: back-to-menu control and, during an experiment, the objective
+          chip beside it (src/ui-levels.jsx) — one row, below the stats. */}
+      <div style={{ display:"flex", alignItems:"flex-start", gap:8, padding:"0 12px 0 14px" }}>
+        <HomeButton onExit={onExit} />
+        <LevelChip tick={ui.tick} />
+      </div>
+      {/* sun-intensity press lever (intervene mode) */}
+      {uiMode === "intervene" && (
+        <div style={{ alignSelf:"center", pointerEvents:"auto",
+          maxWidth:"calc(100% - 24px)", boxSizing:"border-box",
+          padding:"6px 12px", borderRadius:12,
+          background:"rgba(11,19,30,0.72)", border:"1px solid rgba(242,178,74,0.35)" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ color:"#F2B24A", fontSize:11, fontFamily:"ui-monospace, Menlo, monospace" }}>
+            ☀ ×{ui.lightMul.toFixed(2)}</span>
+          <input type="range" min="0.4" max="1.6" step="0.05" value={ui.lightMul}
+            onChange={e => { const v = +e.target.value;
+              setUi(u2 => ({ ...u2, lightMul: v }));
+              queueEvent({ type:"lightMul", v, done: s => {
+                if (Math.abs(s.prev - v) > 0.24) W.evLog.push({ tick: W.tick, type: "sunlight" });
+                if (Math.abs(s.prev - v) > 0.24)
+                  actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt("Changed the sun · Undo",
+                    () => queueEvent({ type:"lightMul", v: s.prev }));
+              }});
+            }}
+            style={{ width: 130, accentColor: "#F2B24A" }} />
+          </div>
+          <div style={{ fontSize:10, color:"rgba(242,178,74,0.75)", marginTop:4, lineHeight:1.45, textAlign:"center" }}>
+            {LVL.def ? "drag → sun · tap → pour" + (levelAllows("seed") ? " · hold → seed" : "")
+                     : "drag → source · tap → pour · tap source/wall → card · hold → seed · sun · heat · wall"}</div>
+        </div>
+      )}
+      {uiMode === "intervene" && levelAllows("evolution") && (
+        <EvolutionPanel desktop={desktop} mono={mono}
+          onLog={(type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
+            actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt(label + " · Undo", undoFn); }} />
+      )}
+      </div>{/* /top stack */}
       {/* intervene edge tint: unmistakable "you are editing the world" signal */}
       {uiMode === "intervene" && (
         <div style={{ position:"absolute", inset:0, pointerEvents:"none",
@@ -4153,40 +4199,10 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       )}
       {uiMode === "data" && !desktop && <DataMode />}
       <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()} card={sheetUp} />
-      {/* Phase 8: back-to-menu control and, during an experiment, the objective HUD + verdict (src/ui-levels.jsx) */}
-      <HomeButton onExit={onExit} />
-      <LevelStage tick={ui.tick} desktop={desktop} panelW={panelW} onExit={onExit} onLevel={onLevel}
+      {/* Phase 8: the experiment verdict card (src/ui-levels.jsx). The objective
+          chip and the home control ride in the top stack above. */}
+      <LevelVerdict onExit={onExit} onLevel={onLevel}
         onRetry={() => actionsRef.current.reset && actionsRef.current.reset()} />
-      {/* sun-intensity press lever (intervene mode) */}
-      {uiMode === "intervene" && (
-        <div style={{ position:"absolute", top: LVL.def ? 112 : 64, left:"50%", transform:"translateX(-50%)",
-          padding:"6px 12px", borderRadius:12,
-          background:"rgba(11,19,30,0.72)", border:"1px solid rgba(242,178,74,0.35)", zIndex:5 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ color:"#F2B24A", fontSize:11, fontFamily:"ui-monospace, Menlo, monospace" }}>
-            ☀ ×{ui.lightMul.toFixed(2)}</span>
-          <input type="range" min="0.4" max="1.6" step="0.05" value={ui.lightMul}
-            onChange={e => { const v = +e.target.value;
-              setUi(u2 => ({ ...u2, lightMul: v }));
-              queueEvent({ type:"lightMul", v, done: s => {
-                if (Math.abs(s.prev - v) > 0.24) W.evLog.push({ tick: W.tick, type: "sunlight" });
-                if (Math.abs(s.prev - v) > 0.24)
-                  actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt("Changed the sun · Undo",
-                    () => queueEvent({ type:"lightMul", v: s.prev }));
-              }});
-            }}
-            style={{ width: 130, accentColor: "#F2B24A" }} />
-          </div>
-          <div style={{ fontSize:10, color:"rgba(242,178,74,0.75)", marginTop:4, whiteSpace:"nowrap" }}>
-            {LVL.def ? "drag → sun · tap → pour" + (levelAllows("seed") ? " · hold → seed" : "")
-                     : "drag → source · tap → pour · tap source/wall → card · hold → seed · sun · heat · wall"}</div>
-        </div>
-      )}
-      {uiMode === "intervene" && levelAllows("evolution") && (
-        <EvolutionPanel desktop={desktop} mono={mono}
-          onLog={(type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
-            actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt(label + " · Undo", undoFn); }} />
-      )}
       {ui.spawnPick && (
         <div style={{ position:"absolute", zIndex:7,
           left: Math.min(Math.max(8, ui.spawnPick.sx - 130), Math.max(8, vp.vw - panelW - 268)),
@@ -4457,7 +4473,7 @@ function EvolutionPanel({ desktop, mono, onLog }){
       onChange={e => commit(sp, kL, key, +e.target.value, label)}
       title={label} style={{ width: desktop ? 110 : 84, accentColor: amber }} /> ); };
   return (
-    <div style={{ position:"absolute", top: 126, left:"50%", transform:"translateX(-50%)", zIndex:5,
+    <div style={{ alignSelf:"center", pointerEvents:"auto",
       padding:"6px 12px 8px", borderRadius:12, background:"rgba(11,19,30,0.78)", border:"1px solid rgba(242,178,74,0.35)",
       color:"#C9D7E3", fontSize:11, fontFamily:mono, maxWidth:"calc(100vw - 24px)" }}>
       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -4802,7 +4818,7 @@ function HomeButton({ onExit }){
   return (
     <button aria-label="Back to the start screen"
       onClick={() => { if (armed){ setArmed(false); onExit(); } else setArmed(true); }}
-      style={{ position:"absolute", left:14, top:"calc(env(safe-area-inset-top, 0px) + 46px)", zIndex:6,
+      style={{ flex:"0 0 auto", pointerEvents:"auto",
         width:34, height:34, borderRadius:17,
         background: armed ? "rgba(201,215,227,0.16)" : "rgba(21,34,51,0.8)",
         border: armed ? "1.5px solid rgba(201,215,227,0.7)" : "1px solid rgba(94,115,134,0.4)",
@@ -4813,28 +4829,25 @@ function HomeButton({ onExit }){
   );
 }
 
-// objective HUD + verdict card for the running experiment; null in the sandbox
-function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
+// the running experiment's status colour, shared by the chip and the verdict card
+function lvlColor(st){
+  return st === "passed" ? "rgb(70,214,140)" : st === "failed" ? "rgb(226,96,96)" : "rgba(148,166,184,0.55)";
+}
+
+// objective chip for the running experiment; null in the sandbox. Lives in the
+// top stack's flow (src/ui.jsx), beside the home control and below the stats —
+// it never overlays them, however many lines it grows to.
+function LevelChip({ tick }){
   const def = LVL.def;
-  const [dismissed, setDismissed] = React.useState(false);
-  const prevSt = React.useRef("running");
   if (!def) return null;
   const st = LVL.state;
-  if (prevSt.current !== st){ prevSt.current = st; if (dismissed) setDismissed(false); }
   const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
   const S = W.recCount ? lvlSample(0) : null;
   const meters = S ? def.meter(S) : [];
-  const col = st === "passed" ? "rgb(70,214,140)" : st === "failed" ? "rgb(226,96,96)" : "rgba(148,166,184,0.55)";
-  const next = LEVELS[LEVELS.indexOf(def) + 1];
-  const [asking, setAsking] = React.useState(false); // F1 for the Next button: commit before the next world runs
-  const btn = solid => ({ padding:"9px 14px", borderRadius:10, cursor:"pointer", fontSize:12.5, fontWeight:600,
-    border:"1px solid rgba(148,166,184,0.45)", background: solid ? "rgba(201,215,227,0.16)" : "transparent",
-    color:"#C9D7E3" });
+  const col = lvlColor(st);
   return (
-    <>
-      {/* objective chip: right of the home control, compact two lines — the sun lever steps below it in intervene mode */}
-      <div style={{ position:"absolute", top:"calc(env(safe-area-inset-top, 0px) + 44px)", left:56, right:12,
-        maxWidth:430, margin:"0 auto", zIndex:5, padding:"6px 11px", borderRadius:12,
+      <div style={{ flex:"1 1 auto", minWidth:0, maxWidth:430,
+        padding:"6px 11px", borderRadius:12,
         background:"rgba(11,19,30,0.82)", border:`1px solid ${col}`,
         color:"#C9D7E3", fontSize:11, fontFamily:mono, pointerEvents:"none" }}>
         <div style={{ display:"flex", gap:8, alignItems:"baseline", whiteSpace:"nowrap" }}>
@@ -4857,7 +4870,27 @@ function LevelStage({ tick, desktop, panelW, onExit, onLevel, onRetry }){
           <div style={{ marginTop: 3, color: "#8FA3B5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             ⚑ {ev.text}</div> ) : null; })()}
       </div>
-      {/* verdict card */}
+  );
+}
+
+// verdict card for the finished experiment — a full-stage overlay, so it stays
+// outside the top stack
+function LevelVerdict({ onExit, onLevel, onRetry }){
+  const def = LVL.def;
+  const [dismissed, setDismissed] = React.useState(false);
+  const [asking, setAsking] = React.useState(false); // F1 for the Next button: commit before the next world runs
+  const prevSt = React.useRef("running");
+  const st = LVL.state;
+  if (prevSt.current !== st){ prevSt.current = st; if (dismissed) setDismissed(false); }
+  if (!def) return null;
+  const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
+  const col = lvlColor(st);
+  const next = LEVELS[LEVELS.indexOf(def) + 1];
+  const btn = solid => ({ padding:"9px 14px", borderRadius:10, cursor:"pointer", fontSize:12.5, fontWeight:600,
+    border:"1px solid rgba(148,166,184,0.45)", background: solid ? "rgba(201,215,227,0.16)" : "transparent",
+    color:"#C9D7E3" });
+  return (
+    <>
       {(st === "passed" || st === "failed") && !dismissed && (
         <div style={{ position:"absolute", inset:0, zIndex:9, display:"flex", alignItems:"center",
           justifyContent:"center", padding:18, background:"rgba(5,10,17,0.45)" }}>
