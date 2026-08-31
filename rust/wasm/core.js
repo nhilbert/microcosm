@@ -262,15 +262,40 @@ function dispatch(ev, queue){
 const queueEvent = ev => dispatch(ev, true);
 const applyEvent = ev => dispatch(ev, false);
 
-// The observatory is M3. Fail loudly rather than let a gate quietly measure nothing.
+// indicators() — the health dashboard, assembled from the core's own numbers. Same shape as the
+// JavaScript version, including which fields are null.
+const nn = v => (Number.isNaN(v) ? null : v);
+function indicators(){
+  if (!X.mc_ind_ok()) return null;
+  const strain = [];
+  for (let sp = 0; sp < 7; sp++){
+    if (!X.mc_ind_strain(sp, 0)){ strain.push(null); continue; }
+    const st = { level: X.mc_ind_strain(sp,1), reserve: X.mc_ind_strain(sp,2),
+      trend: X.mc_ind_strain(sp,3), popTrend: X.mc_ind_strain(sp,4) };
+    if (X.mc_ind_strain(sp,5)){ st.dAc1 = X.mc_ind_strain(sp,6); st.varX = X.mc_ind_strain(sp,7); }
+    strain.push(st);
+  }
+  const ven = X.mc_ind_venator(0)
+    ? { reserve: X.mc_ind_venator(1), preyLossRate: X.mc_ind_venator(2) } : null;
+  return {
+    adaptability: nn(X.mc_ind_num(0)), variety: X.mc_ind_num(1), prodVsCons: X.mc_ind_num(2),
+    recyclingMin: nn(X.mc_ind_num(3)), lockedPct: X.mc_ind_num(4),
+    pyramid: { producers: X.mc_ind_num(5), grazers: X.mc_ind_num(6),
+               decomposers: X.mc_ind_num(7), predators: X.mc_ind_num(8) },
+    strain, venator: ven,
+  };
+}
+
+// Still JS-only: impact() and the level API. Fail loudly rather than let a gate quietly measure
+// nothing.
 const notYet = name => () => {
-  throw new Error(`wasm core: ${name} is observatory surface, not ported yet (M3 of docs/android-port-plan.md) — run this harness against dist/core.js`);
+  throw new Error(`wasm core: ${name} is not ported yet (docs/android-port-plan.md) — run this harness against dist/core.js`);
 };
 
 module.exports = {
   W, P, TRAITS, TAG, REC, SPECIES, MAXN, MAXLOCI, CELL,
   resetWorld, initWorld, step, queueEvent, applyEvent,
   wrap, wd, cellOf, mulberry32,
-  indicators: notYet("indicators"), impact: notYet("impact"),
+  indicators, impact: notYet("impact"),
   levelCheck: notYet("levelCheck"), levelStart: notYet("levelStart"),
 };

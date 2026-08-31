@@ -629,3 +629,82 @@ pub extern "C" fn mc_wall_get(k: i32, field: i32) -> f64 {
         _ => f64::NAN,
     }
 }
+
+// ---------- indicators ----------
+// Assembled field by field rather than serialized: the shape is small and fixed, and this keeps
+// the ABI free of any encoding the two sides could disagree about.
+
+/// 1 when `indicators()` would return an object at all (recCount >= 2).
+#[no_mangle]
+pub extern "C" fn mc_ind_ok() -> i32 {
+    let sim = s();
+    if sim.obs.indicators(&sim.p, &sim.tr, &sim.reg).is_some() { 1 } else { 0 }
+}
+
+/// Scalar fields: 0 adaptability, 1 variety, 2 prodVsCons, 3 recyclingMin, 4 lockedPct,
+/// 5-8 pyramid (producers, grazers, decomposers, predators). NaN means JavaScript `null`.
+#[no_mangle]
+pub extern "C" fn mc_ind_num(field: i32) -> f64 {
+    let sim = s();
+    let ind = match sim.obs.indicators(&sim.p, &sim.tr, &sim.reg) {
+        Some(v) => v,
+        None => return f64::NAN,
+    };
+    match field {
+        0 => ind.adaptability.unwrap_or(f64::NAN),
+        1 => ind.variety,
+        2 => ind.prod_vs_cons,
+        3 => ind.recycling_min.unwrap_or(f64::NAN),
+        4 => ind.locked_pct,
+        5..=8 => ind.pyramid[(field - 5) as usize],
+        _ => f64::NAN,
+    }
+}
+
+/// Per-species strain: 0 present, 1 level, 2 reserve, 3 trend, 4 popTrend, 5 has-advisory,
+/// 6 dAc1, 7 varX.
+#[no_mangle]
+pub extern "C" fn mc_ind_strain(sp: i32, field: i32) -> f64 {
+    let sim = s();
+    let ind = match sim.obs.indicators(&sim.p, &sim.tr, &sim.reg) {
+        Some(v) => v,
+        None => return f64::NAN,
+    };
+    let sp = sp as usize;
+    if sp >= 7 {
+        return f64::NAN;
+    }
+    match ind.strain[sp] {
+        None => {
+            if field == 0 { 0.0 } else { f64::NAN }
+        }
+        Some(st) => match field {
+            0 => 1.0,
+            1 => st.level as f64,
+            2 => st.reserve,
+            3 => st.trend,
+            4 => st.pop_trend,
+            5 => if st.adv.is_some() { 1.0 } else { 0.0 },
+            6 => st.adv.map_or(f64::NAN, |a| a.0),
+            7 => st.adv.map_or(f64::NAN, |a| a.1),
+            _ => f64::NAN,
+        },
+    }
+}
+
+/// Venator read-out: 0 present, 1 reserve, 2 preyLossRate.
+#[no_mangle]
+pub extern "C" fn mc_ind_venator(field: i32) -> f64 {
+    let sim = s();
+    let ind = match sim.obs.indicators(&sim.p, &sim.tr, &sim.reg) {
+        Some(v) => v,
+        None => return f64::NAN,
+    };
+    match (ind.venator, field) {
+        (None, 0) => 0.0,
+        (Some(_), 0) => 1.0,
+        (Some(v), 1) => v.0,
+        (Some(v), 2) => v.1,
+        _ => f64::NAN,
+    }
+}

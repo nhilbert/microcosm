@@ -807,3 +807,205 @@ impl Observatory {
         }
     }
 }
+
+// ---- indicators (Phase 4.2): the health dashboard, computed on demand ----
+// Translated from src/observatory/analysis.js. Read-only over the ring buffer.
+
+/// Per-species strain, or `None` where the species has no measured reference band or too little
+/// population to judge.
+#[derive(Clone, Copy, Debug)]
+pub struct Strain {
+    pub level: i32,
+    pub reserve: f64,
+    pub trend: f64,
+    pub pop_trend: f64,
+    /// EWS advisory overlay, present only past 3 windows. Shipped demoted and clearly
+    /// experimental: the calibration verdict was that generic early-warning statistics misfire on
+    /// this system, and the mechanistic vitals are the honest headline.
+    pub adv: Option<(f64, f64)>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Indicators {
+    pub adaptability: Option<f64>,
+    pub variety: f64,
+    pub prod_vs_cons: f64,
+    pub recycling_min: Option<f64>,
+    pub locked_pct: f64,
+    pub pyramid: [f64; 4],
+    pub strain: [Option<Strain>; 7],
+    /// (reserve, preyLossRate) when any apex is alive.
+    pub venator: Option<(f64, f64)>,
+}
+
+/// `+v.toFixed(n)` — the JS idiom for "round to n decimals and keep it a number".
+fn round_to(v: f64, n: u32) -> f64 {
+    to_fixed(v, n).parse::<f64>().unwrap_or(v)
+}
+
+impl Observatory {
+    fn window_stats(&self, sp: usize, back: usize, wn: usize) -> (f64, f64, f64) {
+        let mut xs = Vec::with_capacity(wn);
+        let mut k = back + wn;
+        while k > back {
+            xs.push(self.b(self.row(k), sp));
+            k -= 1;
+        }
+        let mean = xs.iter().sum::<f64>() / wn as f64;
+        // detrend: subtract the least-squares line
+        let n = xs.len();
+        let (mut sx, mut sy, mut sxy, mut sxx) = (0.0f64, 0.0, 0.0, 0.0);
+        for (i, v) in xs.iter().enumerate() {
+            let i = i as f64;
+            sx += i;
+            sy += v;
+            sxy += i * v;
+            sxx += i * i;
+        }
+        let den = n as f64 * sxx - sx * sx;
+        let b = (n as f64 * sxy - sx * sy) / if den != 0.0 { den } else { 1.0 };
+        let a = (sy - b * sx) / n as f64;
+        let res: Vec<f64> = xs.iter().enumerate().map(|(i, v)| v - (a + b * i as f64)).collect();
+        let mut num = 0.0f64;
+        for i in 0..wn - 1 {
+            num += res[i] * res[i + 1];
+        }
+        let mut den2 = 0.0f64;
+        for r in res.iter().take(wn) {
+            den2 += r * r;
+        }
+        (mean, if den2 > 0.0 { num / den2 } else { 0.0 }, den2 / wn as f64)
+    }
+
+    fn strain_of(&self, sp: usize, p: &Params) -> Option<Strain> {
+        let wn = 60usize;
+        if self.count < 2 * wn {
+            return None;
+        }
+        let r0 = self.row(1);
+        let r60 = self.row(wn);
+        let pop = self.b(r0, sp);
+        if pop < 20.0 {
+            return None;
+        }
+        let mean_sz = {
+            let v = self.b(r0, 26 + sp);
+            if v != 0.0 { v } else { 1.0 }
+        };
+        let reserve = (self.b(r0, 7 + sp) / pop) / (p.cap_mul * mean_sz);
+        let pop_ago = self.b(r60, sp);
+        let res_ago = if pop_ago > 0.0 {
+            let msz = { let v = self.b(r60, 26 + sp); if v != 0.0 { v } else { 1.0 } };
+            (self.b(r60, 7 + sp) / pop_ago) / (p.cap_mul * msz)
+        } else {
+            reserve
+        };
+        let res_trend = reserve - res_ago;
+        let pop_trend = pop / crate::jsnum::jmax(1.0, pop_ago);
+        let rb = reference_band(sp)?;
+        let level = if (reserve < rb.res_p03 && res_trend < -0.01) || pop_trend < rb.pop_p03 * 0.9 {
+            2
+        } else if reserve < rb.res_p10 || pop_trend < rb.pop_p10 {
+            1
+        } else {
+            0
+        };
+        let adv = if self.count >= 3 * wn {
+            let now = self.window_stats(sp, 1, wn);
+            let base = self.window_stats(sp, 2 * wn, wn);
+            Some((
+                round_to(now.1 - base.1, 2),
+                round_to(now.2 / if base.2 != 0.0 { base.2 } else { 1.0 }, 2),
+            ))
+        } else {
+            None
+        };
+        Some(Strain {
+            level,
+            reserve: round_to(reserve, 2),
+            trend: round_to(res_trend, 3),
+            pop_trend: round_to(pop_trend, 2),
+            adv,
+        })
+    }
+
+    /// Labels follow the naming rule: functional first, science as subtitle.
+    pub fn indicators(&self, p: &Params, tr: &[Species], reg: &Registry) -> Option<Indicators> {
+        if self.count < 2 {
+            return None;
+        }
+        let r0 = self.row(1);
+        let mut bio = [0.0f64; 7];
+        let mut bio_tot = 0.0f64;
+        for sp in 0..7 {
+            bio[sp] = self.b(r0, 7 + sp);
+            bio_tot += bio[sp];
+        }
+        let mut h = 0.0f64;
+        for sp in 0..7 {
+            let pp = bio[sp] / if bio_tot != 0.0 { bio_tot } else { 1.0 };
+            if pp > 0.0 {
+                h -= pp * pp.ln();
+            }
+        }
+        let k = self.count.min(15);
+        let (mut g, mut rr, mut up) = (0.0f64, 0.0, 0.0);
+        for kk in 1..=k {
+            let rk = self.row(kk);
+            g += self.b(rk, 19);
+            rr += self.b(rk, 20);
+            up += self.b(rk, 18);
+        }
+        let total = self.b(r0, 14) + self.b(r0, 15) + self.b(r0, 16) + self.b(r0, 17);
+        let turnover_ticks = if up > 0.0 {
+            self.b(r0, 15) / (up / (k as f64 * REC_STRIDE as f64))
+        } else {
+            f64::INFINITY
+        };
+        let mut strain: [Option<Strain>; 7] = [None; 7];
+        for sp in 0..7 {
+            strain[sp] = if tr[sp].apex { None } else { self.strain_of(sp, p) };
+        }
+        let venator = if self.b(r0, 6) > 0.0 {
+            let mean_sz = { let v = self.b(r0, 32); if v != 0.0 { v } else { 9.0 } };
+            let cap = p.cap_mul * mean_sz;
+            let kl = self.count.min(10);
+            let mut loss = 0.0f64;
+            for kk in 1..=kl {
+                loss += self.b(self.row(kk), 35 + 2);
+            }
+            Some((
+                (self.b(r0, 13) / self.b(r0, 6)) / cap,
+                loss / (kl as f64 * REC_STRIDE as f64 / 10.0),
+            ))
+        } else {
+            None
+        };
+        // adaptability (6.2): mean locus sd over every (species, locus) with >= 20 alive
+        let (mut ad_sum, mut ad_n) = (0.0f64, 0.0f64);
+        for sp in 0..7 {
+            if self.b(r0, sp) >= 20.0 {
+                for k in 0..tr[sp].loci.len().min(LOCUS_CH.len()) {
+                    ad_sum += self.b(r0, LOCUS_CH[k][1] + sp);
+                    ad_n += 1.0;
+                }
+            }
+        }
+        let _ = reg;
+        Some(Indicators {
+            adaptability: if ad_n != 0.0 { Some(round_to(ad_sum / ad_n, 3)) } else { None },
+            variety: round_to(h, 2),
+            prod_vs_cons: round_to(g / if rr != 0.0 { rr } else { 1.0 }, 2),
+            recycling_min: if turnover_ticks.is_infinite() { None } else { Some(round_to(turnover_ticks / 600.0, 1)) },
+            locked_pct: round_to(100.0 * (self.b(r0, 16) + self.b(r0, 17)) / if total != 0.0 { total } else { 1.0 }, 0),
+            pyramid: [
+                round_to((bio[0] + bio[1]) / if bio_tot != 0.0 { bio_tot } else { 1.0 }, 2),
+                round_to(bio[2] / if bio_tot != 0.0 { bio_tot } else { 1.0 }, 2),
+                round_to(bio[3] / if bio_tot != 0.0 { bio_tot } else { 1.0 }, 2),
+                round_to(bio[6] / if bio_tot != 0.0 { bio_tot } else { 1.0 }, 2),
+            ],
+            strain,
+            venator,
+        })
+    }
+}
