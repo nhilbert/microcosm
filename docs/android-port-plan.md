@@ -500,15 +500,21 @@ touching `src/sim/`.
 The port is complete: core, observatory, save/load, three targets, all proven, with
 the handover done. What remains is product work and two loose ends.
 
-1. **M5.1 — the app.** Kotlin/Compose over a SurfaceView render thread, full
-   parity, save/load wired to `AtomicFile`. The longest milestone by far: ~2,700
-   lines of JSX behaviour, the visual grammar, the Data pages, the levels shell.
-   **Planned in docs/android-app-plan.md** (increments A.0–A.6, two owner
-   decisions recorded); A.0, the shared frame builder, is shipped. The toolchain and the JNI path underneath
-   it are now proven, and the core sustains 250× against a UI that caps at 16× —
-   so the render path, not the simulation, is what that plan has to think about.
-2. **Finish the observatory**: `impact()` is what is left. It reads `W.evLog`,
-   which the UI writes, so it lands with M5.1. ~~The level API~~ — done, §7.
+1. ~~**M5.1 — the app.**~~ **Shipped, 2026-08-31**, increments A.0–A.6:
+   docs/android-app-plan.md. A SurfaceView render thread paints a display list the
+   core builds; gestures, selection, the levers with undo and impact cards, the
+   Data pages, the experiment ladder and save/load all run natively. Measured on
+   the Fairphone 5: the renderer costs **1.26–1.84 ms a frame at 2,049
+   organisms**, about 9× headroom at 60 Hz, of which the frame builder is
+   0.09–0.13 ms. What is *not* done is listed in that plan's §5i rather than
+   implied by silence — the Evolution panel, the Traits page, the loupe, named
+   saves. And nothing in the app has been seen running by its author: CI is the
+   only compiler it has met, and a screen is the one instrument this container
+   does not have.
+2. ~~**Finish the observatory**~~ — **done**. `impact()` was the last piece; the
+   core keeps the intervention log the shell appends to, and
+   `harness/fingerprint-impact.js` proves the cards identical across both cores on
+   all seven of their branches. `port:check` now compares six things.
 3. **The unmeasured ratio.** Rust versus V8 *on the same phone* was never measured;
    the WebView wrapper does not report tick times. It gates nothing — the margin is
    15× past the UI's ceiling — but it is the one performance claim in this document

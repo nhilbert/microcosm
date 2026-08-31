@@ -367,6 +367,31 @@ six things.
 The Events page shows each intervention with its card, in the browser's own wording: "Since", never
 "because"; "could be a natural swing" under the noise floor; "attribution weak" under a press.
 
+## 5i. What A.0–A.6 add up to
+
+The app runs the world, navigates it, intervenes in it with undo and impact cards, shows the
+Observatory's pages, plays the experiment ladder, and saves. Six increments, each compiled by CI
+and none of them seen on a screen by their author.
+
+**What the core carries now, and what Kotlin carries.** Everything that *decides* is in the crate
+and is gate-compared against the frozen JavaScript: the tick, the observatory, the levels, the
+visual grammar, selection, the undo inverses, the impact cards. `port:check` compares six things
+and all six are identical. Kotlin holds strokes and chrome — bitmaps, blend modes, buttons — and
+one rule it must keep: nothing in the render layer may decide anything about the *world*.
+
+**What is not done**, listed rather than implied by silence:
+
+- the **Evolution panel** (mutation on/off, per-locus rate and curvature, the price sliders, the
+  presets). Its events are in the ABI; it needs the panel;
+- the **Traits page**, the **amber intervention markers** on the charts, and **scrubbing**;
+- the browser's **species chips** when several species sit under one thumb — nearest wins here;
+- the **loupe**, and the **follow-cam** that eases toward a selected organism;
+- **naming saves** — one slot for now, though the format is versioned;
+- the **start screen** as a screen: experiments are a list behind a button, not a front door.
+
+None of it is load-bearing for the milestone's question — can the native app run this world, with
+its levers and its honesty intact? It can.
+
 ## 6. Open, and honestly so
 
 - **The web artifact's `frameOf` is a second implementation until it isn't.** A.0 leaves the JS
@@ -379,3 +404,11 @@ The Events page shows each intervention with its card, in the browser's own word
 - **`W.px/py` are UI-managed.** The browser copies positions before stepping, to interpolate
   between ticks. The Android shell needs the same, so the ABI gains `mc_mark_prev()` rather
   than the core doing it silently — which would change what the oracle does.
+- **The mat carpet's blockiness is unresolved.** Setting `isFilterBitmap` did not change it, so
+  the fields are now prescaled 4x on a software canvas where filtering is not in doubt. If the
+  next screenshot is still blocky, those blocks were never the carpet and the search moves — and
+  that would be worth knowing, because it would mean something else is being drawn at cell size.
+- **Nothing in the app has been seen running by its author.** Every increment compiled in CI and
+  every gate that can run headlessly is green, but CI cannot say whether a panel overlaps, a
+  gesture fights the camera, or a colour reads wrong. That is the standing gap of this milestone
+  and it closes only on the owner's phone.
