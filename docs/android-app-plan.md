@@ -79,7 +79,7 @@ right.
 | **A.1** ✅ | Kotlin shell: SurfaceView render thread, JNI to the frame builder, painter for the display list; a device build that reports ms/frame by zoom and population | the renderer's real budget on hardware — the number M5.0 left open |
 | **A.2** ✅ | Camera and gestures: pan, pinch, tap-select, long-press; the status strip and the specimen card | the world is navigable |
 | **A.3** | Intervene: sun drag and press, mineral pour, feed/kill, the seeding picker, walls — each an event, undoable, impact-carded | the levers, with their provenance intact |
-| **A.4** | Data mode: the five pages against the ported `indicators` | the Observatory on the phone |
+| **A.4** ✅ | Data mode: the five pages against the ported `indicators` | the Observatory on the phone |
 | **A.5** | Experiments: start screen, prediction step, HUD, verdicts (the level API is already ported) | the ladder is playable |
 | **A.6** | Save/load wired to `AtomicFile` (the snapshot format is already ported and proved) | the feature that motivated the port |
 
@@ -297,6 +297,23 @@ deep. The gate runs inside `port:check`.
 Not ported yet, recorded rather than dropped: the Evolution panel (mutation on/off, per-locus rates
 and curvature, the price sliders and presets). Its events — `mutation`, `locus` — are in the ABI
 already; it needs the panel, and it belongs with the Data pages' chrome rather than with the levers.
+
+## 5f. A.4 — Data mode, 2026-08-31
+
+Five pages: Populations on a log axis, Chemistry as a stacked area whose bright top edge only moves
+when the hand adds matter, Metabolism with recycling on its own scale, Health against the measured
+reference ranges, and the Events feed. The scales and the stacking order are the browser's.
+
+**Nothing reads the core from the UI thread.** `indicators()` recomputes as it goes and the event
+feed walks the ring, so both genuinely mutate a `&mut Sim`; reading them from the UI thread while a
+tick ran would be a data race, not a stale number. So the render thread produces everything —
+fourteen channels copied out of the recorder ring, the vitals and the feed rendered to text — four
+times a second, and only while the panel is open. Fourteen channels × 900 samples is 50 KB; the
+cost of copying it is not worth the cost of thinking about the race.
+
+Deferred and recorded: the Traits page (per-locus ribbons and histograms), the amber intervention
+markers on the charts (they need the UI's own intervention log, which arrives with `impact()`), and
+scrubbing.
 
 ## 6. Open, and honestly so
 

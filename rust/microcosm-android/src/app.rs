@@ -451,3 +451,100 @@ pub extern "system" fn Java_org_microcosm_app_Native_speciesFlag(
 ) -> jint {
     abi::mc_species_flag(sp, which)
 }
+
+// ---------------------------------------------------------------------------
+// The Observatory's read-outs (A.4). All of these touch the core, so the shell must call them from
+// the render thread and publish the results — never from the UI thread while a tick is running.
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_recBuffer<'a>(
+    mut env: JNIEnv<'a>,
+    _this: JObject,
+) -> JByteBuffer<'a> {
+    unsafe {
+        wrap(
+            &mut env,
+            abi::mc_rec_ptr(),
+            microcosm_core::params::REC_N * microcosm_core::params::REC_CH * 4,
+        )
+    }
+}
+
+/// 1 when there is enough history for the vitals to mean anything.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_indOk(_env: JNIEnv, _this: JObject) -> jint {
+    abi::mc_ind_ok()
+}
+
+/// 0 adaptability, 1 variety, 2 production/consumption, 3 recycling minutes, 4 locked %,
+/// 5..8 the pyramid's four levels.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_indNum(
+    _env: JNIEnv,
+    _this: JObject,
+    field: jint,
+) -> jdouble {
+    abi::mc_ind_num(field)
+}
+
+/// Per species. 0 present, 1 level, 2 reserve, 3 trend, 4 population trend.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_indStrain(
+    _env: JNIEnv,
+    _this: JObject,
+    sp: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_ind_strain(sp, field)
+}
+
+/// The hunter's own vitals. 0 present, 1 reserve, 2 prey losses per second.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_indVenator(
+    _env: JNIEnv,
+    _this: JObject,
+    field: jint,
+) -> jdouble {
+    abi::mc_ind_venator(field)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_sysEventCount(
+    _env: JNIEnv,
+    _this: JObject,
+) -> jint {
+    abi::mc_sysev_count() as jint
+}
+
+/// 0 tick, 1 species, 2 locus plane (-1 when none).
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_sysEventNum(
+    _env: JNIEnv,
+    _this: JObject,
+    i: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_sysev_num(i.max(0) as u32, field)
+}
+
+/// `which`: 0 the event type, 1 the narration text.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_sysEventText(
+    env: JNIEnv,
+    _this: JObject,
+    i: jint,
+    which: jint,
+) -> jni::sys::jstring {
+    let ptr = abi::mc_sysev_ptr(i.max(0) as u32, which) as *const u8;
+    let len = abi::mc_sysev_len(i.max(0) as u32, which) as usize;
+    let text = if len == 0 || ptr.is_null() {
+        String::new()
+    } else {
+        // SAFETY: the event's own bytes, alive for as long as the event is in the ring.
+        unsafe { String::from_utf8_lossy(std::slice::from_raw_parts(ptr, len)).into_owned() }
+    };
+    match env.new_string(text) {
+        Ok(v) => v.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}

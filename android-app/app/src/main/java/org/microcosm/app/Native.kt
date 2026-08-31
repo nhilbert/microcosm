@@ -124,6 +124,32 @@ object Native {
                            lt: Double, ht: Double, fl: Double, pass: Int)
     external fun evWallRemove(k: Int)
 
+    // ---- the Observatory's read-outs (A.4) ----
+    /** The recorder ring, REC_N x REC_CH float32 in WASM/native memory. Read on the render thread. */
+    external fun recBuffer(): ByteBuffer
+
+    external fun indOk(): Int
+
+    /**
+     * 0 adaptability, 1 variety, 2 production/consumption, 3 recycling minutes, 4 locked %,
+     * 5..8 the pyramid's four levels.
+     */
+    external fun indNum(field: Int): Double
+
+    /** Per species: 0 present, 1 level, 2 reserve, 3 trend, 4 population trend. */
+    external fun indStrain(sp: Int, field: Int): Double
+
+    /** The hunter's own vitals: 0 present, 1 reserve, 2 prey losses per second. */
+    external fun indVenator(field: Int): Double
+
+    external fun sysEventCount(): Int
+
+    /** 0 tick, 1 species, 2 locus plane (-1 when none). */
+    external fun sysEventNum(i: Int, field: Int): Double
+
+    /** which: 0 the event type, 1 the narration text. */
+    external fun sysEventText(i: Int, which: Int): String
+
     external fun sourceCount(): Int
 
     /** field: 0 x, 1 y, 2 i, 3 a, 4 sigma. */

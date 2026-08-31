@@ -10,6 +10,7 @@ import android.view.SurfaceView
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.hypot
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * The world, on its own render thread.
@@ -23,6 +24,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
 
     companion object {
         const val TICK_MS = 100.0
+        private const val REC_N = 900
+        private const val REC_CH = 141
     }
 
     val cam = Camera()
@@ -68,6 +71,23 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         private set
     @Volatile var undoSpecies = -1
         private set
+
+    // ---- Data mode (A.4) ----
+    // Everything here is produced on the render thread and published. `indicators()` and the event
+    // feed mutate the core while computing, so reading them from the UI thread would be a race on
+    // a &mut Sim; the recorder ring is copied for the same reason, and because fourteen channels
+    // four times a second costs nothing.
+    @Volatile var dataOpen = false
+    @Volatile var series: FloatArray? = null
+        private set
+    @Volatile var seriesN = 0
+        private set
+    @Volatile var healthText: String = ""
+        private set
+    @Volatile var eventsText: String = ""
+        private set
+    private var dataFrame = 0
+    private var recBuf: java.nio.FloatBuffer? = null
 
     /** Amber pour rings: the hand's touch, fading. Screen space, like the browser's. */
     private class Pour(val sx: Float, val sy: Float, val t: Long)
@@ -296,7 +316,59 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 Native.org(selI, 1).toInt() else -1
             undoKind = Native.undoKind()
             undoSpecies = Native.undoSpecies()
+            if (dataOpen && dataFrame++ % 15 == 0) publishData()
         }
+    }
+
+    /** Copy the channels the charts need, and write out the two text pages. Render thread only. */
+    private fun publishData() {
+        val rec = recBuf ?: Native.recBuffer().order(java.nio.ByteOrder.nativeOrder())
+            .asFloatBuffer().also { recBuf = it }
+        val head = Native.scalar(13).toInt()
+        val n = Native.scalar(14).toInt()
+        val chans = DataView.CHANNELS
+        val out = FloatArray(chans.size * n)
+        for (k in 0 until n) {
+            val row = ((head - n + k + REC_N) % REC_N) * REC_CH
+            for (c in chans.indices) out[c * n + k] = rec.get(row + chans[c])
+        }
+        series = out
+        seriesN = n
+
+        val sb = StringBuilder()
+        if (Native.indOk() == 0) sb.append("gathering history…")
+        else {
+            sb.append("VARIETY %.2f    P/R %.2f\n".format(Native.indNum(1), Native.indNum(2)))
+            val rec2 = Native.indNum(3)
+            sb.append("RECYCLING %s    LOCKED %d%%\n".format(
+                if (rec2.isNaN()) "–" else "every ${(rec2 * 60).roundToInt()} s", Native.indNum(4).toInt()))
+            val ad = Native.indNum(0)
+            if (!ad.isNaN()) sb.append("ADAPTABILITY %.2f\n".format(ad))
+            sb.append("\nSPECIES VITALS\n")
+            for (sp in 0 until 7) {
+                if (Native.indStrain(sp, 0) == 0.0) continue
+                val lvl = Native.indStrain(sp, 1).toInt()
+                val word = if (lvl == 2) "critical" else if (lvl == 1) "tense" else "calm"
+                val trend = Native.indStrain(sp, 3)
+                val arrow = if (trend < -0.03) "↓" else if (trend > 0.03) "↑" else "→"
+                sb.append("%-9s reserve %3d%% %s  pop x%.2f   %s\n".format(
+                    renderer.speciesName[sp], (Native.indStrain(sp, 2) * 100).toInt(), arrow,
+                    Native.indStrain(sp, 4), word))
+            }
+            if (Native.indVenator(0) != 0.0)
+                sb.append("%-9s reserve %3d%%    prey losses %.1f/s\n".format(
+                    "Venator", (Native.indVenator(1) * 100).toInt(), Native.indVenator(2)))
+            sb.append("\nReference ranges measured on six healthy archived worlds.")
+        }
+        healthText = sb.toString()
+
+        val ev = StringBuilder()
+        val count = Native.sysEventCount()
+        for (i in count - 1 downTo maxOf(0, count - 40)) {
+            ev.append("t %-6d %s\n".format(Native.sysEventNum(i, 0).toLong(), Native.sysEventText(i, 1)))
+        }
+        if (count == 0) ev.append("nothing to report yet.")
+        eventsText = ev.toString()
     }
 
     private fun popLine(): String {

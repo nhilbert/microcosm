@@ -39,6 +39,11 @@ class MainActivity : Activity() {
     private lateinit var feedButton: Button
     private lateinit var killButton: Button
     private lateinit var sunBar: LinearLayout
+    private lateinit var dataPanel: LinearLayout
+    private lateinit var dataView: DataView
+    private lateinit var dataText: TextView
+    private lateinit var dataTitle: TextView
+    private var dataPage = 0
     private val chips = ArrayList<TextView>()
     private val ui = Handler(Looper.getMainLooper())
 
@@ -68,6 +73,7 @@ class MainActivity : Activity() {
             wallButton.alpha = if (world.wallArmed) 1f else 0.6f
             undoChip.visibility = if (world.undoKind != 0) ViewGroup.VISIBLE else ViewGroup.GONE
             undoChip.text = undoLabel(world.undoKind, world.undoSpecies)
+            if (world.dataOpen) refreshData()
             world.report?.let {
                 reportView.text = it
                 reportView.visibility = ViewGroup.VISIBLE
@@ -171,6 +177,11 @@ class MainActivity : Activity() {
             world.speed = s
         })
         bar.addView(button("mode") { world.intervene = !world.intervene }.also { modeButton = it })
+        bar.addView(button("data") {
+            world.dataOpen = true
+            dataPanel.visibility = ViewGroup.VISIBLE
+            refreshData()
+        })
         bar.addView(button("bench") {
             reportView.visibility = ViewGroup.GONE
             world.speed = 0.0
@@ -178,6 +189,37 @@ class MainActivity : Activity() {
         })
         bottom.addView(bar)
         root.addView(bottom, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
+
+        // Data mode: the Observatory's screen, over the world rather than beside it. Charts are
+        // drawn from the series the render thread copies out; Health and Events are its text.
+        dataPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#F00B131E"))
+            visibility = ViewGroup.GONE
+        }
+        dataTitle = TextView(this).apply {
+            setTextColor(Color.parseColor("#C9D7E3"))
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            setPadding(24, 20, 24, 8)
+        }
+        dataPanel.addView(dataTitle)
+        val pages = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12, 0, 12, 0) }
+        for ((k, name) in listOf("pops", "chem", "metab", "health", "events").withIndex())
+            pages.addView(button(name) { dataPage = k; refreshData() })
+        dataPanel.addView(pages)
+        dataView = DataView(this)
+        dataPanel.addView(dataView, LinearLayout.LayoutParams(MATCH, 0, 1f))
+        dataText = TextView(this).apply {
+            setTextColor(Color.parseColor("#C9D7E3"))
+            textSize = 11f
+            typeface = Typeface.MONOSPACE
+            setPadding(24, 12, 24, 24)
+        }
+        dataPanel.addView(ScrollView(this).apply { addView(dataText) },
+            LinearLayout.LayoutParams(MATCH, 0, 1f))
+        dataPanel.addView(button("close") { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE })
+        root.addView(dataPanel, FrameLayout.LayoutParams(MATCH, MATCH))
 
         reportView = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
@@ -212,6 +254,28 @@ class MainActivity : Activity() {
     )
 
     private fun shortName(sp: Int) = Native.traitText(sp, 0).take(3)
+
+    private val PAGE_TITLES = listOf(
+        "Populations — every line a species, on a log axis",
+        "Chemistry — where every unit of mineral sits; the top edge is the world's total",
+        "Metabolism — what the world produces and burns",
+        "Health — vitals against measured reference ranges",
+        "Events — the world's story, newest first; since is not because",
+    )
+
+    /** Chart pages draw; Health and Events are text. Only one of the two is ever visible. */
+    private fun refreshData() {
+        dataTitle.text = PAGE_TITLES[dataPage]
+        val chart = dataPage <= 2
+        dataView.visibility = if (chart) ViewGroup.VISIBLE else ViewGroup.GONE
+        (dataText.parent as ViewGroup).visibility = if (chart) ViewGroup.GONE else ViewGroup.VISIBLE
+        if (chart) {
+            dataView.page = dataPage
+            world.series?.let { dataView.submit(it, world.seriesN, IntArray(7) { sp -> speciesColor(sp) }) }
+        } else {
+            dataText.text = if (dataPage == 3) world.healthText else world.eventsText
+        }
+    }
 
     /** The seeding picker: choose a species, then long-press the water to found a pack there. */
     private fun seedPicker() {
