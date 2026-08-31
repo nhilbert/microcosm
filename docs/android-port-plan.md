@@ -293,6 +293,14 @@ byte for byte with the same harness on the JavaScript core:
 | gate5 (the Observatory narrates the evolution) | **ALL CRITERIA PASS**; seed-22 Yoshida baseline reproduced exactly (pOff 4860, pOn 6680) |
 | heat (7.H.4 warm-water narrations) | **ALL 3 PASS**, byte-identical output: hot-sun pile-up 8/8, thinning 8/8 for Dri/Cil/Bac, press starve 8/8 always ahead of the extinction, control silent |
 | light (7.L patch adaptation) | identical output to the JavaScript core, criterion 2 (control silent, channels exactly 0) PASS |
+| corridor `--sample 2` (16 runs, 8 seeds, 11 loci pinned) | identical output — CORRIDOR CERTIFIED, same apex-loss ticks and audit drifts |
+
+The corridor run matters beyond its verdict: `pin()` writes locus values straight
+into `W.g`, so it is the test that the shim's typed-array **writes** land in the
+same memory the tick reads. A separate stress check confirms the views survive
+allocation — filling the wall table (8 long strokes, each allocating face and path
+vectors, the most likely thing to grow WASM memory and detach every view) leaves
+the world readable and the mineral audit at exactly 9011.2.
 
 The heat gate also found a real gap rather than a difference: a harness that pokes
 `P.tempAmb` or `P.lightMul` directly has to ask for a field recompute, and the shim
