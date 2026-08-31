@@ -83,7 +83,7 @@ right.
 | **A.5** ✅ | Experiments: start screen, prediction step, HUD, verdicts (the level API is already ported) | the ladder is playable |
 | **A.6** ✅ | Save/load wired to `AtomicFile` (the snapshot format is already ported and proved) | the feature that motivated the port |
 
-`impact()` lands in A.3: it reads the UI's event log, which is why it was deferred out of M3.
+`impact()` landed with A.3 — see §5h.
 
 ## 5a. A.0 — shipped, 2026-08-31
 
@@ -340,6 +340,32 @@ the render thread, because a snapshot taken mid-tick would be a torn world and t
 A bad file is refused rather than half-loaded, which the snapshot gate already covers.
 
 One slot for now. Naming saves is chrome; the format carries its own version.
+
+## 5h. `impact()` — ported and gated, 2026-08-31
+
+The last piece of the Observatory, and the one it was worth being careful with. `impact()` is the
+honesty machinery: an interrupted time series that fits the fifteen samples before a lever as a
+trend, extrapolates it (clamped at fifteen samples — never trust a trend further than it was
+observed), and credits the lever only with the *departure* from it, so a lever pulled during a
+decline is not credited with the decline. The natural-variability floors were measured, not chosen:
+12% for the mat and 170% for the plankton, because mats barely move on their own while blooms go
+2.5x unprovoked. Every one of those numbers is a Phase 4 calibration fight, and a port that gets one
+wrong does not crash — it quietly narrates a different world.
+
+It was deferred out of M3 because it reads the UI's own intervention log, and the core cannot tell a
+player's hand from a script. So the core keeps `iv_log` and the shell appends to it through
+`ivPush`, which is the same shape the undo slot took: the *decision* stays with the shell, the
+*arithmetic* moves into the core.
+
+**`harness/fingerprint-impact.js`** drives a run with several hands in it — a pulse alone, a press,
+a pulse under that press's backdrop, two pulses close enough that neither can claim sole credit, and
+one so old it has rolled off the ring — and compares the two implementations' cards as raw bits:
+status, press flag, completeness, mixed, backdrop, recovery, and every mover's channel, percentage
+and strength. **Identical**, on all seven branches. It runs inside `port:check`, which now compares
+six things.
+
+The Events page shows each intervention with its card, in the browser's own wording: "Since", never
+"because"; "could be a natural swing" under the noise floor; "attribution weak" under a press.
 
 ## 6. Open, and honestly so
 

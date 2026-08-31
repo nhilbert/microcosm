@@ -24,6 +24,24 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
 
     companion object {
         const val TICK_MS = 100.0
+        // The core's KINDS table (impact.rs), by index. A press changes the regime; a pulse pokes it.
+        const val IV_POUR = 0
+        const val IV_KILL = 1
+        const val IV_FEED = 2
+        const val IV_SEED = 3
+        const val IV_UNDO = 4
+        const val IV_SOURCE = 5
+        const val IV_SOURCE_SET = 9
+        const val IV_WALL_ADD = 14
+        /** What the Events page calls each one. */
+        val IV_LABEL = arrayOf(
+            "You poured mineral", "You killed a specimen", "You fed a specimen",
+            "You introduced organisms", "You undid the last action", "You moved an energy source",
+            "You changed the sunlight", "You added an energy source", "You removed an energy source",
+            "You changed an energy source", "You changed the source layout", "You switched mutation",
+            "You changed an evolution setting", "You applied an evolution preset",
+            "You built a wall", "You removed a wall", "You changed a wall",
+        )
         private const val REC_N = 900
         private const val REC_CH = 141
     }
@@ -123,6 +141,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     private class Pour(val sx: Float, val sy: Float, val t: Long)
     private val pours = ArrayList<Pour>()
     private var wallDrag: FloatArray? = null
+    /** A sun drag is one intervention, not one per frame: log it when the grip starts moving. */
+    private var sunLogged = -1
 
     /** Run something against the core on the render thread, where the core may be touched. */
     fun post(cmd: () -> Unit) { commands.add(cmd) }
@@ -172,7 +192,10 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 val k = sunSel
                 val wx = wrapWorld(cam.x + (e2.x - width / 2.0) / cam.z)
                 val wy = wrapWorld(cam.y + (e2.y - height / 2.0) / cam.z)
-                post { Native.evSource(k, wx, wy) }
+                post {
+                    if (sunLogged != k) { Native.ivPush(IV_SOURCE); sunLogged = k }
+                    Native.evSource(k, wx, wy)
+                }
                 return true
             }
             cam.x = wrapWorld(cam.x + dx / cam.z)
@@ -195,6 +218,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         scaleDetector.onTouchEvent(e)
         tapDetector.onTouchEvent(e)
         if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) {
+            sunLogged = -1
             val d = wallDrag
             wallDrag = null
             if (d != null && wallArmed) {
@@ -205,8 +229,11 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 val y1 = cam.y + (d[3] - height / 2.0) / cam.z
                 // wallAdd takes the stroke as a VECTOR, not two endpoints: a long stroke is
                 // minimal-imaged across the seam rather than wrapped the long way round
-                post { Native.evWallAdd(x0, y0, x1 - (cam.x + (d[0] - width / 2.0) / cam.z),
-                    y1 - (cam.y + (d[1] - height / 2.0) / cam.z), 0.0, 0.0, 0.0, 0) }
+                post {
+                    Native.ivPush(IV_WALL_ADD)
+                    Native.evWallAdd(x0, y0, x1 - (cam.x + (d[0] - width / 2.0) / cam.z),
+                        y1 - (cam.y + (d[1] - height / 2.0) / cam.z), 0.0, 0.0, 0.0, 0)
+                }
             }
         }
         return true
@@ -230,6 +257,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             pendingLongX = Float.NaN
             val sp = seedSpecies
             if (intervene && sp >= 0 && Native.levelAllows(1) != 0) {
+                Native.ivPush(IV_SEED)
                 Native.evSpawnPack(sp, worldX(lx), worldY(ly))
                 pours.add(Pour(lx, ly, System.nanoTime()))
             }
@@ -253,6 +281,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             }
             if (Native.pick(wx, wy, Native.pickRadius(cam.z, 0)) == 0) {
                 if (Native.levelAllows(0) != 0 && Native.levelPourOk() != 0) {
+                    Native.ivPush(IV_POUR)
                     Native.evFertilize(wx, wy, 40.0)
                     Native.levelNotePour(1)
                     pours.add(Pour(sx, sy, System.nanoTime()))
@@ -294,11 +323,13 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     }
 
     /** Feed and kill act on what is selected, so the shell does not need the slot index. */
-    fun feedSelected() = post { if (selI >= 0) Native.evFeed(selI, selGen, 0.35) }
-    fun killSelected() = post {
-        if (selI >= 0) { Native.evKill(selI, selGen); selI = -1 }
+    fun feedSelected() = post {
+        if (selI >= 0) { Native.ivPush(IV_FEED); Native.evFeed(selI, selGen, 0.35) }
     }
-    fun undoLast() = post { Native.undo() }
+    fun killSelected() = post {
+        if (selI >= 0) { Native.ivPush(IV_KILL); Native.evKill(selI, selGen); selI = -1 }
+    }
+    fun undoLast() = post { Native.ivPush(IV_UNDO); Native.undo() }
 
     // ---- save and load (A.6) ----
     // Both run on the render thread, then hand the result back on the UI thread: a snapshot taken
@@ -366,6 +397,38 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             undoSpecies = Native.undoSpecies()
             if (dataOpen && dataFrame++ % 15 == 0) publishData()
             publishLevel()
+        }
+    }
+
+    /** What the Observatory can say about one intervention. Render thread only. */
+    private fun impactLine(i: Int): String {
+        return when (Native.impact(i)) {
+            0 -> "history has rolled past this one"
+            1 -> "watching impact… ${Native.impactNum(0).toInt()}%"
+            else -> {
+                val n = Native.impactNum(2).toInt()
+                val sb = StringBuilder()
+                if (n == 0) sb.append("no clear shift beyond normal variability — the world absorbed it")
+                else {
+                    sb.append("Since: ")
+                    for (k in 0 until n) {
+                        if (k > 0) sb.append(" · ")
+                        val pct = Native.impactMover(k, 1)
+                        sb.append(Native.impactMoverName(k)).append(' ')
+                            .append(if (pct > 0) "+" else "").append(pct.toInt()).append('%')
+                        if (Native.impactMover(k, 2) == 0.0) sb.append(" (could be a natural swing)")
+                    }
+                }
+                val tails = ArrayList<String>()
+                val rec = Native.impactNum(3)
+                if (!rec.isNaN() && rec != 0.0) tails.add("relaxed back after ${rec.toInt()} s")
+                else if (Native.impactNum(1) != 0.0) tails.add("settling toward a new regime")
+                else if (Native.impactNum(6) == 0.0) tails.add("still developing")
+                if (Native.impactNum(4) != 0.0) tails.add("mixed with other interventions")
+                if (Native.impactNum(5) != 0.0) tails.add("under a changed-sun regime — attribution weak")
+                if (tails.isNotEmpty()) sb.append(" · ").append(tails.joinToString(" · "))
+                sb.toString()
+            }
         }
     }
 
@@ -440,7 +503,14 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         }
         healthText = sb.toString()
 
+        // The player's own hands first, each with its card. Rule 6: "since", never "because".
         val ev = StringBuilder()
+        val ivs = Native.ivCount()
+        for (i in ivs - 1 downTo maxOf(0, ivs - 8)) {
+            ev.append("t %-6d %s\n".format(Native.ivAt(i, 0).toLong(), IV_LABEL[Native.ivAt(i, 1).toInt()]))
+            ev.append("        ").append(impactLine(i)).append('\n')
+        }
+        if (ivs > 0) ev.append('\n')
         val count = Native.sysEventCount()
         for (i in count - 1 downTo maxOf(0, count - 40)) {
             ev.append("t %-6d %s\n".format(Native.sysEventNum(i, 0).toLong(), Native.sysEventText(i, 1)))

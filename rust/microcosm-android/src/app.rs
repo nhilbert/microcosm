@@ -707,3 +707,77 @@ pub extern "system" fn Java_org_microcosm_app_Native_load(
     unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len()) };
     abi::mc_load()
 }
+
+// ---------------------------------------------------------------------------
+// Impact cards. The shell logs its own interventions — the core cannot tell a hand from a script —
+// and reads the card back on the render thread.
+
+/// `kind` indexes the core's KINDS table (see impact.rs).
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_ivPush(_env: JNIEnv, _this: JObject, kind: jint) {
+    abi::mc_iv_push(kind);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_ivCount(_env: JNIEnv, _this: JObject) -> jint {
+    abi::mc_iv_count() as jint
+}
+
+/// `field`: 0 tick, 1 kind.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_ivAt(
+    _env: JNIEnv,
+    _this: JObject,
+    i: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_iv_at(i.max(0) as u32, field)
+}
+
+/// Compute the card for intervention `i`. 0 rolled, 1 watching, 2 done.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_impact(_env: JNIEnv, _this: JObject, i: jint) -> jint {
+    abi::mc_impact(i.max(0) as u32)
+}
+
+/// `field`: 0 watching pct, 1 isPress, 2 notable count, 3 recovered seconds (NaN if never),
+/// 4 mixed, 5 pressBackdrop, 6 complete.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_impactNum(
+    _env: JNIEnv,
+    _this: JObject,
+    field: jint,
+) -> jdouble {
+    abi::mc_impact_num(field)
+}
+
+/// One mover. `field`: 0 channel, 1 percent, 2 strong.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_impactMover(
+    _env: JNIEnv,
+    _this: JObject,
+    k: jint,
+    field: jint,
+) -> jdouble {
+    abi::mc_impact_mover(k.max(0) as u32, field)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_impactMoverName(
+    env: JNIEnv,
+    _this: JObject,
+    k: jint,
+) -> jni::sys::jstring {
+    let ptr = abi::mc_impact_mover_ptr(k.max(0) as u32) as *const u8;
+    let len = abi::mc_impact_mover_len(k.max(0) as u32) as usize;
+    let text = if len == 0 || ptr.is_null() {
+        ""
+    } else {
+        // SAFETY: a &'static str in the channel table.
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(ptr, len)) }
+    };
+    match env.new_string(text) {
+        Ok(v) => v.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}

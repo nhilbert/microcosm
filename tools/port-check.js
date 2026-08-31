@@ -74,6 +74,9 @@ compare(`the visual grammar`, "fingerprint-frame.js", []);
 // Undo (A.3). The browser inverts a lever with an explicit inverse event; the Rust core inverts
 // from a slot it keeps itself. Two mechanisms, one arithmetic — so the worlds must agree.
 compare(`undo puts the world back`, "fingerprint-undo.js", []);
+// Impact cards: the honesty machinery. Every threshold in it is a Phase 4 calibration fight, so a
+// port that gets one wrong narrates a different world rather than crashing.
+compare(`impact cards`, "fingerprint-impact.js", []);
 
 console.log(fails === 0
   ? "PORT CHECK PASS (bit-identical)"

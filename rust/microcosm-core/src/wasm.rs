@@ -1318,3 +1318,107 @@ pub extern "C" fn mc_load() -> i32 {
         Err(_) => 0,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Impact cards (A.3, completed). The core cannot tell a player's hand from a script, so the shell
+// logs its own interventions here and `impact()` reads that log.
+
+/// Log an intervention at the current tick. `kind` indexes `impact::KINDS`.
+#[no_mangle]
+pub extern "C" fn mc_iv_push(kind: i32) {
+    let sim = s();
+    if kind < 0 || kind as usize >= crate::impact::KINDS.len() {
+        return;
+    }
+    let tick = sim.w.tick;
+    sim.iv_log.push(crate::impact::IvEntry { tick, kind: kind as usize });
+    if sim.iv_log.len() > 300 {
+        sim.iv_log.remove(0);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mc_iv_count() -> u32 {
+    s().iv_log.len() as u32
+}
+
+/// `field`: 0 tick, 1 kind.
+#[no_mangle]
+pub extern "C" fn mc_iv_at(i: u32, field: i32) -> f64 {
+    match s().iv_log.get(i as usize) {
+        None => f64::NAN,
+        Some(e) => match field {
+            0 => e.tick as f64,
+            1 => e.kind as f64,
+            _ => f64::NAN,
+        },
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mc_iv_clear() {
+    s().iv_log.clear();
+}
+
+static mut IMPACT: Option<crate::impact::Impact> = None;
+
+#[allow(static_mut_refs)]
+fn imp() -> &'static crate::impact::Impact {
+    unsafe { IMPACT.as_ref().unwrap() }
+}
+
+/// Compute the card for intervention `i` and park it. Returns the status: 0 rolled, 1 watching,
+/// 2 done.
+#[no_mangle]
+pub extern "C" fn mc_impact(i: u32) -> i32 {
+    let r = s().impact(i as usize);
+    let code = match r.status {
+        crate::impact::Status::Rolled => 0,
+        crate::impact::Status::Watching => 1,
+        crate::impact::Status::Done => 2,
+    };
+    unsafe { IMPACT = Some(r) };
+    code
+}
+
+/// `field`: 0 watching pct, 1 isPress, 2 notable count, 3 recovered seconds (NaN if never),
+/// 4 mixed, 5 pressBackdrop, 6 complete.
+#[no_mangle]
+pub extern "C" fn mc_impact_num(field: i32) -> f64 {
+    let r = imp();
+    match field {
+        0 => r.watching_pct,
+        1 => r.is_press as i32 as f64,
+        2 => r.notable.len() as f64,
+        3 => r.recovered_s.unwrap_or(f64::NAN),
+        4 => r.mixed as i32 as f64,
+        5 => r.press_backdrop as i32 as f64,
+        6 => r.complete as i32 as f64,
+        _ => f64::NAN,
+    }
+}
+
+/// One mover. `field`: 0 channel, 1 percent, 2 strong.
+#[no_mangle]
+pub extern "C" fn mc_impact_mover(k: u32, field: i32) -> f64 {
+    match imp().notable.get(k as usize) {
+        None => f64::NAN,
+        Some(m) => match field {
+            0 => m.ch as f64,
+            1 => m.pct,
+            2 => m.strong as i32 as f64,
+            _ => f64::NAN,
+        },
+    }
+}
+
+/// The mover's name, in the words the browser uses. UTF-8 bytes.
+#[no_mangle]
+pub extern "C" fn mc_impact_mover_ptr(k: u32) -> usize {
+    imp().notable.get(k as usize).map_or(0, |m| m.name.as_ptr() as usize)
+}
+
+#[no_mangle]
+pub extern "C" fn mc_impact_mover_len(k: u32) -> u32 {
+    imp().notable.get(k as usize).map_or(0, |m| m.name.len() as u32)
+}

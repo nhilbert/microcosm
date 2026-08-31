@@ -183,6 +183,27 @@ object Native {
     /** 1 when the world was taken, 0 when the file is not one of ours or is truncated. */
     external fun load(data: ByteArray): Int
 
+    // ---- impact cards ----
+    /** kind indexes the core's KINDS table; see IV in WorldView. */
+    external fun ivPush(kind: Int)
+    external fun ivCount(): Int
+
+    /** field: 0 tick, 1 kind. */
+    external fun ivAt(i: Int, field: Int): Double
+
+    /** Compute the card for intervention i. 0 rolled, 1 watching, 2 done. */
+    external fun impact(i: Int): Int
+
+    /**
+     * field: 0 watching pct, 1 isPress, 2 notable count, 3 recovered seconds (NaN if never),
+     * 4 mixed, 5 pressBackdrop, 6 complete.
+     */
+    external fun impactNum(field: Int): Double
+
+    /** One mover. field: 0 channel, 1 percent, 2 strong. */
+    external fun impactMover(k: Int, field: Int): Double
+    external fun impactMoverName(k: Int): String
+
     external fun sourceCount(): Int
 
     /** field: 0 x, 1 y, 2 i, 3 a, 4 sigma. */

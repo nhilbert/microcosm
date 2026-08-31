@@ -11,9 +11,9 @@
 // live rather than snapshots.
 //
 // The observatory is here too: `W.rec`, `W.recHead/recCount` and `W.sysEvents` (decoded from WASM
-// memory on read), `indicators`, and the level API. Still absent is `impact`, which reads the UI's
-// own event log; it throws rather than silently returning undefined, so a harness that needs it
-// fails loudly instead of quietly measuring nothing.
+// memory on read), `indicators`, the level API, the frame builder and `impact`. Nothing of the
+// observatory is missing now; `impact` takes its intervention log through `ivPush` rather than
+// reading a UI-side array, since the core cannot tell a player's hand from a script.
 const fs = require("fs");
 const path = require("path");
 
@@ -365,6 +365,34 @@ const undoKind = () => X.mc_undo_kind();
 const undoSpecies = () => X.mc_undo_species();
 const undo = () => { X.mc_undo(); sync(); };
 const undoClear = () => X.mc_undo_clear();
+// Impact cards. The core cannot tell a hand from a script, so the shell logs its own
+// interventions and impact() reads that log. `kind` indexes the core's KINDS table.
+const IV_KINDS = ["pour", "kill", "feed", "seed", "undo", "source", "sunlight", "sourceAdd",
+  "sourceRemove", "sourceSet", "sourceLayout", "mutation", "evolution", "preset",
+  "wallAdd", "wallRemove", "wallSet"];
+const ivPush = type => {
+  const k = IV_KINDS.indexOf(type);
+  if (k < 0) throw new Error(`wasm core: unknown intervention "${type}"`);
+  X.mc_iv_push(k);
+};
+const ivCount = () => X.mc_iv_count();
+const ivClear = () => X.mc_iv_clear();
+function impact(i){
+  const code = X.mc_impact(i);
+  if (code === 0) return { status: "rolled" };
+  if (code === 1) return { status: "watching", pct: X.mc_impact_num(0) };
+  const notable = [];
+  for (let k = 0; k < X.mc_impact_num(2); k++){
+    const p = X.mc_impact_mover_ptr(k), n = X.mc_impact_mover_len(k);
+    notable.push({ ch: X.mc_impact_mover(k, 0), name: DEC.decode(new Uint8Array(MEM.buffer, p, n)),
+      pct: X.mc_impact_mover(k, 1), strong: X.mc_impact_mover(k, 2) !== 0 });
+  }
+  const rec = X.mc_impact_num(3);
+  return { status: "done", isPress: X.mc_impact_num(1) !== 0, notable,
+    recoveredS: Number.isNaN(rec) ? null : rec,
+    mixed: X.mc_impact_num(4) !== 0, pressBackdrop: X.mc_impact_num(5) !== 0,
+    complete: X.mc_impact_num(6) !== 0 };
+}
 const pickRadius = (z, tight) => X.mc_pick_radius(z, tight ? 1 : 0);
 function pickCandidates(wx, wy, rad){
   const n = X.mc_pick(wx, wy, rad), out = [];
@@ -428,16 +456,11 @@ function wallStrokes(){
   return out;
 }
 
-// Still JS-only: impact(). Fail loudly rather than let a gate quietly measure nothing.
-const notYet = name => () => {
-  throw new Error(`wasm core: ${name} is not ported yet (docs/android-port-plan.md) — run this harness against dist/core.js`);
-};
-
 module.exports = {
   W, P, TRAITS, TAG, REC, SPECIES, MAXN, MAXLOCI, CELL,
   resetWorld, initWorld, step, queueEvent, applyEvent, computeLight, computeTemp,
   wrap, wd, cellOf, mulberry32,
-  indicators, impact: notYet("impact"),
+  indicators, impact, ivPush, ivCount, ivClear, IV_KINDS,
   LEVELS, LEVEL_ROWS: LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter,
   levelAllows, levelPourOk, levelNotePour, levelNarration,
   markPrev, makeGrammar, bucketSpec, frameOf, TINT_BINS: 7, LOD_Z, pickRadius, pickCandidates,

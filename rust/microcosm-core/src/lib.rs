@@ -16,6 +16,7 @@
 pub mod events;
 pub mod fields;
 pub mod frame;
+pub mod impact;
 pub mod jsnum;
 pub mod levels;
 pub mod levels_gen;
@@ -68,6 +69,9 @@ pub struct Sim {
     /// What it would take to put the world back after the last lever (see events.rs). One slot,
     /// like the browser's five-second undo.
     pub undo: events::Undo,
+    /// The player's own interventions, in order. The core cannot know a hand from a script, so the
+    /// shell appends here and `impact()` reads it.
+    pub iv_log: Vec<impact::IvEntry>,
     /// The shipped evolution settings, captured once at load; `init_world` restores them.
     locus_shipped: Vec<Vec<Locus>>,
 }
@@ -96,6 +100,7 @@ impl Sim {
             grammar: frame::grammar(&tr2),
             frame_field: vec![0; NCELL * 4],
             undo: events::Undo::None,
+            iv_log: Vec::new(),
             locus_shipped,
         }
     }
