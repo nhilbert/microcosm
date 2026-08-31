@@ -362,7 +362,7 @@ function HealthPage(){
   );
 }
 
-function DataMode({ docked }){
+function DataMode({ docked, topH }){
   const cRef = React.useRef(null);
   const [page, setPage] = React.useState(0);
   const [scrub, setScrub] = React.useState(null);
@@ -409,7 +409,10 @@ function DataMode({ docked }){
       ? { position:"relative", flex:1, minHeight:0, display:"flex", flexDirection:"column",
           paddingTop:12, fontFamily:"ui-monospace, Menlo, monospace", color:"#B8C5D1" }
       : { position:"absolute", inset:0, background:"rgba(11,19,30,0.97)",
-          zIndex:4, display:"flex", flexDirection:"column", paddingTop:88,
+          zIndex:4, display:"flex", flexDirection:"column",
+          // clears the measured top stack (stats, home control, experiment chip);
+          // 88 is the fallback where ResizeObserver is missing
+          paddingTop: topH ? topH + 6 : 88,
           fontFamily:"ui-monospace, Menlo, monospace", color:"#B8C5D1" }}
       onPointerDown={docked ? undefined : swDown} onPointerUp={docked ? undefined : swUp}>
       <div style={{ padding:"0 16px 6px", display:"flex", alignItems:"flex-start" }}>
