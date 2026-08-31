@@ -93,7 +93,12 @@ function marchMul(x0, y0, dx, dy, AV, AH){
   return m;
 }
 
-function diffuseM(){
+// Perf pass 2026-08-31: two bodies, one arithmetic. Every face factor is exactly 1.0 without
+// walls, and multiplying by 1.0 is an exact identity in IEEE 754 — so the open-world body drops
+// the four face loads+multiplies per cell per field and stays bit-identical to the walled one.
+// Banner rule 4 holds for both: draw-free.
+function diffuseM(){ return W.wallsOn ? diffuseMWalled() : diffuseMOpen(); }
+function diffuseMWalled(){
   const G=P.GRID, M=W.M, T=W.Mtmp, k=P.mDiff*0.25;
   const FV=W.wfFlV, FH=W.wfFlH; // face flow transmission (7.W): exactly 1 on open faces, so the flux-pair form is the shipped stencil bit for bit
   for(let y=0;y<G;y++){
@@ -129,6 +134,44 @@ function diffuseM(){
       const xl=(x-1+G)%G, xr=(x+1)%G;
       const c=y0+x, v=A[c];
       AT[c]=(v + ka*(FV[y0+xl]*(A[y0+xl]-v)+FV[c]*(A[y0+xr]-v)+FH[yu+x]*(A[yu+x]-v)+FH[c]*(A[yd+x]-v)))*0.85;
+    }
+  }
+  A.set(AT);
+}
+function diffuseMOpen(){ // the wall-free fast path: the walled body with every face factor (exactly 1) elided
+  const G=P.GRID, M=W.M, T=W.Mtmp, k=P.mDiff*0.25;
+  for(let y=0;y<G;y++){
+    const yu=((y-1+G)%G)*G, yd=((y+1)%G)*G, y0=y*G;
+    for(let x=0;x<G;x++){
+      const xl=(x-1+G)%G, xr=(x+1)%G;
+      const c=y0+x, m=M[c];
+      T[c]=m + k*((M[y0+xl]-m)+(M[y0+xr]-m)+(M[yu+x]-m)+(M[yd+x]-m));
+    }
+  }
+  M.set(T);
+  const dE=W.dE, dP=W.dP, dM=W.dM, qD=W.qD;
+  for(let c=0;c<G*G;c++){
+    const back=dM[c]*P.dLeach*qD[c], keep=1-P.dLeach*qD[c]; // abiotic breakdown warms with the cell (7.H)
+    if(back>0){ M[c]+=back; W.flows.leachM+=back; }
+    dM[c]*=keep; dE[c]*=keep; dP[c]*=keep;  // organic fractions dissipate
+  }
+  const S=W.sc, ST=W.scTmp, ks=P.scentDiff*0.25;
+  for(let y=0;y<G;y++){
+    const yu=((y-1+G)%G)*G, yd=((y+1)%G)*G, y0=y*G;
+    for(let x=0;x<G;x++){
+      const xl=(x-1+G)%G, xr=(x+1)%G;
+      const c=y0+x, v=S[c];
+      ST[c]=(v + ks*((S[y0+xl]-v)+(S[y0+xr]-v)+(S[yu+x]-v)+(S[yd+x]-v)))*P.scentDecay;
+    }
+  }
+  S.set(ST);
+  const A=W.al, AT=W.alTmp, ka=0.2*0.25;
+  for(let y=0;y<G;y++){
+    const yu=((y-1+G)%G)*G, yd=((y+1)%G)*G, y0=y*G;
+    for(let x=0;x<G;x++){
+      const xl=(x-1+G)%G, xr=(x+1)%G;
+      const c=y0+x, v=A[c];
+      AT[c]=(v + ka*((A[y0+xl]-v)+(A[y0+xr]-v)+(A[yu+x]-v)+(A[yd+x]-v)))*0.85;
     }
   }
   A.set(AT);

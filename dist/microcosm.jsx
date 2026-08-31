@@ -545,7 +545,18 @@ function normalizeTraits(rows){
     }
     t.locus = t.loci.length ? t.loci[0] : null;
   }
-  return rows;
+  // Hidden-class canonicalization (perf pass 2026-08-31, behavior-neutral): rows and their
+  // sub-objects arrive with per-species key orders, giving V8 one hidden class per species at
+  // every T.x / L.x load site in the step loop (measured ~8% of the tick). Rebuilding every
+  // object with one fixed (sorted) key order makes those sites monomorphic. Pure data plumbing:
+  // same keys, same values, and the locus === loci[0] alias is preserved.
+  const canon = o => { const r = {}; for (const k of Object.keys(o).sort()) r[k] = o[k]; return r; };
+  return rows.map(t => {
+    t.loci = t.loci.map(canon);
+    t.locus = t.loci.length ? t.loci[0] : null;
+    for (const k of ["cyst", "escape", "detritivore", "corpsivore", "flee", "burst"]) if (t[k]) t[k] = canon(t[k]);
+    return canon(t);
+  });
 }
 // Load-time guardrail: every multiplier a locus can express must stay inside [LOCUS_MULT_MIN, LOCUS_MULT_MAX]
 // across the whole corridor, curvature included. A typo in a slope fails here, not in a 54k-tick run.
@@ -607,6 +618,7 @@ const W = {
   px: new Float32Array(MAXN), py: new Float32Array(MAXN), // previous tick, for render interpolation
   vx: new Float32Array(MAXN), vy: new Float32Array(MAXN),
   en: new Float32Array(MAXN), sz: new Float32Array(MAXN),
+  szPow: new Float64Array(MAXN), // sz^0.75, cached at spawn (sz is written nowhere else; perf pass 2026-08-31 — the pow was the tick's single hottest line)
   sp: new Uint8Array(MAXN), alive: new Uint8Array(MAXN),
   hd: new Float32Array(MAXN), handle: new Int16Array(MAXN),
   cd: new Int16Array(MAXN), cy: new Uint8Array(MAXN), gr: new Int16Array(MAXN),
@@ -665,7 +677,7 @@ function spawn(species, sx, sy, e, size, mnEndow, prEndow){
   const i = W.freeList.length ? W.freeList.pop() : W.n++;
   if (i >= MAXN) return -1;
   W.x[i]=wrap(sx); W.y[i]=wrap(sy); W.px[i]=W.x[i]; W.py[i]=W.y[i];
-  W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.sp[i]=species; W.alive[i]=1;
+  W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.szPow[i]=Math.pow(W.sz[i],0.75); W.sp[i]=species; W.alive[i]=1;
   W.hd[i]=R()*6.283; W.cd[i]=TRAITS[species].matureCd; W.handle[i]=0; W.cy[i]=0; W.gr[i]=0;
   W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0; W.pc[i]=0;
   { const loci = TRAITS[species].loci; // every plane reset: slots are reused across species
@@ -957,7 +969,12 @@ function marchMul(x0, y0, dx, dy, AV, AH){
   return m;
 }
 
-function diffuseM(){
+// Perf pass 2026-08-31: two bodies, one arithmetic. Every face factor is exactly 1.0 without
+// walls, and multiplying by 1.0 is an exact identity in IEEE 754 — so the open-world body drops
+// the four face loads+multiplies per cell per field and stays bit-identical to the walled one.
+// Banner rule 4 holds for both: draw-free.
+function diffuseM(){ return W.wallsOn ? diffuseMWalled() : diffuseMOpen(); }
+function diffuseMWalled(){
   const G=P.GRID, M=W.M, T=W.Mtmp, k=P.mDiff*0.25;
   const FV=W.wfFlV, FH=W.wfFlH; // face flow transmission (7.W): exactly 1 on open faces, so the flux-pair form is the shipped stencil bit for bit
   for(let y=0;y<G;y++){
@@ -993,6 +1010,44 @@ function diffuseM(){
       const xl=(x-1+G)%G, xr=(x+1)%G;
       const c=y0+x, v=A[c];
       AT[c]=(v + ka*(FV[y0+xl]*(A[y0+xl]-v)+FV[c]*(A[y0+xr]-v)+FH[yu+x]*(A[yu+x]-v)+FH[c]*(A[yd+x]-v)))*0.85;
+    }
+  }
+  A.set(AT);
+}
+function diffuseMOpen(){ // the wall-free fast path: the walled body with every face factor (exactly 1) elided
+  const G=P.GRID, M=W.M, T=W.Mtmp, k=P.mDiff*0.25;
+  for(let y=0;y<G;y++){
+    const yu=((y-1+G)%G)*G, yd=((y+1)%G)*G, y0=y*G;
+    for(let x=0;x<G;x++){
+      const xl=(x-1+G)%G, xr=(x+1)%G;
+      const c=y0+x, m=M[c];
+      T[c]=m + k*((M[y0+xl]-m)+(M[y0+xr]-m)+(M[yu+x]-m)+(M[yd+x]-m));
+    }
+  }
+  M.set(T);
+  const dE=W.dE, dP=W.dP, dM=W.dM, qD=W.qD;
+  for(let c=0;c<G*G;c++){
+    const back=dM[c]*P.dLeach*qD[c], keep=1-P.dLeach*qD[c]; // abiotic breakdown warms with the cell (7.H)
+    if(back>0){ M[c]+=back; W.flows.leachM+=back; }
+    dM[c]*=keep; dE[c]*=keep; dP[c]*=keep;  // organic fractions dissipate
+  }
+  const S=W.sc, ST=W.scTmp, ks=P.scentDiff*0.25;
+  for(let y=0;y<G;y++){
+    const yu=((y-1+G)%G)*G, yd=((y+1)%G)*G, y0=y*G;
+    for(let x=0;x<G;x++){
+      const xl=(x-1+G)%G, xr=(x+1)%G;
+      const c=y0+x, v=S[c];
+      ST[c]=(v + ks*((S[y0+xl]-v)+(S[y0+xr]-v)+(S[yu+x]-v)+(S[yd+x]-v)))*P.scentDecay;
+    }
+  }
+  S.set(ST);
+  const A=W.al, AT=W.alTmp, ka=0.2*0.25;
+  for(let y=0;y<G;y++){
+    const yu=((y-1+G)%G)*G, yd=((y+1)%G)*G, y0=y*G;
+    for(let x=0;x<G;x++){
+      const xl=(x-1+G)%G, xr=(x+1)%G;
+      const c=y0+x, v=A[c];
+      AT[c]=(v + ka*((A[y0+xl]-v)+(A[y0+xr]-v)+(A[yu+x]-v)+(A[yd+x]-v)))*0.85;
     }
   }
   A.set(AT);
@@ -1779,7 +1834,8 @@ const LEVELS = [
 //      a world without walls runs the certified arithmetic bit for bit;
 //      a walled world diverges only through ecology, like a moved sun.
 // Modification protocol: after ANY edit to this file, run
-//   `node conform.js`   (2 seeds x 3000 ticks, ~3 s)
+//   `node conform.js`   (2 seeds x 2 genomes x 3000 ticks; the perf review caught this
+//   note claiming ~3 s when the tick had grown 6x past it — time it, don't trust it)
 // A changed fingerprint is fine only when an ecology change is the
 // declared intent — then re-capture with `node conform.js --capture`
 // and re-run the full 8-seed harness (tune2.js) before shipping.
@@ -1828,7 +1884,7 @@ function step(){
     if (dT > 0) for (let k=0;k<nL;k++){ const L=loci[k]; if (L.warmSlope !== 0 || L.warmGainSlope !== 0){
       const d=W.g[k*MAXN+i]-L.g0, hw=dT*0.1;
       wR *= 1 - L.warmSlope*d*hw; wA *= 1 - L.warmGainSlope*d*hw; } }
-    let cost = T.kb*kbG*Math.pow(W.sz[i],0.75)*W.qR[cT]*wR; // maintenance: Q10 2.5, flattened by the thermal locus
+    let cost = T.kb*kbG*W.szPow[i]*W.qR[cT]*wR; // maintenance: Q10 2.5, flattened by the thermal locus (szPow = sz^0.75 cached at spawn — the same double)
     const mQ = P.mQuota*T.mQm*W.sz[i], mCap = mQ*P.mCapMul;
     if(T.photosynth){
       const c0 = cellOf(i);
@@ -1905,16 +1961,30 @@ function step(){
         if(W.flee[i]>0){ W.flee[i]--; fleeing=true; }
       }
       if(hungry && !fleeing){
-        neighbors(i, T.sense, (j,ddx,ddy,d)=>{
-          if(W.cy[j] && !TRAITS[W.sp[j]].cystYield) return; // cysts of shelterless species are invisible; sheltered ones are half-yield prey
-          const TJ = TRAITS[W.sp[j]];
-          if(W.sp[j]===W.sp[i]){ if(d<T.interfRadius) nearKin++; return; }
-          if(!(T.diet & TJ.bodyTag)) return;
-          if(TJ.grazeFloor && W.en[j]<=TJ.grazeFloor) return;
-          if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], ddx, ddy)) return; // 7.W: prey beyond a face this hunter cannot cross is out of reach -- and out of mind (no wall-camping, no through-mesh bites)
-          const pref = d*TJ.pursuitPenalty;
-          if(pref<best){ best=pref; tx=ddx; ty=ddy; found=true; target=j; }
-        });
+        // The hunt scan, inlined (perf pass 2026-08-31): the same cell walk and arithmetic as
+        // neighbors(), without the per-tick closure and per-candidate call (they were ~20% of the
+        // tick between them), and with the sqrt taken only on candidates that reach a distance
+        // comparison — the same doubles wherever a value is used, so the chosen target, nearKin
+        // and best are bit-identical. Draw-free, like the callback it replaces.
+        const rr=Math.ceil(T.sense/CELL), r2=T.sense*T.sense;
+        const gx=Math.floor(W.x[i]/CELL), gy=Math.floor(W.y[i]/CELL);
+        for(let dy=-rr;dy<=rr;dy++) for(let dx=-rr;dx<=rr;dx++){
+          const c=((gy+dy+P.GRID)%P.GRID)*P.GRID + ((gx+dx+P.GRID)%P.GRID);
+          for(let j=W.hashHead[c]; j>=0; j=W.hashNext[j]){
+            if(j===i||!W.alive[j]) continue;
+            const ddx=wd(W.x[j]-W.x[i]), ddy=wd(W.y[j]-W.y[i]);
+            const d2=ddx*ddx+ddy*ddy;
+            if(d2>r2) continue;
+            if(W.cy[j] && !TRAITS[W.sp[j]].cystYield) continue; // cysts of shelterless species are invisible; sheltered ones are half-yield prey
+            const TJ = TRAITS[W.sp[j]];
+            if(W.sp[j]===W.sp[i]){ if(Math.sqrt(d2)<T.interfRadius) nearKin++; continue; }
+            if(!(T.diet & TJ.bodyTag)) continue;
+            if(TJ.grazeFloor && W.en[j]<=TJ.grazeFloor) continue;
+            if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], ddx, ddy)) continue; // 7.W: prey beyond a face this hunter cannot cross is out of reach -- and out of mind (no wall-camping, no through-mesh bites)
+            const pref = Math.sqrt(d2)*TJ.pursuitPenalty;
+            if(pref<best){ best=pref; tx=ddx; ty=ddy; found=true; target=j; }
+          }
+        }
       }
       let speed;
       if(fleeing){ // run down the alarm gradient, foraging suspended

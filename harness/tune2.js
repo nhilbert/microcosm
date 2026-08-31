@@ -8,28 +8,48 @@
 //   reported per seed so the trend stays visible.
 //   Superseded: the original criterion required Venator on all 8 seeds.
 // --silent runs the reference world (P.mutation=false); default is the shipped, evolving world.
+// Parallel since the perf review (docs/perf-review-2026-08-31.md): the 8 seeds are independent
+// worlds and fan across cores via harness/pool.js — one fresh process per seed, per-seed lines
+// printed in seed order, byte-identical to the sequential harness. MC_JOBS caps the workers;
+// `--job <json>` is the internal worker entry point. The measurement arithmetic is unchanged.
 const L = require("./lib.js"); const { C, W, P, SEEDS, HORIZON } = L;
-const mutation = !process.argv.includes("--silent");
-console.log(`[${mutation ? "evolving world, P.mutation=true" : "reference world, P.mutation=false"}]`);
-const t0 = Date.now(); let anyFail = false;
-for (const seed of SEEDS){
+const argv = process.argv.slice(2);
+
+function runSeed(seed, mutation){
   L.start(seed, mutation);
   const M0 = L.auditM();
-  let minP = new Array(7).fill(1e9), last = [0,0,0,0,0,0,0], ok = true, mStarv = 0, vSeen = false, vLostT = -1;
+  let minP = new Array(7).fill(1e9), last = [0,0,0,0,0,0,0], collapsedAt = -1, mStarv = 0, vSeen = false, vLostT = -1;
   for (let t = 0; t <= HORIZON; t++){
     C.step(); const p = L.pops(); last = p;
     for (let k = 0; k < 7; k++) minP[k] = Math.min(minP[k], p[k]);
     if (t === 9000) for (let i = 0; i < W.n; i++) // mid-run: how many producers are mineral-limited?
       if (W.alive[i] && W.sp[i] < 2 && !W.cy[i] && W.mn[i] < 0.5*P.mQuota*W.sz[i]) mStarv++;
     if (p[6] > 0) vSeen = true; else if (vSeen && vLostT < 0) vLostT = t;
-    if (L.coreCollapsed(p, t)){ console.log(`seed ${seed}: ECOSYSTEM COLLAPSE at t=${t} pops=${p}`); ok = false; anyFail = true; break; }
+    if (L.coreCollapsed(p, t)){ collapsedAt = t; break; }
   }
   const drift = 100*(L.auditM()-M0)/M0;
-  const apex = !vSeen ? "never established" : vLostT < 0 ? `held (${last[6]})` : `lost at t=${vLostT}`;
   let corpses = 0; for (let k=0;k<W.cN;k++) if (W.cAlive[k]) corpses++;
   let dE=0, dP=0; for (let c=0;c<P.GRID*P.GRID;c++){ dE+=W.dE[c]; dP+=W.dP[c]; }
-  if (ok) console.log(`seed ${seed}: OK apex ${apex} | final S=${last[0]} D=${last[1]} C=${last[2]} B=${last[3]} My=${last[4]} V=${last[6]} | min ${minP.join('/')} | M-audit drift ${drift.toFixed(4)}% | M-starved producers @t9000: ${mStarv} | uptake ${W.flows.uptake.toFixed(0)} release ${W.flows.release.toFixed(0)} | corpses=${corpses} | detritus E=${dE.toFixed(0)} P=${dP.toFixed(0)} egested E=${W.flows.egestE.toFixed(0)} | bacRelease M=${W.flows.bacRelease.toFixed(0)}`);
-  else console.log(`  (audit drift at abort: ${drift.toFixed(4)}%)`);
+  return { seed, collapsedAt, last, minP, mStarv, vSeen, vLostT, drift, corpses, dE, dP,
+    uptake: W.flows.uptake, release: W.flows.release, egestE: W.flows.egestE, bacRelease: W.flows.bacRelease };
 }
-console.log(`wall: ${(Date.now()-t0)/1000}s`);
-process.exit(anyFail ? 1 : 0);
+const jobIdx = argv.indexOf("--job");
+if (jobIdx >= 0){ const job = JSON.parse(argv[jobIdx+1]); console.log(JSON.stringify(runSeed(job.seed, job.mutation))); process.exit(0); }
+
+const mutation = !argv.includes("--silent");
+console.log(`[${mutation ? "evolving world, P.mutation=true" : "reference world, P.mutation=false"}]`);
+const t0 = Date.now(); let anyFail = false;
+const { runPool } = require("./pool.js");
+runPool(__filename, SEEDS.map(seed => ({ seed, mutation })), r => {
+  if (r.workerError){ console.log(`WORKER ERROR ${r.workerError} ${r.raw || ""}`); anyFail = true; return; }
+  if (r.collapsedAt >= 0){
+    console.log(`seed ${r.seed}: ECOSYSTEM COLLAPSE at t=${r.collapsedAt} pops=${r.last}`);
+    console.log(`  (audit drift at abort: ${r.drift.toFixed(4)}%)`);
+    anyFail = true; return;
+  }
+  const apex = !r.vSeen ? "never established" : r.vLostT < 0 ? `held (${r.last[6]})` : `lost at t=${r.vLostT}`;
+  console.log(`seed ${r.seed}: OK apex ${apex} | final S=${r.last[0]} D=${r.last[1]} C=${r.last[2]} B=${r.last[3]} My=${r.last[4]} V=${r.last[6]} | min ${r.minP.join('/')} | M-audit drift ${r.drift.toFixed(4)}% | M-starved producers @t9000: ${r.mStarv} | uptake ${r.uptake.toFixed(0)} release ${r.release.toFixed(0)} | corpses=${r.corpses} | detritus E=${r.dE.toFixed(0)} P=${r.dP.toFixed(0)} egested E=${r.egestE.toFixed(0)} | bacRelease M=${r.bacRelease.toFixed(0)}`);
+}).then(() => {
+  console.log(`wall: ${(Date.now()-t0)/1000}s`);
+  process.exit(anyFail ? 1 : 0);
+});

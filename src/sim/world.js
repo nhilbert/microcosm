@@ -10,6 +10,7 @@ const W = {
   px: new Float32Array(MAXN), py: new Float32Array(MAXN), // previous tick, for render interpolation
   vx: new Float32Array(MAXN), vy: new Float32Array(MAXN),
   en: new Float32Array(MAXN), sz: new Float32Array(MAXN),
+  szPow: new Float64Array(MAXN), // sz^0.75, cached at spawn (sz is written nowhere else; perf pass 2026-08-31 — the pow was the tick's single hottest line)
   sp: new Uint8Array(MAXN), alive: new Uint8Array(MAXN),
   hd: new Float32Array(MAXN), handle: new Int16Array(MAXN),
   cd: new Int16Array(MAXN), cy: new Uint8Array(MAXN), gr: new Int16Array(MAXN),
@@ -68,7 +69,7 @@ function spawn(species, sx, sy, e, size, mnEndow, prEndow){
   const i = W.freeList.length ? W.freeList.pop() : W.n++;
   if (i >= MAXN) return -1;
   W.x[i]=wrap(sx); W.y[i]=wrap(sy); W.px[i]=W.x[i]; W.py[i]=W.y[i];
-  W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.sp[i]=species; W.alive[i]=1;
+  W.vx[i]=0; W.vy[i]=0; W.en[i]=e; W.sz[i]=size; W.szPow[i]=Math.pow(W.sz[i],0.75); W.sp[i]=species; W.alive[i]=1;
   W.hd[i]=R()*6.283; W.cd[i]=TRAITS[species].matureCd; W.handle[i]=0; W.cy[i]=0; W.gr[i]=0;
   W.mn[i]=mnEndow||0; W.pr[i]=prEndow||0; W.mem[i]=0; W.flee[i]=0; W.bst[i]=0; W.pc[i]=0;
   { const loci = TRAITS[species].loci; // every plane reset: slots are reused across species
