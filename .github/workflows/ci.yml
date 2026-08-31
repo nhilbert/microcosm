@@ -98,6 +98,14 @@ jobs:
             exit 1
           fi
 
+      - name: The generated level table must match src/observatory/levels.json
+        run: |
+          node tools/gen-levels-rs.js
+          if ! git diff --exit-code -- rust/microcosm-core/src/levels_gen.rs; then
+            echo "::error::levels_gen.rs is out of date. Run 'node tools/gen-levels-rs.js' and commit the result."
+            exit 1
+          fi
+
       - name: Build the core for WASM
         run: npm run wasm
 
@@ -128,3 +136,8 @@ jobs:
 
       - name: The Observatory must narrate identically (K6 gate on the ported core)
         run: MC_CORE=$PWD/rust/wasm/core.js node harness/k6gate.js
+
+      # The level runtime is the ported core's, so the honesty gate has to hold there too: every
+      # level still fails untouched, passes on its lesson, and fails on the wrong lever.
+      - name: The levels gate must pass on the ported core
+        run: MC_CORE=$PWD/rust/wasm/core.js node harness/levels.js

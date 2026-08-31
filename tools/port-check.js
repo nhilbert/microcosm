@@ -10,8 +10,9 @@
 // agreement means the two implementations consumed the same draws in the same order and produced
 // the same doubles, not merely the same ecology.
 //
-// This is the M2/M4 proof protocol of docs/android-port-plan.md in one command. It does NOT cover
-// the observatory (M3) — the gates that read recorder channels still need the JavaScript core.
+// This is the M2/M4 proof protocol of docs/android-port-plan.md in one command. The observatory's
+// own channels are covered by the gates (K6, gate5, heat, light), which take MC_CORE; what this
+// adds on top of the world fingerprints is the level API's surface.
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -63,6 +64,9 @@ function compare(label, script, args) {
 console.log(`PORT CHECK — dist/core.js vs rust/microcosm-core (wasm), ${TICKS} ticks, seeds ${SEEDS}`);
 compare(`world fingerprint`, "fingerprint-raw.js", [TICKS, SEEDS]);
 compare(`events + scenario founding`, "fingerprint-events.js", []);
+// The level API's surface beyond the verdict: apparatus gates, pour budget, meters, narration,
+// restart. `harness/levels.js` proves the verdicts; nothing else exercises these headlessly.
+compare(`the level API's surface`, "fingerprint-levels.js", ["600"]);
 
 console.log(fails === 0
   ? "PORT CHECK PASS (bit-identical)"

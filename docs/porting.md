@@ -110,9 +110,10 @@ Same ritual as always, pointed at the crate.
 | command | what it certifies |
 |---|---|
 | `npm run conform:core` | the fingerprint, bound to a hash of the Rust sources — **and that native and WASM agree** |
-| `npm run port:check` | the Rust core still reproduces the frozen JavaScript oracle (see §7) |
+| `npm run port:check` | the Rust core still reproduces the frozen JavaScript oracle (see §7), world and level API alike |
 | `npm run port:math` | the math module against a V8 trace, exact bits, no tolerance |
 | `npm run port:snapshot` | save/load resumes a world identically |
+| `npm run port:levels` | the Phase 8 honesty gate on the ported core — every level still fails untouched and passes on its lesson |
 | `npm run test:port` | all of the above plus the K6 gate on the ported core |
 | `MC_CORE=rust/wasm/core.js npm run tune` | the 8-seed × 18,000-tick ecology acceptance |
 | the gates | `gate`, `gate5`, `heat:gate`, `light:gate`, `corridor`, `levels` — all take `MC_CORE` |

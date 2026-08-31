@@ -723,3 +723,142 @@ pub extern "C" fn mc_compute_temp() {
     let sim = s();
     crate::fields::compute_temp(&mut sim.w, &sim.p);
 }
+
+// ---------------------------------------------------------------------------
+// The level API (Phase 8). Definitions travel as JSON — one string, parsed once by the shim —
+// because the player text is the bulk of a level and marshalling it field by field would buy
+// nothing. Everything the runtime decides (state, meters, the pour budget) crosses as numbers.
+
+/// The level table, verbatim from `src/observatory/levels.json`. UTF-8 bytes.
+#[no_mangle]
+pub extern "C" fn mc_levels_json_ptr() -> u32 {
+    crate::levels_gen::LEVELS_JSON.as_ptr() as u32
+}
+
+#[no_mangle]
+pub extern "C" fn mc_levels_json_len() -> u32 {
+    crate::levels_gen::LEVELS_JSON.len() as u32
+}
+
+#[no_mangle]
+pub extern "C" fn mc_level_count() -> u32 {
+    crate::levels_gen::LEVELS.len() as u32
+}
+
+/// `levelStart(def, predicted)`. `predicted` is -1 when the prediction step was skipped.
+#[no_mangle]
+pub extern "C" fn mc_level_start(idx: i32, predicted: i32) {
+    if idx >= 0 && (idx as usize) < crate::levels_gen::LEVELS.len() {
+        s().level_start(idx as usize, predicted);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mc_level_restart() {
+    s().level_restart();
+}
+
+#[no_mangle]
+pub extern "C" fn mc_level_stop() {
+    s().level_stop();
+}
+
+fn state_code(st: crate::levels::LvlState) -> i32 {
+    match st {
+        crate::levels::LvlState::Idle => 0,
+        crate::levels::LvlState::Running => 1,
+        crate::levels::LvlState::Passed => 2,
+        crate::levels::LvlState::Failed => 3,
+    }
+}
+
+/// Run the verdict loop and return the state: 0 idle, 1 running, 2 passed, 3 failed.
+#[no_mangle]
+pub extern "C" fn mc_level_check() -> i32 {
+    state_code(s().level_check())
+}
+
+/// `field`: 0 state code, 1 level index (-1 outside a level), 2 run, 3 seenS, 4 predicted,
+/// 5 pours left (-1 unlimited).
+#[no_mangle]
+pub extern "C" fn mc_level_num(field: i32) -> f64 {
+    let l = &s().lvl;
+    match field {
+        0 => state_code(l.state) as f64,
+        1 => l.def as f64,
+        2 => l.run as f64,
+        3 => l.seen_s as f64,
+        4 => l.predicted as f64,
+        5 => l.pour_left as f64,
+        _ => f64::NAN,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mc_level_fail_why_ptr() -> u32 {
+    s().lvl.fail_why.as_ptr() as u32
+}
+
+#[no_mangle]
+pub extern "C" fn mc_level_fail_why_len() -> u32 {
+    s().lvl.fail_why.len() as u32
+}
+
+/// `what`: 0 pours, 1 seed, 2 sources, 3 walls, 4 evolution.
+#[no_mangle]
+pub extern "C" fn mc_level_allows(what: i32) -> i32 {
+    use crate::levels::Apparatus::*;
+    let a = match what {
+        0 => Pours,
+        1 => Seed,
+        2 => Sources,
+        3 => Walls,
+        4 => Evolution,
+        _ => return 0,
+    };
+    s().level_allows(a) as i32
+}
+
+#[no_mangle]
+pub extern "C" fn mc_level_pour_ok() -> i32 {
+    s().level_pour_ok() as i32
+}
+
+#[no_mangle]
+pub extern "C" fn mc_level_note_pour(d: i32) {
+    s().level_note_pour(d);
+}
+
+/// Index into `W.sysEvents` of the freshest event this level narrates, or -1.
+#[no_mangle]
+pub extern "C" fn mc_level_narration() -> i32 {
+    let sim = s();
+    let def = match sim.lvl.def() {
+        Some(d) => d,
+        None => return -1,
+    };
+    for (i, e) in sim.obs.sys_events.iter().enumerate().rev() {
+        if def.narrate.iter().any(|t| *t == e.kind) {
+            return i as i32;
+        }
+    }
+    -1
+}
+
+/// One evaluated meter row of the running level. `field`: 0 value, 1 has-goal, 2 goal, 3 dir.
+/// Labels and units come from the level JSON, so they cross the boundary once, not per frame.
+#[no_mangle]
+pub extern "C" fn mc_level_meter(row: u32, field: i32) -> f64 {
+    let rows = s().level_meter();
+    let r = match rows.get(row as usize) {
+        Some(r) => r,
+        None => return f64::NAN,
+    };
+    match field {
+        0 => r.v,
+        1 => r.goal.is_some() as i32 as f64,
+        2 => r.goal.unwrap_or(f64::NAN),
+        3 => r.dir as f64,
+        _ => f64::NAN,
+    }
+}

@@ -84,7 +84,10 @@ Readability targets for every body text (briefing, debriefs, reflects, fails):
 **no sentence over 20 words, Flesch–Kincaid grade ≤ 8 (checked on texts of 25+
 words).** `harness/prose.js` enforces the word budgets, the sentence cap, the FK
 ceiling, the banned list, and the term ladder — inside `npm test`, so no level ships
-prose the budgets reject. The sentence *counts* in the table are shape guidance, not
+prose the budgets reject. Since the Rust port turned the level predicates into data
+(2026-08-31), the `failNow` verdicts are checked by the gate too; they used to be
+built inside closures and covered only by review. The sentence *counts* in the table
+are shape guidance, not
 enforced: the L5 rewrite (§9) showed that eight tiny sentences can beat five long
 ones for this reader, and the caps that matter are per-sentence length and total
 words.

@@ -16,6 +16,8 @@
 pub mod events;
 pub mod fields;
 pub mod jsnum;
+pub mod levels;
+pub mod levels_gen;
 #[cfg(feature = "stub-math")]
 #[path = "math_stub.rs"]
 pub mod math;
@@ -53,6 +55,8 @@ pub struct Sim {
     pub reg: Registry,
     /// The Observatory: a pure observer over the world (see observatory.rs).
     pub obs: observatory::Observatory,
+    /// The running learning level, if any (see levels.rs). Session state, not world state.
+    pub lvl: levels::Lvl,
     /// The shipped evolution settings, captured once at load; `init_world` restores them.
     locus_shipped: Vec<Vec<Locus>>,
 }
@@ -75,6 +79,7 @@ impl Sim {
             tr,
             reg,
             obs: observatory::Observatory::new(),
+            lvl: levels::Lvl::default(),
             locus_shipped,
         }
     }

@@ -11,9 +11,9 @@
 // live rather than snapshots.
 //
 // The observatory is here too: `W.rec`, `W.recHead/recCount` and `W.sysEvents` (decoded from WASM
-// memory on read). Still absent are the on-demand read-outs built on top of it — `indicators`,
-// `impact` and the level API — which throw rather than silently returning undefined, so a harness
-// that needs them fails loudly instead of quietly measuring nothing.
+// memory on read), `indicators`, and the level API. Still absent is `impact`, which reads the UI's
+// own event log; it throws rather than silently returning undefined, so a harness that needs it
+// fails loudly instead of quietly measuring nothing.
 const fs = require("fs");
 const path = require("path");
 
@@ -290,8 +290,71 @@ function indicators(){
   };
 }
 
-// Still JS-only: impact() and the level API. Fail loudly rather than let a gate quietly measure
-// nothing.
+
+// ---------- the level API (Phase 8) ----------
+// Definitions cross once, as the JSON the crate carries verbatim from src/observatory/levels.json;
+// the runtime itself is Rust (levels.rs), reached through calls. A verdict here is therefore the
+// ported core's verdict rather than a JavaScript re-implementation of it — which is the whole
+// point of running `harness/levels.js` against MC_CORE.
+const LEVELS = JSON.parse(DEC.decode(
+  new Uint8Array(MEM.buffer, X.mc_levels_json_ptr(), X.mc_levels_json_len())));
+const LVL_STATE = ["idle", "running", "passed", "failed"];
+const APPARATUS = ["pours", "seed", "sources", "walls", "evolution"];
+function lvlIdx(def){
+  const key = typeof def === "string" ? def : (def && def.key);
+  const i = LEVELS.findIndex(L => L.key === key);
+  if (i < 0) throw new Error(`wasm core: unknown level ${JSON.stringify(key)}`);
+  return i;
+}
+function levelStart(def, predicted){
+  X.mc_level_start(lvlIdx(def), predicted === undefined ? -1 : predicted | 0);
+  sync();
+}
+function levelRestart(){ X.mc_level_restart(); sync(); }
+function levelStop(){ X.mc_level_stop(); }
+function levelCheck(){ return LVL_STATE[X.mc_level_check()]; }
+function levelAllows(what){
+  const k = APPARATUS.indexOf(what);
+  if (k < 0) throw new Error(`wasm core: unknown apparatus ${JSON.stringify(what)}`);
+  return !!X.mc_level_allows(k);
+}
+function levelPourOk(){ return !!X.mc_level_pour_ok(); }
+function levelNotePour(d){ X.mc_level_note_pour(d | 0); }
+function levelNarration(){
+  const i = X.mc_level_narration();
+  return i < 0 ? null : W.sysEvents[i];
+}
+// Values from Rust, labels and units from the shared table — so the text crosses once, not per frame.
+function levelMeter(){
+  const d = X.mc_level_num(1);
+  if (d < 0) return [];
+  const rows = LEVELS[d].meter, out = [];
+  for (let k = 0; k < rows.length; k++){
+    const v = X.mc_level_meter(k, 0);
+    if (Number.isNaN(v)) return [];   // no recorder sample yet
+    const o = { label: rows[k].label, v };
+    if (X.mc_level_meter(k, 1)) o.goal = X.mc_level_meter(k, 2);
+    if (rows[k].dir !== undefined) o.dir = rows[k].dir;
+    if (rows[k].unit !== undefined) o.unit = rows[k].unit;
+    out.push(o);
+  }
+  return out;
+}
+// The live mirror of the run. `mem` is the evaluator's own scratch and stays inside Rust.
+const LVL = {};
+for (const [name, id] of [["run", 2], ["seenS", 3], ["predicted", 4]])
+  Object.defineProperty(LVL, name, { get(){ return X.mc_level_num(id); }, enumerable: true });
+Object.defineProperty(LVL, "def", { get(){
+  const d = X.mc_level_num(1); return d < 0 ? null : LEVELS[d]; }, enumerable: true });
+Object.defineProperty(LVL, "state", { get(){ return LVL_STATE[X.mc_level_num(0)]; }, enumerable: true });
+Object.defineProperty(LVL, "pourLeft", { get(){
+  const v = X.mc_level_num(5); return v < 0 ? Infinity : v; }, enumerable: true });
+Object.defineProperty(LVL, "failWhy", { get(){
+  const n = X.mc_level_fail_why_len();
+  return n === 0 ? "" : DEC.decode(new Uint8Array(MEM.buffer, X.mc_level_fail_why_ptr(), n));
+  }, enumerable: true });
+
+// Still JS-only: impact(). Fail loudly rather than let a gate quietly measure nothing.
 const notYet = name => () => {
   throw new Error(`wasm core: ${name} is not ported yet (docs/android-port-plan.md) — run this harness against dist/core.js`);
 };
@@ -301,5 +364,6 @@ module.exports = {
   resetWorld, initWorld, step, queueEvent, applyEvent, computeLight, computeTemp,
   wrap, wd, cellOf, mulberry32,
   indicators, impact: notYet("impact"),
-  levelCheck: notYet("levelCheck"), levelStart: notYet("levelStart"),
+  LEVELS, LEVEL_ROWS: LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter,
+  levelAllows, levelPourOk, levelNotePour, levelNarration,
 };

@@ -52,5 +52,5 @@ if (typeof module !== "undefined" && module.exports !== undefined){
     cellLight, neighbors, step, initWorld, resetWorld, applyEvent, drainEvents,
     queueEvent, mulberry32, CELL, MAXN, MAXLOCI,
     makeWall, compileWalls, marchMul, pathBlocked,
-    LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelAllows, levelPourOk, levelNotePour, levelNarration };
+    LEVELS, LEVEL_ROWS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter, levelAllows, levelPourOk, levelNotePour, levelNarration };
 }

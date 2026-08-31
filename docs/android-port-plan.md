@@ -279,7 +279,7 @@ re-reads `W.n` every iteration and `spawn()` grows it, so a child born this tick
 processed this tick. Hoisting the bound — the obvious Rust translation — left every
 newborn unstepped while the parents stayed bit-identical.
 
-**M3 done** (except `impact` and the level API). `src/observatory.rs` carries the
+**M3 done** (except `impact`). `src/observatory.rs` carries the
 141-channel recorder, every detector, and `indicators`/`strainOf` with the measured
 reference bands. Over 6,000 ticks: all per-channel sums bit-identical and all
 narrated events matching on tick, type, species, locus and text.
@@ -316,9 +316,44 @@ making the gate honour `MC_CORE` like every other harness, and by porting
 exercises it. An audit of every harness for the same mistake found no others.
 
 `impact()` is deliberately deferred: it reads `W.evLog`, which the UI writes, so it
-belongs with M5 rather than here. The level API is deferred too — it needs the level
-definitions extracted to shared JSON first, so `harness/prose.js` and the term
-ladder keep binding the same text.
+belongs with M5 rather than here.
+
+**The level API, ported (2026-08-31).** It was deferred behind one prerequisite —
+extracting the level definitions to shared data — and that prerequisite turned out
+to be the interesting part. The definitions were already "data" by the project's own
+rule, but three fields were not: `pass`, `failNow` and `meter` were JavaScript
+closures. A closure cannot cross a language boundary, so shipping them as they were
+would have meant writing the six levels' predicates a second time in Rust — the
+exact dual maintenance the migration exists to end, and the kind that fails
+silently, because a mistranslated threshold still produces a plausible verdict.
+
+So the predicates became data too. `src/observatory/levels.json` now carries every
+level, predicates included, in a small declarative schema: a condition is a metric
+(`pop(sp)`, `lockShare`, `free`), an operator and a right-hand side; `pass` is their
+conjunction; `failNow` is an ordered list of condition-lists with the message each
+fires; `latch` covers the one stateful predicate in the ladder (L6's "the pack is
+gone" must fire only after a pack existed); `meter` is the HUD's rows. `levels.js`
+became the evaluator over that table, `tools/gen-levels-rs.js` generates
+`levels_gen.rs` from the built core (the species_gen.rs pattern, CI-enforced), and
+`levels.rs` is the runtime. The player text travels as the JSON itself, so
+`harness/prose.js`, the term ladder and any future app shell keep reading the same
+strings.
+
+Two consequences worth stating. The JavaScript refactor is behaviour-preserving and
+proved so — conformance bit-identical, the levels gate's 21 cases passing at the
+same ticks as the record. And the gate now runs on the ported core:
+`MC_CORE=rust/wasm/core.js node harness/levels.js` (`npm run port:levels`, in
+`test:port` and in CI) produces byte-identical output, which means the Rust runtime
+walks the recorder ring, latches and sustain counters exactly as the oracle does.
+
+The honesty gate only ever exercises the verdict, though, and the level API is wider
+than that: the apparatus gates decide which tools a player is handed, the pour budget
+how many doses they carry, `levelNarration` which Observatory line the HUD shows,
+`levelMeter` what they read while deciding. None of that is reachable from the gate,
+so `harness/fingerprint-levels.js` walks all six levels and prints the whole surface —
+founding pops and mineral audit, every apparatus flag, the pour budget spent dose by
+dose, meter values as raw bits, the narrated event with its text, `failWhy`, and what
+a restart resets. It runs inside `port:check`, and it is identical across the cores.
 
 **The WASM bridge works.** `MC_CORE=rust/wasm/core.js` points the existing harnesses
 at the ported core, unchanged. `npm run port:check` is the whole comparison in one
@@ -471,10 +506,8 @@ the handover done. What remains is product work and two loose ends.
    It deserves its own increment plan. The toolchain and the JNI path underneath
    it are now proven, and the core sustains 250× against a UI that caps at 16× —
    so the render path, not the simulation, is what that plan has to think about.
-2. **Finish the observatory**: `impact()` (needs `evLog`, which the UI writes — so
-   it lands with M5.1) and the level API (needs the level definitions extracted to
-   shared JSON first, so `harness/prose.js` and the term ladder keep binding the
-   same text). Until then the levels gate runs on the oracle.
+2. **Finish the observatory**: `impact()` is what is left. It reads `W.evLog`,
+   which the UI writes, so it lands with M5.1. ~~The level API~~ — done, §7.
 3. **The unmeasured ratio.** Rust versus V8 *on the same phone* was never measured;
    the WebView wrapper does not report tick times. It gates nothing — the margin is
    15× past the UI's ceiling — but it is the one performance claim in this document

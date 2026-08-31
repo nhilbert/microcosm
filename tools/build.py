@@ -27,7 +27,8 @@ CORE_PARTS = [
     "src/observatory/recorder.js",  # ring buffer + event detectors (pure observers)
     "src/observatory/analysis.js",  # reference bands, strain, indicators
     "src/observatory/impact.js",    # before/after intervention analysis
-    "src/observatory/levels.js",    # learning levels: definitions + pure-observer verdicts (Phase 8)
+    "src/observatory/levels.json",  # the level table, inlined as `const LEVEL_ROWS = [...]`
+    "src/observatory/levels.js",    # learning levels: the evaluator + pure-observer verdicts (Phase 8)
     "src/sim/step.js",              # THE RNG-ORDER CONTRACT + the tick
     "src/sim/init.js",              # world setup + the Node export block
 ]
@@ -42,6 +43,12 @@ UI_PARTS = [
     "src/ui-levels.jsx",  # start screen, level HUD, the app shell (default export)
 ]
 
+# data parts become one const in the shared scope, named here
+DATA_CONST = {
+    "src/sim/species.json": "SPECIES_ROWS",
+    "src/observatory/levels.json": "LEVEL_ROWS",
+}
+
 MARKER = "// __NODE_EXPORTS__"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -52,10 +59,12 @@ def read(part):
         sys.exit("build.py: missing %s" % part)
     with io.open(path, encoding="utf-8") as fh:
         text = fh.read()
-    if part.endswith(".json"):  # data parts become one const in the shared scope
+    if part.endswith(".json"):
         import json
         json.loads(text)  # fail loudly on malformed JSON
-        return "const SPECIES_ROWS = " + text.strip() + ";\n"
+        if part not in DATA_CONST:
+            sys.exit("build.py: no const name declared for data part %s" % part)
+        return "const " + DATA_CONST[part] + " = " + text.strip() + ";\n"
     return text
 
 
