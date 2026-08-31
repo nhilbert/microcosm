@@ -288,7 +288,7 @@ const SPECIES_ROWS = [
       {
         "g0": 0.5,
         "sigma": 0.03,
-        "tumbleSlope": 0.5,
+        "tumbleSlope": 0.4,
         "kbSlope": 0.1,
         "label": "Search style",
         "hiWord": "smooth-running",
