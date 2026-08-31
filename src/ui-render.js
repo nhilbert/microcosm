@@ -223,6 +223,49 @@ function makeWorldLayers(){
   };
   drawHeat();
 
+  // wall layer (7.W): crisp slate polylines on the world tile, redrawn on wall events only.
+  // Dashed = something may pass (a grille); translucency follows light transmission (glass fades).
+  // Never amber -- a placed wall belongs to the world; amber is the preview and the selection.
+  const WB = document.createElement("canvas"); WB.width = 512; WB.height = 512;
+  const wg = WB.getContext("2d");
+  const drawWalls = () => {
+    wg.clearRect(0,0,512,512);
+    const k = 512 / P.WORLD;
+    const tracePath = (path, ox, oy) => {
+      wg.beginPath();
+      for (let q = 0; q < path.length; q++){
+        const x = path[q][0]*CELL*k + ox, y = path[q][1]*CELL*k + oy;
+        q ? wg.lineTo(x, y) : wg.moveTo(x, y);
+      }
+      wg.stroke();
+    };
+    wg.lineCap = "round"; wg.lineJoin = "round";
+    for (const wl of W.walls){
+      const a = 0.92 - 0.62*wl.lt;
+      wg.setLineDash(wl.pass !== 0 ? [5,4] : []);
+      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
+        wg.strokeStyle = `rgba(11,19,30,${(0.8*a).toFixed(3)})`; wg.lineWidth = 4.4; tracePath(wl.path, ox, oy);
+        wg.strokeStyle = `rgba(148,167,184,${a.toFixed(3)})`;   wg.lineWidth = 2.2; tracePath(wl.path, ox, oy);
+      }
+    }
+    wg.setLineDash([]);
+  };
+  drawWalls();
+  // wall shade (7.W): the honest darkening where walls occlude the sources, so the painted glow
+  // never claims light the field does not deliver. Fed by W.wShade; fully transparent without walls.
+  const SB = document.createElement("canvas"); SB.width = P.GRID; SB.height = P.GRID;
+  const sbx = SB.getContext("2d");
+  const sbImg = sbx.createImageData(P.GRID, P.GRID);
+  const drawShade = () => {
+    const d = sbImg.data;
+    for (let c = 0; c < P.GRID*P.GRID; c++){
+      const o = c*4; d[o]=6; d[o+1]=10; d[o+2]=16;
+      d[o+3] = Math.round(175 * (1 - W.wShade[c]));
+    }
+    sbx.putImageData(sbImg, 0, 0);
+  };
+  drawShade();
+
   // mat carpet: density field for sessile producers (Splatterplots-style aggregation).
   // Denser mats render DARKER, saturated green — thick algae absorb light; brightness stays reserved.
   const MC = document.createElement("canvas"); MC.width = P.GRID; MC.height = P.GRID;
@@ -286,7 +329,41 @@ function makeWorldLayers(){
     }
     ccx.putImageData(ccImg, 0, 0);
   };
-  return { LB, HB, MC, MN, CC, LOD_Z, drawLight, drawHeat, updateCarpet };
+  return { LB, HB, MC, MN, CC, WB, SB, LOD_Z, drawLight, drawHeat, drawWalls, drawShade, updateCarpet };
+}
+// Wall affordances (7.W): amber marks the hand -- the selected wall and the drawing preview only.
+// Paths are unwrapped corner staircases; the first point is placed by minimal image, the rest follow
+// by their deltas so a wall crossing the seam never tears across the screen.
+function traceWallScreen(ctx, view, path){
+  const { cam, z, hw, hh } = view;
+  let sx = hw + wd(path[0][0]*CELL - cam.x)*z, sy = hh + wd(path[0][1]*CELL - cam.y)*z;
+  ctx.beginPath(); ctx.moveTo(sx, sy);
+  for (let q = 1; q < path.length; q++){
+    sx += (path[q][0]-path[q-1][0])*CELL*z; sy += (path[q][1]-path[q-1][1])*CELL*z;
+    ctx.lineTo(sx, sy);
+  }
+  ctx.stroke();
+}
+function drawWallAffordance(ctx, view, k){
+  const wl = W.walls[k]; if (!wl) return;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(242,178,74,0.35)"; ctx.lineWidth = 7; traceWallScreen(ctx, view, wl.path);
+  ctx.strokeStyle = "rgba(242,178,74,0.95)"; ctx.lineWidth = 2; traceWallScreen(ctx, view, wl.path);
+}
+function drawWallPreview(ctx, view, drag){
+  const wl = makeWall(drag);              // pure: the exact staircase the release would build
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  if (!wl){                               // too short still: show the anchor point
+    const { cam, z, hw, hh } = view;
+    const sx = hw + wd(drag.x0 - cam.x)*z, sy = hh + wd(drag.y0 - cam.y)*z;
+    ctx.fillStyle = "rgba(242,178,74,0.9)";
+    ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 6.283); ctx.fill();
+    return;
+  }
+  ctx.setLineDash([7,5]);
+  ctx.strokeStyle = "rgba(242,178,74,0.35)"; ctx.lineWidth = 6.5; traceWallScreen(ctx, view, wl.path);
+  ctx.strokeStyle = "rgba(242,178,74,0.9)";  ctx.lineWidth = 2.2; traceWallScreen(ctx, view, wl.path);
+  ctx.setLineDash([]);
 }
 // Sprite set: one sprite per species, plus one per genotype bin for every species with a locus.
 function makeSpriteSet(){

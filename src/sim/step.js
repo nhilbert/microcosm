@@ -16,6 +16,10 @@
 //   5. Heredity draws one mutation kick PER LOCUS, in TRAITS[sp].loci
 //      order, at every division (sigma > 0 and P.mutation only). Adding,
 //      removing or reordering a species' loci is a declared ecology change.
+//   6. Walls (7.W) draw NOTHING: movement blocking, the hunt filter and
+//      the field transmissions are draw-free and gated on W.wallsOn --
+//      a world without walls runs the certified arithmetic bit for bit;
+//      a walled world diverges only through ecology, like a moved sun.
 // Modification protocol: after ANY edit to this file, run
 //   `node conform.js`   (2 seeds x 3000 ticks, ~3 s)
 // A changed fingerprint is fine only when an ecology change is the
@@ -101,7 +105,7 @@ function step(){
         W.vx[i] += T.thermo*sgn*W.tgx[cT]; W.vy[i] += T.thermo*sgn*W.tgy[cT]; }
       const s=Math.hypot(W.vx[i],W.vy[i]);
       if(s>T.driftSpeed){ W.vx[i]*=T.driftSpeed/s; W.vy[i]*=T.driftSpeed/s; }
-      W.x[i]=wrap(W.x[i]+W.vx[i]); W.y[i]=wrap(W.y[i]+W.vy[i]);
+      moveOrg(i, W.vx[i], W.vy[i]); // 7.W: slides along walls; identical writes without them
       cost += P.moveCost*(W.vx[i]*W.vx[i]+W.vy[i]*W.vy[i])*W.sz[i]*T.moveCostMul;
     }
     else if(T.movement==="tumble"){ // run-and-tumble chemotaxis along the detritus gradient
@@ -112,7 +116,7 @@ function step(){
       W.mem[i]=here;
       if(R()<pT) W.hd[i]=R()*6.283;
       const tor = T.torpor && W.en[i] < T.torpor*cap ? 0.6 : 1;
-      W.x[i]=wrap(W.x[i]+Math.cos(W.hd[i])*T.speed*tor); W.y[i]=wrap(W.y[i]+Math.sin(W.hd[i])*T.speed*tor);
+      moveOrg(i, Math.cos(W.hd[i])*T.speed*tor, Math.sin(W.hd[i])*T.speed*tor);
       cost += P.moveCost*T.speed*T.speed*W.sz[i]*tor;
     }
     else if(T.movement==="steer"){ // pursuit forager
@@ -132,6 +136,7 @@ function step(){
           if(W.sp[j]===W.sp[i]){ if(d<T.interfRadius) nearKin++; return; }
           if(!(T.diet & TJ.bodyTag)) return;
           if(TJ.grazeFloor && W.en[j]<=TJ.grazeFloor) return;
+          if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], ddx, ddy)) return; // 7.W: prey beyond a face this hunter cannot cross is out of reach -- and out of mind (no wall-camping, no through-mesh bites)
           const pref = d*TJ.pursuitPenalty;
           if(pref<best){ best=pref; tx=ddx; ty=ddy; found=true; target=j; }
         });
@@ -169,8 +174,7 @@ function step(){
           }
           if(TJ.escape && R()<escP){ // escape jink: prey darts away, contact broken
             const ja=R()*6.283;
-            W.x[target]=wrap(W.x[target]+Math.cos(ja)*TJ.escape.kick);
-            W.y[target]=wrap(W.y[target]+Math.sin(ja)*TJ.escape.kick);
+            moveOrg(target, Math.cos(ja)*TJ.escape.kick, Math.sin(ja)*TJ.escape.kick); // 7.W: a jink cannot cross a wall the prey cannot pass
             W.vx[target]=Math.cos(ja)*0.5; W.vy[target]=Math.sin(ja)*0.5;
           } else {
             const bite=Math.min(T.bite*W.qA[cT], W.en[target] - (TJ.grazeFloor? TJ.grazeFloor*0.99 : 0)); // ingestion warms too (7.H.4, Q10 1.8) -- flatter than upkeep, so the hunter still loses ground
@@ -218,7 +222,7 @@ function step(){
         else if(W.bst[i]<0) W.bst[i]++;
         else if(found && best>W.sz[i]+6 && best<T.burst.range){ W.bst[i]=T.burst.dur; speed*=T.burst.mul; W.bst[i]--; }
       }
-      W.x[i]=wrap(W.x[i]+Math.cos(W.hd[i])*speed); W.y[i]=wrap(W.y[i]+Math.sin(W.hd[i])*speed);
+      moveOrg(i, Math.cos(W.hd[i])*speed, Math.sin(W.hd[i])*speed);
       cost += P.moveCost*speed*speed*W.sz[i] + T.interfCost*nearKin;
       if(torpid) cost*=0.7;
     }
@@ -279,7 +283,8 @@ function step(){
       const childE = W.en[i]*P.invest;
       const childM = W.mn[i]*P.invest;
       const childP = W.pr[i]*P.invest;
-      const nx=wrap(W.x[i]+(R()-0.5)*T.spread), ny=wrap(W.y[i]+(R()-0.5)*T.spread);
+      let nx=wrap(W.x[i]+(R()-0.5)*T.spread), ny=wrap(W.y[i]+(R()-0.5)*T.spread);
+      if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], wd(nx-W.x[i]), wd(ny-W.y[i]))){ nx=W.x[i]; ny=W.y[i]; } // 7.W: dispersal blocked -- the child settles beside the parent (draws above already spent)
       if(T.settleLimited){
         const c=(Math.floor(ny/CELL)&(P.GRID-1))*P.GRID+(Math.floor(nx/CELL)&(P.GRID-1));
         const crowd = T.layer==="fungal" ? W.fB[c] : W.bB[c];

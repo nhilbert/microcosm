@@ -43,6 +43,7 @@ const P = {
   WORLD: 1024, GRID: 64,
   sunSigma: 210, sunI: 1.0, ambient: 0.03,   // defaults for the shipped sun and for every sun the player adds (7.L)
   maxSources: 4,    // energy sources (W.sources): light i and warmth a per source; the shipped world has one sun, centred
+  maxWalls: 8,      // walls (7.W): face barriers with light/warmth/flow transmission and per-species passage
   tempAmb: 0,       // ambient warmth (Phase 7 H; the global press is deferred) -- every Q10 factor is exactly 1 at dT = 0
   // Q10 per process (7.H, phase7-heat-plan.md §3): maintenance steeper than photosynthesis (E 0.65 vs 0.32 eV),
   // decomposition in between, handling time shortens, pursuit speed rises less than cost. The separation is the content.
@@ -553,6 +554,16 @@ const W = {
   n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
   events: [], eventLog: [], lightDirty: false,
   sources: [{ x: P.WORLD / 2, y: P.WORLD / 2, i: P.sunI, a: 0, sigma: P.sunSigma }],  // energy sources (7.L/7.H): light i, warmth a
+  // Walls (7.W): thin barriers on cell boundaries. W.walls holds the drawn strokes; compileWalls()
+  // (the only writer) stamps them into per-FACE property planes -- vertical faces indexed by the LEFT
+  // cell, horizontal by the TOP cell. An open face is pass = all bits, every transmission exactly 1,
+  // and W.wallsOn false short-circuits every wall branch: the certified world's arithmetic bit for bit.
+  walls: [], wallsOn: false,
+  wfPassV: new Int32Array(P.GRID * P.GRID).fill(-1), wfPassH: new Int32Array(P.GRID * P.GRID).fill(-1),
+  wfLtV: new Float32Array(P.GRID * P.GRID).fill(1), wfLtH: new Float32Array(P.GRID * P.GRID).fill(1),
+  wfHtV: new Float32Array(P.GRID * P.GRID).fill(1), wfHtH: new Float32Array(P.GRID * P.GRID).fill(1),
+  wfFlV: new Float32Array(P.GRID * P.GRID).fill(1), wfFlH: new Float32Array(P.GRID * P.GRID).fill(1),
+  wShade: new Float32Array(P.GRID * P.GRID).fill(1),  // occluded/unoccluded light ratio per cell (UI honesty layer; 1 without walls)
   temp: new Float32Array(P.GRID * P.GRID),   // warmth above ambient per cell (7.H); exactly 0 without a warm source
   // per-cell Q10 factors, all exactly 1 where temp is 0 (7.H): maintenance, photosynthesis, decomposition, handling, pursuit
   qR: new Float32Array(P.GRID * P.GRID).fill(1), qP: new Float32Array(P.GRID * P.GRID).fill(1), qD: new Float32Array(P.GRID * P.GRID).fill(1),
@@ -720,6 +731,29 @@ function applyEvent(ev){
       if (ev.a !== undefined) s.a = Math.max(-8, Math.min(15, +ev.a));
       if (ev.sigma !== undefined) s.sigma = Math.max(90, Math.min(300, +ev.sigma));
       computeLight(); computeTemp(); W.lightDirty = true; done && done({ prev }); break; }
+    // Walls (7.W, docs/phase7-walls-plan.md): face barriers -- light/warmth/flow transmission and
+    // per-species passage. Draw-free, like sources: they change the future stream only through ecology.
+    case "wallAdd": {
+      if (W.walls.length >= P.maxWalls) break;
+      const wl = makeWall(ev); if (!wl) break;   // stroke snapped to nothing
+      const k = ev.at === undefined ? W.walls.length : Math.max(0, Math.min(W.walls.length, ev.at|0)); // `at` restores an undone removal at its old index
+      W.walls.splice(k, 0, wl);
+      compileWalls(); computeLight(); computeTemp(); W.lightDirty = true;
+      done && done({ k }); break; }
+    case "wallRemove": {
+      const k = ev.k|0; if (!W.walls[k]) break;
+      const s = W.walls.splice(k, 1)[0];
+      compileWalls(); computeLight(); computeTemp(); W.lightDirty = true;
+      done && done({ k, snap: { x0:s.x0, y0:s.y0, dx:s.dx, dy:s.dy, lt:s.lt, ht:s.ht, fl:s.fl, pass:s.pass } }); break; }
+    case "wallSet": {
+      const wl = W.walls[ev.k|0]; if (!wl) break;
+      const prev = { lt: wl.lt, ht: wl.ht, fl: wl.fl, pass: wl.pass };
+      if (ev.lt !== undefined) wl.lt = Math.max(0, Math.min(1, +ev.lt || 0));
+      if (ev.ht !== undefined) wl.ht = Math.max(0, Math.min(1, +ev.ht || 0));
+      if (ev.fl !== undefined) wl.fl = Math.max(0, Math.min(1, +ev.fl || 0));
+      if (ev.pass !== undefined) wl.pass = ev.pass|0;
+      compileWalls(); computeLight(); computeTemp(); W.lightDirty = true;
+      done && done({ prev }); break; }
     case "feed": {
       const i = ev.i; if (!(W.alive[i] && W.gen[i] === ev.gen)) break;
       const cap = P.capMul*W.sz[i], before = W.en[i];
@@ -756,17 +790,117 @@ function queueEvent(ev){
     const k = W.events.findIndex(e => e.type === "source" && (e.k|0) === (ev.k|0));
     if (k >= 0){ W.events[k] = ev; return; }
   }
+  if (ev.type === "wallSet"){ // coalesce a slider drag: only the latest properties of that wall matter within one tick
+    const k = W.events.findIndex(e => e.type === "wallSet" && (e.k|0) === (ev.k|0));
+    if (k >= 0){ W.events[k] = { ...W.events[k], ...ev }; return; }
+  }
   W.events.push(ev);
+}
+
+// ---------- Walls (7.W): face barriers (docs/phase7-walls-plan.md) ----------
+// A wall is a player stroke snapped to grid corners and rasterized into a 4-connected staircase of
+// cell-boundary edges (integer Bresenham over corners) -- infinitely thin, so nothing is ever "inside"
+// a wall. Everything here is draw-free. Face indices: vertical face between (x,y) and (x+1,y) lives at
+// y*G+x (the LEFT cell); horizontal face between (x,y) and (x,y+1) at y*G+x (the TOP cell); a wall
+// object stores horizontal faces offset by G*G to keep one list.
+function makeWall(ev){
+  // The stroke is a start point plus the DRAG VECTOR (dx,dy) -- not a second endpoint, because the
+  // minimal-image rule would flip any stroke longer than half the world. A full-height wall is one
+  // stroke with |dy| = WORLD, closing on itself around the torus.
+  const G=P.GRID;
+  const x0=wrap(+ev.x0||0), y0=wrap(+ev.y0||0);
+  const kx0=Math.round(x0/CELL), ky0=Math.round(y0/CELL);
+  const cd=v=>Math.round(Math.max(-P.WORLD,Math.min(P.WORLD,+v||0))/CELL); // one wrap at most: past that the staircase would overwrite itself
+  const dkx=cd(ev.dx), dky=cd(ev.dy);
+  const ax=Math.abs(dkx), ay=Math.abs(dky);
+  if(ax+ay===0) return null;                       // snapped to a point: no wall
+  const sx=dkx>0?1:-1, sy=dky>0?1:-1;
+  const faces=[], path=[[kx0,ky0]];
+  let ix=0, iy=0;
+  while(ix!==ax||iy!==ay){
+    // midpoint rule: step the axis whose normalized progress is behind (pure integer, deterministic)
+    const stepX = iy===ay || (ix!==ax && (2*ix+1)*ay <= (2*iy+1)*ax);
+    const kx=kx0+ix*sx, ky=ky0+iy*sy;
+    if(stepX){ faces.push(G*G + ((ky-1)&(G-1))*G + ((sx>0?kx:kx-1)&(G-1))); ix++; } // edge along row-line ky
+    else     { faces.push(((sy>0?ky:ky-1)&(G-1))*G + ((kx-1)&(G-1))); iy++; }      // edge along column-line kx
+    path.push([kx0+ix*sx, ky0+iy*sy]);
+  }
+  const cl=(v,d)=>v===undefined?d:Math.max(0,Math.min(1,+v||0));
+  return { x0:wrap(kx0*CELL), y0:wrap(ky0*CELL), dx:dkx*CELL, dy:dky*CELL,
+    lt:cl(ev.lt,0), ht:cl(ev.ht,0), fl:cl(ev.fl,0), pass:ev.pass===undefined?0:(ev.pass|0),
+    faces, path };
+}
+function compileWalls(){ // the only writer of the face planes; later walls win on shared faces
+  const N=P.GRID*P.GRID;
+  W.wfPassV.fill(-1); W.wfPassH.fill(-1);
+  W.wfLtV.fill(1); W.wfLtH.fill(1); W.wfHtV.fill(1); W.wfHtH.fill(1); W.wfFlV.fill(1); W.wfFlH.fill(1);
+  W.wallsOn = W.walls.length > 0;
+  if(!W.wallsOn){ W.wShade.fill(1); return; }
+  for(const wl of W.walls) for(const f of wl.faces){
+    if(f>=N){ const c=f-N; W.wfPassH[c]=wl.pass; W.wfLtH[c]=wl.lt; W.wfHtH[c]=wl.ht; W.wfFlH[c]=wl.fl; }
+    else    { W.wfPassV[f]=wl.pass; W.wfLtV[f]=wl.lt; W.wfHtV[f]=wl.ht; W.wfFlV[f]=wl.fl; }
+  }
+}
+// Passage: a step's x (or y) component is dropped when any face it crosses refuses the bodyTag.
+function xPassBlocked(tag, x, y, dx){
+  const G=P.GRID, row=(Math.floor(y/CELL)&(G-1))*G;
+  const c0=Math.floor(x/CELL), c1=Math.floor((x+dx)/CELL);
+  if(dx>0){ for(let cc=c0;cc<c1;cc++)    if(!(W.wfPassV[row+(cc&(G-1))]&tag)) return true; }
+  else    { for(let cc=c0-1;cc>=c1;cc--) if(!(W.wfPassV[row+(cc&(G-1))]&tag)) return true; }
+  return false;
+}
+function yPassBlocked(tag, x, y, dy){
+  const G=P.GRID, col=Math.floor(x/CELL)&(G-1);
+  const r0=Math.floor(y/CELL), r1=Math.floor((y+dy)/CELL);
+  if(dy>0){ for(let rr=r0;rr<r1;rr++)    if(!(W.wfPassH[(rr&(G-1))*G+col]&tag)) return true; }
+  else    { for(let rr=r0-1;rr>=r1;rr--) if(!(W.wfPassH[(rr&(G-1))*G+col]&tag)) return true; }
+  return false;
+}
+// Reachability along the L-path (x leg at the start row, then y leg at the end column) -- the same
+// geometry the axis-separated mover walks, so "can target" and "can get there" agree.
+function pathBlocked(tag, x, y, dx, dy){
+  return xPassBlocked(tag,x,y,dx) || yPassBlocked(tag,x+dx,y,dy);
+}
+function moveOrg(i, dx, dy){ // THE position write for organism motion; draw-free; slides along walls
+  if(!W.wallsOn){ W.x[i]=wrap(W.x[i]+dx); W.y[i]=wrap(W.y[i]+dy); return; }
+  const tag=TRAITS[W.sp[i]].bodyTag;
+  if(!xPassBlocked(tag,W.x[i],W.y[i],dx)) W.x[i]=wrap(W.x[i]+dx);
+  if(!yPassBlocked(tag,W.x[i],W.y[i],dy)) W.y[i]=wrap(W.y[i]+dy);
+}
+// Product of a face-transmission plane over every boundary crossed by the minimal-image segment from
+// (x0,y0) along (dx,dy). A product is order-free, so the two axes walk their crossings independently.
+function marchMul(x0, y0, dx, dy, AV, AH){
+  const G=P.GRID; let m=1;
+  if(dx!==0){
+    const s=dx>0?1:-1, c0=Math.floor(x0/CELL), c1=Math.floor((x0+dx)/CELL);
+    for(let cc=c0; cc!==c1; cc+=s){
+      const t=((s>0?cc+1:cc)*CELL-x0)/dx;
+      const row=Math.floor((y0+t*dy)/CELL)&(G-1);
+      m*=AV[row*G+((s>0?cc:cc-1)&(G-1))];
+      if(m===0) return 0;
+    }
+  }
+  if(dy!==0){
+    const s=dy>0?1:-1, r0=Math.floor(y0/CELL), r1=Math.floor((y0+dy)/CELL);
+    for(let rr=r0; rr!==r1; rr+=s){
+      const t=((s>0?rr+1:rr)*CELL-y0)/dy;
+      const col=Math.floor((x0+t*dx)/CELL)&(G-1);
+      m*=AH[((s>0?rr:rr-1)&(G-1))*G+col];
+      if(m===0) return 0;
+    }
+  }
+  return m;
 }
 
 function diffuseM(){
   const G=P.GRID, M=W.M, T=W.Mtmp, k=P.mDiff*0.25;
+  const FV=W.wfFlV, FH=W.wfFlH; // face flow transmission (7.W): exactly 1 on open faces, so the flux-pair form is the shipped stencil bit for bit
   for(let y=0;y<G;y++){
     const yu=((y-1+G)%G)*G, yd=((y+1)%G)*G, y0=y*G;
     for(let x=0;x<G;x++){
       const xl=(x-1+G)%G, xr=(x+1)%G;
       const c=y0+x, m=M[c];
-      T[c]=m + k*((M[y0+xl]-m)+(M[y0+xr]-m)+(M[yu+x]-m)+(M[yd+x]-m));
+      T[c]=m + k*(FV[y0+xl]*(M[y0+xl]-m)+FV[c]*(M[y0+xr]-m)+FH[yu+x]*(M[yu+x]-m)+FH[c]*(M[yd+x]-m));
     }
   }
   M.set(T);
@@ -782,7 +916,7 @@ function diffuseM(){
     for(let x=0;x<G;x++){
       const xl=(x-1+G)%G, xr=(x+1)%G;
       const c=y0+x, v=S[c];
-      ST[c]=(v + ks*((S[y0+xl]-v)+(S[y0+xr]-v)+(S[yu+x]-v)+(S[yd+x]-v)))*P.scentDecay;
+      ST[c]=(v + ks*(FV[y0+xl]*(S[y0+xl]-v)+FV[c]*(S[y0+xr]-v)+FH[yu+x]*(S[yu+x]-v)+FH[c]*(S[yd+x]-v)))*P.scentDecay;
     }
   }
   S.set(ST);
@@ -793,22 +927,29 @@ function diffuseM(){
     for(let x=0;x<G;x++){
       const xl=(x-1+G)%G, xr=(x+1)%G;
       const c=y0+x, v=A[c];
-      AT[c]=(v + ka*((A[y0+xl]-v)+(A[y0+xr]-v)+(A[yu+x]-v)+(A[yd+x]-v)))*0.85;
+      AT[c]=(v + ka*(FV[y0+xl]*(A[y0+xl]-v)+FV[c]*(A[y0+xr]-v)+FH[yu+x]*(A[yu+x]-v)+FH[c]*(A[yd+x]-v)))*0.85;
     }
   }
   A.set(AT);
 }
 // Irradiance adds: the field is the ambient floor plus one toroidal Gaussian per source's light. Draw-free.
+// Walls (7.W) occlude each source's term by the product of light transmissions over faces crossed on the
+// minimal-image ray; the ambient floor is a floor, not a source, and passes. W.wShade keeps the honest
+// occluded/unoccluded ratio for the painted light layer. Without walls the arithmetic is the shipped one.
 function computeLight(){
-  const S = W.sources;
+  const S = W.sources, on = W.wallsOn;
   for (let gy = 0; gy < P.GRID; gy++) for (let gx = 0; gx < P.GRID; gx++){
     const cx=(gx+0.5)*CELL, cyy=(gy+0.5)*CELL;
-    let v = P.ambient;
+    let v = P.ambient, v0 = P.ambient;
     for (let k = 0; k < S.length; k++){
       const s = S[k], dx=wd(cx-s.x), dy=wd(cyy-s.y);
-      v += s.i * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+      const g = s.i * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+      if (on){ v0 += g; v += g * marchMul(s.x, s.y, dx, dy, W.wfLtV, W.wfLtH); }
+      else v += g;
     }
-    W.light[gy*P.GRID+gx] = v * P.lightMul;
+    const c = gy*P.GRID+gx;
+    W.light[c] = v * P.lightMul;
+    if (on) W.wShade[c] = v0 > 0 ? v/v0 : 1;
   }
   // the gradient the drifter senses (7.H.3, declared change): central differences on the torus, light per world unit
   const G = P.GRID, Lt = W.light;
@@ -821,14 +962,16 @@ function computeLight(){
 // Warmth above ambient (7.H): the same Gaussians, each source's `a` (negative = a cold source). Static like
 // light, recomputed on events only. Sources with a = 0 are skipped so the shipped world's field is exactly 0.
 function computeTemp(){
-  const S = W.sources;
+  const S = W.sources, on = W.wallsOn; // walls (7.W) conduct each source's warmth by their ht per crossed face
   for (let gy = 0; gy < P.GRID; gy++) for (let gx = 0; gx < P.GRID; gx++){
     const cx=(gx+0.5)*CELL, cyy=(gy+0.5)*CELL;
     let v = P.tempAmb;
     for (let k = 0; k < S.length; k++){
       const s = S[k]; if (s.a === 0) continue;
       const dx=wd(cx-s.x), dy=wd(cyy-s.y);
-      v += s.a * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+      let g = s.a * Math.exp(-(dx*dx+dy*dy)/(2*s.sigma*s.sigma));
+      if (on) g *= marchMul(s.x, s.y, dx, dy, W.wfHtV, W.wfHtH);
+      v += g;
     }
     const c = gy*P.GRID+gx; W.temp[c] = v;
     const Q = P.q10, e = v/10; // Math.pow(q, 0) is exactly 1: the certified world's factors stay 1
@@ -1249,7 +1392,8 @@ const IMPACT_CHS = [[0,"Solara"],[1,"Drifta"],[2,"Cilio"],[3,"Bacillus"],[6,"Ven
 // natural-variability floors (measured: mats barely move, plankton blooms 2.5x unprovoked)
 const IMPACT_NOISE = { 0:12, 1:170, 2:55, 3:20, 6:25, 14:15, 19:30 };
 // presses: interventions that change the regime rather than poke it once (a changed sky, changed evolution settings)
-const IMPACT_PRESS = new Set(["source","sunlight","sourceAdd","sourceRemove","sourceSet","sourceLayout","mutation","evolution","preset"]);
+const IMPACT_PRESS = new Set(["source","sunlight","sourceAdd","sourceRemove","sourceSet","sourceLayout","mutation","evolution","preset",
+  "wallAdd","wallRemove","wallSet"]); // a wall changes the regime, not a moment (7.W)
 function impact(entry){
   const isPress = IMPACT_PRESS.has(entry.type);
   const i0 = W.recCount-1 - Math.floor((W.tick - entry.tick)/REC.STRIDE);
@@ -1320,6 +1464,10 @@ function impact(entry){
 //   5. Heredity draws one mutation kick PER LOCUS, in TRAITS[sp].loci
 //      order, at every division (sigma > 0 and P.mutation only). Adding,
 //      removing or reordering a species' loci is a declared ecology change.
+//   6. Walls (7.W) draw NOTHING: movement blocking, the hunt filter and
+//      the field transmissions are draw-free and gated on W.wallsOn --
+//      a world without walls runs the certified arithmetic bit for bit;
+//      a walled world diverges only through ecology, like a moved sun.
 // Modification protocol: after ANY edit to this file, run
 //   `node conform.js`   (2 seeds x 3000 ticks, ~3 s)
 // A changed fingerprint is fine only when an ecology change is the
@@ -1405,7 +1553,7 @@ function step(){
         W.vx[i] += T.thermo*sgn*W.tgx[cT]; W.vy[i] += T.thermo*sgn*W.tgy[cT]; }
       const s=Math.hypot(W.vx[i],W.vy[i]);
       if(s>T.driftSpeed){ W.vx[i]*=T.driftSpeed/s; W.vy[i]*=T.driftSpeed/s; }
-      W.x[i]=wrap(W.x[i]+W.vx[i]); W.y[i]=wrap(W.y[i]+W.vy[i]);
+      moveOrg(i, W.vx[i], W.vy[i]); // 7.W: slides along walls; identical writes without them
       cost += P.moveCost*(W.vx[i]*W.vx[i]+W.vy[i]*W.vy[i])*W.sz[i]*T.moveCostMul;
     }
     else if(T.movement==="tumble"){ // run-and-tumble chemotaxis along the detritus gradient
@@ -1416,7 +1564,7 @@ function step(){
       W.mem[i]=here;
       if(R()<pT) W.hd[i]=R()*6.283;
       const tor = T.torpor && W.en[i] < T.torpor*cap ? 0.6 : 1;
-      W.x[i]=wrap(W.x[i]+Math.cos(W.hd[i])*T.speed*tor); W.y[i]=wrap(W.y[i]+Math.sin(W.hd[i])*T.speed*tor);
+      moveOrg(i, Math.cos(W.hd[i])*T.speed*tor, Math.sin(W.hd[i])*T.speed*tor);
       cost += P.moveCost*T.speed*T.speed*W.sz[i]*tor;
     }
     else if(T.movement==="steer"){ // pursuit forager
@@ -1436,6 +1584,7 @@ function step(){
           if(W.sp[j]===W.sp[i]){ if(d<T.interfRadius) nearKin++; return; }
           if(!(T.diet & TJ.bodyTag)) return;
           if(TJ.grazeFloor && W.en[j]<=TJ.grazeFloor) return;
+          if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], ddx, ddy)) return; // 7.W: prey beyond a face this hunter cannot cross is out of reach -- and out of mind (no wall-camping, no through-mesh bites)
           const pref = d*TJ.pursuitPenalty;
           if(pref<best){ best=pref; tx=ddx; ty=ddy; found=true; target=j; }
         });
@@ -1473,8 +1622,7 @@ function step(){
           }
           if(TJ.escape && R()<escP){ // escape jink: prey darts away, contact broken
             const ja=R()*6.283;
-            W.x[target]=wrap(W.x[target]+Math.cos(ja)*TJ.escape.kick);
-            W.y[target]=wrap(W.y[target]+Math.sin(ja)*TJ.escape.kick);
+            moveOrg(target, Math.cos(ja)*TJ.escape.kick, Math.sin(ja)*TJ.escape.kick); // 7.W: a jink cannot cross a wall the prey cannot pass
             W.vx[target]=Math.cos(ja)*0.5; W.vy[target]=Math.sin(ja)*0.5;
           } else {
             const bite=Math.min(T.bite*W.qA[cT], W.en[target] - (TJ.grazeFloor? TJ.grazeFloor*0.99 : 0)); // ingestion warms too (7.H.4, Q10 1.8) -- flatter than upkeep, so the hunter still loses ground
@@ -1522,7 +1670,7 @@ function step(){
         else if(W.bst[i]<0) W.bst[i]++;
         else if(found && best>W.sz[i]+6 && best<T.burst.range){ W.bst[i]=T.burst.dur; speed*=T.burst.mul; W.bst[i]--; }
       }
-      W.x[i]=wrap(W.x[i]+Math.cos(W.hd[i])*speed); W.y[i]=wrap(W.y[i]+Math.sin(W.hd[i])*speed);
+      moveOrg(i, Math.cos(W.hd[i])*speed, Math.sin(W.hd[i])*speed);
       cost += P.moveCost*speed*speed*W.sz[i] + T.interfCost*nearKin;
       if(torpid) cost*=0.7;
     }
@@ -1583,7 +1731,8 @@ function step(){
       const childE = W.en[i]*P.invest;
       const childM = W.mn[i]*P.invest;
       const childP = W.pr[i]*P.invest;
-      const nx=wrap(W.x[i]+(R()-0.5)*T.spread), ny=wrap(W.y[i]+(R()-0.5)*T.spread);
+      let nx=wrap(W.x[i]+(R()-0.5)*T.spread), ny=wrap(W.y[i]+(R()-0.5)*T.spread);
+      if(W.wallsOn && pathBlocked(T.bodyTag, W.x[i], W.y[i], wd(nx-W.x[i]), wd(ny-W.y[i]))){ nx=W.x[i]; ny=W.y[i]; } // 7.W: dispersal blocked -- the child settles beside the parent (draws above already spent)
       if(T.settleLimited){
         const c=(Math.floor(ny/CELL)&(P.GRID-1))*P.GRID+(Math.floor(nx/CELL)&(P.GRID-1));
         const crowd = T.layer==="fungal" ? W.fB[c] : W.bB[c];
@@ -1650,6 +1799,7 @@ function initWorld(seed){
   W.cN=0; W.cFree.length=0; W.cAlive.fill(0);
   for (const k in W.flows) W.flows[k] = (k==="deathsBy") ? [0,0,0,0,0,0,0] : 0;
   W.sources.length = 0; W.sources.push({ x: P.WORLD/2, y: P.WORLD/2, i: P.sunI, a: 0, sigma: P.sunSigma }); // one sun, centred (like P.lightMul)
+  W.walls.length = 0; compileWalls(); // a fresh world has no walls (7.W)
   computeLight(); computeTemp();
   const nearSun = rad => { const a=R()*6.283, r=Math.sqrt(R())*rad;
     return [wrap(W.sources[0].x+Math.cos(a)*r), wrap(W.sources[0].y+Math.sin(a)*r)]; };
@@ -1892,6 +2042,49 @@ function makeWorldLayers(){
   };
   drawHeat();
 
+  // wall layer (7.W): crisp slate polylines on the world tile, redrawn on wall events only.
+  // Dashed = something may pass (a grille); translucency follows light transmission (glass fades).
+  // Never amber -- a placed wall belongs to the world; amber is the preview and the selection.
+  const WB = document.createElement("canvas"); WB.width = 512; WB.height = 512;
+  const wg = WB.getContext("2d");
+  const drawWalls = () => {
+    wg.clearRect(0,0,512,512);
+    const k = 512 / P.WORLD;
+    const tracePath = (path, ox, oy) => {
+      wg.beginPath();
+      for (let q = 0; q < path.length; q++){
+        const x = path[q][0]*CELL*k + ox, y = path[q][1]*CELL*k + oy;
+        q ? wg.lineTo(x, y) : wg.moveTo(x, y);
+      }
+      wg.stroke();
+    };
+    wg.lineCap = "round"; wg.lineJoin = "round";
+    for (const wl of W.walls){
+      const a = 0.92 - 0.62*wl.lt;
+      wg.setLineDash(wl.pass !== 0 ? [5,4] : []);
+      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
+        wg.strokeStyle = `rgba(11,19,30,${(0.8*a).toFixed(3)})`; wg.lineWidth = 4.4; tracePath(wl.path, ox, oy);
+        wg.strokeStyle = `rgba(148,167,184,${a.toFixed(3)})`;   wg.lineWidth = 2.2; tracePath(wl.path, ox, oy);
+      }
+    }
+    wg.setLineDash([]);
+  };
+  drawWalls();
+  // wall shade (7.W): the honest darkening where walls occlude the sources, so the painted glow
+  // never claims light the field does not deliver. Fed by W.wShade; fully transparent without walls.
+  const SB = document.createElement("canvas"); SB.width = P.GRID; SB.height = P.GRID;
+  const sbx = SB.getContext("2d");
+  const sbImg = sbx.createImageData(P.GRID, P.GRID);
+  const drawShade = () => {
+    const d = sbImg.data;
+    for (let c = 0; c < P.GRID*P.GRID; c++){
+      const o = c*4; d[o]=6; d[o+1]=10; d[o+2]=16;
+      d[o+3] = Math.round(175 * (1 - W.wShade[c]));
+    }
+    sbx.putImageData(sbImg, 0, 0);
+  };
+  drawShade();
+
   // mat carpet: density field for sessile producers (Splatterplots-style aggregation).
   // Denser mats render DARKER, saturated green — thick algae absorb light; brightness stays reserved.
   const MC = document.createElement("canvas"); MC.width = P.GRID; MC.height = P.GRID;
@@ -1955,7 +2148,41 @@ function makeWorldLayers(){
     }
     ccx.putImageData(ccImg, 0, 0);
   };
-  return { LB, HB, MC, MN, CC, LOD_Z, drawLight, drawHeat, updateCarpet };
+  return { LB, HB, MC, MN, CC, WB, SB, LOD_Z, drawLight, drawHeat, drawWalls, drawShade, updateCarpet };
+}
+// Wall affordances (7.W): amber marks the hand -- the selected wall and the drawing preview only.
+// Paths are unwrapped corner staircases; the first point is placed by minimal image, the rest follow
+// by their deltas so a wall crossing the seam never tears across the screen.
+function traceWallScreen(ctx, view, path){
+  const { cam, z, hw, hh } = view;
+  let sx = hw + wd(path[0][0]*CELL - cam.x)*z, sy = hh + wd(path[0][1]*CELL - cam.y)*z;
+  ctx.beginPath(); ctx.moveTo(sx, sy);
+  for (let q = 1; q < path.length; q++){
+    sx += (path[q][0]-path[q-1][0])*CELL*z; sy += (path[q][1]-path[q-1][1])*CELL*z;
+    ctx.lineTo(sx, sy);
+  }
+  ctx.stroke();
+}
+function drawWallAffordance(ctx, view, k){
+  const wl = W.walls[k]; if (!wl) return;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(242,178,74,0.35)"; ctx.lineWidth = 7; traceWallScreen(ctx, view, wl.path);
+  ctx.strokeStyle = "rgba(242,178,74,0.95)"; ctx.lineWidth = 2; traceWallScreen(ctx, view, wl.path);
+}
+function drawWallPreview(ctx, view, drag){
+  const wl = makeWall(drag);              // pure: the exact staircase the release would build
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  if (!wl){                               // too short still: show the anchor point
+    const { cam, z, hw, hh } = view;
+    const sx = hw + wd(drag.x0 - cam.x)*z, sy = hh + wd(drag.y0 - cam.y)*z;
+    ctx.fillStyle = "rgba(242,178,74,0.9)";
+    ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 6.283); ctx.fill();
+    return;
+  }
+  ctx.setLineDash([7,5]);
+  ctx.strokeStyle = "rgba(242,178,74,0.35)"; ctx.lineWidth = 6.5; traceWallScreen(ctx, view, wl.path);
+  ctx.strokeStyle = "rgba(242,178,74,0.9)";  ctx.lineWidth = 2.2; traceWallScreen(ctx, view, wl.path);
+  ctx.setLineDash([]);
 }
 // Sprite set: one sprite per species, plus one per genotype bin for every species with a locus.
 function makeSpriteSet(){
@@ -2159,7 +2386,8 @@ const PAGE_TITLES = [
 const IV_LABEL = { pour:"You poured mineral", kill:"You killed a specimen", feed:"You fed a specimen", seed:"You introduced organisms",
   source:"You moved an energy source", sunlight:"You changed the sunlight", undo:"You undid the last action",
   sourceAdd:"You added an energy source", sourceRemove:"You removed an energy source", sourceSet:"You changed an energy source", sourceLayout:"You changed the source layout",
-  mutation:"You switched mutation", evolution:"You changed an evolution setting", preset:"You applied an evolution preset" };
+  mutation:"You switched mutation", evolution:"You changed an evolution setting", preset:"You applied an evolution preset",
+  wallAdd:"You built a wall", wallRemove:"You removed a wall", wallSet:"You changed a wall" };
 function ImpactLine({ ev }){
   const r = typeof impact === "function" ? impact(ev) : null;
   if (!r) return null;
@@ -2642,7 +2870,7 @@ const LIGHT_REF = { v: 0 };
 const lightInput = () => { let t = 0; const L = W.light; for (let c = 0; c < L.length; c++) t += L[c]; return t; };
 export default function Microcosm(){
   const canvasRef = useRef(null);
-  const [ui, setUi] = useState({ tick: 0, fps: 0, pops: [0,0,0,0,0,0,0], speed: 1, card: null, mineral: { b: 0, f: 0, l: 0, add: 0 }, lightMul: 1, spawnPick: null, srcSel: -1 });
+  const [ui, setUi] = useState({ tick: 0, fps: 0, pops: [0,0,0,0,0,0,0], speed: 1, card: null, mineral: { b: 0, f: 0, l: 0, add: 0 }, lightMul: 1, spawnPick: null, srcSel: -1, wallSel: -1, wallArm: false });
   const [detent, setDetent] = useState(0); // 0 peek, 1 half, 2 full
   const [undoChip, setUndoChip] = useState(null);
   const [uiMode, setUiMode] = useState("observe");
@@ -2677,7 +2905,7 @@ export default function Microcosm(){
 
     const S = makeSpriteSet();
 
-    const { LB, HB, MC, MN, CC, LOD_Z, drawLight, drawHeat, updateCarpet } = makeWorldLayers();
+    const { LB, HB, MC, MN, CC, WB, SB, LOD_Z, drawLight, drawHeat, drawWalls, drawShade, updateCarpet } = makeWorldLayers();
     drawLight();
 
     // selection + follow-cam
@@ -2745,6 +2973,17 @@ export default function Microcosm(){
       W.sources.forEach((s, k) => { const d = Math.hypot(vw/2 + wd(s.x - cam.x)*cam.z - sx, vh/2 + wd(s.y - cam.y)*cam.z - sy);
         if (d < best.d) best = { k, d }; });
       return best; };
+    const wallAt = (sx, sy) => { // wall under a screen point (7.W): nearest corner of any wall's staircase; -1 if none close
+      const wxp = wrap(cam.x + (sx - vw/2)/cam.z), wyp = wrap(cam.y + (sy - vh/2)/cam.z);
+      const thr = Math.max(18/cam.z, 10);
+      let best = -1, bd = thr*thr;
+      W.walls.forEach((wl, k) => {
+        for (const pt of wl.path){
+          const dx = wd(pt[0]*CELL - wxp), dy = wd(pt[1]*CELL - wyp), d2 = dx*dx+dy*dy;
+          if (d2 < bd){ bd = d2; best = k; }
+        }
+      });
+      return best; };
     const doSelect = (cxp, cyp, tight) => {
       const wxp = wrap(cam.x + (cxp - vw/2)/cam.z), wyp = wrap(cam.y + (cyp - vh/2)/cam.z);
       const rad = tight ? Math.max(10/cam.z, 7) : Math.max(24/cam.z, 14);
@@ -2775,6 +3014,9 @@ export default function Microcosm(){
     let mode = "observe";      // gesture routing: observe = pan/select, intervene = tool
     let srcDrag = null;         // indirect sun drag accumulator + undo origin
     let srcSel = -1;            // selected sun (intervene): the sun card's subject and the drag target (7.L)
+    let wallSel = -1;           // selected wall (7.W): the wall card's subject
+    let wallArm = false;        // wall tool armed (7.W): the next drag draws a wall
+    let wallDrag = null;        // in-progress wall stroke { x0, y0, dx, dy } in world units
     let loupe = null;           // magnifier: {x,y} in screen coords while long-pressing
     let chipTimer = 0;
     const LP = document.createElement("canvas"); LP.width = LP.height = Math.round(128 * dpr);
@@ -2806,7 +3048,10 @@ export default function Microcosm(){
           pushUndo(`Killed ${nm} · Undo`, () => { logIv("undo"); queueEvent({ type:"revive", snap }); });
         }});
       },
-      setMode: m => { mode = m; if (m === "intervene") follow = false; else if (srcSel >= 0) actionsRef.current.selectSource(-1); },
+      setMode: m => { mode = m; if (m === "intervene") follow = false;
+        else { if (srcSel >= 0) actionsRef.current.selectSource(-1);
+               if (wallSel >= 0) actionsRef.current.selectWall(-1);
+               actionsRef.current.disarmWall(); } },
       pick: (i, g) => { if (W.alive[i] && W.gen[i] === g) selectIndex(i); else clearChips(); },
       undo: () => {
         if (undoAction){ undoAction(); undoAction = null; }
@@ -2814,7 +3059,35 @@ export default function Microcosm(){
       },
       pushUndoExt: (label, fn) => pushUndo(label, fn),
       // 7.L suns: every change is an event (logged, undoable); a layout is one intervention
-      selectSource: k => { srcSel = k; setUi(u => ({ ...u, srcSel: k })); },
+      selectSource: k => { srcSel = k; if (k >= 0) wallSel = -1;
+        setUi(u => ({ ...u, srcSel: k, wallSel: k >= 0 ? -1 : u.wallSel })); },
+      // 7.W walls: select, arm the one-shot drawing tool, add from a drag, remove -- all events, all undoable
+      selectWall: k => { wallSel = k; if (k >= 0) srcSel = -1;
+        setUi(u => ({ ...u, wallSel: k, srcSel: k >= 0 ? -1 : u.srcSel })); },
+      armWall: () => { if (W.walls.length >= P.maxWalls) return;
+        wallArm = true; wallDrag = null;
+        actionsRef.current.selectSource(-1); actionsRef.current.selectWall(-1);
+        setUi(u => ({ ...u, wallArm: true })); },
+      disarmWall: () => { wallArm = false; wallDrag = null;
+        setUi(u => (u.wallArm ? { ...u, wallArm: false } : u)); },
+      addWallFromDrag: d => {
+        logIv("wallAdd");
+        queueEvent({ type:"wallAdd", x0: d.x0, y0: d.y0, dx: d.dx, dy: d.dy, done: r => {
+          actionsRef.current.selectWall(r.k);
+          pushUndo("Built a wall · Undo", () => { logIv("undo"); actionsRef.current.selectWall(-1);
+            queueEvent({ type:"wallRemove", k: r.k }); });
+        }});
+      },
+      removeWall: k => {
+        if (!W.walls[k]) return;
+        actionsRef.current.selectWall(-1);
+        logIv("wallRemove");
+        queueEvent({ type:"wallRemove", k, done: r => {
+          pushUndo("Removed a wall · Undo", () => { logIv("undo");
+            queueEvent({ type:"wallAdd", ...r.snap, at: r.k, done: a => actionsRef.current.selectWall(a.k) }); });
+        }});
+      },
+      removeSelWall: () => { if (wallSel >= 0) actionsRef.current.removeWall(wallSel); },
       addSourceAt: (wx, wy, sx, sy, kind) => { // kind: "sun" (light 1) or "heat" (dark, warmth +10)
         if (W.sources.length >= P.maxSources) return;
         if (sx !== undefined) pours.push({ sx, sy, t: performance.now() });
@@ -2851,10 +3124,12 @@ export default function Microcosm(){
       reset: () => {
         P.mutation = true; // a fresh world starts with the shipped settings (locus settings are restored by initWorld)
         resetWorld(); initWorld((Math.random()*1e9)|0);
-        sel.i = -1; follow = false; srcSel = -1; undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
+        sel.i = -1; follow = false; srcSel = -1; wallSel = -1; wallArm = false; wallDrag = null;
+        undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
         cam.x = W.sources[0].x; cam.y = W.sources[0].y;
+        W.lightDirty = true; // sources and walls are back to the founding state: repaint every derived layer
         setUi(us => ({ ...us, card: null, chips: [], spawnPick: null, tick: 0,
-          mineral: { b:0, f:0, l:0, add:0 }, lightMul: 1, srcSel: -1 }));
+          mineral: { b:0, f:0, l:0, add:0 }, lightMul: 1, srcSel: -1, wallSel: -1, wallArm: false }));
       },
       seedAt: (sp, wx, wy, sx, sy) => {
         const nm = SPECIES_META[sp].name;
@@ -2875,9 +3150,13 @@ export default function Microcosm(){
         t: performance.now(), moved: false, louping: false, lt: null };
       pointers.set(e.pointerId, pp);
       if (mode === "intervene" && pointers.size === 1){
-        // the drag target: the selected sun, else the sun nearest the finger at touch-down
-        const k = srcSel >= 0 && W.sources[srcSel] ? srcSel : nearestSource(pp.sx, pp.sy).k, s = W.sources[k];
-        srcDrag = { k, x: s.x, y: s.y, ox: s.x, oy: s.y };
+        if (wallArm){ // 7.W: the armed wall tool claims the drag -- it starts under the finger
+          wallDrag = { x0: wrap(cam.x + (pp.sx - vw/2)/cam.z), y0: wrap(cam.y + (pp.sy - vh/2)/cam.z), dx: 0, dy: 0 };
+        } else {
+          // the drag target: the selected sun, else the sun nearest the finger at touch-down
+          const k = srcSel >= 0 && W.sources[srcSel] ? srcSel : nearestSource(pp.sx, pp.sy).k, s = W.sources[k];
+          srcDrag = { k, x: s.x, y: s.y, ox: s.x, oy: s.y };
+        }
       }
       if (mode === "observe" && pointers.size === 1){
         pp.lt = setTimeout(() => { pp.lt = null;
@@ -2888,7 +3167,7 @@ export default function Microcosm(){
         const [a,b]=[...pointers.values()];
         a.moved = b.moved = true;
         for (const q of [a,b]){ if (q.lt){ clearTimeout(q.lt); q.lt = null; } q.louping = false; }
-        loupe = null;
+        loupe = null; wallDrag = null; // a second finger means pinch, not a wall stroke
         pinch = { d: Math.hypot(a.x-b.x, a.y-b.y), z: cam.z };
       } };
     const onMove = e => {
@@ -2903,7 +3182,9 @@ export default function Microcosm(){
         if (p.louping){
           if (loupe){ loupe.x = nx; loupe.y = ny; } // loupe follows the finger; camera stays put
         } else if (p.moved){
-          if (mode === "intervene" && srcDrag){
+          if (mode === "intervene" && wallDrag){
+            wallDrag.dx += (nx - p.x) / cam.z; wallDrag.dy += (ny - p.y) / cam.z; // preview drawn per frame
+          } else if (mode === "intervene" && srcDrag){
             // indirect sun drag: move by the finger's delta, from anywhere on screen
             srcDrag.x += (nx - p.x) / cam.z; srcDrag.y += (ny - p.y) / cam.z;
             queueEvent({ type:"source", k: srcDrag.k, x: srcDrag.x, y: srcDrag.y });
@@ -2927,6 +3208,17 @@ export default function Microcosm(){
       if (p && p.lt) clearTimeout(p.lt);
       if (p && p.louping){ loupe = null; doSelect(p.x, p.y, true); return; } // precision pick at loupe center
       if (mode === "intervene"){
+        if (wallArm){ // 7.W: the armed tool owns this release -- commit the stroke, or cancel on a tap
+          if (p && p.moved && wallDrag && pointers.size === 0){
+            const d = wallDrag;
+            actionsRef.current.disarmWall();
+            actionsRef.current.addWallFromDrag(d);
+          } else if (p && !p.moved && !wasPinch && pointers.size === 0){
+            actionsRef.current.disarmWall();
+          }
+          if (pointers.size === 0){ wallDrag = null; srcDrag = null; }
+          return;
+        }
         if (p && p.moved && srcDrag && pointers.size === 0){
           const { ox, oy } = srcDrag;
           logIv("source");
@@ -2937,8 +3229,11 @@ export default function Microcosm(){
           setUi(us => ({ ...us, spawnPick: { sx: p.sx, sy: p.sy, x: wx2, y: wy2 } }));
         } else if (p && !p.moved && !wasPinch && pointers.size === 0 && performance.now() - p.t < 350){
           const ns = nearestSource(p.sx, p.sy);
+          const wk = ns.d <= 28 ? -1 : wallAt(p.sx, p.sy);
           if (ns.d <= 28) actionsRef.current.selectSource(ns.k === srcSel ? -1 : ns.k); // tap a sun: its card (again: let go)
+          else if (wk >= 0) actionsRef.current.selectWall(wk === wallSel ? -1 : wk);    // tap a wall: its card (7.W)
           else if (srcSel >= 0) actionsRef.current.selectSource(-1);                    // tap water with a sun selected: just let go
+          else if (wallSel >= 0) actionsRef.current.selectWall(-1);                     // likewise a wall
           else {
             // fertilize pulse: tap open water to pour mineral there
             const fx = wrap(cam.x + (p.sx - vw/2)/cam.z), fy = wrap(cam.y + (p.sy - vh/2)/cam.z);
@@ -2977,7 +3272,7 @@ export default function Microcosm(){
       if (steps === maxSteps) acc = 0; // shed backlog: slow-motion, never death-spiral
       const alpha = spd === 0 ? 1 : Math.min(1, acc / P.TICK_MS);
       if (spd === 0) drainEvents(); // interventions apply even while paused
-      if (W.lightDirty){ drawLight(); drawHeat(); W.lightDirty = false; }
+      if (W.lightDirty){ drawLight(); drawHeat(); drawWalls(); drawShade(); W.lightDirty = false; }
 
       // follow-cam: ease toward the selected organism
       if (follow && selValid()){
@@ -2997,6 +3292,7 @@ export default function Microcosm(){
         for (let kx = Math.floor(tlx/P.WORLD); (kx*P.WORLD) < tlx + vw/z; kx++){
           const dx0 = (kx*P.WORLD - cam.x)*z + hw, dy0 = (ky*P.WORLD - cam.y)*z + hh;
           if (!hiddenRef.current[8]) ctx.drawImage(LB, dx0, dy0, P.WORLD*z, P.WORLD*z);
+          if (!hiddenRef.current[8] && W.wallsOn) ctx.drawImage(SB, dx0, dy0, P.WORLD*z, P.WORLD*z); // wall shade: the glow must not claim occluded light (7.W)
           if (!hiddenRef.current[9]) ctx.drawImage(HB, dx0, dy0, P.WORLD*z, P.WORLD*z);
         }
       // dissolved mineral (below life), then mat carpet (aggregate sessile producers)
@@ -3008,6 +3304,7 @@ export default function Microcosm(){
           ctx.drawImage(MN, dx0, dy0, P.WORLD*z, P.WORLD*z);
           if (!hiddenRef.current[0]) ctx.drawImage(MC, dx0, dy0, P.WORLD*z, P.WORLD*z);
           if (z < LOD_Z && !hiddenRef.current[7]) ctx.drawImage(CC, dx0, dy0, P.WORLD*z, P.WORLD*z);
+          if (W.wallsOn) ctx.drawImage(WB, dx0, dy0, P.WORLD*z, P.WORLD*z); // walls above the carpet, below the swimmers (7.W)
         }
       // organisms: saturating "screen" composition instead of unbounded addition
       const { pops, mnBound } = drawOrganisms(ctx, view, hiddenRef.current, S);
@@ -3015,7 +3312,12 @@ export default function Microcosm(){
       drawCorpses(ctx, view, hiddenRef.current[7]);
       W.pops = pops;
 
-      if (mode === "intervene") drawSunAffordance(ctx, view, srcSel);
+      if (mode === "intervene"){
+        drawSunAffordance(ctx, view, srcSel);
+        if (wallSel >= 0 && !W.walls[wallSel]) actionsRef.current.selectWall(-1); // undone/removed elsewhere
+        else if (wallSel >= 0) drawWallAffordance(ctx, view, wallSel);
+        if (wallDrag) drawWallPreview(ctx, view, wallDrag);
+      }
       // selection ring (non-additive, drawn above organisms)
       if (selValid()){
         drawSelectionRing(ctx, view, sel.i);
@@ -3070,11 +3372,12 @@ export default function Microcosm(){
   // watch the pond and read the instruments at the same time — the whole point
   // of an observatory. On mobile nothing changes: sheet over world, as before.
   const srcOpen = uiMode === "intervene" && ui.srcSel >= 0;            // the sun card is showing (7.L)
-  const panelKind = !desktop ? null : uiMode === "data" ? "data" : srcOpen ? "src" : ui.card ? "card" : null;
+  const wallOpen = uiMode === "intervene" && ui.wallSel >= 0 && !srcOpen; // the wall card is showing (7.W)
+  const panelKind = !desktop ? null : uiMode === "data" ? "data" : srcOpen ? "src" : wallOpen ? "wall" : ui.card ? "card" : null;
   const panelW = panelKind === "data" ? LAYOUT.panelData
-               : (panelKind === "card" || panelKind === "src") ? LAYOUT.panelCard : 0;
-  const sheetUp = !desktop && (!!ui.card || srcOpen);                    // a bottom sheet is up: lift the controls
-  const sheetPad = srcOpen ? 262 : 194;
+               : (panelKind === "card" || panelKind === "src" || panelKind === "wall") ? LAYOUT.panelCard : 0;
+  const sheetUp = !desktop && (!!ui.card || srcOpen || wallOpen);        // a bottom sheet is up: lift the controls
+  const sheetPad = wallOpen ? 312 : srcOpen ? 262 : 194;
   const srcLog = (type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
     actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt(label + " · Undo", undoFn); };
 
@@ -3098,8 +3401,14 @@ export default function Microcosm(){
       else if (k === "z" || k === "Z"){ actionsRef.current.undo && actionsRef.current.undo(); }
       else if (k === "s" || k === "S" || k === "h" || k === "H"){ setUiMode("intervene"); actionsRef.current.setMode && actionsRef.current.setMode("intervene");
         actionsRef.current.addSourceCenter && actionsRef.current.addSourceCenter(k === "h" || k === "H" ? "heat" : "sun"); }
-      else if (k === "Delete" || k === "Backspace"){ actionsRef.current.removeSelSource && actionsRef.current.removeSelSource(); }
+      else if (k === "w" || k === "W"){ setUiMode("intervene"); actionsRef.current.setMode && actionsRef.current.setMode("intervene");
+        actionsRef.current.armWall && actionsRef.current.armWall(); }
+      else if (k === "Delete" || k === "Backspace"){
+        if (actionsRef.current.removeSelWall) actionsRef.current.removeSelWall();
+        actionsRef.current.removeSelSource && actionsRef.current.removeSelSource(); }
       else if (k === "Escape"){
+        actionsRef.current.disarmWall && actionsRef.current.disarmWall();
+        actionsRef.current.selectWall && actionsRef.current.selectWall(-1);
         actionsRef.current.selectSource && actionsRef.current.selectSource(-1);
         setUi(u => u.spawnPick ? { ...u, spawnPick: null } : { ...u, card: null });
         setUiMode(m => { if (m === "data"){ actionsRef.current.setMode && actionsRef.current.setMode("observe"); return "observe"; } return m; });
@@ -3178,7 +3487,7 @@ export default function Microcosm(){
           past its peek (same rule as the speed control): at half or full height
           the sheet owns that screen space, and a fixed-offset bar would float
           over its content (seen on phone: tabs across the portrait). */}
-      {(srcOpen || !ui.card || detent === 0 || desktop) && (
+      {(srcOpen || wallOpen || !ui.card || detent === 0 || desktop) && (
       <div style={{ position:"absolute", left:16, zIndex:6,
         bottom: sheetUp ? sheetPad : "calc(env(safe-area-inset-bottom, 0px) + 20px)",
         transition:"bottom 0.25s",
@@ -3226,7 +3535,7 @@ export default function Microcosm(){
             style={{ width: 130, accentColor: "#F2B24A" }} />
           </div>
           <div style={{ fontSize:10, color:"rgba(242,178,74,0.75)", marginTop:4, whiteSpace:"nowrap" }}>
-            drag → source · tap source → card · tap → pour · hold → seed · sun · heat</div>
+            drag → source · tap → pour · tap source/wall → card · hold → seed · sun · heat · wall</div>
         </div>
       )}
       {uiMode === "intervene" && (
@@ -3254,6 +3563,12 @@ export default function Microcosm(){
                 background:"rgba(21,34,51,0.95)", color:"#F2B24A", fontFamily:"ui-monospace, Menlo, monospace" }}>
               {kind === "sun" ? "☀ Sun" : "♨ Heat"}</button>
           ))}
+          {W.walls.length < P.maxWalls && (
+            <button onClick={() => { actionsRef.current.armWall(); setUi(us => ({ ...us, spawnPick: null })); }}
+              style={{ padding:"7px 9px", borderRadius:10, fontSize:11, border:"1px solid rgba(242,178,74,0.45)",
+                background:"rgba(21,34,51,0.95)", color:"#F2B24A", fontFamily:"ui-monospace, Menlo, monospace" }}>
+              ▦ Wall</button>
+          )}
           <button onClick={() => setUi(us => ({ ...us, spawnPick: null }))}
             style={{ padding:"7px 8px", borderRadius:10, fontSize:11, border:"none",
               background:"transparent", color:"#5E7386" }}>✕</button>
@@ -3283,7 +3598,7 @@ export default function Microcosm(){
       {undoChip && (
         <button onClick={() => actionsRef.current.undo && actionsRef.current.undo()}
           style={{ position:"absolute", left:"50%", transform:"translateX(-50%)",
-            bottom: sheetUp ? (srcOpen ? sheetPad + 64 : detent===0 ? 194 + 64 : detent===1 ? "48vh" : "82vh")
+            bottom: sheetUp ? ((srcOpen || wallOpen) ? sheetPad + 64 : detent===0 ? 194 + 64 : detent===1 ? "48vh" : "82vh")
                             : "calc(env(safe-area-inset-bottom, 0px) + 88px)",
             padding:"10px 18px", borderRadius:20, cursor:"pointer",
             border:"1px solid rgba(242,178,74,0.7)", background:"rgba(21,34,51,0.95)",
@@ -3293,7 +3608,7 @@ export default function Microcosm(){
         </button>
       )}
       {/* specimen card — bottom sheet on mobile, docked panel on desktop */}
-      {ui.card && !desktop && !srcOpen && (
+      {ui.card && !desktop && !srcOpen && !wallOpen && (
         <div style={{ position:"absolute", left:0, right:0, bottom:0,
           height: detent===0 ? 178 : detent===1 ? "46vh" : "80vh",
           background:"rgba(21,34,51,0.92)", backdropFilter:"blur(10px)",
@@ -3320,6 +3635,27 @@ export default function Microcosm(){
         </div>
       )}
       {/* sun card (7.L) — the selected light source: bottom sheet on mobile, docked panel on desktop */}
+      {/* wall card (7.W) — the selected wall: bottom sheet on mobile, docked panel on desktop */}
+      {wallOpen && !desktop && (
+        <div style={{ position:"absolute", left:0, right:0, bottom:0, height: sheetPad - 16,
+          background:"rgba(21,34,51,0.92)", backdropFilter:"blur(10px)",
+          borderTop:"1px solid rgba(242,178,74,0.35)", borderRadius:"16px 16px 0 0",
+          color:COL.plankTxt, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+          <div className="mc-scroll" style={{ padding:"14px 18px calc(env(safe-area-inset-bottom, 0px) + 12px)", overflowY:"auto", flex:1 }}>
+            <WallCard k={ui.wallSel} mono={mono} actions={actionsRef}
+              onClose={() => actionsRef.current.selectWall(-1)} onLog={srcLog} />
+          </div>
+        </div>
+      )}
+      {/* wall tool armed: one instruction, amber, dismissable */}
+      {ui.wallArm && (
+        <div style={{ position:"absolute", left:"50%", transform:"translateX(-50%)",
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)", zIndex:6,
+          padding:"9px 16px", borderRadius:14, whiteSpace:"nowrap",
+          background:"rgba(11,19,30,0.9)", border:"1px solid rgba(242,178,74,0.7)",
+          color:"#F2B24A", fontSize:12.5, fontWeight:600 }}>
+          ▦ Draw the wall: drag across the water · tap to cancel</div>
+      )}
       {srcOpen && !desktop && (
         <div style={{ position:"absolute", left:0, right:0, bottom:0, height: sheetPad - 16,
           background:"rgba(21,34,51,0.92)", backdropFilter:"blur(10px)",
@@ -3332,7 +3668,7 @@ export default function Microcosm(){
         </div>
       )}
       {/* speed control */}
-      {(srcOpen || !ui.card || detent === 0 || desktop) && (
+      {(srcOpen || wallOpen || !ui.card || detent === 0 || desktop) && (
       <button className="mc-fab" onPointerDown={fabDown} onPointerUp={fabUp} onPointerCancel={fabUp}
         title={vp.fine ? "Space play/pause · 1 2 3 speed · . step" : undefined}
         aria-label={ui.speed === 0 ? "Play (long-press: step one tick)" : `Speed ${ui.speed}x (long-press: step one tick)`}
@@ -3382,6 +3718,20 @@ export default function Microcosm(){
               </div>
               <div className="mc-scroll" style={{ padding:"0 16px 18px", overflowY:"auto", flex:1 }}>
                 <SourceCard k={ui.srcSel} desktop mono={mono} actions={actionsRef} lightMul={ui.lightMul} onLog={srcLog} />
+              </div>
+            </>
+          ) : panelKind === "wall" ? (
+            <>
+              <div style={{ display:"flex", alignItems:"center", padding:"14px 16px 10px", flexShrink:0 }}>
+                <span style={{ fontSize:11, letterSpacing:1.4, color:"#F2B24A", fontFamily:mono }}>WALL</span>
+                <button className="mc-hit" onClick={() => actionsRef.current.selectWall(-1)}
+                  title="Close (Esc)"
+                  style={{ marginLeft:"auto", width:28, height:28, borderRadius:8, cursor:"pointer",
+                    border:"1px solid rgba(94,115,134,0.3)", background:"transparent",
+                    color:COL.silt, fontSize:13, lineHeight:1 }}>✕</button>
+              </div>
+              <div className="mc-scroll" style={{ padding:"0 16px 18px", overflowY:"auto", flex:1 }}>
+                <WallCard k={ui.wallSel} desktop mono={mono} actions={actionsRef} onLog={srcLog} />
               </div>
             </>
           ) : panelKind === "card" ? (
@@ -3701,6 +4051,90 @@ function SourceCard({ k, desktop, mono, actions, lightMul, onClose, onLog }){
       <div style={{ fontSize:10, color:"#5E7386", marginTop:8, lineHeight:1.5 }}>
         {st.sources.length < P.maxSources ? (desktop ? "S adds a sun, H a heater, at the view centre" : "hold on water → add a sun or a heater there") : "four sources at most"}
         {" · drag anywhere moves this one"}{Math.abs(lightMul - 1) > 1e-9 ? ` · ☀ lever ×${lightMul.toFixed(2)} on all light` : ""}
+      </div>
+    </div>
+  );
+}
+
+// 7.W — the wall card: the selected wall. Functional names first (rule 8): light, warmth and flow
+// are transmissions (0 = sealed, 1 = as if no wall); passage is per-species. Presets are one
+// intervention each (one wallSet, one log entry, one undo). Sliders: one drag = one undo.
+const WALL_PRESETS = [
+  { key:"stone", label:"Stone",       vals: () => ({ lt:0, ht:0, fl:0, pass:0 }) },
+  { key:"glass", label:"Glass",       vals: () => ({ lt:1, ht:0.5, fl:0, pass:0 }) },
+  { key:"mesh",  label:"Fine mesh",   vals: () => ({ lt:0.9, ht:0.9, fl:0.7, pass: TAG.SOLARA|TAG.DRIFTA|TAG.BACILLUS }) },
+  { key:"grate", label:"Coarse mesh", vals: () => ({ lt:0.9, ht:0.9, fl:0.85, pass: TAG.SOLARA|TAG.DRIFTA|TAG.BACILLUS|TAG.CILIO }) },
+];
+const wallKind = wl => wl.pass !== 0 ? "▦ Mesh wall" : wl.lt >= 0.7 ? "▦ Glass wall" : "▦ Stone wall";
+function WallCard({ k, desktop, mono, actions, onClose, onLog }){
+  const amber = "#F2B24A";
+  const read = () => ({ walls: W.walls.map(w2 => ({ lt: w2.lt, ht: w2.ht, fl: w2.fl, pass: w2.pass })) });
+  const [st, setSt] = React.useState(read);
+  React.useEffect(() => { const iv = setInterval(() => setSt(read), 400); return () => clearInterval(iv); }, []);
+  const dragStart = React.useRef({}), logTimer = React.useRef({});
+  const s = st.walls[k];
+  if (!s) return null;
+  const commit = (key, v, label) => {
+    if (dragStart.current[key] === undefined) dragStart.current[key] = W.walls[k][key];
+    queueEvent({ type:"wallSet", k, [key]: v });
+    setSt(x => ({ walls: x.walls.map((q, j) => j === k ? { ...q, [key]: v } : q) }));
+    clearTimeout(logTimer.current[key]);
+    logTimer.current[key] = setTimeout(() => { const prev = dragStart.current[key]; dragStart.current[key] = undefined;
+      if (prev !== undefined && Math.abs(prev - v) > 1e-9) onLog("wallSet", label, () => queueEvent({ type:"wallSet", k, [key]: prev })); }, 700);
+  };
+  const togglePass = sp => {
+    const bit = TRAITS[sp].bodyTag, prev = W.walls[k].pass, next = prev ^ bit;
+    queueEvent({ type:"wallSet", k, pass: next });
+    setSt(x => ({ walls: x.walls.map((q, j) => j === k ? { ...q, pass: next } : q) }));
+    onLog("wallSet", (prev & bit ? "Closed the wall to " : "Opened the wall to ") + SPECIES_META[sp].name,
+      () => queueEvent({ type:"wallSet", k, pass: prev }));
+  };
+  const applyPreset = pr => {
+    const prev = { lt: s.lt, ht: s.ht, fl: s.fl, pass: s.pass };
+    queueEvent({ type:"wallSet", k, ...pr.vals() });
+    onLog("wallSet", "Wall: " + pr.label, () => queueEvent({ type:"wallSet", k, ...prev }));
+    setTimeout(() => setSt(read), 120);
+  };
+  const row = { display:"flex", alignItems:"center", gap:10, marginTop:8, fontSize:11, fontFamily:mono };
+  const lab = { width:62, color:"#8FA3B5", flexShrink:0 };
+  const val = { width:44, textAlign:"right", color:amber, flexShrink:0 };
+  const btn = { padding:"5px 9px", borderRadius:8, cursor:"pointer", font:"inherit", fontSize:10, fontFamily:mono,
+    border:"1px solid rgba(242,178,74,0.45)", background:"transparent", color:amber };
+  const slider = (key, label) => (
+    <input type="range" min={0} max={1} step={0.05} value={s[key]}
+      onChange={e => commit(key, +e.target.value, label)} style={{ flex:1, accentColor:amber }} />);
+  return (
+    <div style={{ color:"#C9D7E3" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+        <span style={{ fontSize:13, fontWeight:600, color:amber }}>{wallKind(s)} · {k+1} of {st.walls.length}</span>
+        {onClose && <button className="mc-hit" onClick={onClose} aria-label="Close"
+          style={{ marginLeft:"auto", border:"none", background:"transparent", color:"#5E7386", fontSize:13, cursor:"pointer", padding:"0 0 0 4px" }}>✕</button>}
+      </div>
+      <div style={{ ...row, flexWrap:"wrap", gap:6, marginTop:10 }}>
+        {WALL_PRESETS.map(pr => (
+          <button key={pr.key} className="mc-hit" style={btn} onClick={() => applyPreset(pr)}>{pr.label}</button>))}
+      </div>
+      <div style={row}><span style={lab}>light</span>{slider("lt", "Changed a wall's light")}<span style={val}>{Math.round(s.lt*100)}%</span></div>
+      <div style={row}><span style={lab}>warmth</span>{slider("ht", "Changed a wall's warmth")}<span style={val}>{Math.round(s.ht*100)}%</span></div>
+      <div style={row}><span style={lab}>flow</span>{slider("fl", "Changed a wall's flow")}<span style={val}>{Math.round(s.fl*100)}%</span></div>
+      <div style={{ ...row, flexWrap:"wrap", gap:6 }}>
+        <span style={{ ...lab, width:"auto" }}>may cross</span>
+        {SPECIES.LIVE.map(sp => { const on = !!(s.pass & TRAITS[sp].bodyTag), c = SPECIES_META[sp].rgb; return (
+          <button key={sp} className="mc-hit" onClick={() => togglePass(sp)}
+            title={(on ? "Close the wall to " : "Open the wall to ") + SPECIES_META[sp].name}
+            style={{ padding:"4px 8px", borderRadius:8, cursor:"pointer", font:"inherit", fontSize:10, fontFamily:mono,
+              border: on ? `1px solid rgb(${c[0]},${c[1]},${c[2]})` : "1px solid rgba(94,115,134,0.4)",
+              background: on ? "rgba(201,215,227,0.10)" : "transparent",
+              color: on ? `rgb(${c[0]},${c[1]},${c[2]})` : "#5E7386",
+              textDecoration: on ? "none" : "line-through" }}>
+            {SPECIES_META[sp].name}</button> ); })}
+        <button className="mc-hit" onClick={() => actions.current.removeWall(k)}
+          title="Remove this wall (Delete)"
+          style={{ ...btn, marginLeft:"auto", borderColor:"rgba(226,96,96,0.6)", color:"rgb(226,96,96)" }}>Remove</button>
+      </div>
+      <div style={{ fontSize:10, color:"#5E7386", marginTop:8, lineHeight:1.5 }}>
+        transmissions: 0 = sealed, 100% = as if no wall · a dashed wall lets the lit species through · flow 0 keeps the water apart
+        {W.walls.length < P.maxWalls ? (desktop ? " · W draws another wall" : " · hold on water → ▦ Wall draws another") : " · eight walls at most"}
       </div>
     </div>
   );

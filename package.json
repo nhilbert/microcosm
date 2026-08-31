@@ -23,6 +23,8 @@
     "light": "npm run build && node harness/light.js --patches --seed",
     "light:gate": "npm run build && node harness/light.js --gate",
     "heat:gate": "npm run build && node harness/heat.js --gate",
+    "walls": "npm run build && node harness/walls.js",
+    "walls:all": "npm run build && node harness/walls.js --open --seal --hideout --shade",
     "apk:assets": "node tools/build-app.js",
     "selftest": "node harness/selftest.js",
     "yoshida:capture": "npm run build && node harness/yoshida.js --capture",
