@@ -1,1 +1,3 @@
+# Rust build output. Everything here is regenerable:
+#   npm run wasm   -> microcosm-core/target/wasm32-unknown-unknown/release/microcosm_core.wasm
 target/
