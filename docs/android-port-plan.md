@@ -349,7 +349,51 @@ through WASM 54.8 s vs 132.3 s (**×2.4**). Inside the ×2–5 the plan predicte
 the ×3–6 organism-loop estimate looks about right — but WASM and native are not the
 phone, and the M1 go/no-go still wants an on-device number.
 
-## 8. Next
+## 8. M5.0 — the core on the phone (2026-08-31)
+
+The two claims a container could not settle — ARM64 bit-exactness and the tick rate
+on real hardware — needed a device. Everything else was proved against the
+JavaScript core on x86-64, and no amount of further desktop work would close them.
+
+The approach: **make the evidence travel with the code.** There is no Node on a
+phone to compare against, so the phone carries what it needs to check itself.
+
+- `microcosm_core::probe` holds the checks, **in the core**, so the phone and the
+  workstation run the same code and their answers are comparable: the four
+  certified 3,000-tick fingerprints (matching them means the whole sim —
+  arithmetic, draw order, field passes, heredity — is bit-exact), a replay of V8's
+  own results, a save/load resumption check, and a tick-rate probe.
+- `EXPECTED_3000` is embedded in the source. CI runs the same check on the host
+  (`bin/selfcheck`), so a stale constant fails where the cause is unambiguous
+  rather than on a device, where nobody could tell a stale constant from a
+  hardware difference.
+- `dev/xcheck/gen-bin.js` re-captures the trace as **1.9 MiB of binary** instead of
+  72 MB of hex text — small enough to ship inside an APK, same reference engine.
+- `rust/microcosm-android` is thin JNI glue. The `jni` dependency lives out there
+  so it never enters the crate whose arithmetic has to stay auditable.
+- `android-native/` is a plain Activity that runs the four checks and prints them.
+  Its own applicationId, so it installs beside the wrapper and cannot disturb it.
+  Dependency-free, like the wrapper: Compose belongs to M5.1, and adding it now
+  would only slow the build that answers the measurement questions.
+- `.github/workflows/android-native.yml` builds it and publishes a rolling
+  `probe-latest` release, so the APK is a direct download on the phone.
+
+**Verified locally, as far as a container allows:** both crates compile for
+`aarch64-linux-android`; the four exported JNI symbols match the Kotlin
+declarations exactly; and the whole JNI path was exercised from a real JVM against
+the host build — sim bit-exact, math 0 mismatches on all seven functions,
+save/load resumed identically, and **0.464 ms/tick (2,155 ticks/s, 215× speed) on
+x86-64**, the number the phone's result should be read against.
+
+**Not verified locally: the Gradle build.** The Android plugin repositories are
+unreachable from this container — the *existing, working* `android/` project fails
+identically — so this is the environment, not the configuration. CI proves it.
+
+What the device run will settle: if the fingerprints match, the ARM64
+bit-exactness claim stops being inferred; and the tick rate answers the M1
+go/no-go with a real number instead of a ×2–5 estimate.
+
+## 9. Next
 
 1. **On-device (M1 remainder)**: replay the math trace on ARM64, and run the perf
    probe on a mid-range phone. Until then the Android bit-exactness claim is
