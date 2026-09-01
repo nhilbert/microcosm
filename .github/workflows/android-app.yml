@@ -44,6 +44,12 @@ jobs:
       - name: Build the core + JNI adapter for arm64-v8a
         run: tools/build-app.sh arm64-v8a
 
+      # The layout gate: docs/app-ux-review.md §6. Every other gate in this repository is about
+      # the world; this one is about the screen, and it exists because a nine-button bar that
+      # overflowed a 408 dp phone shipped through nine green runs of this very workflow.
+      - name: Layout gate
+        run: gradle -p android-app testReleaseUnitTest --no-daemon
+
       - name: Build signed APK
         run: gradle -p android-app assembleRelease -PversionCode=${{ github.run_number }} --no-daemon
 

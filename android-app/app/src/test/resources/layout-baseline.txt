@@ -1,0 +1,13 @@
+# Layout gate baseline — what is wrong with the app's chrome TODAY.
+#
+# Every line here is a violation the gate found and that we have chosen not to fix yet. They are
+# not excuses: they are docs/app-ux-review.md §1, written down where CI can count them. The file
+# may only shrink, and the test fails if a line stops occurring without being deleted — so a
+# repair cannot land silently and a regression cannot hide behind an old entry.
+#
+# Format: one violation key per line, "KIND subject @ profile". Comments after '#'.
+#
+# Nothing is listed yet. The first CI run of this gate prints exactly what belongs here; that
+# output is transcribed into this file in the commit that follows, so the initial contents are
+# measured rather than guessed. Until then the gate reports every violation as new, which is the
+# honest starting state — the screen has never been measured before.

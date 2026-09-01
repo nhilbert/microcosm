@@ -153,13 +153,20 @@ class MainActivity : Activity() {
             setPadding(12, 0, 12, 0)
             visibility = ViewGroup.GONE
         }
-        feedButton = button("feed") { world.feedSelected() }
-        killButton = button("kill") { world.killSelected() }
-        wallButton = button("wall") { world.wallArmed = !world.wallArmed }
-        actions.addView(feedButton)
-        actions.addView(killButton)
-        actions.addView(button("seed") { seedPicker() })
-        actions.addView(wallButton)
+        // Rows come from Chrome so the layout gate measures the row that ships, not a copy of
+        // it (docs/app-ux-review.md §6).
+        val tools = Chrome.row(this, Chrome.TOOLS) { k ->
+            when (k) {
+                0 -> world.feedSelected()
+                1 -> world.killSelected()
+                2 -> seedPicker()
+                else -> world.wallArmed = !world.wallArmed
+            }
+        }
+        while (tools.childCount > 0) actions.addView(tools.getChildAt(0))
+        feedButton = Chrome.at(actions, Chrome.TOOLS, "feed")
+        killButton = Chrome.at(actions, Chrome.TOOLS, "kill")
+        wallButton = Chrome.at(actions, Chrome.TOOLS, "wall")
         bottom.addView(actions)
 
         // The sun's own controls, shown while a sun is gripped. Drag the world to move it.
@@ -175,9 +182,14 @@ class MainActivity : Activity() {
             typeface = Typeface.MONOSPACE
             setPadding(0, 18, 8, 0)
         })
-        sunBar.addView(button("dimmer") { nudgeSun(-0.15) })
-        sunBar.addView(button("brighter") { nudgeSun(0.15) })
-        sunBar.addView(button("release") { world.sunSel = -1 })
+        val sunRow = Chrome.row(this, Chrome.SUN) { k ->
+            when (k) {
+                0 -> nudgeSun(-0.15)
+                1 -> nudgeSun(0.15)
+                else -> world.sunSel = -1
+            }
+        }
+        while (sunRow.childCount > 0) sunBar.addView(sunRow.getChildAt(0))
         bottom.addView(sunBar)
 
         undoChip = button("undo") { world.undoLast() }.apply {
@@ -190,22 +202,29 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(12, 12, 12, 12)
         }
-        for (s in doubleArrayOf(0.0, 1.0, 4.0, 16.0)) bar.addView(button(if (s == 0.0) "pause" else "${s.toInt()}x") {
-            world.speed = s
-        })
-        bar.addView(button("mode") { world.intervene = !world.intervene }.also { modeButton = it })
-        bar.addView(button("save") { saveOrLoad() })
-        bar.addView(button("exp") { experimentPicker() })
-        bar.addView(button("data") {
-            world.dataOpen = true
-            dataPanel.visibility = ViewGroup.VISIBLE
-            refreshData()
-        })
-        bar.addView(button("bench") {
-            reportView.visibility = ViewGroup.GONE
-            world.speed = 0.0
-            world.benchmark()
-        })
+        val barRow = Chrome.row(this, Chrome.BAR) { k ->
+            when (Chrome.BAR[k]) {
+                "pause" -> world.speed = 0.0
+                "1x" -> world.speed = 1.0
+                "4x" -> world.speed = 4.0
+                "16x" -> world.speed = 16.0
+                "mode" -> world.intervene = !world.intervene
+                "save" -> saveOrLoad()
+                "exp" -> experimentPicker()
+                "data" -> {
+                    world.dataOpen = true
+                    dataPanel.visibility = ViewGroup.VISIBLE
+                    refreshData()
+                }
+                else -> {
+                    reportView.visibility = ViewGroup.GONE
+                    world.speed = 0.0
+                    world.benchmark()
+                }
+            }
+        }
+        while (barRow.childCount > 0) bar.addView(barRow.getChildAt(0))
+        modeButton = Chrome.at(bar, Chrome.BAR, "mode")
         bottom.addView(bar)
         root.addView(bottom, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
@@ -224,8 +243,8 @@ class MainActivity : Activity() {
         }
         dataPanel.addView(dataTitle)
         val pages = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12, 0, 12, 0) }
-        for ((k, name) in listOf("pops", "chem", "metab", "health", "events").withIndex())
-            pages.addView(button(name) { dataPage = k; refreshData() })
+        val pageRow = Chrome.row(this, Chrome.PAGES) { k -> dataPage = k; refreshData() }
+        while (pageRow.childCount > 0) pages.addView(pageRow.getChildAt(0))
         dataPanel.addView(pages)
         dataView = DataView(this)
         dataPanel.addView(dataView, LinearLayout.LayoutParams(MATCH, 0, 1f))
@@ -461,11 +480,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun button(label: String, onTap: () -> Unit) = Button(this).apply {
-        text = label
-        textSize = 11f
-        setOnClickListener { onTap() }
-    }
+    private fun button(label: String, onTap: () -> Unit) = Chrome.button(this, label, onTap)
 
     override fun onResume() {
         super.onResume()

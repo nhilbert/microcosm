@@ -46,6 +46,14 @@ android {
         }
     }
 
+    // The layout gate (src/test) needs the app's resources and a real Android runtime; Robolectric
+    // supplies both on the JVM, which is the only way CI can run it — there is no device here.
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -55,5 +63,11 @@ android {
     }
 }
 
-// Dependency-free on purpose (A.1): a SurfaceView, a render thread and a Canvas. Compose arrives
-// with the panels in A.2+; nothing here needs it, and a plain build is a fast build.
+// The shipping app is dependency-free on purpose (A.1): a SurfaceView, a render thread and a
+// Canvas. Nothing here needs more, and a plain build is a fast build. The test dependencies below
+// ship with nothing — they exist so the screen can be measured without a screen.
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.robolectric:robolectric:4.14.1"
+    testImplementation "androidx.test:core:1.6.1"
+}
