@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The display-side German for the core's narration (DE.4).
+
+     The Observatory's sentences are produced by the certified Rust core and CHECKED BY GATES
+     (K6, heat, the honesty gate), so they cannot be translated at the source — the English IS
+     the certified behavior. Instead the app translates at display: `narration_patterns` are
+     full-match regexes over the core's fixed templates (observatory.rs), `narration_de` the
+     German each one becomes. Row k of one matches row k of the other; a sentence no pattern
+     matches is shown in English rather than guessed at — untranslated is honest, wrong is not.
+
+     Template placeholders: {n} = capture n verbatim, {wn} = capture n through the trait
+     vocabulary (pole words), {ln} = capture n as a locus label. The vocabulary below carries
+     the species' locus labels and pole words (species.json → the core's trait rows); species
+     names are proper names and stay.
+
+     Backslashes are doubled for the resource compiler; the gate skips translatable="false"
+     (machine patterns) and holds names ending in _de to the German rules. -->
+<resources>
+
+    <string-array name="narration_patterns" translatable="false" formatted="false">
+        <item>^(\\w+) established — (\\d+) hunters\\.$</item>
+        <item>^(\\w+) established — (\\d+) strong\\.$</item>
+        <item>^The pack wakes — (\\w+) is hunting\\.$</item>
+        <item>^(\\w+) has died out\\.$</item>
+        <item>^(\\w+) bloom under way — up ([\\d.]+)x in (\\d+) s\\.$</item>
+        <item>^(\\w+) crashing — down (\\d+)% in (\\d+) s\\.$</item>
+        <item>^(\\w+) has reached the limit of its (.+) — (\\d+)% at the (.+) edge\\.$</item>
+        <item>^A (.+) (\\w+) line is taking over — (\\d+)% of the population and rising\\.$</item>
+        <item>^The (.+) (\\w+) line has taken over — (\\d+)% of the population\\.$</item>
+        <item>^(\\w+) is diversifying — (.+) and (.+) lines coexist, neither winning\\.$</item>
+        <item>^(\\w+) differs by patch — (.+) near sun (\\d+), (.+) near sun (\\d+)\\.$</item>
+        <item>^Variation collapsing in (\\w+) — the population is becoming uniform\\.$</item>
+        <item>^Variation collapsing in (\\w+)\'s (.+) — the trait is becoming uniform\\.$</item>
+        <item>^Mineral is flowing into dead matter faster than it returns\\.$</item>
+        <item>^Over a third of the world\'s mineral is locked in dead matter\\.$</item>
+        <item>^(\\w+) is thinning out of the warm water — down (\\d+)% where it is warm\\.$</item>
+        <item>^Dead matter is piling up in the warm water — ([\\d.-]+) per cell against ([\\d.-]+) outside\\.$</item>
+        <item>^The pack is starving in the heat — upkeep ×([\\d.]+) against meals that scale flatter\\.$</item>
+        <item>^(\\w+) is running itself down in the warm water — reserve (\\d+)% against a healthy (\\d+)%\\+\\.$</item>
+    </string-array>
+
+    <string-array name="narration_de" formatted="false">
+        <item>{1} hat sich angesiedelt — {2} Jäger.</item>
+        <item>{1} hat sich angesiedelt — {2} stark.</item>
+        <item>Das Rudel erwacht — {1} jagt.</item>
+        <item>{1} ist ausgestorben.</item>
+        <item>{1}-Blüte im Gange — {2}× in {3} s.</item>
+        <item>{1} bricht ein — {2} % weniger in {3} s.</item>
+        <item>{1} ist an der Grenze von „{l2}“ — {3} % am Rand „{w4}“.</item>
+        <item>Eine {2}-Linie Richtung „{w1}“ übernimmt — {3} % des Bestands, Tendenz steigend.</item>
+        <item>Die {2}-Linie „{w1}“ hat übernommen — {3} % des Bestands.</item>
+        <item>{1} fächert sich auf — „{w2}“ und „{w3}“ bestehen nebeneinander, keine Linie gewinnt.</item>
+        <item>{1} unterscheidet sich je Fleck — „{w2}“ nahe Sonne {3}, „{w4}“ nahe Sonne {5}.</item>
+        <item>Die Variation in {1} bricht zusammen — der Bestand wird einheitlich.</item>
+        <item>Die Variation in {1}s „{l2}“ bricht zusammen — das Merkmal wird einheitlich.</item>
+        <item>Mineral fließt schneller in tote Masse, als es zurückkommt.</item>
+        <item>Über ein Drittel des Minerals der Welt steckt in toter Masse fest.</item>
+        <item>{1} wird im warmen Wasser dünn — {2} % weniger, wo es warm ist.</item>
+        <item>Tote Masse häuft sich im warmen Wasser — {1} pro Zelle gegen {2} außerhalb.</item>
+        <item>Das Rudel hungert in der Hitze — Unterhalt ×{1} gegen Mahlzeiten, die flacher steigen.</item>
+        <item>{1} zehrt sich im warmen Wasser auf — Reserve {2} % gegen gesunde {3} %+.</item>
+    </string-array>
+
+    <!-- The trait vocabulary: locus labels and pole words as the core's trait rows spell them
+         (species.json), and the impact channels that are not species. Row k of _en matches
+         row k of _de. Lookup is case-insensitive; a word not listed passes through. -->
+    <string-array name="trait_vocab_en" translatable="false">
+        <item>Light</item>
+        <item>Defense</item>
+        <item>Thermal</item>
+        <item>Warmth preference</item>
+        <item>Restlessness</item>
+        <item>Pursuit</item>
+        <item>Hunting style</item>
+        <item>Metabolism</item>
+        <item>Search style</item>
+        <item>shade-tolerant</item>
+        <item>sun-loving</item>
+        <item>tougher</item>
+        <item>faster-growing</item>
+        <item>heat-tolerant</item>
+        <item>quick-burning</item>
+        <item>warm-seeking</item>
+        <item>cool-seeking</item>
+        <item>roving</item>
+        <item>settled</item>
+        <item>keener</item>
+        <item>thriftier</item>
+        <item>kill-and-stay</item>
+        <item>kill-and-move</item>
+        <item>voracious</item>
+        <item>frugal</item>
+        <item>smooth-running</item>
+        <item>twitchy</item>
+        <item>dissolved mineral</item>
+        <item>production</item>
+    </string-array>
+
+    <string-array name="trait_vocab_de">
+        <item>Licht</item>
+        <item>Abwehr</item>
+        <item>Wärme</item>
+        <item>Wärmevorliebe</item>
+        <item>Rastlosigkeit</item>
+        <item>Verfolgung</item>
+        <item>Jagdstil</item>
+        <item>Stoffwechsel</item>
+        <item>Suchstil</item>
+        <item>schattenfest</item>
+        <item>sonnenhungrig</item>
+        <item>zäher</item>
+        <item>schnellwüchsig</item>
+        <item>hitzefest</item>
+        <item>schnell brennend</item>
+        <item>wärmesuchend</item>
+        <item>kühlesuchend</item>
+        <item>rastlos</item>
+        <item>sesshaft</item>
+        <item>schärfer</item>
+        <item>sparsamer</item>
+        <item>bleiben</item>
+        <item>weiterziehen</item>
+        <item>gefräßig</item>
+        <item>genügsam</item>
+        <item>geradlinig</item>
+        <item>zappelig</item>
+        <item>gelöstes Mineral</item>
+        <item>Produktion</item>
+    </string-array>
+
+</resources>

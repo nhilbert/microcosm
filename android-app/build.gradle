@@ -1,0 +1,12 @@
+// The app: Microcosm running natively on the phone, on the Rust core.
+//
+// Three Android projects live in this repository and install side by side under different
+// applicationIds, so work on one cannot break another:
+//
+//   android/         the WebView wrapper around the JS artifact — what ships today
+//   android-native/  the M5.0 diagnostics probe — prints numbers and stops
+//   android-app/     this: the native app (M5.1, docs/android-app-plan.md)
+plugins {
+    id "com.android.application" version "8.7.3" apply false
+    id "org.jetbrains.kotlin.android" version "2.0.21" apply false
+}

@@ -43,6 +43,19 @@ this gate, not from taste.
   walls pattern, banner rule 6): with `sc` undefined every count is the shipped literal
   and the RNG stream is bit-identical — conformance confirmed identical on all four
   fingerprints; the hash was rebound for this declared behavior-neutral extension.
+- **The table is data, predicates included** (`src/observatory/levels.json`, since the
+  Rust port, 2026-08-31). A condition is a metric (`pop(sp)`, `lockShare`, `free`), an
+  operator and a right-hand side; `pass` is their conjunction, `failNow` an ordered list
+  of condition-lists with the message each fires, `latch` the one stateful case in the
+  ladder (L6's "the pack is gone" only after a pack existed), `meter` the HUD's rows.
+  This is not tidiness: `pass`/`failNow`/`meter` used to be closures, and a closure
+  cannot cross into the Rust core — shipping them as closures would have meant writing
+  every level's predicates twice, in a way that fails silently, since a mistranslated
+  threshold still yields a plausible verdict. The extraction was proved behaviour-
+  preserving (conformance bit-identical, all 21 gate cases at the same ticks), and the
+  gate now runs on both cores with byte-identical output. Two side effects: the level
+  text reaches the crate as JSON for a future app shell, and `harness/prose.js` can
+  finally check the `failNow` verdicts, which were review-only before.
 - **Level state** (`src/observatory/levels.js`): definitions are data; `levelCheck()` is
   a pure observer (zero draws, zero mutation) that walks the recorder ring one sample at
   a time — verdicts are counted in samples, so UI speed and the headless harness agree

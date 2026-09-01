@@ -1,0 +1,11 @@
+<resources>
+    <!-- The dialogs speak the shell's language too (U2.S follow-up: the owner's screenshot of
+         the stock gray seed picker against the styled sheet made the clash undeniable). -->
+    <style name="MicrocosmDialog" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">#F2B24A</item>
+        <item name="android:windowBackground">@drawable/dialog_bg</item>
+        <item name="android:textColorPrimary">#C9D7E3</item>
+        <item name="android:textColor">#C9D7E3</item>
+        <item name="android:fontFamily">@font/space_grotesk</item>
+    </style>
+</resources>

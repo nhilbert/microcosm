@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Every string a player reads, in one place (DE.1). The Kotlin sources keep only developer
+     text and the machine keys the gates measure by. values-de/ carries the German; the app-strings
+     prose gate (harness/prose-app.js) holds both files to the style rules and refuses a key that
+     exists in one language and not the other.
+
+     What is deliberately NOT here: the core's own words. Species names, locus labels, narration
+     and level text are produced by the certified Rust core and checked by gates — the German for
+     those is a display overlay (res/values/narration.xml, assets/levels.de.json), never an edit
+     to the core. -->
+<resources>
+
+    <!-- the front door -->
+    <string name="app_tagline">a small pond, entirely yours</string>
+    <string name="choice_sandbox">sandbox</string>
+    <string name="sub_sandbox_resume">your pond, as you left it</string>
+    <string name="sub_sandbox_fresh">a fresh pond</string>
+    <string name="choice_experiments">experiments</string>
+    <string name="sub_experiments">questions with a pond attached</string>
+    <string name="experiments_title">Experiments</string>
+    <string name="start_sub_behind_experiment">your pond is waiting behind the experiment</string>
+    <string name="start_sub_as_stands">your pond, as it stands</string>
+
+    <!-- shared buttons -->
+    <string name="btn_back">back</string>
+    <string name="btn_close">close</string>
+    <string name="btn_cancel">cancel</string>
+    <string name="btn_none">none</string>
+    <string name="btn_begin">begin</string>
+    <string name="btn_skip">skip</string>
+    <string name="btn_undo">undo</string>
+    <string name="btn_experiments">experiments</string>
+    <string name="btn_reset_sure">sure?</string>
+
+    <!-- the chrome inventory's faces (the keys stay English in Chrome.kt; the gates key on them) -->
+    <string name="pace_pause">pause</string>
+    <string name="tool_feed">feed</string>
+    <string name="tool_kill">kill</string>
+    <string name="tool_seed">seed</string>
+    <string name="tool_wall">wall</string>
+    <string name="sun_dimmer">dimmer</string>
+    <string name="sun_brighter">brighter</string>
+    <string name="sun_release">release</string>
+    <string name="page_pops">pops</string>
+    <string name="page_chem">chem</string>
+    <string name="page_metab">metab</string>
+    <string name="page_health">health</string>
+    <string name="page_events">events</string>
+    <string name="util_reset">reset</string>
+    <string name="util_save">save</string>
+    <string name="util_data">data</string>
+    <string name="util_bench" translatable="false">bench</string>
+
+    <!-- the drawer -->
+    <string name="section_pace">pace</string>
+    <string name="section_species">species · tap to hide</string>
+
+    <!-- the hand's hints and the sun -->
+    <string name="hint_wall_drag">drag on the water</string>
+    <string name="hint_seed_press">long-press the water</string>
+    <string name="hint_tool_touch">tap or drag the water</string>
+    <string name="label_sun">sun</string>
+    <string name="badge_tap_restores">tap restores</string>
+    <string name="sun_badge_moved">moved</string>
+    <string name="sun_badge_just">just changed</string>
+    <string name="sun_badge_standing">standing %1$d min</string>
+
+    <!-- the specimen sheet -->
+    <string name="specimen_dormant">dormant</string>
+    <string name="specimen_sub">age %1$d min · size %2$.1f · mineral %3$.2f</string>
+    <string name="label_energy">energy</string>
+
+    <!-- save and load -->
+    <string name="dlg_saved_world">Saved world</string>
+    <string name="item_save_world">save the world</string>
+    <string name="item_load_world">load the saved world</string>
+    <string name="toast_saved">Saved — %1$d KB</string>
+    <string name="toast_save_failed">Could not save</string>
+    <string name="toast_load_unreadable">Could not read the saved world</string>
+    <string name="toast_loaded">Loaded</string>
+    <string name="toast_not_world">That file is not a Microcosm world</string>
+
+    <!-- seeding -->
+    <string name="dlg_seed_title">Seed which species? Then long-press the water.</string>
+
+    <!-- experiments -->
+    <string name="goal_prefix">Goal: %1$s</string>
+    <string name="verdict_predicted">You predicted: %1$s</string>
+    <string name="verdict_dismiss">(tap to dismiss · reset runs it again)</string>
+    <string name="pours_left">pours left %1$d</string>
+
+    <!-- impact cards. Rule 6: "since", never "because" — the card reports co-occurrence. -->
+    <string name="impact_rolled">history has rolled past this one</string>
+    <string name="impact_watching">watching impact… %1$d%%</string>
+    <string name="impact_none">no clear shift beyond normal variability — the world absorbed it</string>
+    <string name="impact_since">"Since: "</string>
+    <string name="impact_natural_swing">" (could be a natural swing)"</string>
+    <string name="impact_relaxed">relaxed back after %1$d s</string>
+    <string name="impact_settling">settling toward a new regime</string>
+    <string name="impact_developing">still developing</string>
+    <string name="impact_mixed">mixed with other interventions</string>
+    <string name="impact_sun_regime">under a changed-sun regime — attribution weak</string>
+
+    <!-- the Health page -->
+    <string name="health_gathering">gathering history…</string>
+    <string name="axis_now">now</string>
+    <string name="health_variety">VARIETY %1$.2f    P/R %2$.2f</string>
+    <string name="health_recycling">RECYCLING %1$s    LOCKED %2$d%%</string>
+    <string name="health_every">every %1$d s</string>
+    <string name="health_adapt">ADAPTABILITY %1$.2f</string>
+    <string name="health_vitals_header">SPECIES VITALS</string>
+    <string name="vital_critical">critical</string>
+    <string name="vital_tense">tense</string>
+    <string name="vital_calm">calm</string>
+    <string name="health_row">%1$-9s reserve %2$3d%% %3$s  pop x%4$.2f   %5$s</string>
+    <string name="health_venator">%1$-9s reserve %2$3d%%    prey losses %3$.1f/s</string>
+    <string name="health_reference">Reference ranges measured on six healthy archived worlds.</string>
+    <string name="events_none">nothing to report yet.</string>
+
+    <!-- what the Events page calls each intervention, by the core's KINDS index (impact.rs) -->
+    <string-array name="iv_labels">
+        <item>You poured mineral</item>
+        <item>You killed a specimen</item>
+        <item>You fed a specimen</item>
+        <item>You introduced creatures</item>
+        <item>You undid the last action</item>
+        <item>You moved an energy source</item>
+        <item>You changed the sunlight</item>
+        <item>You added an energy source</item>
+        <item>You removed an energy source</item>
+        <item>You changed an energy source</item>
+        <item>You changed the source layout</item>
+        <item>You switched mutation</item>
+        <item>You changed an evolution setting</item>
+        <item>You applied an evolution preset</item>
+        <item>You built a wall</item>
+        <item>You removed a wall</item>
+        <item>You changed a wall</item>
+    </string-array>
+
+    <!-- the undo chip, by undo kind; 1–3 take the species name -->
+    <string-array name="undo_labels">
+        <item>undo</item>
+        <item>undo · fed %1$s</item>
+        <item>undo · killed %1$s</item>
+        <item>undo · seeded %1$s</item>
+        <item>undo · poured mineral</item>
+        <item>undo · the sunlight</item>
+        <item>undo · moved the sun</item>
+        <item>undo · added a sun</item>
+        <item>undo · removed a sun</item>
+        <item>undo · the sun\'s setting</item>
+        <item>undo · built a wall</item>
+        <item>undo · removed a wall</item>
+        <item>undo · the wall\'s setting</item>
+    </string-array>
+
+    <!-- the Data pages' titles, in page order -->
+    <string-array name="page_titles">
+        <item>Head counts — every line a species, on a log axis</item>
+        <item>Chemistry — where every unit of mineral sits; the top edge is the world\'s total</item>
+        <item>Metabolism — what the world produces and burns</item>
+        <item>Health — vitals against measured reference ranges</item>
+        <item>Events — the world\'s story, newest first; since is not because</item>
+    </string-array>
+
+</resources>

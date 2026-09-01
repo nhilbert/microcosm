@@ -1,0 +1,23 @@
+# Layout gate baseline — what is wrong with the app's chrome TODAY.
+#
+# Every line is a violation the gate found and that we have chosen not to fix yet. They are not
+# excuses: they are docs/app-ux-review.md §1, written down where CI can count them. The file may
+# only shrink, and the test fails if a line stops occurring without being deleted — so a repair
+# cannot land silently and a regression cannot hide behind an old entry.
+#
+# Format: one violation key per line, "KIND subject @ profile". Comments after '#'.
+#
+# HISTORY
+#
+# 2026-09-01, first measured run (CI run 14): 35 violations across four device profiles. The bar
+# wanted 88 dp per button — 792 dp for nine — and the Fairphone 5 laid out save/exp/data/bench at
+# 0 px each; the tablet was clean, proving the problem was width and nothing deeper.
+#
+# 2026-09-01, U0.1: the wide rows (bar, tools, pages) became scroll rows — every button laid out
+# at the width it asked for, everything past the edge a swipe away. All 35 lines stopped occurring
+# and were deleted per the ratchet. The gate's caveat stands: it proves each control exists at
+# full size and is reachable; it cannot prove the player knows the row scrolls, and it cannot see
+# the species chips, which are built in MainActivity and not measured here (their ~2 dp padding is
+# docs/app-ux-review.md §2, owned by the redesign's reach-inversion finding, not by U0).
+#
+# Nothing to record. Keep it that way.

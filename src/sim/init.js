@@ -6,7 +6,7 @@ function resetWorld(){
 }
 function initWorld(seed, sc){
   if (W.initialized) return; W.initialized = true;
-  W.rng = mulberry32(seed === undefined ? P.SEED : seed);
+  W.seed = seed === undefined ? P.SEED : seed; W.rngState = W.seed|0;
   W.n=0; W.freeList.length=0; W.alive.fill(0); W.tick=0;
   W.M.fill(sc && sc.M0 !== undefined ? sc.M0 : P.M0); W.dE.fill(0); W.dP.fill(0); W.dM.fill(0); W.sc.fill(0); W.al.fill(0);
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
@@ -52,5 +52,5 @@ if (typeof module !== "undefined" && module.exports !== undefined){
     cellLight, neighbors, step, initWorld, resetWorld, applyEvent, drainEvents,
     queueEvent, mulberry32, CELL, MAXN, MAXLOCI,
     makeWall, compileWalls, marchMul, pathBlocked,
-    LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelAllows, levelPourOk, levelNotePour, levelNarration };
+    LEVELS, LEVEL_ROWS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter, levelAllows, levelPourOk, levelNotePour, levelNarration };
 }

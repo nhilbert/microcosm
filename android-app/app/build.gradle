@@ -1,0 +1,88 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+}
+
+def vCode = (findProperty("versionCode") ?: "1").toInteger()
+
+android {
+    namespace "org.microcosm.app"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "org.microcosm.app"
+        // API 26 for lockHardwareCanvas(); arm64 only, like the probe — a second ABI would double
+        // the Rust build time in CI for no phone this is aimed at.
+        minSdk 26
+        targetSdk 35
+        versionCode vCode
+        versionName "0.1.0"
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    }
+
+    // The same identity-only keystore as the other two: consecutive sideloaded builds must share a
+    // signature so the phone treats them as updates. It guards nothing.
+    signingConfigs {
+        release {
+            storeFile file("../../android/keystore/microcosm.keystore")
+            storePassword "microcosm"
+            keyAlias "microcosm"
+            keyPassword "microcosm"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ["src/main/jniLibs"]
+        }
+    }
+
+    // The layout gate (src/test) needs the app's resources and a real Android runtime; Robolectric
+    // supplies both on the JVM, which is the only way CI can run it — there is no device here.
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            // The gate's whole output is its violation list. Without this Gradle files it in an
+            // HTML report nobody reads and prints one line of stack trace instead.
+            all {
+                testLogging {
+                    showStandardStreams = true
+                    exceptionFormat = "full"
+                }
+                // The boot gate (BootTest) loads the HOST build of the native core, so the JVM
+                // needs it on java.library.path. Built by `cargo build --release` in
+                // rust/microcosm-android; CI does this right before the tests. When absent the
+                // boot gate skips (loudly) and everything else still runs.
+                def nativeDir = "${rootDir}/../rust/microcosm-android/target/release"
+                systemProperty "microcosm.native.dir", nativeDir
+                systemProperty "java.library.path", nativeDir
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+// The shipping app is dependency-free on purpose (A.1): a SurfaceView, a render thread and a
+// Canvas. Nothing here needs more, and a plain build is a fast build. The test dependencies below
+// ship with nothing — they exist so the screen can be measured without a screen.
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.robolectric:robolectric:4.14.1"
+    testImplementation "androidx.test:core:1.6.1"
+}

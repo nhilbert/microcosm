@@ -5,8 +5,9 @@
 //   reading    Flesch–Kincaid grade ≤ 8 on body texts of 25+ words
 //   words      banned terms never in player text (science subtitle exempt);
 //              ladder terms never before the level that introduces them (§5)
-// failNow strings are built inside functions and are not reachable here;
-// they follow the same rules by review. Exit non-zero on any violation.
+// Since the level table became data (predicates included), the failNow verdicts are
+// reachable here too and are checked like any other body text — they used to be
+// closure-built and covered only by review. Exit non-zero on any violation.
 const path = require("path");
 const C = require(process.env.MC_CORE || path.join(__dirname, "..", "dist", "core.js"));
 
@@ -55,6 +56,7 @@ for (const L of C.LEVELS){
   check(id + " debrief.pass", L.debrief.pass, BUDGET.debrief, true);
   check(id + " debrief.fail", L.debrief.fail, BUDGET.debrief, true);
   const texts = [L.briefing, L.question, L.goalText, L.timeoutWhy || "", L.debrief.pass, L.debrief.fail, L.title];
+  L.failNow.forEach((r, i) => { check(`${id} failNow[${i}]`, r.why, BUDGET.timeoutWhy, true); texts.push(r.why); });
   if (L.predict){
     check(id + " predict.prompt", L.predict.prompt, BUDGET.prompt, false);
     L.predict.options.forEach((o, i) => check(`${id} chip[${i}]`, o, BUDGET.chip, false));

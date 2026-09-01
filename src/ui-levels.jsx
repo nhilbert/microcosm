@@ -41,8 +41,7 @@ function LevelChip({ tick }){
   if (!def) return null;
   const st = LVL.state;
   const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
-  const S = W.recCount ? lvlSample(0) : null;
-  const meters = S ? def.meter(S) : [];
+  const meters = levelMeter();
   const col = lvlColor(st);
   return (
       <div style={{ flex:"1 1 auto", minWidth:0, maxWidth:430,

@@ -181,8 +181,258 @@ function drawGhostRay(ctx, sx, sy, hd, r, striking, trail){
 }
 
 // ============================================================
-// WORLD VIEW DRAWING — the frame pipeline, extracted from the component so the visual
-// grammar (sprites, tint, shape, layers) lives in one file. `view` = { cam, vw, vh, z, hw, hh, alpha, dpr, LOD_Z }.
+// THE FRAME BUILDER — the visual GRAMMAR, separated from the painting.
+//
+// Everything below decides *what* to draw: which sprite bucket an organism lands in, where it
+// projects on screen, what colour a cell of the mat carpet is, how wide a sun's glow reaches.
+// Those are measured or owner-decided rules, and the phone and the browser must not disagree
+// about any of them — so they live once, in the core (rust/microcosm-core/src/frame.rs), with
+// this as the reference implementation. `harness/fingerprint-frame.js` runs both and compares
+// raw bits; `tools/port-check.js` runs that comparison.
+//
+// The painting stays per platform: gradients, blend modes, the sprite bitmaps themselves, text.
+// Two platforms will not produce identical gradient pixels, and it does not matter — what must
+// agree is which bucket an organism is in, not how prettily the bucket is drawn.
+//
+// Pure observers, all of them: zero PRNG draws, no mutation of dynamic state.
+// ============================================================
+
+// ---- per-cell pixel fields: GRID x GRID RGBA, written into a caller's buffer ----
+// A fully transparent pixel is written as 0,0,0,0 rather than left with whatever it held before.
+// It paints identically (alpha 0 contributes nothing) and it makes the buffer comparable.
+function fieldMineral(d){ // faint blue nutrient water, dark where depleted
+  for (let c = 0; c < P.GRID*P.GRID; c++){
+    const o = c*4, m = Math.min(1, W.M[c] / 3.2);
+    d[o] = 64; d[o+1] = 138; d[o+2] = 205; d[o+3] = Math.round(82 * m);
+  }
+}
+// mat carpet: density field for sessile producers (Splatterplots-style aggregation).
+// Denser mats render DARKER, saturated green — thick algae absorb light; brightness stays reserved.
+// Documented grammar exception: the carpet keeps its plane-0 (light locus) genotype turn, because a
+// per-cell pixel field has no outline or body form to carry it.
+const _cellG = new Float32Array(P.GRID * P.GRID), _cellGn = new Uint16Array(P.GRID * P.GRID);
+function fieldCarpet(d){
+  const matLocus = SPECIES.MAT >= 0 && TRAITS[SPECIES.MAT].locus;
+  if (matLocus){
+    _cellG.fill(0); _cellGn.fill(0);
+    for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === SPECIES.MAT){ const c = cellOf(i); _cellG[c] += W.g[i]; _cellGn[c]++; }
+  }
+  for (let c = 0; c < P.GRID*P.GRID; c++){
+    const o = c*4;
+    const dens = Math.min(1, W.bB[c] / 200);
+    if (dens <= 0.01){ d[o] = 0; d[o+1] = 0; d[o+2] = 0; d[o+3] = 0; continue; }
+    const t = Math.sqrt(dens); // fast rise, then saturate
+    if (matLocus && _cellGn[c]){ // sparse [96,205,150] -> dense [34,123,78], both turned by the cell's mean genotype
+      const gm = _cellG[c] / _cellGn[c];
+      const lo = tintRgb([96,205,150], gm), hi = tintRgb([34,123,78], gm);
+      d[o]   = Math.round(lo[0] + (hi[0]-lo[0])*t);
+      d[o+1] = Math.round(lo[1] + (hi[1]-lo[1])*t);
+      d[o+2] = Math.round(lo[2] + (hi[2]-lo[2])*t);
+    } else {
+      d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
+      d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
+      d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
+    }
+    d[o+3] = Math.round(70 + 150*t);    // alpha: sparse faint -> dense solid
+  }
+}
+const _corpseMass = new Float32Array(P.GRID * P.GRID);
+function fieldCorpsePall(d){ // zoomed out, husks merge into a gray pall
+  _corpseMass.fill(0);
+  for (let k = 0; k < W.cN; k++){
+    if (!W.cAlive[k]) continue;
+    const cc = (Math.floor(W.cY[k]/(P.WORLD/P.GRID))&(P.GRID-1))*P.GRID + (Math.floor(W.cX[k]/(P.WORLD/P.GRID))&(P.GRID-1));
+    _corpseMass[cc] += W.cE[k] + W.cP[k] + W.cM[k];
+  }
+  for (let c = 0; c < P.GRID*P.GRID; c++){
+    const o = c*4;
+    d[o] = 158; d[o+1] = 168; d[o+2] = 178;
+    d[o+3] = Math.min(150, Math.round(_corpseMass[c] * 4));
+  }
+}
+function fieldShade(d){ // 7.W: the honest darkening where walls occlude the sources
+  for (let c = 0; c < P.GRID*P.GRID; c++){
+    const o = c*4;
+    d[o] = 6; d[o+1] = 10; d[o+2] = 16;
+    d[o+3] = Math.round(175 * (1 - W.wShade[c]));
+  }
+}
+
+// ---- world-tile vector lists, in the 512-unit tile space the layers are painted on ----
+// A glow near a tile edge must continue on the far side, so each source is emitted at every
+// wrapped offset its radius reaches (the field itself wraps in computeLight).
+function sunGlows(){
+  const k = 512 / P.WORLD, out = [];
+  for (const s of W.sources){
+    const a = Math.min(1, s.i), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
+    for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
+      const x = cx+ox, y = cy+oy;
+      if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
+      out.push({ x, y, r, a });
+    }
+  }
+  return out;
+}
+function sunMarks(){
+  const k = 512 / P.WORLD, out = [];
+  for (const s of W.sources){ if (s.i <= 0) continue;
+    for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512)
+      out.push({ x: s.x*k+ox, y: s.y*k+oy }); }
+  return out;
+}
+// 7.H: warmth as an ember glow, cold as a blue one — never amber, which is the hand's colour.
+function heatGlows(){
+  const k = 512 / P.WORLD, out = [];
+  for (const s of W.sources){
+    if (s.a === 0) continue;
+    const warm = s.a > 0, m = Math.min(1, Math.abs(s.a)/10), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
+    for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
+      const x = cx+ox, y = cy+oy;
+      if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
+      out.push({ x, y, r, m, warm });
+    }
+  }
+  return out;
+}
+function heatMarks(){ // a dark source still needs a mark
+  const k = 512 / P.WORLD, out = [];
+  for (const s of W.sources){ if (s.a === 0 || s.i > 0) continue;
+    for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512)
+      out.push({ x: s.x*k+ox, y: s.y*k+oy, warm: s.a > 0 }); }
+  return out;
+}
+// 7.W: crisp slate polylines. Dashed = something may pass (a grille); translucency follows light
+// transmission (glass fades). Never amber — a placed wall belongs to the world.
+function wallStrokes(){
+  const k = 512 / P.WORLD;
+  return W.walls.map(wl => ({
+    a: 0.92 - 0.62*wl.lt,
+    dashed: wl.pass !== 0,
+    pts: wl.path.map(p => [p[0]*CELL*k, p[1]*CELL*k]),
+  }));
+}
+
+// ---- the sprite bucket table ----
+// Which bin an organism lands in is grammar; the 64x64 bitmaps are painting. Split so the frame
+// builder runs without a canvas, and so the core can carry the same table.
+//   tint      <- the species' temperature locus (warmSlope/warmGainSlope), warm-adapted leaning WARM
+//   outline   <- the defense locus (escSlope): tougher wears a ring
+//   roundness <- feeding/metabolic axes (catchSlope/rateSlope/effSlope): thrifty rounds, keen stays sharp
+// Movement-strategy loci carry NO body channel (owner decision D7) — their display is behaviour.
+const TINT_BINS = 7;
+// Below this zoom: aggregate corpses into the pall layer, draw bacteria as dots. Grammar, so the
+// core carries it too (frame.rs LOD_Z) and the frame gate compares them.
+const LOD_Z = 0.9;
+function makeGrammar(){
+  return TRAITS.map((T, sp) => {
+    if (!T.loci.length || SHAPES[sp] === "ray" || SHAPES[sp] === "nucleus") return null;
+    const tintPlane = T.loci.findIndex(L => L.warmSlope || L.warmGainSlope);
+    const outlinePlane = T.loci.findIndex(L => L.escSlope > 0);
+    const roundPlane = T.loci.findIndex(L => L.catchSlope > 0 || L.rateSlope > 0 || L.effSlope > 0);
+    const morphPlane = outlinePlane >= 0 ? outlinePlane : roundPlane;
+    if (tintPlane < 0 && morphPlane < 0) return null;
+    return { tintPlane, morphPlane, outlinePlane, roundPlane,
+      tN: tintPlane >= 0 ? TINT_BINS : 1, mN: morphPlane >= 0 ? TINT_BINS : 1 };
+  });
+}
+
+// Everything a painter needs to render one bucket's 64x64 sprite. The colour and the two shape
+// dials are decided here, so a platform's painter never has to know what a locus is.
+function bucketSpec(G, sp, tb, mb){
+  const base = { rgb: SPECIES_META[sp].rgb, shape: SHAPES[sp], scale: SPRITE_SCALE[sp], outline: 0, round: 0 };
+  const gr = G[sp];
+  if (!gr) return base;
+  const gM = mb/(TINT_BINS-1);
+  return Object.assign(base, {
+    rgb: gr.tintPlane >= 0 ? tintRgb(SPECIES_META[sp].rgb, 1 - tb/(TINT_BINS-1)) : SPECIES_META[sp].rgb,
+    outline: gr.outlinePlane >= 0 ? gM : 0,
+    round: gr.outlinePlane < 0 && gr.roundPlane >= 0 ? 1 - gM : 0,
+  });
+}
+
+// ---- selection ----
+// Grammar too: the radius and the tie-breaking decide WHICH organism a thumb lands on, and the
+// platforms must not disagree about that. Raw positions, not interpolated ones — a tap picks what
+// is there, not what is being drawn on the way there. Ties keep slot order (sort is stable).
+function pickRadius(z, tight){ return tight ? Math.max(10/z, 7) : Math.max(24/z, 14); }
+function pickCandidates(wx, wy, rad){
+  const cand = [], rr = rad*rad;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i]) continue;
+    const dx = wd(W.x[i]-wx), dy = wd(W.y[i]-wy), d2 = dx*dx+dy*dy;
+    if (d2 < rr) cand.push([d2, i]);
+  }
+  cand.sort((a, b) => a[0]-b[0]);
+  return cand;
+}
+
+// ---- the display list ----
+// Organism record (8 doubles): kind, sx, sy, r, sp, bucket, hd, flags.
+//   kind 0 dormant cyst | 1 bacteria dot-LOD | 2 sprite | 3 sprite, heading-aligned | 4 ghost ray
+//   bucket = tintBin*mN + morphBin, or -1 for a species with no grammar
+//   flags  bit 0: striking (the ray's stretched form)
+// Corpse record (4 doubles): sx, sy, r, alpha.
+// Preallocated and reused: a frame allocates nothing, exactly like a tick.
+const FRAME = {
+  org: new Float64Array(MAXN * 8), orgN: 0,
+  corpse: new Float64Array(1500 * 4), corpseN: 0,
+  pops: [0,0,0,0,0,0,0], mnBound: 0,
+};
+function frameOf(view, hidden, G){
+  const { camX, camY, vw, vh, z, hw, hh, alpha, lodZ } = view;
+  const F = FRAME, o = F.org, cull = 40, pops = F.pops;
+  for (let s = 0; s < 7; s++) pops[s] = 0;
+  let n = 0, mnBound = 0;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i]) continue;
+    pops[W.sp[i]]++;
+    mnBound += W.mn[i];
+    if (hidden[W.sp[i]]) continue; // hidden from view, still counted
+    const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
+    const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
+    const sx = hw + wd(ix - camX)*z, sy = hh + wd(iy - camY)*z;
+    if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
+    const sp = W.sp[i], b = n*8;
+    o[b+1] = sx; o[b+2] = sy; o[b+4] = sp; o[b+5] = -1; o[b+6] = 0; o[b+7] = 0;
+    if (W.cy[i]){ // dormant cyst: dim ember, no glow
+      o[b] = 0; o[b+3] = Math.max(1, W.sz[i]*0.5*z); n++; continue;
+    }
+    if (SHAPES[sp] === "square" && z < lodZ){ // bacteria dot-LOD: batched rects instead of sprite blits
+      o[b] = 1; o[b+3] = 1.1; n++; continue;
+    }
+    o[b+3] = W.sz[i] * SPRITE_SCALE[sp] * z;
+    const gr = G[sp];
+    if (gr){
+      const tb = gr.tN > 1 ? Math.max(0, Math.min(gr.tN-1, Math.round(W.g[gr.tintPlane*MAXN+i]*(gr.tN-1)))) : 0;
+      const mb = gr.mN > 1 ? Math.max(0, Math.min(gr.mN-1, Math.round(W.g[gr.morphPlane*MAXN+i]*(gr.mN-1)))) : 0;
+      o[b+5] = tb*gr.mN + mb;
+    }
+    const shape = SHAPES[sp];
+    o[b] = shape === "tri" ? 3 : shape === "ray" ? 4 : 2;
+    o[b+6] = W.hd[i];
+    if (shape === "ray" && W.bst[i] > 0) o[b+7] = 1;
+    n++;
+  }
+  F.orgN = n; F.mnBound = mnBound;
+  // corpses: pale husks when zoomed in; the aggregate pall layer covers zoomed-out
+  const c = F.corpse;
+  let m = 0;
+  if (z >= lodZ && !hidden[7]) for (let k = 0; k < W.cN; k++){
+    if (!W.cAlive[k]) continue;
+    const sx = hw + wd(W.cX[k] - camX)*z, sy = hh + wd(W.cY[k] - camY)*z;
+    if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
+    const mass = W.cE[k] + W.cP[k] + W.cM[k], b = m*4;
+    c[b] = sx; c[b+1] = sy;
+    c[b+2] = Math.max(1.5, W.cSz[k]*1.0*z);
+    c[b+3] = Math.min(0.55, 0.12 + 0.05*mass/W.cSz[k]);
+    m++;
+  }
+  F.corpseN = m;
+  return F;
+}
+
+// ============================================================
+// PAINTING — Canvas 2D. `view` = { camX, camY, vw, vh, z, hw, hh, alpha, dpr, lodZ }.
 // ============================================================
 // World layers: light (redrawn when the sun moves), dissolved mineral, mat carpet, corpse pall.
 // Everything reads the module-singleton W; the returned closures own their offscreen canvases.
@@ -195,25 +445,16 @@ function makeWorldLayers(){
     lg.fillStyle = COL.abyss; lg.fillRect(0,0,512,512);
     const k = 512 / P.WORLD;
     lg.globalCompositeOperation = "lighter";
-    // the layer is one torus tile: a glow near a tile edge must continue on the far side, so each
-    // sun is painted at every wrapped offset its radius reaches (the field itself wraps in computeLight)
-    for (const s of W.sources){
-      const a = Math.min(1, s.i), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
-      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
-        const x = cx+ox, y = cy+oy;
-        if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
-        const gr2 = lg.createRadialGradient(x, y, 4, x, y, r);
-        gr2.addColorStop(0, `rgba(214,238,255,${(0.30*a).toFixed(3)})`);
-        gr2.addColorStop(0.4, `rgba(140,190,225,${(0.12*a).toFixed(3)})`);
-        gr2.addColorStop(1, "rgba(140,190,225,0)");
-        lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
-      }
+    for (const s of sunGlows()){
+      const gr2 = lg.createRadialGradient(s.x, s.y, 4, s.x, s.y, s.r);
+      gr2.addColorStop(0, `rgba(214,238,255,${(0.30*s.a).toFixed(3)})`);
+      gr2.addColorStop(0.4, `rgba(140,190,225,${(0.12*s.a).toFixed(3)})`);
+      gr2.addColorStop(1, "rgba(140,190,225,0)");
+      lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
     }
     lg.globalCompositeOperation = "source-over";
     lg.fillStyle = "rgba(240,250,255,0.9)";
-    for (const s of W.sources){ if (s.i <= 0) continue; const cx = s.x*k, cy = s.y*k;
-      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
-        lg.beginPath(); lg.arc(cx+ox, cy+oy, 5, 0, 6.283); lg.fill(); } }
+    for (const m of sunMarks()){ lg.beginPath(); lg.arc(m.x, m.y, 5, 0, 6.283); lg.fill(); }
   };
   drawLight();
   // heat layer (7.H): warmth as an ember glow, cold as a blue one -- never amber, which is the hand's colour.
@@ -222,21 +463,17 @@ function makeWorldLayers(){
   const hg = HB.getContext("2d");
   const drawHeat = () => {
     hg.clearRect(0,0,512,512);
-    const k = 512 / P.WORLD;
-    for (const s of W.sources){ if (s.a === 0) continue;
-      const warm = s.a > 0, m = Math.min(1, Math.abs(s.a)/10), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
-      const c0 = warm ? "255,120,60" : "110,170,255", c1 = warm ? "200,70,40" : "80,120,220";
-      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
-        const x = cx+ox, y = cy+oy;
-        if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
-        const gr = hg.createRadialGradient(x, y, 2, x, y, r);
-        gr.addColorStop(0, `rgba(${c0},${(0.38*m).toFixed(3)})`);
-        gr.addColorStop(0.45, `rgba(${c1},${(0.16*m).toFixed(3)})`);
-        gr.addColorStop(1, `rgba(${c1},0)`);
-        hg.fillStyle = gr; hg.fillRect(0,0,512,512);
-      }
-      if (s.i <= 0){ hg.fillStyle = warm ? "rgba(255,160,110,0.9)" : "rgba(170,210,255,0.9)"; // a dark source still needs a mark
-        for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){ hg.beginPath(); hg.arc(cx+ox, cy+oy, 4, 0, 6.283); hg.fill(); } }
+    for (const s of heatGlows()){
+      const c0 = s.warm ? "255,120,60" : "110,170,255", c1 = s.warm ? "200,70,40" : "80,120,220";
+      const gr = hg.createRadialGradient(s.x, s.y, 2, s.x, s.y, s.r);
+      gr.addColorStop(0, `rgba(${c0},${(0.38*s.m).toFixed(3)})`);
+      gr.addColorStop(0.45, `rgba(${c1},${(0.16*s.m).toFixed(3)})`);
+      gr.addColorStop(1, `rgba(${c1},0)`);
+      hg.fillStyle = gr; hg.fillRect(0,0,512,512);
+    }
+    for (const m of heatMarks()){
+      hg.fillStyle = m.warm ? "rgba(255,160,110,0.9)" : "rgba(170,210,255,0.9)";
+      hg.beginPath(); hg.arc(m.x, m.y, 4, 0, 6.283); hg.fill();
     }
   };
   drawHeat();
@@ -248,22 +485,17 @@ function makeWorldLayers(){
   const wg = WB.getContext("2d");
   const drawWalls = () => {
     wg.clearRect(0,0,512,512);
-    const k = 512 / P.WORLD;
-    const tracePath = (path, ox, oy) => {
+    const tracePath = (pts, ox, oy) => {
       wg.beginPath();
-      for (let q = 0; q < path.length; q++){
-        const x = path[q][0]*CELL*k + ox, y = path[q][1]*CELL*k + oy;
-        q ? wg.lineTo(x, y) : wg.moveTo(x, y);
-      }
+      for (let q = 0; q < pts.length; q++) q ? wg.lineTo(pts[q][0]+ox, pts[q][1]+oy) : wg.moveTo(pts[q][0]+ox, pts[q][1]+oy);
       wg.stroke();
     };
     wg.lineCap = "round"; wg.lineJoin = "round";
-    for (const wl of W.walls){
-      const a = 0.92 - 0.62*wl.lt;
-      wg.setLineDash(wl.pass !== 0 ? [5,4] : []);
+    for (const wl of wallStrokes()){
+      wg.setLineDash(wl.dashed ? [5,4] : []);
       for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
-        wg.strokeStyle = `rgba(11,19,30,${(0.8*a).toFixed(3)})`; wg.lineWidth = 4.4; tracePath(wl.path, ox, oy);
-        wg.strokeStyle = `rgba(148,167,184,${a.toFixed(3)})`;   wg.lineWidth = 2.2; tracePath(wl.path, ox, oy);
+        wg.strokeStyle = `rgba(11,19,30,${(0.8*wl.a).toFixed(3)})`; wg.lineWidth = 4.4; tracePath(wl.pts, ox, oy);
+        wg.strokeStyle = `rgba(148,167,184,${wl.a.toFixed(3)})`;    wg.lineWidth = 2.2; tracePath(wl.pts, ox, oy);
       }
     }
     wg.setLineDash([]);
@@ -274,14 +506,7 @@ function makeWorldLayers(){
   const SB = document.createElement("canvas"); SB.width = P.GRID; SB.height = P.GRID;
   const sbx = SB.getContext("2d");
   const sbImg = sbx.createImageData(P.GRID, P.GRID);
-  const drawShade = () => {
-    const d = sbImg.data;
-    for (let c = 0; c < P.GRID*P.GRID; c++){
-      const o = c*4; d[o]=6; d[o+1]=10; d[o+2]=16;
-      d[o+3] = Math.round(175 * (1 - W.wShade[c]));
-    }
-    sbx.putImageData(sbImg, 0, 0);
-  };
+  const drawShade = () => { fieldShade(sbImg.data); sbx.putImageData(sbImg, 0, 0); };
   drawShade();
 
   // mat carpet: density field for sessile producers (Splatterplots-style aggregation).
@@ -297,55 +522,12 @@ function makeWorldLayers(){
   const CC = document.createElement("canvas"); CC.width = P.GRID; CC.height = P.GRID;
   const ccx = CC.getContext("2d");
   const ccImg = ccx.createImageData(P.GRID, P.GRID);
-  const corpseMass = new Float32Array(P.GRID * P.GRID);
-  // per-cell mean genotype of the mat species, so a heritable Solara trait shows in the carpet itself
-  const cellG = new Float32Array(P.GRID * P.GRID), cellGn = new Uint16Array(P.GRID * P.GRID);
-  const LOD_Z = 0.9; // below this zoom: aggregate corpses, draw bacteria as dots
   let carpetTick = -1;
   const updateCarpet = () => {
     if (W.tick === carpetTick) return; carpetTick = W.tick;
-    const d = mcImg.data, dm = mnImg.data;
-    const matLocus = SPECIES.MAT >= 0 && TRAITS[SPECIES.MAT].locus;
-    if (matLocus){
-      cellG.fill(0); cellGn.fill(0);
-      for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === SPECIES.MAT){ const c = cellOf(i); cellG[c] += W.g[i]; cellGn[c]++; }
-    }
-    for (let c = 0; c < P.GRID*P.GRID; c++){
-      const o = c*4;
-      const m = Math.min(1, W.M[c] / 3.2);
-      dm[o] = 64; dm[o+1] = 138; dm[o+2] = 205;
-      dm[o+3] = Math.round(82 * m);
-      const dens = Math.min(1, W.bB[c] / 200);
-      if (dens <= 0.01){ d[o+3] = 0; continue; }
-      const t = Math.sqrt(dens); // fast rise, then saturate
-      if (matLocus && cellGn[c]){ // sparse [96,205,150] -> dense [34,123,78], both turned by the cell's mean genotype
-        const gm = cellG[c] / cellGn[c];
-        const lo = tintRgb([96,205,150], gm), hi = tintRgb([34,123,78], gm);
-        d[o]   = Math.round(lo[0] + (hi[0]-lo[0])*t);
-        d[o+1] = Math.round(lo[1] + (hi[1]-lo[1])*t);
-        d[o+2] = Math.round(lo[2] + (hi[2]-lo[2])*t);
-      } else {
-        d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
-        d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
-        d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
-      }
-      d[o+3] = Math.round(70 + 150*t);  // alpha: sparse faint -> dense solid
-    }
-    mcx.putImageData(mcImg, 0, 0);
-    mnx.putImageData(mnImg, 0, 0);
-    corpseMass.fill(0);
-    for (let k = 0; k < W.cN; k++){
-      if (!W.cAlive[k]) continue;
-      const cc = (Math.floor(W.cY[k]/(P.WORLD/P.GRID))&(P.GRID-1))*P.GRID + (Math.floor(W.cX[k]/(P.WORLD/P.GRID))&(P.GRID-1));
-      corpseMass[cc] += W.cE[k] + W.cP[k] + W.cM[k];
-    }
-    const dc = ccImg.data;
-    for (let c = 0; c < P.GRID*P.GRID; c++){
-      const o = c*4;
-      dc[o]=158; dc[o+1]=168; dc[o+2]=178;
-      dc[o+3] = Math.min(150, Math.round(corpseMass[c] * 4));
-    }
-    ccx.putImageData(ccImg, 0, 0);
+    fieldCarpet(mcImg.data);     mcx.putImageData(mcImg, 0, 0);
+    fieldMineral(mnImg.data);    mnx.putImageData(mnImg, 0, 0);
+    fieldCorpsePall(ccImg.data); ccx.putImageData(ccImg, 0, 0);
   };
   return { LB, HB, MC, MN, CC, WB, SB, LOD_Z, drawLight, drawHeat, drawWalls, drawShade, updateCarpet };
 }
@@ -353,8 +535,8 @@ function makeWorldLayers(){
 // Paths are unwrapped corner staircases; the first point is placed by minimal image, the rest follow
 // by their deltas so a wall crossing the seam never tears across the screen.
 function traceWallScreen(ctx, view, path){
-  const { cam, z, hw, hh } = view;
-  let sx = hw + wd(path[0][0]*CELL - cam.x)*z, sy = hh + wd(path[0][1]*CELL - cam.y)*z;
+  const { camX, camY, z, hw, hh } = view;
+  let sx = hw + wd(path[0][0]*CELL - camX)*z, sy = hh + wd(path[0][1]*CELL - camY)*z;
   ctx.beginPath(); ctx.moveTo(sx, sy);
   for (let q = 1; q < path.length; q++){
     sx += (path[q][0]-path[q-1][0])*CELL*z; sy += (path[q][1]-path[q-1][1])*CELL*z;
@@ -372,8 +554,8 @@ function drawWallPreview(ctx, view, drag){
   const wl = makeWall(drag);              // pure: the exact staircase the release would build
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   if (!wl){                               // too short still: show the anchor point
-    const { cam, z, hw, hh } = view;
-    const sx = hw + wd(drag.x0 - cam.x)*z, sy = hh + wd(drag.y0 - cam.y)*z;
+    const { camX, camY, z, hw, hh } = view;
+    const sx = hw + wd(drag.x0 - camX)*z, sy = hh + wd(drag.y0 - camY)*z;
     ctx.fillStyle = "rgba(242,178,74,0.9)";
     ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 6.283); ctx.fill();
     return;
@@ -383,88 +565,46 @@ function drawWallPreview(ctx, view, drag){
   ctx.strokeStyle = "rgba(242,178,74,0.9)";  ctx.lineWidth = 2.2; traceWallScreen(ctx, view, wl.path);
   ctx.setLineDash([]);
 }
-// Sprite set under the locus visual grammar (owner decision 2026-08-30, one documented increment):
-//   tint      <- the species' temperature locus (warmSlope/warmGainSlope), warm-adapted leaning WARM
-//                (tintRgb runs warm at t=0, so the temperature axis passes 1-g). Tint no longer shows
-//                the display loci -- a deliberate change of what an existing player's colors mean.
-//   outline   <- the defense locus (escSlope): tougher wears a ring.
-//   roundness <- feeding/metabolic axes (catchSlope/rateSlope/effSlope): thrifty rounds, keen stays sharp.
-//   elongated<->circular stays reserved for a future speed locus; movement-strategy loci (tprefSpan)
-//   carry NO body channel by owner decision D7 -- their display is behaviour itself.
-// Exception, documented: the mat carpet keeps its plane-0 (light locus) genotype turn -- a per-cell
-// pixel field has no outline or body form to carry it, and an invisible locus is worse than an
-// off-grammar one.
+// The sprite bitmaps for the bucket table makeGrammar() defines. Painting, not grammar: two
+// platforms will not produce identical gradient pixels, and nothing depends on their doing so.
+// Exception, documented above fieldCarpet: the mat carpet carries its own genotype turn.
 function makeSpriteSet(){
   const sprites = [makeSprite(COL.solara,"nucleus"), makeSprite(COL.drifta,"dot"), makeSprite(COL.cilio,"tri"), makeSprite(COL.bacillus,"square"),
     makeSprite(COL.mycora,"dot"), makeSprite(COL.necro,"dot"), makeSprite(COL.venator,"tri")];
-  const TINT_BINS = 7;
-  const grammar = TRAITS.map((T, sp) => {
-    if (!T.loci.length || SHAPES[sp] === "ray" || SHAPES[sp] === "nucleus") return null;
-    const tintPlane = T.loci.findIndex(L => L.warmSlope || L.warmGainSlope);
-    const outlinePlane = T.loci.findIndex(L => L.escSlope > 0);
-    const roundPlane = T.loci.findIndex(L => L.catchSlope > 0 || L.rateSlope > 0 || L.effSlope > 0);
-    const morphPlane = outlinePlane >= 0 ? outlinePlane : roundPlane;
-    if (tintPlane < 0 && morphPlane < 0) return null;
-    const tN = tintPlane >= 0 ? TINT_BINS : 1, mN = morphPlane >= 0 ? TINT_BINS : 1;
-    const bins = Array.from({ length: tN }, (_, tb) =>
-      Array.from({ length: mN }, (_, mb) => {
-        const rgb = tintPlane >= 0 ? tintRgb(SPECIES_META[sp].rgb, 1 - tb/(TINT_BINS-1)) : SPECIES_META[sp].rgb;
-        const gM = mb/(TINT_BINS-1);
-        const vis = outlinePlane >= 0 ? { outline: gM } : roundPlane >= 0 ? { round: 1 - gM } : undefined;
-        return makeSprite(rgb, SHAPES[sp], vis);
-      }));
-    return { tintPlane, morphPlane, tN, mN, bins };
-  });
-  return { sprites, grammar, TINT_BINS };
+  const grammar = makeGrammar();
+  const bins = grammar.map((gr, sp) => gr && Array.from({ length: gr.tN }, (_, tb) =>
+    Array.from({ length: gr.mN }, (_, mb) => {
+      const sc = bucketSpec(grammar, sp, tb, mb);
+      const vis = gr.outlinePlane >= 0 ? { outline: sc.outline } : gr.roundPlane >= 0 ? { round: sc.round } : undefined;
+      return makeSprite(sc.rgb, sc.shape, vis);
+    })));
+  return { sprites, grammar, bins };
 }
-// Organisms, with the screen composite, cull margin and LOD; returns the live census the strip and card need.
-function drawOrganisms(ctx, view, hidden, S){
-  const { cam, vw, vh, z, hw, hh, alpha, LOD_Z } = view;
+// Organisms, from the display list: the screen composite and the sprite blits, nothing decided here.
+function paintOrganisms(ctx, F, S){
   ctx.globalCompositeOperation = "screen";
-  const cull = 40;
-  const pops = [0,0,0,0,0,0,0];
-  let mnBound = 0;
-  for (let i=0;i<W.n;i++){
-    if (!W.alive[i]) continue;
-    pops[W.sp[i]]++;
-    mnBound += W.mn[i];
-    if (hidden[W.sp[i]]) continue; // hidden from view, still counted
-    const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
-    const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
-    const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
-    if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
-    if (W.cy[i]){ // dormant cyst: dim ember, no glow
+  const o = F.org;
+  for (let q = 0; q < F.orgN; q++){
+    const b = q*8, kind = o[b], sx = o[b+1], sy = o[b+2], r = o[b+3], sp = o[b+4], bucket = o[b+5];
+    if (kind === 0){ // dormant cyst: dim ember, no glow
       ctx.globalCompositeOperation = "source-over";
       ctx.fillStyle = "rgba(120,135,150,0.5)";
-      ctx.beginPath(); ctx.arc(sx, sy, Math.max(1, W.sz[i]*0.5*z), 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill();
       ctx.globalCompositeOperation = "screen";
       continue;
     }
-    const spb = W.sp[i];
-    if (SHAPES[spb] === "square" && z < LOD_Z){ // bacteria dot-LOD: batched rects instead of sprite blits
+    if (kind === 1){ // bacteria dot-LOD: batched rects instead of sprite blits
       ctx.fillStyle = "rgba(196,206,150,0.8)";
-      ctx.fillRect(sx-1.1, sy-1.1, 2.2, 2.2);
+      ctx.fillRect(sx-r, sy-r, r*2, r*2);
       continue;
     }
-    const r = W.sz[i] * SPRITE_SCALE[spb] * z;
-    let spr = S.sprites[spb];
-    const gr = S.grammar[spb];
-    if (gr){ // locus visual grammar: tint by the temperature plane, outline/roundness by the defense/feeding plane
-      const tb = gr.tN > 1 ? Math.max(0, Math.min(gr.tN-1, Math.round(W.g[gr.tintPlane*MAXN+i]*(gr.tN-1)))) : 0;
-      const mb = gr.mN > 1 ? Math.max(0, Math.min(gr.mN-1, Math.round(W.g[gr.morphPlane*MAXN+i]*(gr.mN-1)))) : 0;
-      spr = gr.bins[tb][mb];
-    }
-    if (SHAPES[spb] === "tri"){
-      ctx.save(); ctx.translate(sx, sy); ctx.rotate(W.hd[i]);
-      ctx.drawImage(spr, -r, -r, r*2, r*2); ctx.restore();
-    } else if (SHAPES[spb] === "ray"){
-      drawGhostRay(ctx, sx, sy, W.hd[i], r, W.bst[i] > 0, null);
-    } else {
-      ctx.drawImage(spr, sx-r, sy-r, r*2, r*2);
-    }
+    if (kind === 4){ drawGhostRay(ctx, sx, sy, o[b+6], r, o[b+7] !== 0, null); continue; }
+    const gr = S.grammar[sp];
+    const spr = bucket >= 0 && gr ? S.bins[sp][(bucket / gr.mN)|0][bucket % gr.mN] : S.sprites[sp];
+    if (kind === 3){ ctx.save(); ctx.translate(sx, sy); ctx.rotate(o[b+6]); ctx.drawImage(spr, -r, -r, r*2, r*2); ctx.restore(); }
+    else ctx.drawImage(spr, sx-r, sy-r, r*2, r*2);
   }
   ctx.globalCompositeOperation = "source-over";
-  return { pops, mnBound };
 }
 function drawPours(ctx, pours, nowT){
   // amber pour rings: the hand's touch, fading
@@ -476,16 +616,10 @@ function drawPours(ctx, pours, nowT){
     ctx.beginPath(); ctx.arc(pours[q].sx, pours[q].sy, 10 + age*34, 0, 6.283); ctx.stroke();
   }
 }
-function drawCorpses(ctx, view, hiddenDebris){
-  const { cam, vw, vh, z, hw, hh, LOD_Z } = view; const cull = 40;
-  // corpses: pale husks when zoomed in; the aggregate layer covers zoomed-out
-  if (z >= LOD_Z && !hiddenDebris) for (let k = 0; k < W.cN; k++){
-    if (!W.cAlive[k]) continue;
-    const sx = hw + wd(W.cX[k] - cam.x)*z, sy = hh + wd(W.cY[k] - cam.y)*z;
-    if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
-    const mass = W.cE[k] + W.cP[k] + W.cM[k];
-    const a = Math.min(0.55, 0.12 + 0.05*mass/W.cSz[k]);
-    const r = Math.max(1.5, W.cSz[k]*1.0*z);
+function paintCorpses(ctx, F){
+  const c = F.corpse;
+  for (let q = 0; q < F.corpseN; q++){
+    const b = q*4, sx = c[b], sy = c[b+1], r = c[b+2], a = c[b+3];
     ctx.fillStyle = `rgba(158,168,178,${a.toFixed(3)})`;
     ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill();
     ctx.strokeStyle = `rgba(110,120,130,${(a*0.8).toFixed(3)})`; ctx.lineWidth = 1;
@@ -493,9 +627,9 @@ function drawCorpses(ctx, view, hiddenDebris){
   }
 }
 function drawSunAffordance(ctx, view, selSun){
-  const { cam, z, hw, hh } = view;
+  const { camX, camY, z, hw, hh } = view;
   W.sources.forEach((s, k) => {
-    const ssx = hw + wd(s.x - cam.x)*z, ssy = hh + wd(s.y - cam.y)*z, on = k === selSun;
+    const ssx = hw + wd(s.x - camX)*z, ssy = hh + wd(s.y - camY)*z, on = k === selSun;
     ctx.strokeStyle = on ? "rgba(242,178,74,1)" : "rgba(242,178,74,0.9)"; ctx.lineWidth = on ? 2.5 : 1.5;
     ctx.beginPath(); ctx.arc(ssx, ssy, 16, 0, 6.283); ctx.stroke();
     ctx.strokeStyle = on ? "rgba(242,178,74,0.5)" : "rgba(242,178,74,0.3)"; ctx.lineWidth = 6;
@@ -503,9 +637,9 @@ function drawSunAffordance(ctx, view, selSun){
   });
 }
 function drawSelectionRing(ctx, view, si){
-  const { cam, z, hw, hh, alpha } = view;
+  const { camX, camY, z, hw, hh, alpha } = view;
   const ix = W.px[si] + wd(W.x[si]-W.px[si])*alpha, iy = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
-  const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
+  const sx = hw + wd(ix - camX)*z, sy = hh + wd(iy - camY)*z;
   const rr = Math.max(14, W.sz[si]*2.6*z);
   ctx.strokeStyle = "rgba(201,215,227,0.95)"; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(sx, sy, rr, 0, 6.283); ctx.stroke();

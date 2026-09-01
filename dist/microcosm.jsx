@@ -628,7 +628,10 @@ const W = {
   flee: new Int16Array(MAXN), bst: new Int16Array(MAXN),
   pc: new Int16Array(MAXN),   // post-capture program timer (MV-C): ticks left in the two-phase after-kill window; expresses nothing at g0
   birth: new Int32Array(MAXN), gen: new Uint16Array(MAXN),
-  n: 0, freeList: [], tick: 0, initialized: false, rng: mulberry32(P.SEED),
+  // PRNG state lives HERE, not in a closure: a save must be able to read and restore it, and the
+  // port stores it in the same place (docs/android-port-plan.md M0). rngState is the mulberry32
+  // integer state; seed is provenance (the world can name the seed it was founded on).
+  n: 0, freeList: [], tick: 0, initialized: false, rngState: P.SEED|0, seed: P.SEED,
   events: [], eventLog: [], lightDirty: false,
   sources: [{ x: P.WORLD / 2, y: P.WORLD / 2, i: P.sunI, a: 0, sigma: P.sunSigma }],  // energy sources (7.L/7.H): light i, warmth a
   // Walls (7.W): thin barriers on cell boundaries. W.walls holds the drawn strokes; compileWalls()
@@ -669,7 +672,12 @@ const W = {
   cE: new Float32Array(1500), cP: new Float32Array(1500), cM: new Float32Array(1500),
   cSz: new Float32Array(1500), cSp: new Uint8Array(1500),
 };
-const R = () => W.rng();
+// mulberry32 inlined over W.rngState — the same ops in the same order as the closure form in
+// params.js (which stays, as the factory for independent streams like corridor.js's sampler),
+// so the world's stream is bit-identical while its state is now snapshot-visible.
+const R = () => { let a = W.rngState|0; a = a + 0x6D2B79F5 | 0; W.rngState = a;
+  let t = Math.imul(a^a>>>15, 1|a); t = t + Math.imul(t^t>>>7, 61|t) ^ t;
+  return ((t^t>>>14)>>>0)/4294967296; };
 const wrap = v => { v %= P.WORLD; return v < 0 ? v + P.WORLD : v; };
 const wd = d => { if (d > P.WORLD / 2) d -= P.WORLD; if (d < -P.WORLD / 2) d += P.WORLD; return d; };
 
@@ -1650,15 +1658,590 @@ function impact(entry){
     IMPACT_PRESS.has(e.type) && e.tick < entry.tick);
   return { status:"done", isPress, notable, recoveredS, mixed, pressBackdrop, complete: win >= need };
 }
+const LEVEL_ROWS = [
+  {
+    "key": "light",
+    "n": 1,
+    "title": "First Light",
+    "science": "Photosynthesis · carrying capacity",
+    "question": "Why does nothing grow in a dim pond?",
+    "briefing": "Twenty founders of Solara drift onto a settling ground under a weak sun. Left alone, the mat starves at any size — light is this world's only income. Your instrument is the ☀ lever in Intervene mode.",
+    "goalText": "Establish the mat — 400 Solara, held",
+    "predict": {
+      "prompt": "Twenty founders under a weak sun. If you only watch, what happens?",
+      "options": [
+        "The mat grows slowly, but it gets there",
+        "It starves at any size — light is the income",
+        "It grows until the water's mineral runs out"
+      ],
+      "reflect": [
+        "Patience can't fix this pond. Below a certain light the mat loses energy at every size — waiting only makes it smaller.",
+        "That's what the energy bars showed. Under this sun, every Solara burns more than it earns.",
+        "The water never got to matter. The energy ran out first — light is the income here."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "found": {
+        "0": 20,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "6": 0
+      },
+      "lightMul": 0.5
+    },
+    "apparatus": {
+      "pours": true,
+      "seed": false,
+      "sources": false,
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 8000,
+    "sustain": 10,
+    "pass": [
+      {
+        "m": "pop",
+        "sp": 0,
+        "op": ">=",
+        "v": 400
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 0,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The last Solara died — the mat never caught the light."
+      }
+    ],
+    "timeoutWhy": "The mat never took hold. Under this sun, every Solara spends more than it earns — at any number.",
+    "meter": [
+      {
+        "label": "Solara",
+        "m": "pop",
+        "sp": 0,
+        "goal": 400
+      }
+    ],
+    "debrief": {
+      "pass": "Light is the pond's only income. Under a dim sun the mat spends more than it earns, so it shrinks at any size. With enough light it grows fast, then flattens — the mat shades itself and runs out of ground. That ceiling is the carrying capacity: not a quota, just income meeting cost.",
+      "fail": "The mat needed more income, and only light is income here. Tap a Solara and watch its card: the energy bar never fills. The ☀ lever raises what the whole pond earns — everything else just moves it around."
+    }
+  },
+  {
+    "key": "mineral",
+    "n": 2,
+    "title": "The Hungry Water",
+    "science": "Liebig's law of the minimum",
+    "question": "The sun is already at its fiercest — why does the mat stall anyway?",
+    "briefing": "The ☀ lever starts pinned at its maximum — but the water is poor. The mat rises, then stalls; more light has nothing left to give. You carry ten doses of mineral: tap open water to pour one, and choose the spot with care.",
+    "goalText": "Grow the mat past 600 on ten pours",
+    "predict": {
+      "prompt": "The sun is maxed out. What will ten doses of mineral do?",
+      "options": [
+        "Placement won't matter — mixing spreads them anyway",
+        "They only help where the mat drinks first",
+        "Nothing — light must still be the problem"
+      ],
+      "reflect": [
+        "Mixing does spread them — but far too slowly. Doses poured at the dark shore arrived late, and the clock ran out.",
+        "Right: mineral moves slowly, and the mat drinks what lands beside it.",
+        "The lever was pinned at its ceiling the whole time. The scarcest ingredient ruled, and it was not light."
+      ]
+    },
+    "world": {
+      "seed": 202,
+      "found": {
+        "0": 20,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "6": 0
+      },
+      "M0": 0.4,
+      "lightMul": 1.6
+    },
+    "apparatus": {
+      "pours": 10,
+      "seed": false,
+      "sources": false,
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 9000,
+    "sustain": 10,
+    "pass": [
+      {
+        "m": "pop",
+        "sp": 0,
+        "op": ">=",
+        "v": 600
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 0,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The mat has died out."
+      }
+    ],
+    "timeoutWhy": "The mat stalled below 600. Light was maxed out the whole time — the scarcest ingredient set the ceiling.",
+    "meter": [
+      {
+        "label": "Solara",
+        "m": "pop",
+        "sp": 0,
+        "goal": 600
+      }
+    ],
+    "debrief": {
+      "pass": "The scarcest ingredient sets the ceiling — not the most generous one. The sun had nothing more to give; mineral was the limit. And it only helped where the mat could drink it before the slow mixing thinned it out. Check the M bar: everything you poured is still somewhere. In bodies, in the water, or in the dead — matter never leaves, it only moves.",
+      "fail": "The cards told the story: Mineral-limited, under a maxed-out sun. Pours at the dark edge mostly feed empty water — mixing is slow. Pour early, and pour where the mat lives."
+    }
+  },
+  {
+    "key": "cycle",
+    "n": 3,
+    "title": "Everything Flows",
+    "science": "Decomposition · the mineral cycle",
+    "question": "The mat is thriving — so why is the water emptying?",
+    "briefing": "The same pond as your first experiment, under a full sun. The mat booms — and still the free mineral drains away. Everything that dies takes its mineral into the mud, and nothing brings it back. Long-press open water to seed a species, and choose well.",
+    "goalText": "Unlock the mud — recyclers in, mat 1,000",
+    "predict": {
+      "prompt": "The mat is thriving. Where is the free mineral going?",
+      "options": [
+        "Nowhere — a healthy pond cycles by itself",
+        "Into the dead — and it stays there",
+        "The living mat is hoarding all of it"
+      ],
+      "reflect": [
+        "Cycling is work, and nobody in this world was doing it — matter flowed downhill into the mud and stopped.",
+        "The chemistry page agrees: the locked share climbed, tick after tick, until something ate the dead.",
+        "Bodies held part of it — but the mud held more, and the mud gives nothing back on its own."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "found": {
+        "0": 20,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "6": 0
+      }
+    },
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 14000,
+    "sustain": 10,
+    "pass": [
+      {
+        "m": "pop",
+        "sp": 3,
+        "op": ">=",
+        "v": 80
+      },
+      {
+        "m": "lockShare",
+        "op": "<",
+        "v": 0.2
+      },
+      {
+        "m": "pop",
+        "sp": 0,
+        "op": ">=",
+        "v": 1000
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 0,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The producers are gone — without the mat, nothing eats and nothing returns."
+      }
+    ],
+    "timeoutWhy": "The dead kept their mineral. Over 40% of the world's matter ended up locked in corpses and mud, and the water kept emptying.",
+    "meter": [
+      {
+        "label": "locked",
+        "m": "lockShare",
+        "pct": true,
+        "goal": 20,
+        "dir": -1,
+        "unit": "%"
+      },
+      {
+        "label": "Bacillus",
+        "m": "pop",
+        "sp": 3,
+        "goal": 80
+      }
+    ],
+    "debrief": {
+      "pass": "Bacillus eats the dead and returns their mineral to the water. Creatures with this job are called decomposers — they close the loop. The same matter now goes around instead of piling up in the mud. That is this world's deepest rule: matter moves in a loop, energy flows through like a river. A pond without its recyclers slowly chokes on its own dead.",
+      "fail": "Only a decomposer returns locked mineral to the water. Grazers and hunters just move matter between bodies — and everything they kill locks more of it in the mud. Seed Bacillus near the mat, where the dead are."
+    }
+  },
+  {
+    "key": "garden",
+    "n": 4,
+    "title": "The Gardener",
+    "science": "Competitive exclusion · keystone grazing",
+    "question": "The water is poor and the bloom owns it. Can the meadow be saved?",
+    "briefing": "Poor water, and the quick plankton owns it: Drifta drinks faster, and the meadow starves under a bright sun. You carry eight doses of mineral, and the seeding bench is open. Choose your instrument.",
+    "goalText": "Rescue the mat — 250 Solara, held",
+    "predict": {
+      "prompt": "What could save the mat?",
+      "options": [
+        "Pour minerals — feed the mat directly",
+        "Seed a grazer — the bloom's enemy, the meadow's friend",
+        "Nothing — the quick always win"
+      ],
+      "reflect": [
+        "The bloom drinks faster than the mat, so your pours fed the bloom first. Eight doses: the mat stayed under 70.",
+        "The keystone bet: pressure on the winner is the only lever that opens space for the loser.",
+        "They do win the water — until something eats them. Competition has more than one referee."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "found": {
+        "0": 20,
+        "1": 120,
+        "2": 0,
+        "3": 0,
+        "6": 0
+      },
+      "M0": 0.5
+    },
+    "apparatus": {
+      "pours": 8,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 12000,
+    "sustain": 10,
+    "narrate": [
+      "estab",
+      "extinct",
+      "crashev",
+      "bloom"
+    ],
+    "pass": [
+      {
+        "m": "pop",
+        "sp": 0,
+        "op": ">=",
+        "v": 250
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 0,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The last Solara died — the meadow is gone."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The bloom is gone — exterminated, not gardened. That is not the rescue this pond needed."
+      }
+    ],
+    "timeoutWhy": "The mat never rose past 250 — the bloom held the water to the end. Minerals feed whoever drinks fastest; only pressure on the bloom itself opens space below it.",
+    "meter": [
+      {
+        "label": "Solara",
+        "m": "pop",
+        "sp": 0,
+        "goal": 250
+      },
+      {
+        "label": "Drifta",
+        "m": "pop",
+        "sp": 1
+      }
+    ],
+    "debrief": {
+      "pass": "Cilio ate the bloom, and the mat took the light and mineral it freed. One eater held the door open for a whole meadow — that is called a keystone. Now keep watching. In water this poor, the gardener eats itself out of a job: Cilio starves, and the bloom creeps back. A keystone is a job, and jobs need wages.",
+      "fail": "The bloom kept the water. Feeding the loser can't work here — the plankton drinks faster, so every pour fed the bloom first. Try the other direction: seed the bloom's grazer, and let pressure from above open space below."
+    }
+  },
+  {
+    "key": "richer",
+    "n": 5,
+    "title": "The Richer Pond",
+    "science": "Top-down structure · bottom-up inputs",
+    "question": "This pond is stable and full of plankton. Can you make it richer?",
+    "briefing": "A bloom, a mat, decomposers — and nobody eating anybody. Mineral is unlimited this time, and the seeding bench is open. The goal is a richer pond: a meadow past 1,300 with every species alive. Decide what this pond is actually missing.",
+    "goalText": "A richer pond — 1,300 Solara, everyone alive",
+    "predict": {
+      "prompt": "What does a pond need to become richer?",
+      "options": [
+        "More input — pour mineral into the water",
+        "A missing eater — restructure who eats whom",
+        "Both — inputs and structure together"
+      ],
+      "reflect": [
+        "Thirty doses sank into the bloom, and the meadow stayed near 900. A pond's ceiling is set by its structure, not by its soup.",
+        "The structural bet: give the pond an eater, and the meadow nearly doubles.",
+        "Both works — but the experiment shows which half was necessary: pours alone failed, the grazer alone succeeded."
+      ]
+    },
+    "world": {
+      "seed": 202,
+      "found": {
+        "0": 120,
+        "1": 500,
+        "2": 0,
+        "3": 60,
+        "6": 0
+      }
+    },
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 17000,
+    "sustain": 10,
+    "narrate": [
+      "estab",
+      "crashev",
+      "bloom",
+      "extinct"
+    ],
+    "pass": [
+      {
+        "m": "pop",
+        "sp": 0,
+        "op": ">=",
+        "v": 1250
+      },
+      {
+        "m": "pop",
+        "sp": 2,
+        "op": ">=",
+        "v": 20
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 0,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The meadow is gone — richer was the goal, and everything died at the bottom."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The plankton is gone — grazed to nothing. A structure with a hole in it feeds no one."
+      }
+    ],
+    "timeoutWhy": "The pond stayed poor. Everything you poured sank into the standing bloom — nothing turned it over. Richness needed an eater, not an input.",
+    "meter": [
+      {
+        "label": "Solara",
+        "m": "pop",
+        "sp": 0,
+        "goal": 1250
+      },
+      {
+        "label": "Cilio",
+        "m": "pop",
+        "sp": 2,
+        "goal": 20
+      },
+      {
+        "label": "Drifta",
+        "m": "pop",
+        "sp": 1
+      }
+    ],
+    "debrief": {
+      "pass": "You added an eater, and the whole pond got richer. The meadow nearly doubled; the bloom fell to a quarter — and held. Here is why: grazing keeps mineral moving. Eaten, returned to the water, taken up again. All your pouring couldn't do that. This pond was never hungry. It was unfinished.",
+      "fail": "More soup did not make a richer pond. The bloom drank every pour and just stood there. What this pond is missing has a mouth: seed the grazer, and watch what an eater does that pouring can't."
+    }
+  },
+  {
+    "key": "hunters",
+    "n": 6,
+    "title": "A Head Full of Hunters",
+    "science": "Energy pyramid · apex predators",
+    "question": "The pond is rich. How many hunters can it feed?",
+    "briefing": "A full pond: meadow, bloom, grazers, recyclers — and no hunter yet. Venator waits on your seeding bench. Found a pack that lasts.",
+    "goalText": "A lasting pack — 4+ hunters, held long",
+    "predict": {
+      "prompt": "You're adding a top hunter. How many packs would you release?",
+      "options": [
+        "Two packs — twice as safe",
+        "One pack — all this pond can spare",
+        "None can live here at all"
+      ],
+      "reflect": [
+        "Twice the hunters meant twice the hunger. Packs released into the same water strip it together — and starve together.",
+        "Right. Hunters live on what the pond can spare, and even a rich pond spares little.",
+        "A pack can live here. But only a small one, fed by the whole pond below it."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "found": {
+        "0": 120,
+        "1": 500,
+        "2": 12,
+        "3": 60,
+        "6": 0
+      }
+    },
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 15000,
+    "sustain": 350,
+    "narrate": [
+      "wake",
+      "estab",
+      "extinct",
+      "crashev"
+    ],
+    "pass": [
+      {
+        "m": "pop",
+        "sp": 6,
+        "op": ">=",
+        "v": 4
+      }
+    ],
+    "latch": [
+      {
+        "id": "v",
+        "when": [
+          {
+            "m": "pop",
+            "sp": 6,
+            "op": ">",
+            "v": 0
+          }
+        ]
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "latched": "v"
+          },
+          {
+            "m": "pop",
+            "sp": 6,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The pack is gone. It ate through what the pond could spare — the top of a pond is a narrow ledge."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 2,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The grazers are gone. Nothing now stands between the hunters and starving."
+      }
+    ],
+    "timeoutWhy": "No lasting pack took hold. A hunter eats a lot and breeds slowly — seed early, and seed small.",
+    "meter": [
+      {
+        "label": "Venator",
+        "m": "pop",
+        "sp": 6,
+        "goal": 4
+      },
+      {
+        "label": "Cilio",
+        "m": "pop",
+        "sp": 2
+      }
+    ],
+    "debrief": {
+      "pass": "Your pack holds — a few hunters riding a wave of grazers, riding a wave of plankton. Count the layers: hundreds of plankton feed a hundred grazers feed a handful of hunters. Every meal loses most of its energy on the way up. That is the food chain's price, and why the top is always small — and always one bad season from gone.",
+      "fail": "Hunters don't run out of courage — they run out of prey. The pond only makes so many grazers, and every extra mouth shrinks each hunter's share. Try one pack, seeded early, and give it room."
+    }
+  }
+];
 // ============================================================
 // LEARNING LEVELS (Phase 8.0) — guided experiments over the certified world.
 //
 // Contract, same discipline as the rest of the observatory:
-//   - Definitions are DATA. Every number below was measured, not designed;
-//     the calibration runs live in docs/phase8-levels-plan.md and
-//     harness/levels.js re-proves them on every run: a level must FAIL with
-//     no player action and PASS with the intended strategy, or it is a
-//     demonstration wearing a challenge's clothes.
+//   - Definitions are DATA, predicates included. Every number below was
+//     measured, not designed; the calibration runs live in
+//     docs/phase8-levels-plan.md and harness/levels.js re-proves them on every
+//     run: a level must FAIL with no player action and PASS with the intended
+//     strategy, or it is a demonstration wearing a challenge's clothes. The
+//     table itself lives in src/observatory/levels.json (inlined by
+//     tools/build.py as LEVEL_ROWS) and reaches the Rust core through
+//     rust/microcosm-core/src/levels_gen.rs, generated from the built core.
+//     Predicates are comparison lists rather than closures for exactly that
+//     reason: a closure cannot cross the language boundary, so one shared
+//     definition would quietly have become two definitions.
 //   - Evaluation (levelCheck) is a PURE OBSERVER: zero PRNG draws, zero
 //     mutation of dynamic state. It reads the recorder's ring buffer one
 //     sample at a time, so verdicts are identical at any UI speed and in
@@ -1708,6 +2291,48 @@ function levelAllows(what){
 function levelPourOk(){ return !LVL.def || LVL.pourLeft > 0; }
 function levelNotePour(d){ if (LVL.def && LVL.pourLeft !== Infinity) LVL.pourLeft = Math.max(0, LVL.pourLeft - d); }
 
+// ---- the predicate evaluator. Schema:
+//   condition  { m: "pop", sp } | { m: "lockShare" } | { m: "free" }, with op one of
+//              >= <= > < ==, and v the right-hand side; or { latched: id } for a set latch.
+//   pass       AND of conditions.
+//   latch      [{ id, when }] — set once its conditions hold, evaluated before failNow, so a
+//              level can say "extinct AFTER being present". Per-run scratch (LVL.mem), sample-
+//              driven, therefore deterministic.
+//   failNow    ordered [{ when, why }]; the first match ends the run.
+//   meter      [{ label, m, sp?, pct?, goal?, dir?, unit? }] — pct reads the share as a rounded
+//              percentage. A row with no goal is information, not an objective.
+function lvlMetric(S, r){
+  return r.m === "lockShare" ? S.lockShare : r.m === "free" ? S.free : S.pop(r.sp);
+}
+function lvlCond(S, M, c){
+  if (c.latched !== undefined) return !!(M && M[c.latched]);
+  const v = lvlMetric(S, c);
+  switch (c.op){
+    case ">=": return v >= c.v;
+    case "<=": return v <= c.v;
+    case ">":  return v >  c.v;
+    case "<":  return v <  c.v;
+    case "==": return v === c.v;
+  }
+  throw new Error("levels: unknown operator " + c.op);
+}
+function lvlAll(S, M, list){
+  for (let k = 0; k < list.length; k++) if (!lvlCond(S, M, list[k])) return false;
+  return true;
+}
+// the HUD's meter rows for the latest sample; [] outside a level or before the first sample
+function levelMeter(){
+  const def = LVL.def; if (!def || !W.recCount) return [];
+  const S = lvlSample(0);
+  return def.meter.map(m => {
+    const o = { label: m.label, v: m.pct ? Math.round(lvlMetric(S, m) * 100) : lvlMetric(S, m) };
+    if (m.goal !== undefined) o.goal = m.goal;
+    if (m.dir !== undefined) o.dir = m.dir;
+    if (m.unit !== undefined) o.unit = m.unit;
+    return o;
+  });
+}
+
 // The verdict loop: walk every recorder sample exactly once, oldest first.
 // Sustain is counted in samples (20 ticks each), so speed cannot change a verdict.
 function levelCheck(){
@@ -1720,9 +2345,11 @@ function levelCheck(){
     if (news > REC.N) news = REC.N;
     for (let k = news - 1; k >= 0 && L.state === "running"; k--){
       const S = lvlSample(k);
-      const why = def.failNow ? def.failNow(S, L.mem) : "";
+      if (def.latch) for (const l of def.latch) if (lvlAll(S, L.mem, l.when)) L.mem[l.id] = 1;
+      let why = "";
+      for (const f of def.failNow) if (lvlAll(S, L.mem, f.when)){ why = f.why; break; }
       if (why){ L.state = "failed"; L.failWhy = why; break; }
-      L.run = def.pass(S) ? L.run + 1 : 0;
+      L.run = lvlAll(S, L.mem, def.pass) ? L.run + 1 : 0;
       if (L.run >= (def.sustain || 10)) L.state = "passed";
     }
     L.seenS = sNow;
@@ -1733,213 +2360,10 @@ function levelCheck(){
   return L.state;
 }
 
-// ---- the ladder (increment 1: the single-producer arc; the rest is planned in docs/phase8-levels-plan.md)
-// Naming rule 8: functional title first, the science as subtitle. Amber-handed tools only.
-const SOLO_MAT = { 0: 20, 1: 0, 2: 0, 3: 0, 6: 0 };
-const LEVELS = [
-  {
-    key: "light", n: 1,
-    title: "First Light", science: "Photosynthesis · carrying capacity",
-    question: "Why does nothing grow in a dim pond?",
-    briefing: "Twenty founders of Solara drift onto a settling ground under a weak sun. " +
-      "Left alone, the mat starves at any size — light is this world's only income. " +
-      "Your instrument is the ☀ lever in Intervene mode.",
-    goalText: "Establish the mat — 400 Solara, held",
-    predict: { prompt: "Twenty founders under a weak sun. If you only watch, what happens?",
-      options: ["The mat grows slowly, but it gets there", "It starves at any size — light is the income",
-                "It grows until the water's mineral runs out"],
-      reflect: ["Patience can't fix this pond. Below a certain light the mat loses energy at every size — waiting only makes it smaller.",
-                "That's what the energy bars showed. Under this sun, every Solara burns more than it earns.",
-                "The water never got to matter. The energy ran out first — light is the income here."] },
-    world: { seed: 101, found: SOLO_MAT, lightMul: 0.5 },
-    apparatus: { pours: true, seed: false, sources: false, walls: false, evolution: false },
-    deadline: 8000, sustain: 10,
-    pass: S => S.pop(0) >= 400,
-    failNow: S => S.pop(0) === 0 ? "The last Solara died — the mat never caught the light." : "",
-    timeoutWhy: "The mat never took hold. Under this sun, every Solara spends more than it earns — at any number.",
-    meter: S => [{ label: "Solara", v: S.pop(0), goal: 400 }],
-    debrief: {
-      pass: "Light is the pond's only income. Under a dim sun the mat spends more than it earns, so it " +
-        "shrinks at any size. With enough light it grows fast, then flattens — the mat shades itself and " +
-        "runs out of ground. That ceiling is the carrying capacity: not a quota, just income meeting cost.",
-      fail: "The mat needed more income, and only light is income here. Tap a Solara and watch its card: " +
-        "the energy bar never fills. The ☀ lever raises what the whole pond earns — everything else just " +
-        "moves it around.",
-    },
-  },
-  {
-    key: "mineral", n: 2,
-    title: "The Hungry Water", science: "Liebig's law of the minimum",
-    question: "The sun is already at its fiercest — why does the mat stall anyway?",
-    briefing: "The ☀ lever starts pinned at its maximum — but the water is poor. The mat rises, then " +
-      "stalls; more light has nothing left to give. You carry ten doses of mineral: tap open water to " +
-      "pour one, and choose the spot with care.",
-    goalText: "Grow the mat past 600 on ten pours",
-    predict: { prompt: "The sun is maxed out. What will ten doses of mineral do?",
-      options: ["Placement won't matter — mixing spreads them anyway", "They only help where the mat drinks first",
-                "Nothing — light must still be the problem"],
-      reflect: ["Mixing does spread them — but far too slowly. Doses poured at the dark shore arrived late, and the clock ran out.",
-                "Right: mineral moves slowly, and the mat drinks what lands beside it.",
-                "The lever was pinned at its ceiling the whole time. The scarcest ingredient ruled, and it was not light."] },
-    world: { seed: 202, found: SOLO_MAT, M0: 0.4, lightMul: 1.6 },
-    apparatus: { pours: 10, seed: false, sources: false, walls: false, evolution: false },
-    deadline: 9000, sustain: 10,
-    pass: S => S.pop(0) >= 600,
-    failNow: S => S.pop(0) === 0 ? "The mat has died out." : "",
-    timeoutWhy: "The mat stalled below 600. Light was maxed out the whole time — the scarcest ingredient set the ceiling.",
-    meter: S => [{ label: "Solara", v: S.pop(0), goal: 600 }],
-    debrief: {
-      pass: "The scarcest ingredient sets the ceiling — not the most generous one. The sun had nothing more " +
-        "to give; mineral was the limit. And it only helped where the mat could drink it before the slow " +
-        "mixing thinned it out. Check the M bar: everything you poured is still somewhere. In bodies, in " +
-        "the water, or in the dead — matter never leaves, it only moves.",
-      fail: "The cards told the story: Mineral-limited, under a maxed-out sun. Pours at the dark edge " +
-        "mostly feed empty water — mixing is slow. Pour early, and pour where the mat lives.",
-    },
-  },
-  {
-    key: "cycle", n: 3,
-    title: "Everything Flows", science: "Decomposition · the mineral cycle",
-    question: "The mat is thriving — so why is the water emptying?",
-    briefing: "The same pond as your first experiment, under a full sun. The mat booms — and still the " +
-      "free mineral drains away. Everything that dies takes its mineral into the mud, and nothing brings " +
-      "it back. Long-press open water to seed a species, and choose well.",
-    goalText: "Unlock the mud — recyclers in, mat 1,000",
-    predict: { prompt: "The mat is thriving. Where is the free mineral going?",
-      options: ["Nowhere — a healthy pond cycles by itself", "Into the dead — and it stays there",
-                "The living mat is hoarding all of it"],
-      reflect: ["Cycling is work, and nobody in this world was doing it — matter flowed downhill into the mud and stopped.",
-                "The chemistry page agrees: the locked share climbed, tick after tick, until something ate the dead.",
-                "Bodies held part of it — but the mud held more, and the mud gives nothing back on its own."] },
-    world: { seed: 101, found: SOLO_MAT },
-    apparatus: { pours: true, seed: "all", sources: false, walls: false, evolution: false },
-    deadline: 14000, sustain: 10,
-    pass: S => S.pop(3) >= 80 && S.lockShare < 0.20 && S.pop(0) >= 1000,
-    failNow: S => S.pop(0) === 0 ? "The producers are gone — without the mat, nothing eats and nothing returns." : "",
-    timeoutWhy: "The dead kept their mineral. Over 40% of the world's matter ended up locked in corpses and " +
-      "mud, and the water kept emptying.",
-    meter: S => [{ label: "locked", v: Math.round(S.lockShare * 100), goal: 20, dir: -1, unit: "%" },
-                 { label: "Bacillus", v: S.pop(3), goal: 80 }],
-    debrief: {
-      pass: "Bacillus eats the dead and returns their mineral to the water. Creatures with this job are " +
-        "called decomposers — they close the loop. The same matter now goes around instead of piling up " +
-        "in the mud. That is this world's deepest rule: matter moves in a loop, energy flows through " +
-        "like a river. A pond without its recyclers slowly chokes on its own dead.",
-      fail: "Only a decomposer returns locked mineral to the water. Grazers and hunters just move matter " +
-        "between bodies — and everything they kill locks more of it in the mud. Seed Bacillus near the " +
-        "mat, where the dead are.",
-    },
-  },
-  {
-    key: "garden", n: 4,
-    title: "The Gardener", science: "Competitive exclusion · keystone grazing",
-    question: "The water is poor and the bloom owns it. Can the meadow be saved?",
-    briefing: "Poor water, and the quick plankton owns it: Drifta drinks faster, and the meadow starves " +
-      "under a bright sun. You carry eight doses of mineral, and the seeding bench is open. Choose your " +
-      "instrument.",
-    goalText: "Rescue the mat — 250 Solara, held",
-    predict: { prompt: "What could save the mat?",
-      options: ["Pour minerals — feed the mat directly", "Seed a grazer — the bloom's enemy, the meadow's friend",
-                "Nothing — the quick always win"],
-      reflect: ["The bloom drinks faster than the mat, so your pours fed the bloom first. Eight doses: the mat stayed under 70.",
-                "The keystone bet: pressure on the winner is the only lever that opens space for the loser.",
-                "They do win the water — until something eats them. Competition has more than one referee."] },
-    world: { seed: 101, found: { 0: 20, 1: 120, 2: 0, 3: 0, 6: 0 }, M0: 0.5 },
-    apparatus: { pours: 8, seed: "all", sources: false, walls: false, evolution: false },
-    deadline: 12000, sustain: 10,
-    narrate: ["estab", "extinct", "crashev", "bloom"],
-    pass: S => S.pop(0) >= 250,
-    failNow: S => S.pop(0) === 0 ? "The last Solara died — the meadow is gone."
-      : S.pop(1) === 0 ? "The bloom is gone — exterminated, not gardened. That is not the rescue this pond needed." : "",
-    timeoutWhy: "The mat never rose past 250 — the bloom held the water to the end. Minerals feed whoever " +
-      "drinks fastest; only pressure on the bloom itself opens space below it.",
-    meter: S => [{ label: "Solara", v: S.pop(0), goal: 250 }, { label: "Drifta", v: S.pop(1) }],
-    debrief: {
-      pass: "Cilio ate the bloom, and the mat took the light and mineral it freed. One eater held the " +
-        "door open for a whole meadow — that is called a keystone. Now keep watching. In water this " +
-        "poor, the gardener eats itself out of a job: Cilio starves, and the bloom creeps back. A " +
-        "keystone is a job, and jobs need wages.",
-      fail: "The bloom kept the water. Feeding the loser can't work here — the plankton drinks faster, " +
-        "so every pour fed the bloom first. Try the other direction: seed the bloom's grazer, and let " +
-        "pressure from above open space below.",
-    },
-  },
-  {
-    key: "richer", n: 5,
-    title: "The Richer Pond", science: "Top-down structure · bottom-up inputs",
-    question: "This pond is stable and full of plankton. Can you make it richer?",
-    briefing: "A bloom, a mat, decomposers — and nobody eating anybody. Mineral is unlimited this time, " +
-      "and the seeding bench is open. The goal is a richer pond: a meadow past 1,300 with every species " +
-      "alive. Decide what this pond is actually missing.",
-    goalText: "A richer pond — 1,300 Solara, everyone alive",
-    predict: { prompt: "What does a pond need to become richer?",
-      options: ["More input — pour mineral into the water", "A missing eater — restructure who eats whom",
-                "Both — inputs and structure together"],
-      reflect: ["Thirty doses sank into the bloom, and the meadow stayed near 900. A pond's ceiling is " +
-                  "set by its structure, not by its soup.",
-                "The structural bet: give the pond an eater, and the meadow nearly doubles.",
-                "Both works — but the experiment shows which half was necessary: pours alone failed, the " +
-                  "grazer alone succeeded."] },
-    world: { seed: 202, found: { 0: 120, 1: 500, 2: 0, 3: 60, 6: 0 } },
-    apparatus: { pours: true, seed: "all", sources: false, walls: false, evolution: false },
-    deadline: 17000, sustain: 10,
-    narrate: ["estab", "crashev", "bloom", "extinct"],
-    pass: S => S.pop(0) >= 1250 && S.pop(2) >= 20,
-    failNow: S => S.pop(0) === 0 ? "The meadow is gone — richer was the goal, and everything died at the bottom."
-      : S.pop(1) === 0 ? "The plankton is gone — grazed to nothing. A structure with a hole in it feeds no one." : "",
-    timeoutWhy: "The pond stayed poor. Everything you poured sank into the standing bloom — nothing turned " +
-      "it over. Richness needed an eater, not an input.",
-    meter: S => [{ label: "Solara", v: S.pop(0), goal: 1250 }, { label: "Cilio", v: S.pop(2), goal: 20 },
-                 { label: "Drifta", v: S.pop(1) }],
-    debrief: {
-      pass: "You added an eater, and the whole pond got richer. The meadow nearly doubled; the bloom " +
-        "fell to a quarter — and held. Here is why: grazing keeps mineral moving. Eaten, returned to " +
-        "the water, taken up again. All your pouring couldn't do that. This pond was never hungry. " +
-        "It was unfinished.",
-      fail: "More soup did not make a richer pond. The bloom drank every pour and just stood there. " +
-        "What this pond is missing has a mouth: seed the grazer, and watch what an eater does that " +
-        "pouring can't.",
-    },
-  },
-  {
-    key: "hunters", n: 6,
-    title: "A Head Full of Hunters", science: "Energy pyramid · apex predators",
-    question: "The pond is rich. How many hunters can it feed?",
-    briefing: "A full pond: meadow, bloom, grazers, recyclers — and no hunter yet. Venator waits on " +
-      "your seeding bench. Found a pack that lasts.",
-    goalText: "A lasting pack — 4+ hunters, held long",
-    predict: { prompt: "You're adding a top hunter. How many packs would you release?",
-      options: ["Two packs — twice as safe", "One pack — all this pond can spare",
-                "None can live here at all"],
-      reflect: ["Twice the hunters meant twice the hunger. Packs released into the same water strip it " +
-                  "together — and starve together.",
-                "Right. Hunters live on what the pond can spare, and even a rich pond spares little.",
-                "A pack can live here. But only a small one, fed by the whole pond below it."] },
-    world: { seed: 101, found: { 0: 120, 1: 500, 2: 12, 3: 60, 6: 0 } },
-    apparatus: { pours: true, seed: "all", sources: false, walls: false, evolution: false },
-    deadline: 15000, sustain: 350, // V >= 4 held for 7,000 ticks: the doomed double-pack's best stretch is 5,400
-    narrate: ["wake", "estab", "extinct", "crashev"],
-    pass: S => S.pop(6) >= 4,
-    failNow: (S, M) => {
-      if (S.pop(6) > 0) M.v = 1;
-      if (M.v && S.pop(6) === 0) return "The pack is gone. It ate through what the pond could spare — " +
-        "the top of a pond is a narrow ledge.";
-      if (S.pop(2) === 0) return "The grazers are gone. Nothing now stands between the hunters and starving.";
-      return "";
-    },
-    timeoutWhy: "No lasting pack took hold. A hunter eats a lot and breeds slowly — seed early, and seed small.",
-    meter: S => [{ label: "Venator", v: S.pop(6), goal: 4 }, { label: "Cilio", v: S.pop(2) }],
-    debrief: {
-      pass: "Your pack holds — a few hunters riding a wave of grazers, riding a wave of plankton. " +
-        "Count the layers: hundreds of plankton feed a hundred grazers feed a handful of hunters. " +
-        "Every meal loses most of its energy on the way up. That is the food chain's price, and why " +
-        "the top is always small — and always one bad season from gone.",
-      fail: "Hunters don't run out of courage — they run out of prey. The pond only makes so many " +
-        "grazers, and every extra mouth shrinks each hunter's share. Try one pack, seeded early, and " +
-        "give it room.",
-    },
-  },
-];
+// ---- the ladder (increment 1: the single-producer arc; the rest is planned in
+// docs/phase8-ladder-design.md). Naming rule 8: functional title first, the science as
+// subtitle. Amber-handed tools only.
+const LEVELS = LEVEL_ROWS;
 
 // __LEVELS_NOTE__ deferred arcs (L7-L12): specs in docs/phase8-ladder-design.md; each enters through the honesty gate.
 // ============================================================
@@ -2333,7 +2757,7 @@ function resetWorld(){
 }
 function initWorld(seed, sc){
   if (W.initialized) return; W.initialized = true;
-  W.rng = mulberry32(seed === undefined ? P.SEED : seed);
+  W.seed = seed === undefined ? P.SEED : seed; W.rngState = W.seed|0;
   W.n=0; W.freeList.length=0; W.alive.fill(0); W.tick=0;
   W.M.fill(sc && sc.M0 !== undefined ? sc.M0 : P.M0); W.dE.fill(0); W.dP.fill(0); W.dM.fill(0); W.sc.fill(0); W.al.fill(0);
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
@@ -2556,8 +2980,258 @@ function drawGhostRay(ctx, sx, sy, hd, r, striking, trail){
 }
 
 // ============================================================
-// WORLD VIEW DRAWING — the frame pipeline, extracted from the component so the visual
-// grammar (sprites, tint, shape, layers) lives in one file. `view` = { cam, vw, vh, z, hw, hh, alpha, dpr, LOD_Z }.
+// THE FRAME BUILDER — the visual GRAMMAR, separated from the painting.
+//
+// Everything below decides *what* to draw: which sprite bucket an organism lands in, where it
+// projects on screen, what colour a cell of the mat carpet is, how wide a sun's glow reaches.
+// Those are measured or owner-decided rules, and the phone and the browser must not disagree
+// about any of them — so they live once, in the core (rust/microcosm-core/src/frame.rs), with
+// this as the reference implementation. `harness/fingerprint-frame.js` runs both and compares
+// raw bits; `tools/port-check.js` runs that comparison.
+//
+// The painting stays per platform: gradients, blend modes, the sprite bitmaps themselves, text.
+// Two platforms will not produce identical gradient pixels, and it does not matter — what must
+// agree is which bucket an organism is in, not how prettily the bucket is drawn.
+//
+// Pure observers, all of them: zero PRNG draws, no mutation of dynamic state.
+// ============================================================
+
+// ---- per-cell pixel fields: GRID x GRID RGBA, written into a caller's buffer ----
+// A fully transparent pixel is written as 0,0,0,0 rather than left with whatever it held before.
+// It paints identically (alpha 0 contributes nothing) and it makes the buffer comparable.
+function fieldMineral(d){ // faint blue nutrient water, dark where depleted
+  for (let c = 0; c < P.GRID*P.GRID; c++){
+    const o = c*4, m = Math.min(1, W.M[c] / 3.2);
+    d[o] = 64; d[o+1] = 138; d[o+2] = 205; d[o+3] = Math.round(82 * m);
+  }
+}
+// mat carpet: density field for sessile producers (Splatterplots-style aggregation).
+// Denser mats render DARKER, saturated green — thick algae absorb light; brightness stays reserved.
+// Documented grammar exception: the carpet keeps its plane-0 (light locus) genotype turn, because a
+// per-cell pixel field has no outline or body form to carry it.
+const _cellG = new Float32Array(P.GRID * P.GRID), _cellGn = new Uint16Array(P.GRID * P.GRID);
+function fieldCarpet(d){
+  const matLocus = SPECIES.MAT >= 0 && TRAITS[SPECIES.MAT].locus;
+  if (matLocus){
+    _cellG.fill(0); _cellGn.fill(0);
+    for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === SPECIES.MAT){ const c = cellOf(i); _cellG[c] += W.g[i]; _cellGn[c]++; }
+  }
+  for (let c = 0; c < P.GRID*P.GRID; c++){
+    const o = c*4;
+    const dens = Math.min(1, W.bB[c] / 200);
+    if (dens <= 0.01){ d[o] = 0; d[o+1] = 0; d[o+2] = 0; d[o+3] = 0; continue; }
+    const t = Math.sqrt(dens); // fast rise, then saturate
+    if (matLocus && _cellGn[c]){ // sparse [96,205,150] -> dense [34,123,78], both turned by the cell's mean genotype
+      const gm = _cellG[c] / _cellGn[c];
+      const lo = tintRgb([96,205,150], gm), hi = tintRgb([34,123,78], gm);
+      d[o]   = Math.round(lo[0] + (hi[0]-lo[0])*t);
+      d[o+1] = Math.round(lo[1] + (hi[1]-lo[1])*t);
+      d[o+2] = Math.round(lo[2] + (hi[2]-lo[2])*t);
+    } else {
+      d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
+      d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
+      d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
+    }
+    d[o+3] = Math.round(70 + 150*t);    // alpha: sparse faint -> dense solid
+  }
+}
+const _corpseMass = new Float32Array(P.GRID * P.GRID);
+function fieldCorpsePall(d){ // zoomed out, husks merge into a gray pall
+  _corpseMass.fill(0);
+  for (let k = 0; k < W.cN; k++){
+    if (!W.cAlive[k]) continue;
+    const cc = (Math.floor(W.cY[k]/(P.WORLD/P.GRID))&(P.GRID-1))*P.GRID + (Math.floor(W.cX[k]/(P.WORLD/P.GRID))&(P.GRID-1));
+    _corpseMass[cc] += W.cE[k] + W.cP[k] + W.cM[k];
+  }
+  for (let c = 0; c < P.GRID*P.GRID; c++){
+    const o = c*4;
+    d[o] = 158; d[o+1] = 168; d[o+2] = 178;
+    d[o+3] = Math.min(150, Math.round(_corpseMass[c] * 4));
+  }
+}
+function fieldShade(d){ // 7.W: the honest darkening where walls occlude the sources
+  for (let c = 0; c < P.GRID*P.GRID; c++){
+    const o = c*4;
+    d[o] = 6; d[o+1] = 10; d[o+2] = 16;
+    d[o+3] = Math.round(175 * (1 - W.wShade[c]));
+  }
+}
+
+// ---- world-tile vector lists, in the 512-unit tile space the layers are painted on ----
+// A glow near a tile edge must continue on the far side, so each source is emitted at every
+// wrapped offset its radius reaches (the field itself wraps in computeLight).
+function sunGlows(){
+  const k = 512 / P.WORLD, out = [];
+  for (const s of W.sources){
+    const a = Math.min(1, s.i), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
+    for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
+      const x = cx+ox, y = cy+oy;
+      if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
+      out.push({ x, y, r, a });
+    }
+  }
+  return out;
+}
+function sunMarks(){
+  const k = 512 / P.WORLD, out = [];
+  for (const s of W.sources){ if (s.i <= 0) continue;
+    for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512)
+      out.push({ x: s.x*k+ox, y: s.y*k+oy }); }
+  return out;
+}
+// 7.H: warmth as an ember glow, cold as a blue one — never amber, which is the hand's colour.
+function heatGlows(){
+  const k = 512 / P.WORLD, out = [];
+  for (const s of W.sources){
+    if (s.a === 0) continue;
+    const warm = s.a > 0, m = Math.min(1, Math.abs(s.a)/10), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
+    for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
+      const x = cx+ox, y = cy+oy;
+      if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
+      out.push({ x, y, r, m, warm });
+    }
+  }
+  return out;
+}
+function heatMarks(){ // a dark source still needs a mark
+  const k = 512 / P.WORLD, out = [];
+  for (const s of W.sources){ if (s.a === 0 || s.i > 0) continue;
+    for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512)
+      out.push({ x: s.x*k+ox, y: s.y*k+oy, warm: s.a > 0 }); }
+  return out;
+}
+// 7.W: crisp slate polylines. Dashed = something may pass (a grille); translucency follows light
+// transmission (glass fades). Never amber — a placed wall belongs to the world.
+function wallStrokes(){
+  const k = 512 / P.WORLD;
+  return W.walls.map(wl => ({
+    a: 0.92 - 0.62*wl.lt,
+    dashed: wl.pass !== 0,
+    pts: wl.path.map(p => [p[0]*CELL*k, p[1]*CELL*k]),
+  }));
+}
+
+// ---- the sprite bucket table ----
+// Which bin an organism lands in is grammar; the 64x64 bitmaps are painting. Split so the frame
+// builder runs without a canvas, and so the core can carry the same table.
+//   tint      <- the species' temperature locus (warmSlope/warmGainSlope), warm-adapted leaning WARM
+//   outline   <- the defense locus (escSlope): tougher wears a ring
+//   roundness <- feeding/metabolic axes (catchSlope/rateSlope/effSlope): thrifty rounds, keen stays sharp
+// Movement-strategy loci carry NO body channel (owner decision D7) — their display is behaviour.
+const TINT_BINS = 7;
+// Below this zoom: aggregate corpses into the pall layer, draw bacteria as dots. Grammar, so the
+// core carries it too (frame.rs LOD_Z) and the frame gate compares them.
+const LOD_Z = 0.9;
+function makeGrammar(){
+  return TRAITS.map((T, sp) => {
+    if (!T.loci.length || SHAPES[sp] === "ray" || SHAPES[sp] === "nucleus") return null;
+    const tintPlane = T.loci.findIndex(L => L.warmSlope || L.warmGainSlope);
+    const outlinePlane = T.loci.findIndex(L => L.escSlope > 0);
+    const roundPlane = T.loci.findIndex(L => L.catchSlope > 0 || L.rateSlope > 0 || L.effSlope > 0);
+    const morphPlane = outlinePlane >= 0 ? outlinePlane : roundPlane;
+    if (tintPlane < 0 && morphPlane < 0) return null;
+    return { tintPlane, morphPlane, outlinePlane, roundPlane,
+      tN: tintPlane >= 0 ? TINT_BINS : 1, mN: morphPlane >= 0 ? TINT_BINS : 1 };
+  });
+}
+
+// Everything a painter needs to render one bucket's 64x64 sprite. The colour and the two shape
+// dials are decided here, so a platform's painter never has to know what a locus is.
+function bucketSpec(G, sp, tb, mb){
+  const base = { rgb: SPECIES_META[sp].rgb, shape: SHAPES[sp], scale: SPRITE_SCALE[sp], outline: 0, round: 0 };
+  const gr = G[sp];
+  if (!gr) return base;
+  const gM = mb/(TINT_BINS-1);
+  return Object.assign(base, {
+    rgb: gr.tintPlane >= 0 ? tintRgb(SPECIES_META[sp].rgb, 1 - tb/(TINT_BINS-1)) : SPECIES_META[sp].rgb,
+    outline: gr.outlinePlane >= 0 ? gM : 0,
+    round: gr.outlinePlane < 0 && gr.roundPlane >= 0 ? 1 - gM : 0,
+  });
+}
+
+// ---- selection ----
+// Grammar too: the radius and the tie-breaking decide WHICH organism a thumb lands on, and the
+// platforms must not disagree about that. Raw positions, not interpolated ones — a tap picks what
+// is there, not what is being drawn on the way there. Ties keep slot order (sort is stable).
+function pickRadius(z, tight){ return tight ? Math.max(10/z, 7) : Math.max(24/z, 14); }
+function pickCandidates(wx, wy, rad){
+  const cand = [], rr = rad*rad;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i]) continue;
+    const dx = wd(W.x[i]-wx), dy = wd(W.y[i]-wy), d2 = dx*dx+dy*dy;
+    if (d2 < rr) cand.push([d2, i]);
+  }
+  cand.sort((a, b) => a[0]-b[0]);
+  return cand;
+}
+
+// ---- the display list ----
+// Organism record (8 doubles): kind, sx, sy, r, sp, bucket, hd, flags.
+//   kind 0 dormant cyst | 1 bacteria dot-LOD | 2 sprite | 3 sprite, heading-aligned | 4 ghost ray
+//   bucket = tintBin*mN + morphBin, or -1 for a species with no grammar
+//   flags  bit 0: striking (the ray's stretched form)
+// Corpse record (4 doubles): sx, sy, r, alpha.
+// Preallocated and reused: a frame allocates nothing, exactly like a tick.
+const FRAME = {
+  org: new Float64Array(MAXN * 8), orgN: 0,
+  corpse: new Float64Array(1500 * 4), corpseN: 0,
+  pops: [0,0,0,0,0,0,0], mnBound: 0,
+};
+function frameOf(view, hidden, G){
+  const { camX, camY, vw, vh, z, hw, hh, alpha, lodZ } = view;
+  const F = FRAME, o = F.org, cull = 40, pops = F.pops;
+  for (let s = 0; s < 7; s++) pops[s] = 0;
+  let n = 0, mnBound = 0;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i]) continue;
+    pops[W.sp[i]]++;
+    mnBound += W.mn[i];
+    if (hidden[W.sp[i]]) continue; // hidden from view, still counted
+    const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
+    const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
+    const sx = hw + wd(ix - camX)*z, sy = hh + wd(iy - camY)*z;
+    if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
+    const sp = W.sp[i], b = n*8;
+    o[b+1] = sx; o[b+2] = sy; o[b+4] = sp; o[b+5] = -1; o[b+6] = 0; o[b+7] = 0;
+    if (W.cy[i]){ // dormant cyst: dim ember, no glow
+      o[b] = 0; o[b+3] = Math.max(1, W.sz[i]*0.5*z); n++; continue;
+    }
+    if (SHAPES[sp] === "square" && z < lodZ){ // bacteria dot-LOD: batched rects instead of sprite blits
+      o[b] = 1; o[b+3] = 1.1; n++; continue;
+    }
+    o[b+3] = W.sz[i] * SPRITE_SCALE[sp] * z;
+    const gr = G[sp];
+    if (gr){
+      const tb = gr.tN > 1 ? Math.max(0, Math.min(gr.tN-1, Math.round(W.g[gr.tintPlane*MAXN+i]*(gr.tN-1)))) : 0;
+      const mb = gr.mN > 1 ? Math.max(0, Math.min(gr.mN-1, Math.round(W.g[gr.morphPlane*MAXN+i]*(gr.mN-1)))) : 0;
+      o[b+5] = tb*gr.mN + mb;
+    }
+    const shape = SHAPES[sp];
+    o[b] = shape === "tri" ? 3 : shape === "ray" ? 4 : 2;
+    o[b+6] = W.hd[i];
+    if (shape === "ray" && W.bst[i] > 0) o[b+7] = 1;
+    n++;
+  }
+  F.orgN = n; F.mnBound = mnBound;
+  // corpses: pale husks when zoomed in; the aggregate pall layer covers zoomed-out
+  const c = F.corpse;
+  let m = 0;
+  if (z >= lodZ && !hidden[7]) for (let k = 0; k < W.cN; k++){
+    if (!W.cAlive[k]) continue;
+    const sx = hw + wd(W.cX[k] - camX)*z, sy = hh + wd(W.cY[k] - camY)*z;
+    if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
+    const mass = W.cE[k] + W.cP[k] + W.cM[k], b = m*4;
+    c[b] = sx; c[b+1] = sy;
+    c[b+2] = Math.max(1.5, W.cSz[k]*1.0*z);
+    c[b+3] = Math.min(0.55, 0.12 + 0.05*mass/W.cSz[k]);
+    m++;
+  }
+  F.corpseN = m;
+  return F;
+}
+
+// ============================================================
+// PAINTING — Canvas 2D. `view` = { camX, camY, vw, vh, z, hw, hh, alpha, dpr, lodZ }.
 // ============================================================
 // World layers: light (redrawn when the sun moves), dissolved mineral, mat carpet, corpse pall.
 // Everything reads the module-singleton W; the returned closures own their offscreen canvases.
@@ -2570,25 +3244,16 @@ function makeWorldLayers(){
     lg.fillStyle = COL.abyss; lg.fillRect(0,0,512,512);
     const k = 512 / P.WORLD;
     lg.globalCompositeOperation = "lighter";
-    // the layer is one torus tile: a glow near a tile edge must continue on the far side, so each
-    // sun is painted at every wrapped offset its radius reaches (the field itself wraps in computeLight)
-    for (const s of W.sources){
-      const a = Math.min(1, s.i), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
-      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
-        const x = cx+ox, y = cy+oy;
-        if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
-        const gr2 = lg.createRadialGradient(x, y, 4, x, y, r);
-        gr2.addColorStop(0, `rgba(214,238,255,${(0.30*a).toFixed(3)})`);
-        gr2.addColorStop(0.4, `rgba(140,190,225,${(0.12*a).toFixed(3)})`);
-        gr2.addColorStop(1, "rgba(140,190,225,0)");
-        lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
-      }
+    for (const s of sunGlows()){
+      const gr2 = lg.createRadialGradient(s.x, s.y, 4, s.x, s.y, s.r);
+      gr2.addColorStop(0, `rgba(214,238,255,${(0.30*s.a).toFixed(3)})`);
+      gr2.addColorStop(0.4, `rgba(140,190,225,${(0.12*s.a).toFixed(3)})`);
+      gr2.addColorStop(1, "rgba(140,190,225,0)");
+      lg.fillStyle = gr2; lg.fillRect(0,0,512,512);
     }
     lg.globalCompositeOperation = "source-over";
     lg.fillStyle = "rgba(240,250,255,0.9)";
-    for (const s of W.sources){ if (s.i <= 0) continue; const cx = s.x*k, cy = s.y*k;
-      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
-        lg.beginPath(); lg.arc(cx+ox, cy+oy, 5, 0, 6.283); lg.fill(); } }
+    for (const m of sunMarks()){ lg.beginPath(); lg.arc(m.x, m.y, 5, 0, 6.283); lg.fill(); }
   };
   drawLight();
   // heat layer (7.H): warmth as an ember glow, cold as a blue one -- never amber, which is the hand's colour.
@@ -2597,21 +3262,17 @@ function makeWorldLayers(){
   const hg = HB.getContext("2d");
   const drawHeat = () => {
     hg.clearRect(0,0,512,512);
-    const k = 512 / P.WORLD;
-    for (const s of W.sources){ if (s.a === 0) continue;
-      const warm = s.a > 0, m = Math.min(1, Math.abs(s.a)/10), r = s.sigma*2.2*k, cx = s.x*k, cy = s.y*k;
-      const c0 = warm ? "255,120,60" : "110,170,255", c1 = warm ? "200,70,40" : "80,120,220";
-      for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
-        const x = cx+ox, y = cy+oy;
-        if (x + r < 0 || x - r > 512 || y + r < 0 || y - r > 512) continue;
-        const gr = hg.createRadialGradient(x, y, 2, x, y, r);
-        gr.addColorStop(0, `rgba(${c0},${(0.38*m).toFixed(3)})`);
-        gr.addColorStop(0.45, `rgba(${c1},${(0.16*m).toFixed(3)})`);
-        gr.addColorStop(1, `rgba(${c1},0)`);
-        hg.fillStyle = gr; hg.fillRect(0,0,512,512);
-      }
-      if (s.i <= 0){ hg.fillStyle = warm ? "rgba(255,160,110,0.9)" : "rgba(170,210,255,0.9)"; // a dark source still needs a mark
-        for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){ hg.beginPath(); hg.arc(cx+ox, cy+oy, 4, 0, 6.283); hg.fill(); } }
+    for (const s of heatGlows()){
+      const c0 = s.warm ? "255,120,60" : "110,170,255", c1 = s.warm ? "200,70,40" : "80,120,220";
+      const gr = hg.createRadialGradient(s.x, s.y, 2, s.x, s.y, s.r);
+      gr.addColorStop(0, `rgba(${c0},${(0.38*s.m).toFixed(3)})`);
+      gr.addColorStop(0.45, `rgba(${c1},${(0.16*s.m).toFixed(3)})`);
+      gr.addColorStop(1, `rgba(${c1},0)`);
+      hg.fillStyle = gr; hg.fillRect(0,0,512,512);
+    }
+    for (const m of heatMarks()){
+      hg.fillStyle = m.warm ? "rgba(255,160,110,0.9)" : "rgba(170,210,255,0.9)";
+      hg.beginPath(); hg.arc(m.x, m.y, 4, 0, 6.283); hg.fill();
     }
   };
   drawHeat();
@@ -2623,22 +3284,17 @@ function makeWorldLayers(){
   const wg = WB.getContext("2d");
   const drawWalls = () => {
     wg.clearRect(0,0,512,512);
-    const k = 512 / P.WORLD;
-    const tracePath = (path, ox, oy) => {
+    const tracePath = (pts, ox, oy) => {
       wg.beginPath();
-      for (let q = 0; q < path.length; q++){
-        const x = path[q][0]*CELL*k + ox, y = path[q][1]*CELL*k + oy;
-        q ? wg.lineTo(x, y) : wg.moveTo(x, y);
-      }
+      for (let q = 0; q < pts.length; q++) q ? wg.lineTo(pts[q][0]+ox, pts[q][1]+oy) : wg.moveTo(pts[q][0]+ox, pts[q][1]+oy);
       wg.stroke();
     };
     wg.lineCap = "round"; wg.lineJoin = "round";
-    for (const wl of W.walls){
-      const a = 0.92 - 0.62*wl.lt;
-      wg.setLineDash(wl.pass !== 0 ? [5,4] : []);
+    for (const wl of wallStrokes()){
+      wg.setLineDash(wl.dashed ? [5,4] : []);
       for (let ox = -512; ox <= 512; ox += 512) for (let oy = -512; oy <= 512; oy += 512){
-        wg.strokeStyle = `rgba(11,19,30,${(0.8*a).toFixed(3)})`; wg.lineWidth = 4.4; tracePath(wl.path, ox, oy);
-        wg.strokeStyle = `rgba(148,167,184,${a.toFixed(3)})`;   wg.lineWidth = 2.2; tracePath(wl.path, ox, oy);
+        wg.strokeStyle = `rgba(11,19,30,${(0.8*wl.a).toFixed(3)})`; wg.lineWidth = 4.4; tracePath(wl.pts, ox, oy);
+        wg.strokeStyle = `rgba(148,167,184,${wl.a.toFixed(3)})`;    wg.lineWidth = 2.2; tracePath(wl.pts, ox, oy);
       }
     }
     wg.setLineDash([]);
@@ -2649,14 +3305,7 @@ function makeWorldLayers(){
   const SB = document.createElement("canvas"); SB.width = P.GRID; SB.height = P.GRID;
   const sbx = SB.getContext("2d");
   const sbImg = sbx.createImageData(P.GRID, P.GRID);
-  const drawShade = () => {
-    const d = sbImg.data;
-    for (let c = 0; c < P.GRID*P.GRID; c++){
-      const o = c*4; d[o]=6; d[o+1]=10; d[o+2]=16;
-      d[o+3] = Math.round(175 * (1 - W.wShade[c]));
-    }
-    sbx.putImageData(sbImg, 0, 0);
-  };
+  const drawShade = () => { fieldShade(sbImg.data); sbx.putImageData(sbImg, 0, 0); };
   drawShade();
 
   // mat carpet: density field for sessile producers (Splatterplots-style aggregation).
@@ -2672,55 +3321,12 @@ function makeWorldLayers(){
   const CC = document.createElement("canvas"); CC.width = P.GRID; CC.height = P.GRID;
   const ccx = CC.getContext("2d");
   const ccImg = ccx.createImageData(P.GRID, P.GRID);
-  const corpseMass = new Float32Array(P.GRID * P.GRID);
-  // per-cell mean genotype of the mat species, so a heritable Solara trait shows in the carpet itself
-  const cellG = new Float32Array(P.GRID * P.GRID), cellGn = new Uint16Array(P.GRID * P.GRID);
-  const LOD_Z = 0.9; // below this zoom: aggregate corpses, draw bacteria as dots
   let carpetTick = -1;
   const updateCarpet = () => {
     if (W.tick === carpetTick) return; carpetTick = W.tick;
-    const d = mcImg.data, dm = mnImg.data;
-    const matLocus = SPECIES.MAT >= 0 && TRAITS[SPECIES.MAT].locus;
-    if (matLocus){
-      cellG.fill(0); cellGn.fill(0);
-      for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === SPECIES.MAT){ const c = cellOf(i); cellG[c] += W.g[i]; cellGn[c]++; }
-    }
-    for (let c = 0; c < P.GRID*P.GRID; c++){
-      const o = c*4;
-      const m = Math.min(1, W.M[c] / 3.2);
-      dm[o] = 64; dm[o+1] = 138; dm[o+2] = 205;
-      dm[o+3] = Math.round(82 * m);
-      const dens = Math.min(1, W.bB[c] / 200);
-      if (dens <= 0.01){ d[o+3] = 0; continue; }
-      const t = Math.sqrt(dens); // fast rise, then saturate
-      if (matLocus && cellGn[c]){ // sparse [96,205,150] -> dense [34,123,78], both turned by the cell's mean genotype
-        const gm = cellG[c] / cellGn[c];
-        const lo = tintRgb([96,205,150], gm), hi = tintRgb([34,123,78], gm);
-        d[o]   = Math.round(lo[0] + (hi[0]-lo[0])*t);
-        d[o+1] = Math.round(lo[1] + (hi[1]-lo[1])*t);
-        d[o+2] = Math.round(lo[2] + (hi[2]-lo[2])*t);
-      } else {
-        d[o]   = Math.round(96 - 62*t);   // r: 96 -> 34
-        d[o+1] = Math.round(205 - 82*t);  // g: 205 -> 123
-        d[o+2] = Math.round(150 - 72*t);  // b: 150 -> 78
-      }
-      d[o+3] = Math.round(70 + 150*t);  // alpha: sparse faint -> dense solid
-    }
-    mcx.putImageData(mcImg, 0, 0);
-    mnx.putImageData(mnImg, 0, 0);
-    corpseMass.fill(0);
-    for (let k = 0; k < W.cN; k++){
-      if (!W.cAlive[k]) continue;
-      const cc = (Math.floor(W.cY[k]/(P.WORLD/P.GRID))&(P.GRID-1))*P.GRID + (Math.floor(W.cX[k]/(P.WORLD/P.GRID))&(P.GRID-1));
-      corpseMass[cc] += W.cE[k] + W.cP[k] + W.cM[k];
-    }
-    const dc = ccImg.data;
-    for (let c = 0; c < P.GRID*P.GRID; c++){
-      const o = c*4;
-      dc[o]=158; dc[o+1]=168; dc[o+2]=178;
-      dc[o+3] = Math.min(150, Math.round(corpseMass[c] * 4));
-    }
-    ccx.putImageData(ccImg, 0, 0);
+    fieldCarpet(mcImg.data);     mcx.putImageData(mcImg, 0, 0);
+    fieldMineral(mnImg.data);    mnx.putImageData(mnImg, 0, 0);
+    fieldCorpsePall(ccImg.data); ccx.putImageData(ccImg, 0, 0);
   };
   return { LB, HB, MC, MN, CC, WB, SB, LOD_Z, drawLight, drawHeat, drawWalls, drawShade, updateCarpet };
 }
@@ -2728,8 +3334,8 @@ function makeWorldLayers(){
 // Paths are unwrapped corner staircases; the first point is placed by minimal image, the rest follow
 // by their deltas so a wall crossing the seam never tears across the screen.
 function traceWallScreen(ctx, view, path){
-  const { cam, z, hw, hh } = view;
-  let sx = hw + wd(path[0][0]*CELL - cam.x)*z, sy = hh + wd(path[0][1]*CELL - cam.y)*z;
+  const { camX, camY, z, hw, hh } = view;
+  let sx = hw + wd(path[0][0]*CELL - camX)*z, sy = hh + wd(path[0][1]*CELL - camY)*z;
   ctx.beginPath(); ctx.moveTo(sx, sy);
   for (let q = 1; q < path.length; q++){
     sx += (path[q][0]-path[q-1][0])*CELL*z; sy += (path[q][1]-path[q-1][1])*CELL*z;
@@ -2747,8 +3353,8 @@ function drawWallPreview(ctx, view, drag){
   const wl = makeWall(drag);              // pure: the exact staircase the release would build
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   if (!wl){                               // too short still: show the anchor point
-    const { cam, z, hw, hh } = view;
-    const sx = hw + wd(drag.x0 - cam.x)*z, sy = hh + wd(drag.y0 - cam.y)*z;
+    const { camX, camY, z, hw, hh } = view;
+    const sx = hw + wd(drag.x0 - camX)*z, sy = hh + wd(drag.y0 - camY)*z;
     ctx.fillStyle = "rgba(242,178,74,0.9)";
     ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 6.283); ctx.fill();
     return;
@@ -2758,88 +3364,46 @@ function drawWallPreview(ctx, view, drag){
   ctx.strokeStyle = "rgba(242,178,74,0.9)";  ctx.lineWidth = 2.2; traceWallScreen(ctx, view, wl.path);
   ctx.setLineDash([]);
 }
-// Sprite set under the locus visual grammar (owner decision 2026-08-30, one documented increment):
-//   tint      <- the species' temperature locus (warmSlope/warmGainSlope), warm-adapted leaning WARM
-//                (tintRgb runs warm at t=0, so the temperature axis passes 1-g). Tint no longer shows
-//                the display loci -- a deliberate change of what an existing player's colors mean.
-//   outline   <- the defense locus (escSlope): tougher wears a ring.
-//   roundness <- feeding/metabolic axes (catchSlope/rateSlope/effSlope): thrifty rounds, keen stays sharp.
-//   elongated<->circular stays reserved for a future speed locus; movement-strategy loci (tprefSpan)
-//   carry NO body channel by owner decision D7 -- their display is behaviour itself.
-// Exception, documented: the mat carpet keeps its plane-0 (light locus) genotype turn -- a per-cell
-// pixel field has no outline or body form to carry it, and an invisible locus is worse than an
-// off-grammar one.
+// The sprite bitmaps for the bucket table makeGrammar() defines. Painting, not grammar: two
+// platforms will not produce identical gradient pixels, and nothing depends on their doing so.
+// Exception, documented above fieldCarpet: the mat carpet carries its own genotype turn.
 function makeSpriteSet(){
   const sprites = [makeSprite(COL.solara,"nucleus"), makeSprite(COL.drifta,"dot"), makeSprite(COL.cilio,"tri"), makeSprite(COL.bacillus,"square"),
     makeSprite(COL.mycora,"dot"), makeSprite(COL.necro,"dot"), makeSprite(COL.venator,"tri")];
-  const TINT_BINS = 7;
-  const grammar = TRAITS.map((T, sp) => {
-    if (!T.loci.length || SHAPES[sp] === "ray" || SHAPES[sp] === "nucleus") return null;
-    const tintPlane = T.loci.findIndex(L => L.warmSlope || L.warmGainSlope);
-    const outlinePlane = T.loci.findIndex(L => L.escSlope > 0);
-    const roundPlane = T.loci.findIndex(L => L.catchSlope > 0 || L.rateSlope > 0 || L.effSlope > 0);
-    const morphPlane = outlinePlane >= 0 ? outlinePlane : roundPlane;
-    if (tintPlane < 0 && morphPlane < 0) return null;
-    const tN = tintPlane >= 0 ? TINT_BINS : 1, mN = morphPlane >= 0 ? TINT_BINS : 1;
-    const bins = Array.from({ length: tN }, (_, tb) =>
-      Array.from({ length: mN }, (_, mb) => {
-        const rgb = tintPlane >= 0 ? tintRgb(SPECIES_META[sp].rgb, 1 - tb/(TINT_BINS-1)) : SPECIES_META[sp].rgb;
-        const gM = mb/(TINT_BINS-1);
-        const vis = outlinePlane >= 0 ? { outline: gM } : roundPlane >= 0 ? { round: 1 - gM } : undefined;
-        return makeSprite(rgb, SHAPES[sp], vis);
-      }));
-    return { tintPlane, morphPlane, tN, mN, bins };
-  });
-  return { sprites, grammar, TINT_BINS };
+  const grammar = makeGrammar();
+  const bins = grammar.map((gr, sp) => gr && Array.from({ length: gr.tN }, (_, tb) =>
+    Array.from({ length: gr.mN }, (_, mb) => {
+      const sc = bucketSpec(grammar, sp, tb, mb);
+      const vis = gr.outlinePlane >= 0 ? { outline: sc.outline } : gr.roundPlane >= 0 ? { round: sc.round } : undefined;
+      return makeSprite(sc.rgb, sc.shape, vis);
+    })));
+  return { sprites, grammar, bins };
 }
-// Organisms, with the screen composite, cull margin and LOD; returns the live census the strip and card need.
-function drawOrganisms(ctx, view, hidden, S){
-  const { cam, vw, vh, z, hw, hh, alpha, LOD_Z } = view;
+// Organisms, from the display list: the screen composite and the sprite blits, nothing decided here.
+function paintOrganisms(ctx, F, S){
   ctx.globalCompositeOperation = "screen";
-  const cull = 40;
-  const pops = [0,0,0,0,0,0,0];
-  let mnBound = 0;
-  for (let i=0;i<W.n;i++){
-    if (!W.alive[i]) continue;
-    pops[W.sp[i]]++;
-    mnBound += W.mn[i];
-    if (hidden[W.sp[i]]) continue; // hidden from view, still counted
-    const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
-    const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
-    const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
-    if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
-    if (W.cy[i]){ // dormant cyst: dim ember, no glow
+  const o = F.org;
+  for (let q = 0; q < F.orgN; q++){
+    const b = q*8, kind = o[b], sx = o[b+1], sy = o[b+2], r = o[b+3], sp = o[b+4], bucket = o[b+5];
+    if (kind === 0){ // dormant cyst: dim ember, no glow
       ctx.globalCompositeOperation = "source-over";
       ctx.fillStyle = "rgba(120,135,150,0.5)";
-      ctx.beginPath(); ctx.arc(sx, sy, Math.max(1, W.sz[i]*0.5*z), 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill();
       ctx.globalCompositeOperation = "screen";
       continue;
     }
-    const spb = W.sp[i];
-    if (SHAPES[spb] === "square" && z < LOD_Z){ // bacteria dot-LOD: batched rects instead of sprite blits
+    if (kind === 1){ // bacteria dot-LOD: batched rects instead of sprite blits
       ctx.fillStyle = "rgba(196,206,150,0.8)";
-      ctx.fillRect(sx-1.1, sy-1.1, 2.2, 2.2);
+      ctx.fillRect(sx-r, sy-r, r*2, r*2);
       continue;
     }
-    const r = W.sz[i] * SPRITE_SCALE[spb] * z;
-    let spr = S.sprites[spb];
-    const gr = S.grammar[spb];
-    if (gr){ // locus visual grammar: tint by the temperature plane, outline/roundness by the defense/feeding plane
-      const tb = gr.tN > 1 ? Math.max(0, Math.min(gr.tN-1, Math.round(W.g[gr.tintPlane*MAXN+i]*(gr.tN-1)))) : 0;
-      const mb = gr.mN > 1 ? Math.max(0, Math.min(gr.mN-1, Math.round(W.g[gr.morphPlane*MAXN+i]*(gr.mN-1)))) : 0;
-      spr = gr.bins[tb][mb];
-    }
-    if (SHAPES[spb] === "tri"){
-      ctx.save(); ctx.translate(sx, sy); ctx.rotate(W.hd[i]);
-      ctx.drawImage(spr, -r, -r, r*2, r*2); ctx.restore();
-    } else if (SHAPES[spb] === "ray"){
-      drawGhostRay(ctx, sx, sy, W.hd[i], r, W.bst[i] > 0, null);
-    } else {
-      ctx.drawImage(spr, sx-r, sy-r, r*2, r*2);
-    }
+    if (kind === 4){ drawGhostRay(ctx, sx, sy, o[b+6], r, o[b+7] !== 0, null); continue; }
+    const gr = S.grammar[sp];
+    const spr = bucket >= 0 && gr ? S.bins[sp][(bucket / gr.mN)|0][bucket % gr.mN] : S.sprites[sp];
+    if (kind === 3){ ctx.save(); ctx.translate(sx, sy); ctx.rotate(o[b+6]); ctx.drawImage(spr, -r, -r, r*2, r*2); ctx.restore(); }
+    else ctx.drawImage(spr, sx-r, sy-r, r*2, r*2);
   }
   ctx.globalCompositeOperation = "source-over";
-  return { pops, mnBound };
 }
 function drawPours(ctx, pours, nowT){
   // amber pour rings: the hand's touch, fading
@@ -2851,16 +3415,10 @@ function drawPours(ctx, pours, nowT){
     ctx.beginPath(); ctx.arc(pours[q].sx, pours[q].sy, 10 + age*34, 0, 6.283); ctx.stroke();
   }
 }
-function drawCorpses(ctx, view, hiddenDebris){
-  const { cam, vw, vh, z, hw, hh, LOD_Z } = view; const cull = 40;
-  // corpses: pale husks when zoomed in; the aggregate layer covers zoomed-out
-  if (z >= LOD_Z && !hiddenDebris) for (let k = 0; k < W.cN; k++){
-    if (!W.cAlive[k]) continue;
-    const sx = hw + wd(W.cX[k] - cam.x)*z, sy = hh + wd(W.cY[k] - cam.y)*z;
-    if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
-    const mass = W.cE[k] + W.cP[k] + W.cM[k];
-    const a = Math.min(0.55, 0.12 + 0.05*mass/W.cSz[k]);
-    const r = Math.max(1.5, W.cSz[k]*1.0*z);
+function paintCorpses(ctx, F){
+  const c = F.corpse;
+  for (let q = 0; q < F.corpseN; q++){
+    const b = q*4, sx = c[b], sy = c[b+1], r = c[b+2], a = c[b+3];
     ctx.fillStyle = `rgba(158,168,178,${a.toFixed(3)})`;
     ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill();
     ctx.strokeStyle = `rgba(110,120,130,${(a*0.8).toFixed(3)})`; ctx.lineWidth = 1;
@@ -2868,9 +3426,9 @@ function drawCorpses(ctx, view, hiddenDebris){
   }
 }
 function drawSunAffordance(ctx, view, selSun){
-  const { cam, z, hw, hh } = view;
+  const { camX, camY, z, hw, hh } = view;
   W.sources.forEach((s, k) => {
-    const ssx = hw + wd(s.x - cam.x)*z, ssy = hh + wd(s.y - cam.y)*z, on = k === selSun;
+    const ssx = hw + wd(s.x - camX)*z, ssy = hh + wd(s.y - camY)*z, on = k === selSun;
     ctx.strokeStyle = on ? "rgba(242,178,74,1)" : "rgba(242,178,74,0.9)"; ctx.lineWidth = on ? 2.5 : 1.5;
     ctx.beginPath(); ctx.arc(ssx, ssy, 16, 0, 6.283); ctx.stroke();
     ctx.strokeStyle = on ? "rgba(242,178,74,0.5)" : "rgba(242,178,74,0.3)"; ctx.lineWidth = 6;
@@ -2878,9 +3436,9 @@ function drawSunAffordance(ctx, view, selSun){
   });
 }
 function drawSelectionRing(ctx, view, si){
-  const { cam, z, hw, hh, alpha } = view;
+  const { camX, camY, z, hw, hh, alpha } = view;
   const ix = W.px[si] + wd(W.x[si]-W.px[si])*alpha, iy = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
-  const sx = hw + wd(ix - cam.x)*z, sy = hh + wd(iy - cam.y)*z;
+  const sx = hw + wd(ix - camX)*z, sy = hh + wd(iy - camY)*z;
   const rr = Math.max(14, W.sz[si]*2.6*z);
   ctx.strokeStyle = "rgba(201,215,227,0.95)"; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(sx, sy, rr, 0, 6.283); ctx.stroke();
@@ -3621,16 +4179,9 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       return best; };
     const doSelect = (cxp, cyp, tight) => {
       const wxp = wrap(cam.x + (cxp - vw/2)/cam.z), wyp = wrap(cam.y + (cyp - vh/2)/cam.z);
-      const rad = tight ? Math.max(10/cam.z, 7) : Math.max(24/cam.z, 14);
-      const cand = [];
-      for (let i=0;i<W.n;i++){
-        if (!W.alive[i]) continue;
-        const dx = wd(W.x[i]-wxp), dy = wd(W.y[i]-wyp), d2 = dx*dx+dy*dy;
-        if (d2 < rad*rad) cand.push([d2, i]);
-      }
+      const cand = pickCandidates(wxp, wyp, pickRadius(cam.z, tight));
       if (!cand.length){ sel.i = -1; follow = false;
         clearTimeout(chipTimer); setUi(u => ({ ...u, card: null, chips: null })); return; }
-      cand.sort((a,b) => a[0]-b[0]);
       const species = new Set(cand.map(c => W.sp[c[1]]));
       // Same-species neighbors are interchangeable for inspection -> take nearest.
       // Chips appear only for true ambiguity: multiple SPECIES under the thumb.
@@ -3926,7 +4477,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = COL.abyss; ctx.fillRect(0, 0, vw, vh);
       const z = cam.z, hw = vw/2, hh = vh/2, k = P.WORLD/512;
-      const view = { cam, vw, vh, z, hw, hh, alpha, dpr, LOD_Z };
+      const view = { camX: cam.x, camY: cam.y, vw, vh, z, hw, hh, alpha, dpr, lodZ: LOD_Z };
       // tiled light and heat layers (view toggles: slots 8 and 9 of `hidden`)
       const tlx = cam.x - hw/z, tly = cam.y - hh/z;
       for (let ky = Math.floor(tly/P.WORLD); (ky*P.WORLD) < tly + vh/z; ky++)
@@ -3947,10 +4498,13 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
           if (z < LOD_Z && !hiddenRef.current[7]) ctx.drawImage(CC, dx0, dy0, P.WORLD*z, P.WORLD*z);
           if (W.wallsOn) ctx.drawImage(WB, dx0, dy0, P.WORLD*z, P.WORLD*z); // walls above the carpet, below the swimmers (7.W)
         }
-      // organisms: saturating "screen" composition instead of unbounded addition
-      const { pops, mnBound } = drawOrganisms(ctx, view, hiddenRef.current, S);
+      // the display list first (grammar), then the painting: organisms use a saturating "screen"
+      // composition instead of unbounded addition
+      const F = frameOf(view, hiddenRef.current, S.grammar);
+      paintOrganisms(ctx, F, S);
       drawPours(ctx, pours, performance.now());
-      drawCorpses(ctx, view, hiddenRef.current[7]);
+      paintCorpses(ctx, F);
+      const { pops, mnBound } = F;
       W.pops = pops;
 
       if (mode === "intervene"){
@@ -4857,8 +5411,7 @@ function LevelChip({ tick }){
   if (!def) return null;
   const st = LVL.state;
   const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
-  const S = W.recCount ? lvlSample(0) : null;
-  const meters = S ? def.meter(S) : [];
+  const meters = levelMeter();
   const col = lvlColor(st);
   return (
       <div style={{ flex:"1 1 auto", minWidth:0, maxWidth:430,
