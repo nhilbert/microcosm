@@ -1753,7 +1753,7 @@ const LEVEL_ROWS = [
       "reflect": [
         "Mixing does spread them — but far too slowly. Doses poured at the dark shore arrived late, and the clock ran out.",
         "Right: mineral moves slowly, and the mat drinks what lands beside it.",
-        "The lever was pinned at its ceiling the whole time. The scarcest ingredient ruled, and it was not light."
+        "The lever was pinned at its ceiling the whole time. The scarcest ingredient ruled — and it wasn't light."
       ]
     },
     "world": {
@@ -2110,7 +2110,7 @@ const LEVEL_ROWS = [
     ],
     "debrief": {
       "pass": "You added an eater, and the whole pond got richer. The meadow nearly doubled; the bloom fell to a quarter — and held. Here is why: grazing keeps mineral moving. Eaten, returned to the water, taken up again. All your pouring couldn't do that. This pond was never hungry. It was unfinished.",
-      "fail": "More soup did not make a richer pond. The bloom drank every pour and just stood there. What this pond is missing has a mouth: seed the grazer, and watch what an eater does that pouring can't."
+      "fail": "More soup did not make a richer pond. The bloom drank every pour and just stood there. What this pond is missing has a mouth: seed the grazer, and watch an eater do what pouring can't."
     }
   },
   {
@@ -2119,7 +2119,7 @@ const LEVEL_ROWS = [
     "title": "A Head Full of Hunters",
     "science": "Energy pyramid · apex predators",
     "question": "The pond is rich. How many hunters can it feed?",
-    "briefing": "A full pond: meadow, bloom, grazers, recyclers — and no hunter yet. Venator waits on your seeding bench. Found a pack that lasts.",
+    "briefing": "A full pond: meadow, bloom, grazers, recyclers — and no hunter yet. Venator waits on your seeding bench. Seed a pack that lasts.",
     "goalText": "A lasting pack — 4+ hunters, held long",
     "predict": {
       "prompt": "You're adding a top hunter. How many packs would you release?",
