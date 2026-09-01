@@ -4,17 +4,22 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.graphics.Color
 import android.graphics.Typeface
+import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import kotlin.math.abs
 
 /**
  * The shell. A.1 gave it a world and a clock; A.2 gives it a camera, a selection, a status strip
@@ -43,6 +48,7 @@ class MainActivity : Activity() {
     private lateinit var killButton: Button
     private lateinit var sunBar: LinearLayout
     private lateinit var dataPanel: LinearLayout
+    private lateinit var pagesRow: View
     private lateinit var dataView: DataView
     private lateinit var dataText: TextView
     private lateinit var dataTitle: TextView
@@ -227,8 +233,11 @@ class MainActivity : Activity() {
 
         // Data mode: the Observatory's screen, over the world rather than beside it. Charts are
         // drawn from the series the render thread copies out; Health and Events are its text.
-        dataPanel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        // The panel itself catches horizontal swipes and turns them into page changes (U0.3).
+        dataPanel = SwipePanel(this) { d ->
+            dataPage = (dataPage + d).coerceIn(0, Chrome.PAGES.size - 1)
+            refreshData()
+        }.apply {
             setBackgroundColor(Color.parseColor("#F00B131E"))
             visibility = ViewGroup.GONE
         }
@@ -239,9 +248,9 @@ class MainActivity : Activity() {
             setPadding(24, 20, 24, 8)
         }
         dataPanel.addView(dataTitle)
-        val pages = Chrome.build(this, "pages") { k -> dataPage = k; refreshData() }
+        pagesRow = Chrome.build(this, "pages") { k -> dataPage = k; refreshData() }
             .apply { setPadding(12, 0, 12, 0) }
-        dataPanel.addView(pages)
+        dataPanel.addView(pagesRow)
         dataView = DataView(this)
         dataPanel.addView(dataView, LinearLayout.LayoutParams(MATCH, 0, 1f))
         dataText = TextView(this).apply {
@@ -426,6 +435,13 @@ class MainActivity : Activity() {
     /** Chart pages draw; Health and Events are text. Only one of the two is ever visible. */
     private fun refreshData() {
         dataTitle.text = PAGE_TITLES[dataPage]
+        // The selected page reads as selected (U0.3): full strength and bold, the rest receded.
+        // Not amber — amber marks the player's hand on the world, and looking is not touching.
+        val row = Chrome.rowOf(pagesRow)
+        for (k in 0 until row.childCount) (row.getChildAt(k) as Button).apply {
+            alpha = if (k == dataPage) 1f else 0.55f
+            setTypeface(null, if (k == dataPage) Typeface.BOLD else Typeface.NORMAL)
+        }
         val chart = dataPage <= 2
         dataView.visibility = if (chart) ViewGroup.VISIBLE else ViewGroup.GONE
         (dataText.parent as ViewGroup).visibility = if (chart) ViewGroup.GONE else ViewGroup.VISIBLE
@@ -529,5 +545,61 @@ class MainActivity : Activity() {
     private companion object {
         val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
+    }
+
+    /**
+     * A vertical panel whose horizontal swipes change the page (U0.3 — "Data had tabs but I could
+     * not swipe between them"). Dependency-free by the app's own rule (A.1), so this is the small
+     * honest kernel of a pager rather than ViewPager2: intercept a drag once it is decisively
+     * horizontal (twice the slop, and twice as wide as it is tall), report its direction on
+     * release. Vertical scrolling inside the panel is untouched, and a swipe that starts inside a
+     * horizontally scrollable child — the pages row itself scrolls since U0.1 — is left alone,
+     * because that child owns sideways motion.
+     */
+    private class SwipePanel(ctx: Context, val onSwipe: (Int) -> Unit) : LinearLayout(ctx) {
+        private val slop = ViewConfiguration.get(ctx).scaledTouchSlop
+        private var x0 = 0f
+        private var y0 = 0f
+        private var catching = false
+        private var yielded = false // the touch began in a child that scrolls sideways itself
+
+        init { orientation = VERTICAL }
+
+        private fun inHScroll(v: View, x: Float, y: Float): Boolean {
+            if (v is HorizontalScrollView) return true
+            if (v is ViewGroup) for (i in 0 until v.childCount) {
+                val c = v.getChildAt(i)
+                if (c.visibility == View.VISIBLE &&
+                    x >= c.left && x < c.right && y >= c.top && y < c.bottom &&
+                    inHScroll(c, x - c.left + c.scrollX, y - c.top + c.scrollY)) return true
+            }
+            return false
+        }
+
+        override fun onInterceptTouchEvent(e: MotionEvent): Boolean {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    x0 = e.x; y0 = e.y
+                    catching = false
+                    yielded = inHScroll(this, e.x, e.y)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = e.x - x0
+                    val dy = e.y - y0
+                    if (!catching && !yielded && abs(dx) > 2 * slop && abs(dx) > 2 * abs(dy))
+                        catching = true
+                }
+            }
+            return catching
+        }
+
+        override fun onTouchEvent(e: MotionEvent): Boolean {
+            if (e.actionMasked == MotionEvent.ACTION_UP && catching) {
+                val dx = e.x - x0
+                if (dx <= -2 * slop) onSwipe(1) else if (dx >= 2 * slop) onSwipe(-1)
+                catching = false
+            }
+            return true
+        }
     }
 }
