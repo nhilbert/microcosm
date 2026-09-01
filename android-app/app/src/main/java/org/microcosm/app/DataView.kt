@@ -49,7 +49,10 @@ class DataView(context: Context) : View(context) {
         postInvalidate()
     }
 
-    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // U2.R2 (owner note): the charts speak the language too — numbers in Plex Mono.
+        typeface = Style.mono(context)
+    }
     private val path = Path()
     /**
      * This canvas is in device pixels while the browser's chart (src/ui-data.jsx) is in CSS pixels,
@@ -57,10 +60,10 @@ class DataView(context: Context) : View(context) {
      * intended size on a 3x phone — legible on a desktop screenshot, not on the device.
      */
     private val dp = context.resources.displayMetrics.density
-    private val padL = 46f * dp
-    private val padT = 10f * dp
-    private val padB = 26f * dp
-    private val padR = 12f * dp
+    private val padL = 48f * dp
+    private val padT = 16f * dp
+    private val padB = 30f * dp
+    private val padR = 18f * dp
 
     private fun at(c: Int, k: Int): Float {
         val s = series ?: return 0f

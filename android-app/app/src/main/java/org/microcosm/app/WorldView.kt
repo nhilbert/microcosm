@@ -433,6 +433,9 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         return v
     }
 
+    /** Let go of the selection — the specimen drawer's dismiss (U2.R2). */
+    fun deselect() = post { selI = -1 }
+
     /** Feed and kill act on what is selected, so the shell does not need the slot index. */
     fun feedSelected() = post {
         if (selI >= 0) { Native.ivPush(IV_FEED); Native.evFeed(selI, selGen, 0.35) }

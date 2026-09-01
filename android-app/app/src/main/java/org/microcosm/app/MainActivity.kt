@@ -44,16 +44,18 @@ class MainActivity : Activity() {
     private var resetArmedAt = 0L
     private lateinit var sunBar: LinearLayout
 
-    // ---- the sheet (U2.1): peek / half / full, the bar's heir. Internal: the boot gate walks it. ----
-    internal enum class Detent { PEEK, HALF, FULL }
-    internal var detent = Detent.PEEK
-    private lateinit var sheet: LinearLayout
-    private lateinit var halfSection: LinearLayout
-    private lateinit var fullSection: LinearLayout
-    private lateinit var modeSwitchView: LinearLayout
+    // ---- the floating chrome (U2.R2, owner round 2). Internal pieces: the boot gate drives them. ----
+    internal lateinit var interveneFab: android.widget.ImageButton
+    internal lateinit var menuFab: android.widget.ImageButton
+    internal lateinit var drawer: LinearLayout
+    internal lateinit var specimenSheet: LinearLayout
+    internal var dialOpen = false
+        private set
+    internal lateinit var toolsDial: LinearLayout
+    private lateinit var fabLabel: TextView
+    private lateinit var drawerScrim: View
+    private lateinit var specimenName: TextView
     private lateinit var paceBox: LinearLayout
-    private lateinit var tilesRow: LinearLayout
-    private lateinit var armedChip: Button
     private val speciesPills = ArrayList<LinearLayout>()
     private lateinit var dataPanel: LinearLayout
     private lateinit var pagesRow: View
@@ -89,37 +91,44 @@ class MainActivity : Activity() {
             // In an experiment the objective IS the line (D2): the census yields to it.
             strip.visibility = if (running != null && world.levelState != 0) ViewGroup.GONE
                                else ViewGroup.VISIBLE
-            val text = world.card
-            card.text = if (text.isEmpty()) "tap a creature in the pond to read it here" else text
+            card.text = world.card
             for ((k, sp) in live.withIndex()) {
                 val hiddenNow = world.hidden and (1 shl sp) != 0
                 chips[k].text = "%s %d".format(shortName(sp), world.popOf(sp))
                 chips[k].alpha = if (hiddenNow) 0.35f else 1f
             }
-            // The levers show themselves only when they apply: amber is the hand, and a hand with
-            // nothing to touch is clutter.
+            // The floating chrome (U2.R2): the fab is the hand — amber when the mode is on,
+            // wearing the armed tool's icon while one stands, × while the dial is open.
             val on = world.intervene
-            Chrome.switchState(this@MainActivity, modeSwitchView, on)
-            Chrome.paceSelect(this@MainActivity, paceBox,
-                when { world.speed >= 16 -> 3; world.speed >= 4 -> 2; world.speed >= 1 -> 1; else -> 0 })
             val hasSel = world.selSpecies >= 0
-            Chrome.tileState(this@MainActivity, Chrome.rowOf(tilesRow).getChildAt(0) as LinearLayout, false, on && hasSel)
-            Chrome.tileState(this@MainActivity, Chrome.rowOf(tilesRow).getChildAt(1) as LinearLayout, false, on && hasSel)
-            Chrome.tileState(this@MainActivity, Chrome.rowOf(tilesRow).getChildAt(2) as LinearLayout, world.seedSpecies >= 0, on)
-            Chrome.tileState(this@MainActivity, Chrome.rowOf(tilesRow).getChildAt(3) as LinearLayout, world.wallArmed, on)
-            sunBar.visibility = if (on && world.sunSel >= 0) ViewGroup.VISIBLE else ViewGroup.GONE
-            // the armed tool rides the peek row: the sheet is down while the hand works
+            val armedIcon = when {
+                world.wallArmed -> R.drawable.ic_wall
+                world.seedSpecies >= 0 -> R.drawable.ic_seed
+                else -> 0
+            }
+            Chrome.fabState(this@MainActivity, interveneFab, on,
+                when { armedIcon != 0 -> armedIcon; dialOpen -> R.drawable.ic_close; else -> R.drawable.ic_plus })
             val armedText = when {
                 !on -> ""
-                world.wallArmed -> "wall armed · drag on the water"
-                world.seedSpecies >= 0 -> "seed ${Native.traitText(world.seedSpecies, 0)} · long-press the water"
+                world.wallArmed -> "drag on the water"
+                world.seedSpecies >= 0 -> "long-press the water"
                 else -> ""
             }
-            armedChip.text = armedText
-            armedChip.visibility = if (armedText.isEmpty()) ViewGroup.GONE else ViewGroup.VISIBLE
+            fabLabel.text = armedText
+            fabLabel.visibility = if (armedText.isEmpty()) ViewGroup.GONE else ViewGroup.VISIBLE
+            for (k in 0 until toolsDial.childCount) Chrome.dialRowState(this@MainActivity,
+                toolsDial.getChildAt(k) as LinearLayout,
+                (k == 3 && world.wallArmed) || (k == 2 && world.seedSpecies >= 0),
+                if (k <= 1) hasSel else true)
+            Chrome.paceSelect(this@MainActivity, paceBox,
+                when { world.speed >= 16 -> 3; world.speed >= 4 -> 2; world.speed >= 1 -> 1; else -> 0 })
+            sunBar.visibility = if (on && world.sunSel >= 0) ViewGroup.VISIBLE else ViewGroup.GONE
             undoChip.visibility =
                 if (world.undoKind != 0 && armedText.isEmpty()) ViewGroup.VISIBLE else ViewGroup.GONE
             undoChip.text = undoLabel(world.undoKind, world.undoSpecies)
+            // the specimen drawer follows the selection — the drawer the owner found missing
+            specimenSheet.visibility = if (hasSel) ViewGroup.VISIBLE else ViewGroup.GONE
+            if (hasSel) specimenName.text = Native.traitText(world.selSpecies, 0)
             for ((k, sp) in live.withIndex()) {
                 val hiddenNow = world.hidden and (1 shl sp) != 0
                 speciesPills[k].alpha = if (hiddenNow) 0.45f else 1f
@@ -187,7 +196,11 @@ class MainActivity : Activity() {
             toast(if (devMode) "renderer telemetry on" else "renderer telemetry off")
             true
         }
-        top.addView(strip)
+        // narrow phones: the line stays one line and peeks sideways rather than wrapping
+        top.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(strip)
+        })
 
         // The standing-change badge (U2.3): the one lever measured to outrun its undo is a sun
         // change left standing unnoticed — so a standing change wears amber until it is put back,
@@ -220,80 +233,55 @@ class MainActivity : Activity() {
         top.setBackgroundColor(Color.parseColor("#D00B131E"))
         root.addView(top, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.TOP })
 
-        // ---- the sheet (U2.1): peek / half / full, the scrolling bar's heir ----
-        // The half detent is the tool chest, not the workbench: choosing a lever arms it and
-        // lowers the sheet to peek — the act happens on the open water (the plan's rule, decided
-        // at the mockups). Hand-rolled per D1; the browser designed this sheet first.
-        val bottom = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        sheet = LinearLayout(this).apply {
+        // ---- the floating chrome (U2.R2, the owner's round 2) ----
+        // Two overlay buttons over the pond, in the platform's own language: the hand is a fab
+        // that speed-dials the four tools vertically; the menu slides in from the left. The
+        // bottom sheet now belongs to the SPECIMEN alone — it opens when something is selected,
+        // which is also the drawer the owner found missing.
+
+        // the specimen drawer
+        specimenSheet = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = Style.sheet(this@MainActivity)
-            setPadding(Style.dp(this@MainActivity, 20f), 0, Style.dp(this@MainActivity, 20f),
-                Style.dp(this@MainActivity, 10f))
+            setPadding(Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 12f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 14f))
+            visibility = ViewGroup.GONE
         }
-
-        // the handle: a 48 dp strip that drags (or taps) between detents
-        val handle = FrameLayout(this).apply {
-            minimumHeight = Style.dp(this@MainActivity, 30f)
-            addView(View(this@MainActivity).apply {
-                background = Style.pill(this@MainActivity).apply { setColor(Color.argb(89, 148, 178, 204)) }
-            }, FrameLayout.LayoutParams(Style.dp(this@MainActivity, 36f), Style.dp(this@MainActivity, 4f))
-                .apply { gravity = Gravity.CENTER })
-        }
-        var downY = 0f
-        handle.setOnTouchListener { v, e ->
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { downY = e.rawY; true }
-                MotionEvent.ACTION_UP -> {
-                    val dy = e.rawY - downY
-                    val slop = ViewConfiguration.get(this).scaledTouchSlop
-                    when {
-                        dy < -slop -> sheetTo(if (detent == Detent.PEEK) Detent.HALF else Detent.FULL)
-                        dy > slop -> sheetTo(if (detent == Detent.FULL) Detent.HALF else Detent.PEEK)
-                        else -> { v.performClick(); sheetTo(if (detent == Detent.PEEK) Detent.HALF else Detent.PEEK) }
-                    }
-                    true
-                }
-                else -> true
-            }
-        }
-        sheet.addView(handle, LinearLayout.LayoutParams(MATCH, WRAP))
-
-        // the peek row: the mode switch, and the hand's standing state (armed tool, or undo)
-        val peekRow = LinearLayout(this).apply {
+        val specHeader = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        modeSwitchView = Chrome.modeSwitch(this) {
-            world.intervene = !world.intervene
-            if (!world.intervene) { world.wallArmed = false; world.seedSpecies = -1 }
+        specimenName = TextView(this).apply {
+            setTextColor(Style.BRIGHT)
+            textSize = 17f
+            typeface = Style.wordMedium(this@MainActivity)
         }
-        peekRow.addView(modeSwitchView)
-        peekRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        armedChip = button("") {
-            // tapping the armed chip stands the tool down
-            world.wallArmed = false
-            world.seedSpecies = -1
-        }.apply {
-            visibility = ViewGroup.GONE
-            setTextColor(Style.AMBER)
-            background = Style.touchable(this@MainActivity, Style.hand(this@MainActivity))
+        specHeader.addView(specimenName, LinearLayout.LayoutParams(0, WRAP, 1f))
+        specHeader.addView(button("feed") { world.feedSelected() },
+            LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = Style.dp(this@MainActivity, 8f) })
+        specHeader.addView(button("kill") { world.killSelected() })
+        specimenSheet.addView(specHeader)
+        card = TextView(this).apply {
+            setTextColor(Color.parseColor("#C9D7E3"))
+            textSize = 11f
+            typeface = Style.mono(this@MainActivity)
+            setPadding(0, Style.dp(this@MainActivity, 8f), 0, 0)
         }
-        peekRow.addView(armedChip)
-        undoChip = button("undo") { world.undoLast() }.apply {
-            visibility = ViewGroup.GONE
-            setTextColor(Style.AMBER)
-            background = Style.touchable(this@MainActivity, Style.hand(this@MainActivity))
-        }
-        peekRow.addView(undoChip)
-        sheet.addView(peekRow, LinearLayout.LayoutParams(MATCH, WRAP))
+        specimenSheet.addView(ScrollView(this).apply { addView(card) },
+            LinearLayout.LayoutParams(MATCH, Style.dp(this@MainActivity, 200f)))
+        root.addView(specimenSheet, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
-        // The sun's own controls, shown while a sun is gripped — at any detent, because the grip
-        // happens on the open water. (The row goes in whole: moving children between parents was
-        // the U.0 splash crash.)
+        // floating centre chips: the sun's controls while gripped, undo while it applies
+        val centerChips = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
         sunBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            background = Style.card(this@MainActivity)
+            setPadding(Style.dp(this@MainActivity, 14f), Style.dp(this@MainActivity, 4f),
+                Style.dp(this@MainActivity, 8f), Style.dp(this@MainActivity, 4f))
             visibility = ViewGroup.GONE
         }
         sunBar.addView(TextView(this).apply {
@@ -310,34 +298,91 @@ class MainActivity : Activity() {
                 else -> world.sunSel = -1
             }
         })
-        sheet.addView(sunBar, LinearLayout.LayoutParams(MATCH, WRAP))
+        centerChips.addView(sunBar)
+        undoChip = button("undo") { world.undoLast() }.apply {
+            visibility = ViewGroup.GONE
+            setTextColor(Style.AMBER)
+            background = Style.touchable(this@MainActivity, Style.hand(this@MainActivity))
+        }
+        centerChips.addView(undoChip, LinearLayout.LayoutParams(WRAP, WRAP).apply {
+            topMargin = Style.dp(this@MainActivity, 8f)
+        })
+        root.addView(centerChips, FrameLayout.LayoutParams(WRAP, WRAP).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            bottomMargin = Style.dp(this@MainActivity, 92f)
+        })
 
-        // ---- the half detent: the tool chest ----
-        halfSection = LinearLayout(this).apply {
+        // the intervene fab and its speed dial
+        val dialWrap = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            gravity = Gravity.END
+        }
+        toolsDial = Chrome.build(this, "tools") { k -> onTool(k) } as LinearLayout
+        toolsDial.visibility = ViewGroup.GONE
+        dialWrap.addView(toolsDial)
+        val fabRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        fabLabel = TextView(this).apply {
+            setTextColor(Style.AMBER)
+            textSize = 13f
+            typeface = Style.word(this@MainActivity)
+            background = Style.pill(this@MainActivity, amber = true)
+            minHeight = Style.dp(this@MainActivity, 36f)
+            gravity = Gravity.CENTER
+            setPadding(Style.dp(this@MainActivity, 14f), 0, Style.dp(this@MainActivity, 14f), 0)
             visibility = ViewGroup.GONE
         }
-        halfSection.addView(sectionLabel("pace"))
+        fabRow.addView(fabLabel, LinearLayout.LayoutParams(WRAP, WRAP).apply {
+            marginEnd = Style.dp(this@MainActivity, 10f)
+        })
+        interveneFab = Chrome.fab(this, R.drawable.ic_plus) { onFabTap() }
+        fabRow.addView(interveneFab)
+        dialWrap.addView(fabRow)
+        root.addView(dialWrap, FrameLayout.LayoutParams(WRAP, WRAP).apply {
+            gravity = Gravity.BOTTOM or Gravity.END
+            rightMargin = Style.dp(this@MainActivity, 20f)
+            bottomMargin = Style.dp(this@MainActivity, 24f)
+        })
+
+        // the menu fab, mirrored bottom-left
+        menuFab = Chrome.fab(this, R.drawable.ic_menu) { openDrawer() }
+        root.addView(menuFab, FrameLayout.LayoutParams(Style.dp(this, 56f), Style.dp(this, 56f)).apply {
+            gravity = Gravity.BOTTOM or Gravity.START
+            leftMargin = Style.dp(this@MainActivity, 20f)
+            bottomMargin = Style.dp(this@MainActivity, 24f)
+        })
+
+        // the menu drawer, sliding in from the left (owner: "standard best practice" — it is)
+        drawerScrim = View(this).apply {
+            setBackgroundColor(Color.argb(120, 0, 0, 0))
+            visibility = ViewGroup.GONE
+            setOnClickListener { closeDrawer() }
+        }
+        root.addView(drawerScrim, FrameLayout.LayoutParams(MATCH, MATCH))
+        drawer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Style.ABYSS)
+            visibility = ViewGroup.GONE
+            isClickable = true
+            setPadding(Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f))
+        }
+        val drawerBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        drawerBody.addView(TextView(this).apply {
+            text = "Microcosm"
+            setTextColor(Style.BRIGHT)
+            textSize = 20f
+            typeface = Style.wordBold(this@MainActivity)
+            setPadding(0, 0, 0, Style.dp(this@MainActivity, 8f))
+        })
+        drawerBody.addView(sectionLabel("pace"))
         paceBox = Chrome.build(this, "pace") { k ->
             world.speed = when (k) { 0 -> 0.0; 1 -> 1.0; 2 -> 4.0; else -> 16.0 }
         } as LinearLayout
-        halfSection.addView(paceBox, LinearLayout.LayoutParams(MATCH, WRAP))
-        halfSection.addView(sectionLabel("the hand · choosing a tool lowers the sheet"))
-        tilesRow = Chrome.build(this, "tools") { k ->
-            if (!world.intervene) { toast("intervene is off"); return@build }
-            when (k) {
-                0 -> world.feedSelected()
-                1 -> world.killSelected()
-                2 -> seedPicker()
-                else -> {
-                    world.wallArmed = !world.wallArmed
-                    if (world.wallArmed) { world.seedSpecies = -1; sheetTo(Detent.PEEK) }
-                }
-            }
-        } as LinearLayout
-        halfSection.addView(tilesRow, LinearLayout.LayoutParams(MATCH, WRAP))
-        halfSection.addView(sectionLabel("species · tap to hide"))
-        val pillRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        drawerBody.addView(paceBox, LinearLayout.LayoutParams(MATCH, WRAP))
+        drawerBody.addView(sectionLabel("species · tap to hide"))
         for (sp in live) {
             val pill = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -360,25 +405,23 @@ class MainActivity : Activity() {
                 })
             }
             speciesPills.add(pill)
-            val lp = LinearLayout.LayoutParams(WRAP, WRAP)
-            if (pillRow.childCount > 0) lp.marginStart = Style.dp(this@MainActivity, 8f)
-            pillRow.addView(pill, lp)
+            drawerBody.addView(pill, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                bottomMargin = Style.dp(this@MainActivity, 8f)
+            })
         }
-        halfSection.addView(HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            addView(pillRow)
-        }, LinearLayout.LayoutParams(MATCH, WRAP))
-        halfSection.addView(sectionLabel(""))
+        drawerBody.addView(sectionLabel(""))
         val utility = Chrome.build(this, "utility") { k ->
             when (Chrome.UTILITY[k]) {
                 "reset" -> resetTapped()
-                "save" -> saveOrLoad()
+                "save" -> { closeDrawer(); saveOrLoad() }
                 "data" -> {
+                    closeDrawer()
                     world.dataOpen = true
                     dataPanel.visibility = ViewGroup.VISIBLE
                     refreshData()
                 }
                 else -> {
+                    closeDrawer()
                     reportView.visibility = ViewGroup.GONE
                     world.speed = 0.0
                     world.benchmark()
@@ -387,26 +430,15 @@ class MainActivity : Activity() {
         } as LinearLayout
         resetButton = Chrome.at(utility, Chrome.UTILITY, "reset")
         benchButton = Chrome.at(utility, Chrome.UTILITY, "bench").apply { visibility = ViewGroup.GONE }
-        halfSection.addView(utility, LinearLayout.LayoutParams(MATCH, WRAP))
-        sheet.addView(halfSection, LinearLayout.LayoutParams(MATCH, WRAP))
-
-        // ---- the full detent: the specimen, in depth ----
-        fullSection = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = ViewGroup.GONE
-        }
-        card = TextView(this).apply {
-            setTextColor(Color.parseColor("#C9D7E3"))
-            textSize = 11f
-            typeface = Style.mono(this@MainActivity)
-            setPadding(0, Style.dp(this@MainActivity, 12f), 0, Style.dp(this@MainActivity, 8f))
-        }
-        fullSection.addView(ScrollView(this).apply { addView(card) },
-            LinearLayout.LayoutParams(MATCH, 0, 1f))
-        sheet.addView(fullSection, LinearLayout.LayoutParams(MATCH, WRAP))
-
-        bottom.addView(sheet, LinearLayout.LayoutParams(MATCH, WRAP))
-        root.addView(bottom, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
+        drawerBody.addView(utility, LinearLayout.LayoutParams(MATCH, WRAP))
+        drawerBody.addView(sectionLabel(""))
+        drawerBody.addView(button("experiments") { closeDrawer(); expPanel.visibility = ViewGroup.VISIBLE },
+            LinearLayout.LayoutParams(MATCH, WRAP))
+        drawer.addView(ScrollView(this).apply { addView(drawerBody) },
+            LinearLayout.LayoutParams(MATCH, MATCH))
+        root.addView(drawer, FrameLayout.LayoutParams(Style.dp(this, 300f), MATCH).apply {
+            gravity = Gravity.START
+        })
 
         // Data mode: the Observatory's screen, over the world rather than beside it. Charts are
         // drawn from the series the render thread copies out; Health and Events are its text.
@@ -545,8 +577,17 @@ class MainActivity : Activity() {
         // clock and the buttons under the gesture pill — which is what the first screenshots showed.
         @Suppress("DEPRECATION")
         root.setOnApplyWindowInsetsListener { _, insets ->
+            val ib = insets.systemWindowInsetBottom
             top.setPadding(24, insets.systemWindowInsetTop + 20, 24, 16)
-            bottom.setPadding(0, 0, 0, insets.systemWindowInsetBottom)
+            // The floating chrome clears the gesture pill; the specimen sheet absorbs it as padding.
+            specimenSheet.setPadding(Style.dp(this, 20f), Style.dp(this, 12f),
+                Style.dp(this, 20f), Style.dp(this, 14f) + ib)
+            (menuFab.layoutParams as FrameLayout.LayoutParams).bottomMargin = Style.dp(this, 24f) + ib
+            ((interveneFab.parent as View).parent as? View)?.let {
+                (it.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin = Style.dp(this, 24f) + ib
+            }
+            drawer.setPadding(Style.dp(this, 20f), Style.dp(this, 20f) + insets.systemWindowInsetTop,
+                Style.dp(this, 20f), Style.dp(this, 20f) + ib)
             // The Data panel is a full-screen overlay, so it needs the insets itself — without
             // this its title renders under the status bar clock (the owner's screenshots).
             dataPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
@@ -777,15 +818,42 @@ class MainActivity : Activity() {
         }
     }
 
-    /** The sheet's detents: sections show by state, and only FULL takes real height. */
-    internal fun sheetTo(d: Detent) {
-        detent = d
-        halfSection.visibility = if (d == Detent.PEEK) ViewGroup.GONE else ViewGroup.VISIBLE
-        fullSection.visibility = if (d == Detent.FULL) ViewGroup.VISIBLE else ViewGroup.GONE
-        val lp = sheet.layoutParams ?: return
-        lp.height = if (d == Detent.FULL) (resources.displayMetrics.heightPixels * 0.72).toInt()
-                    else ViewGroup.LayoutParams.WRAP_CONTENT
-        sheet.layoutParams = lp
+    /** The speed dial's state. Opening it is opening the hand; closing it alone is not. */
+    internal fun setDial(open: Boolean) {
+        dialOpen = open
+        toolsDial.visibility = if (open) ViewGroup.VISIBLE else ViewGroup.GONE
+    }
+
+    private fun onFabTap() {
+        when {
+            world.wallArmed || world.seedSpecies >= 0 -> { // armed: stand down, offer the dial
+                world.wallArmed = false
+                world.seedSpecies = -1
+                setDial(true)
+            }
+            dialOpen -> { setDial(false); world.intervene = false }
+            else -> { world.intervene = true; setDial(true) }
+        }
+    }
+
+    private fun onTool(k: Int) {
+        when (k) {
+            0 -> world.feedSelected()
+            1 -> world.killSelected()
+            2 -> seedPicker() // arms on choice and closes the dial there
+            else -> { world.wallArmed = true; world.seedSpecies = -1; setDial(false) }
+        }
+        if (k <= 1) setDial(false)
+    }
+
+    internal fun openDrawer() {
+        drawerScrim.visibility = ViewGroup.VISIBLE
+        drawer.visibility = ViewGroup.VISIBLE
+    }
+
+    internal fun closeDrawer() {
+        drawerScrim.visibility = ViewGroup.GONE
+        drawer.visibility = ViewGroup.GONE
     }
 
     /** The canvas's section voice: 11 tracked caps, dim. */
@@ -809,7 +877,7 @@ class MainActivity : Activity() {
         val names = live.map { Native.traitText(it, 0) }.toTypedArray()
         AlertDialog.Builder(this, R.style.MicrocosmDialog)
             .setTitle("Seed which species? Then long-press the water.")
-            .setItems(names) { _, k -> world.seedSpecies = live[k]; world.wallArmed = false; sheetTo(Detent.PEEK) }
+            .setItems(names) { _, k -> world.seedSpecies = live[k]; world.wallArmed = false; setDial(false) }
             .setNegativeButton("none") { _, _ -> world.seedSpecies = -1 }
             .show()
     }
@@ -864,7 +932,9 @@ class MainActivity : Activity() {
             reportView.visibility == ViewGroup.VISIBLE -> reportView.visibility = ViewGroup.GONE
             verdict.visibility == ViewGroup.VISIBLE -> verdict.visibility = ViewGroup.GONE
             world.dataOpen -> { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE }
-            detent != Detent.PEEK -> sheetTo(if (detent == Detent.FULL) Detent.HALF else Detent.PEEK)
+            drawer.visibility == ViewGroup.VISIBLE -> closeDrawer()
+            dialOpen -> { setDial(false); world.intervene = false }
+            world.selSpecies >= 0 -> world.deselect()
             world.sunSel >= 0 -> world.sunSel = -1
             world.wallArmed -> world.wallArmed = false
             world.intervene -> world.intervene = false

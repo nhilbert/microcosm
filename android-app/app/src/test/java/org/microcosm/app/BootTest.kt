@@ -185,8 +185,9 @@ class BootTest {
         // eight HUD rounds at 250 ms — the window in which the phone died
         repeat(8) { looper.idleFor(Duration.ofMillis(250)) }
 
-        // U2.1: the sheet's detents, photographed from the whole real screen, and back
-        // walking them down before it walks anything else.
+        // U2.R2: the floating chrome. The fab opens the hand and its dial, a tool arms from the
+        // dial, the drawer slides in from the left, the specimen sheet follows selection — and
+        // back walks it all down before it walks anything else.
         val decor = activity.window.decorView
         fun relayout() {
             decor.measure(
@@ -196,19 +197,27 @@ class BootTest {
             decor.layout(0, 0, decor.width, decor.height)
         }
         relayout()
-        photograph(decor, "app@peek")
-        activity.sheetTo(MainActivity.Detent.HALF)
+        photograph(decor, "app@world")
+        activity.interveneFab.performClick()
+        assertTrue("the fab should open the hand and its dial",
+            activity.world.intervene && activity.dialOpen)
         looper.idleFor(Duration.ofMillis(50))
         relayout()
-        photograph(decor, "app@sheet-half")
-        activity.sheetTo(MainActivity.Detent.FULL)
+        photograph(decor, "app@dial")
+        (activity.toolsDial.getChildAt(3) as android.widget.LinearLayout).performClick() // wall
+        assertTrue("choosing wall should arm it and close the dial",
+            activity.world.wallArmed && !activity.dialOpen)
+        activity.interveneFab.performClick() // an armed fab tap stands the tool down
+        assertTrue("the fab should stand the wall down", !activity.world.wallArmed)
+        activity.onBackPressed() // dial is open again after standing down; back closes the hand
+        assertTrue("back should close the hand", !activity.dialOpen && !activity.world.intervene)
+        activity.menuFab.performClick()
+        assertTrue("the menu should slide in", activity.drawer.visibility == android.view.View.VISIBLE)
         looper.idleFor(Duration.ofMillis(50))
         relayout()
-        photograph(decor, "app@sheet-full")
+        photograph(decor, "app@drawer")
         activity.onBackPressed()
-        assertTrue("back should lower the sheet a detent", activity.detent == MainActivity.Detent.HALF)
-        activity.onBackPressed()
-        assertTrue("and again to peek", activity.detent == MainActivity.Detent.PEEK)
+        assertTrue("back should close the menu", activity.drawer.visibility != android.view.View.VISIBLE)
 
         controller.pause()   // U0.6's autosave path
         controller.resume()

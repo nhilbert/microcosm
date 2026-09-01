@@ -125,11 +125,20 @@ object LayoutGate {
         for (i in boxes.indices) for (j in i + 1 until boxes.size) {
             val (a, ab) = boxes[i]
             val (c, cb) = boxes[j]
+            // A clickable container holding a clickable child (a dial row and its mini-fab) is
+            // nesting, not ambiguity: the child wins the tap, the rest of the row is the parent's.
+            if (isAncestor(a, c) || isAncestor(c, a)) continue
             if (ab[0] < cb[2] && cb[0] < ab[2] && ab[1] < cb[3] && cb[1] < ab[3])
                 out.add(Violation("OVERLAP", "$what/${label(a)} over ${label(c)}", p.name,
                     "${ab.joinToString(",")} vs ${cb.joinToString(",")}"))
         }
         return out
+    }
+
+    private fun isAncestor(maybeParent: View, v: View): Boolean {
+        var p = v.parent
+        while (p is View) { if (p === maybeParent) return true; p = p.parent }
+        return false
     }
 
     private fun dp(v: Int, density: Float) = (v / density).toInt()

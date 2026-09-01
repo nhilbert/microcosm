@@ -114,7 +114,7 @@ object Chrome {
      */
     fun build(ctx: Context, name: String, onTap: (Int) -> Unit = {}): View = when (name) {
         "pace" -> pace(ctx, onTap)
-        "tools" -> tiles(ctx, onTap)
+        "tools" -> dial(ctx, onTap)
         "utility" -> weightedRow(ctx, UTILITY, onTap)
         in SCROLLS -> scrollRow(ctx, ROWS.getValue(name), onTap)
         else -> row(ctx, ROWS.getValue(name), onTap)
@@ -157,43 +157,77 @@ object Chrome {
         }
     }
 
-    /** The lever tiles: icon over label, four sharing the row's width, 8 dp apart. */
-    fun tiles(ctx: Context, onTap: (Int) -> Unit = {}): LinearLayout {
-        val grid = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        for ((k, label) in TOOLS.withIndex()) {
-            val tile = LinearLayout(ctx).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
-                background = Style.touchable(ctx, Style.quiet(ctx))
-                minimumHeight = Style.dp(ctx, 64f)
-                setPadding(0, Style.dp(ctx, 12f), 0, Style.dp(ctx, 12f))
-                setOnClickListener { onTap(k) }
-                addView(android.widget.ImageView(ctx).apply {
-                    setImageResource(TOOL_ICONS[k])
-                    imageTintList = ColorStateList.valueOf(Style.TEXT)
-                })
-                addView(TextView(ctx).apply {
-                    text = label
-                    textSize = 12f
-                    typeface = Style.word(ctx)
-                    setTextColor(Style.TEXT)
-                    setPadding(0, Style.dp(ctx, 6f), 0, 0)
-                })
-            }
-            val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            if (k > 0) lp.marginStart = Style.dp(ctx, 8f)
-            grid.addView(tile, lp)
+    /** A floating round button (U2.R2 — the owner's overlay language). 56 dp, or 48 for minis. */
+    fun fab(ctx: Context, iconRes: Int, sizeDp: Float = 56f, onTap: () -> Unit = {}): android.widget.ImageButton =
+        android.widget.ImageButton(ctx).apply {
+            setImageResource(iconRes)
+            imageTintList = ColorStateList.valueOf(Style.TEXT)
+            background = Style.touchable(ctx, android.graphics.drawable.GradientDrawable().apply {
+                setColor(Style.SURFACE_SCRIM)
+                setStroke(Style.dp(ctx, 1f), Style.HAIRLINE)
+                cornerRadius = Style.dp(ctx, sizeDp / 2).toFloat()
+            })
+            stateListAnimator = null
+            layoutParams = LinearLayout.LayoutParams(Style.dp(ctx, sizeDp), Style.dp(ctx, sizeDp))
+            setOnClickListener { onTap() }
         }
-        return grid
+
+    /** Repaint a fab: amber when it is the hand. `iconRes` swaps the glyph (armed tool, ×, +). */
+    fun fabState(ctx: Context, fab: android.widget.ImageButton, amber: Boolean, iconRes: Int, sizeDp: Float = 56f) {
+        fab.setImageResource(iconRes)
+        fab.imageTintList = ColorStateList.valueOf(if (amber) Style.AMBER else Style.TEXT)
+        fab.background = Style.touchable(ctx, android.graphics.drawable.GradientDrawable().apply {
+            setColor(if (amber) Color.argb(245, 34, 30, 20) else Style.SURFACE_SCRIM)
+            setStroke(Style.dp(ctx, 1f), if (amber) Style.AMBER_BORDER else Style.HAIRLINE)
+            cornerRadius = Style.dp(ctx, sizeDp / 2).toFloat()
+        })
     }
 
-    /** A tile's armed/idle/disabled look. Amber is the hand; a tile without a target recedes. */
-    fun tileState(ctx: Context, tile: LinearLayout, armed: Boolean, enabled: Boolean = true) {
-        val color = if (armed) Style.AMBER else Style.TEXT
-        tile.background = Style.touchable(ctx, if (armed) Style.hand(ctx) else Style.quiet(ctx))
-        (tile.getChildAt(0) as android.widget.ImageView).imageTintList = ColorStateList.valueOf(color)
-        (tile.getChildAt(1) as TextView).setTextColor(color)
-        tile.alpha = if (enabled) 1f else 0.4f
+    /**
+     * The intervene speed dial (owner, round 2): the four tools stacked vertically above the
+     * hand's fab, each a labelled mini-fab, right-aligned. The rows are children 0..3 (in TOOLS
+     * order), each row = [label pill, mini fab]; the caller toggles their visibility as one.
+     */
+    fun dial(ctx: Context, onTap: (Int) -> Unit = {}): LinearLayout {
+        val stack = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.END
+        }
+        for ((k, label) in TOOLS.withIndex()) {
+            val row = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            row.addView(TextView(ctx).apply {
+                text = label
+                textSize = 13f
+                typeface = Style.word(ctx)
+                setTextColor(Style.TEXT)
+                background = Style.pill(ctx)
+                minHeight = Style.dp(ctx, 36f)
+                gravity = android.view.Gravity.CENTER
+                setPadding(Style.dp(ctx, 14f), 0, Style.dp(ctx, 14f), 0)
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginEnd = Style.dp(ctx, 10f) })
+            row.addView(fab(ctx, TOOL_ICONS[k], 48f) { onTap(k) })
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.bottomMargin = Style.dp(ctx, 10f)
+            // the whole row taps the tool: the label is as good a target as the disc
+            row.setOnClickListener { onTap(k) }
+            stack.addView(row, lp)
+        }
+        return stack
+    }
+
+    /** A dial row's enabled/armed paint. `row` is a child of [dial]. */
+    fun dialRowState(ctx: Context, row: LinearLayout, armed: Boolean, enabled: Boolean) {
+        val label = row.getChildAt(0) as TextView
+        val mini = row.getChildAt(1) as android.widget.ImageButton
+        label.setTextColor(if (armed) Style.AMBER else Style.TEXT)
+        label.background = if (armed) Style.pill(ctx, amber = true) else Style.pill(ctx)
+        fabState(ctx, mini, armed, TOOL_ICONS[ROWS.getValue("tools").indexOf(label.text.toString())], 48f)
+        row.alpha = if (enabled) 1f else 0.4f
     }
 
     /** A row of buttons sharing the width equally — the sheet's utility row. */
@@ -223,7 +257,8 @@ object Chrome {
         }
         track.addView(View(ctx), android.widget.FrameLayout.LayoutParams(
             Style.dp(ctx, 22f), Style.dp(ctx, 22f)).apply {
-            topMargin = Style.dp(ctx, 3f); leftMargin = Style.dp(ctx, 3f); rightMargin = Style.dp(ctx, 3f)
+            // no topMargin: it fought CENTER_VERTICAL and pushed the thumb off-axis (owner note)
+            leftMargin = Style.dp(ctx, 3f); rightMargin = Style.dp(ctx, 3f)
         })
         sw.addView(track)
         sw.addView(TextView(ctx).apply {
