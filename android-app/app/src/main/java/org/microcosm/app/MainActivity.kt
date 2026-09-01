@@ -532,6 +532,26 @@ class MainActivity : Activity() {
 
     private fun button(label: String, onTap: () -> Unit) = Chrome.button(this, label, onTap)
 
+    /**
+     * Back closes what is open instead of leaving the app (U0.5) — on Android the press is close
+     * to a reflex, and until now it always exited. Topmost first: the report, the verdict, Data,
+     * then the held things (grip, armed wall, Intervene itself). Predictive back and a real back
+     * stack are the redesign's problem (research lens 3); this only stops the reflex from killing
+     * the session.
+     */
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        when {
+            reportView.visibility == ViewGroup.VISIBLE -> reportView.visibility = ViewGroup.GONE
+            verdict.visibility == ViewGroup.VISIBLE -> verdict.visibility = ViewGroup.GONE
+            world.dataOpen -> { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE }
+            world.sunSel >= 0 -> world.sunSel = -1
+            world.wallArmed -> world.wallArmed = false
+            world.intervene -> world.intervene = false
+            else -> @Suppress("DEPRECATION") super.onBackPressed()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         ui.post(tickHud)
