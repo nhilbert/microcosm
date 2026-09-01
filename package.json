@@ -47,8 +47,9 @@
     "port:snapshot": "cd rust/microcosm-core && cargo run --release --quiet --bin snapshot",
     "selftest": "node harness/selftest.js",
     "yoshida:capture": "npm run build && node harness/yoshida.js --capture",
-    "test": "npm run build && npm run syntax && node harness/selftest.js && node harness/conform.js && node harness/prose.js && node harness/render-smoke.js",
-    "test:full": "npm run test && npm run tune && npm run gate && node harness/gate5.js && node harness/corridor.js --rails --fuzz && node harness/levels.js"
+    "test": "npm run build && npm run syntax && node harness/selftest.js && node harness/conform.js && node harness/prose.js && node harness/render-smoke.js && node harness/prose-app.js",
+    "test:full": "npm run test && npm run tune && npm run gate && node harness/gate5.js && node harness/corridor.js --rails --fuzz && node harness/levels.js",
+    "prose:app": "node harness/prose-app.js"
   },
   "devDependencies": {
     "esbuild": "^0.28.0",

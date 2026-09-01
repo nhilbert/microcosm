@@ -844,7 +844,7 @@ class MainActivity : Activity() {
     }
 
     private val PAGE_TITLES = listOf(
-        "Populations — every line a species, on a log axis",
+        "Head counts — every line a species, on a log axis",
         "Chemistry — where every unit of mineral sits; the top edge is the world's total",
         "Metabolism — what the world produces and burns",
         "Health — vitals against measured reference ranges",

@@ -37,7 +37,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         /** What the Events page calls each one. */
         val IV_LABEL = arrayOf(
             "You poured mineral", "You killed a specimen", "You fed a specimen",
-            "You introduced organisms", "You undid the last action", "You moved an energy source",
+            "You introduced creatures", "You undid the last action", "You moved an energy source",
             "You changed the sunlight", "You added an energy source", "You removed an energy source",
             "You changed an energy source", "You changed the source layout", "You switched mutation",
             "You changed an evolution setting", "You applied an evolution preset",
