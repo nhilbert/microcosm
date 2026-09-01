@@ -308,6 +308,30 @@ pub extern "system" fn Java_org_microcosm_app_Native_evSource(
     abi::mc_event_source(k, x, y, 0);
 }
 
+/// Mutation on/off — the Evolution panel's master switch (EV).
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evMutation(_env: JNIEnv, _this: JObject, v: jint) {
+    abi::mc_event_mutation(v, 0);
+}
+
+/// One locus field write, clamped by the core exactly as the browser's `locus` event.
+/// `key`: the C ABI's locus key (0 sigma, 1 curve, 2..15 the price slopes).
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_evLocus(
+    _env: JNIEnv, _this: JObject, sp: jint, k: jint, key: jint, v: jdouble,
+) {
+    abi::mc_event_locus(sp, k, key, v, 0);
+}
+
+/// Read a locus field. Same keys as [Java_org_microcosm_app_Native_evLocus], plus 16 g0 and
+/// 17 warmGated — the Evolution panel and the Traits page read through this.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_locusGet(
+    _env: JNIEnv, _this: JObject, sp: jint, k: jint, key: jint,
+) -> jdouble {
+    abi::mc_locus_get(sp, k, key)
+}
+
 #[no_mangle]
 pub extern "system" fn Java_org_microcosm_app_Native_evSourceSet(
     _env: JNIEnv, _this: JObject, k: jint, i: jdouble, a: jdouble, sigma: jdouble,

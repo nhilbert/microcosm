@@ -41,7 +41,26 @@ class MainActivity : Activity() {
     private lateinit var resetButton: Button
     private lateinit var benchButton: Button
     private var resetArmedAt = 0L
-    private lateinit var sunBar: LinearLayout
+
+    // ---- the sun card (EV — "detailed sun management"): sliders and layouts for the grip ----
+    internal lateinit var sunSheet: LinearLayout // internal: the boot gate asserts it opens
+    private lateinit var sunTitle: TextView
+    private lateinit var sunRemoveBtn: Button
+    private val sunSliders = HashMap<String, android.widget.SeekBar>()
+    private val sunValues = HashMap<String, TextView>()
+    private var sunGripShown = -1
+    internal val evoPanel by lazy { EvolutionPanel(this, world) } // internal: the boot gate drives it
+
+    /** The browser's SOURCE_LAYOUTS (src/ui.jsx), verbatim: additive by the L.2 finding. */
+    private data class Src(val x: Double, val y: Double, val i: Double, val a: Double, val sigma: Double)
+    private val sourceLayouts = listOf(
+        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0)),
+        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 1.0, 0.0, 130.0)),
+        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 0.7, 0.0, 130.0)),
+        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 0.8, 0.0, 110.0), Src(0.0, 512.0, 0.8, 0.0, 110.0)),
+        listOf(Src(512.0, 512.0, 1.0, 8.0, 210.0)),
+        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 0.0, 10.0, 130.0)),
+    )
 
     // ---- the floating chrome (U2.R2, owner round 2). Internal pieces: the boot gate drives them. ----
     internal lateinit var interveneFab: android.widget.ImageButton
@@ -126,6 +145,7 @@ class MainActivity : Activity() {
                 when { armedIcon != 0 -> armedIcon; dialOpen -> R.drawable.ic_close; else -> R.drawable.ic_plus })
             val armedText = when {
                 !on -> ""
+                world.placeSource != 0 -> getString(R.string.hint_place_source)
                 world.wallArmed -> getString(R.string.hint_wall_drag)
                 world.seedSpecies >= 0 -> getString(R.string.hint_seed_press)
                 world.toolArmed != 0 -> getString(R.string.hint_tool_touch)
@@ -144,17 +164,36 @@ class MainActivity : Activity() {
                 true) // round 3: no tool needs a selection any more
             Chrome.paceSelect(this@MainActivity, paceBox,
                 when { world.speed >= 16 -> 3; world.speed >= 4 -> 2; world.speed >= 1 -> 1; else -> 0 })
-            sunBar.visibility = if (on && world.sunSel >= 0) ViewGroup.VISIBLE else ViewGroup.GONE
+            // The sun card (EV) follows the grip and outranks the specimen sheet at the bottom.
+            val si = world.sunInfo
+            val sunOpen = on && world.sunSel >= 0 && si != null
+            sunSheet.visibility = if (sunOpen) ViewGroup.VISIBLE else ViewGroup.GONE
+            if (sunOpen && si != null) {
+                sunTitle.text = "${sunKind(si[0], si[1])}  ·  ${world.sunSel + 1}/${si[3].toInt()}"
+                val last = si[3] <= 1.0
+                sunRemoveBtn.isEnabled = !last
+                sunRemoveBtn.alpha = if (last) 0.4f else 1f
+                if (world.sunSel != sunGripShown) { // a fresh grip: sliders take the sun's values
+                    sunGripShown = world.sunSel
+                    sunSliders["i"]?.progress = Math.round(si[0] / 0.05).toInt()
+                    sunValues["i"]?.text = "%.2f".format(si[0])
+                    sunSliders["a"]?.progress = Math.round((si[1] + 8.0) / 0.5).toInt()
+                    sunValues["a"]?.text = (if (si[1] > 0) "+" else "") + "%.1f°".format(si[1])
+                    sunSliders["sigma"]?.progress = Math.round((si[2] - 90.0) / 10.0).toInt()
+                    sunValues["sigma"]?.text = "%.0f".format(si[2])
+                }
+            } else sunGripShown = -1
             undoChip.visibility =
                 if (world.undoKind != 0 && armedText.isEmpty()) ViewGroup.VISIBLE else ViewGroup.GONE
             undoChip.text = undoLabel(world.undoKind, world.undoSpecies)
-            // the specimen drawer follows the selection — the drawer the owner found missing
+            // the specimen drawer follows the selection — the drawer the owner found missing.
+            // The sun card outranks it: one bottom sheet at a time.
             val snap = world.specimen
-            specimenSheet.visibility = if (snap != null) ViewGroup.VISIBLE else ViewGroup.GONE
-            // Round 3: the drawer must not sit UNDER the floating chrome — while it is open,
-            // the fabs, the dial and the centre chips ride above it. (Its height settles a
-            // frame after it becomes visible; the next 250 ms tick corrects the lift.)
-            val lift = if (snap != null) specimenSheet.height else 0
+            specimenSheet.visibility = if (snap != null && !sunOpen) ViewGroup.VISIBLE else ViewGroup.GONE
+            // Round 3: the drawer must not sit UNDER the floating chrome — while a sheet is
+            // open, the fabs, the dial and the centre chips ride above it. (Its height settles
+            // a frame after it becomes visible; the next 250 ms tick corrects the lift.)
+            val lift = if (sunOpen) sunSheet.height else if (snap != null) specimenSheet.height else 0
             if (lift != chromeLift) {
                 chromeLift = lift
                 (dialWrap.layoutParams as FrameLayout.LayoutParams).bottomMargin =
@@ -390,34 +429,63 @@ class MainActivity : Activity() {
         specimenSheet.addView(specimenTiles)
         root.addView(specimenSheet, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
+        // The sun card (EV): the gripped ENERGY SOURCE's own sheet — light, warmth and spread as
+        // sliders (the browser's SourceCard ranges), the six additive layouts, add and remove.
+        // It replaces U2.R2's three-button sun bar: dimmer/brighter was a slider wearing buttons.
+        sunSheet = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Style.sheet(this@MainActivity)
+            setPadding(Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 12f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 14f))
+            visibility = ViewGroup.GONE
+        }
+        val sunHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        sunTitle = TextView(this).apply {
+            setTextColor(Style.AMBER)
+            textSize = 16f
+            typeface = Style.wordMedium(this@MainActivity)
+        }
+        sunHeader.addView(sunTitle, LinearLayout.LayoutParams(0, WRAP, 1f))
+        sunHeader.addView(button(getString(R.string.sun_release)) { world.sunSel = -1; world.placeSource = 0 })
+        sunSheet.addView(sunHeader)
+        sunSheet.addView(sunSliderRow("i", getString(R.string.sun_light), 0.0, 1.5, 0.05) { v -> "%.2f".format(v) })
+        sunSheet.addView(sunSliderRow("a", getString(R.string.sun_warmth), -8.0, 15.0, 0.5) { v ->
+            (if (v > 0) "+" else "") + "%.1f°".format(v) })
+        sunSheet.addView(sunSliderRow("sigma", getString(R.string.sun_spread), 90.0, 300.0, 10.0) { v ->
+            "%.0f".format(v) })
+        sunSheet.addView(Chrome.build(this, "layouts") { k -> applyLayout(k) },
+            LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = Style.dp(this@MainActivity, 10f) })
+        val sunActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        sunActions.addView(button(getString(R.string.sun_add)) { world.placeSource = 1 },
+            LinearLayout.LayoutParams(0, WRAP, 1f))
+        sunActions.addView(button(getString(R.string.heater_add)) { world.placeSource = 2 },
+            LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = Style.dp(this@MainActivity, 8f) })
+        sunRemoveBtn = button(getString(R.string.sun_remove)) {
+            val k = world.sunSel
+            if (k >= 0) world.post {
+                if (Native.sourceCount() > 1) { // the world keeps at least one source
+                    Native.ivPush(WorldView.IV_SOURCE_REMOVE)
+                    Native.evSourceRemove(k)
+                }
+            }
+            world.sunSel = -1
+        }
+        sunActions.addView(sunRemoveBtn, LinearLayout.LayoutParams(0, WRAP, 1f).apply {
+            marginStart = Style.dp(this@MainActivity, 8f)
+        })
+        sunSheet.addView(sunActions, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            topMargin = Style.dp(this@MainActivity, 8f)
+        })
+        root.addView(sunSheet, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
+
         // floating centre chips: the sun's controls while gripped, undo while it applies
         centerChips = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
         }
-        sunBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = Style.card(this@MainActivity)
-            setPadding(Style.dp(this@MainActivity, 14f), Style.dp(this@MainActivity, 4f),
-                Style.dp(this@MainActivity, 8f), Style.dp(this@MainActivity, 4f))
-            visibility = ViewGroup.GONE
-        }
-        sunBar.addView(TextView(this).apply {
-            text = getString(R.string.label_sun) + " "
-            setTextColor(Style.AMBER)
-            textSize = 13f
-            typeface = Style.word(this@MainActivity)
-            setPadding(0, 0, Style.dp(this@MainActivity, 8f), 0)
-        })
-        sunBar.addView(Chrome.row(this, Chrome.SUN) { k ->
-            when (k) {
-                0 -> nudgeSun(-0.15)
-                1 -> nudgeSun(0.15)
-                else -> world.sunSel = -1
-            }
-        })
-        centerChips.addView(sunBar)
         undoChip = button(getString(R.string.btn_undo)) { world.undoLast() }.apply {
             visibility = ViewGroup.GONE
             setTextColor(Style.AMBER)
@@ -555,6 +623,11 @@ class MainActivity : Activity() {
         drawerBody.addView(sectionLabel(""))
         drawerBody.addView(button(getString(R.string.btn_experiments)) { closeDrawer(); expPanel.visibility = ViewGroup.VISIBLE },
             LinearLayout.LayoutParams(MATCH, WRAP))
+        drawerBody.addView(button(getString(R.string.evo_title)) {
+            if (!world.evolutionAllowed) { toast(getString(R.string.evo_locked)); return@button }
+            closeDrawer()
+            evoPanel.open()
+        }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = Style.dp(this@MainActivity, 8f) })
         drawer.addView(ScrollView(this).apply { addView(drawerBody) },
             LinearLayout.LayoutParams(MATCH, MATCH))
         root.addView(drawer, FrameLayout.LayoutParams(
@@ -583,7 +656,12 @@ class MainActivity : Activity() {
             .apply { setPadding(12, 0, 12, 0) }
         dataPanel.addView(pagesRow)
         dataView = DataView(this)
-        dataPanel.addView(dataView, LinearLayout.LayoutParams(MATCH, 0, 1f))
+        // In a scroll container since EV: the Traits page is taller than any screen (160 dp per
+        // (species, locus) band, eleven bands); fillViewport keeps the chart pages full-height.
+        dataPanel.addView(ScrollView(this).apply {
+            isFillViewport = true
+            addView(dataView, ViewGroup.LayoutParams(MATCH, WRAP))
+        }, LinearLayout.LayoutParams(MATCH, 0, 1f))
         dataText = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
             textSize = 11f
@@ -594,6 +672,7 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(MATCH, 0, 1f))
         dataPanel.addView(button(getString(R.string.btn_close)) { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE })
         root.addView(dataPanel, FrameLayout.LayoutParams(MATCH, MATCH))
+        root.addView(evoPanel.view, FrameLayout.LayoutParams(MATCH, MATCH))
 
         // The verdict card: what happened, and why, in the level's own words.
         verdict = TextView(this).apply {
@@ -704,6 +783,9 @@ class MainActivity : Activity() {
             // The floating chrome clears the gesture pill; the specimen sheet absorbs it as padding.
             specimenSheet.setPadding(Style.dp(this, 20f), Style.dp(this, 12f),
                 Style.dp(this, 20f), Style.dp(this, 14f) + ib)
+            sunSheet.setPadding(Style.dp(this, 20f), Style.dp(this, 12f),
+                Style.dp(this, 20f), Style.dp(this, 14f) + ib)
+            evoPanel.view.setPadding(0, insets.systemWindowInsetTop, 0, ib)
             insetBottom = ib
             chromeLift = -1 // margins are lift+inset; a changed inset re-applies them (tickHud)
             (menuFab.layoutParams as FrameLayout.LayoutParams).bottomMargin = Style.dp(this, 24f) + ib
@@ -896,12 +978,14 @@ class MainActivity : Activity() {
                 background = Style.touchable(this@MainActivity, Style.quiet(this@MainActivity))
             }
         }
-        val chart = dataPage <= 2
-        dataView.visibility = if (chart) ViewGroup.VISIBLE else ViewGroup.GONE
+        val chart = dataPage <= 2 || dataPage == DataView.PAGE_TRAITS
+        (dataView.parent as ViewGroup).visibility = if (chart) ViewGroup.VISIBLE else ViewGroup.GONE
         (dataText.parent as ViewGroup).visibility = if (chart) ViewGroup.GONE else ViewGroup.VISIBLE
         if (chart) {
             dataView.page = dataPage
-            world.series?.let { dataView.submit(it, world.seriesN, IntArray(7) { sp -> speciesColor(sp) }) }
+            if (dataPage == DataView.PAGE_TRAITS)
+                dataView.submitTraits(world.traitBands, world.traitSeries, world.seriesN)
+            else world.series?.let { dataView.submit(it, world.seriesN, IntArray(7) { sp -> speciesColor(sp) }) }
         } else {
             dataText.text = if (dataPage == 3) world.healthText else world.eventsText
         }
@@ -1043,14 +1127,82 @@ class MainActivity : Activity() {
             .show()
     }
 
-    /** The sun-intensity press, one step at a time. The core clamps; this only asks. */
-    private fun nudgeSun(d: Double) {
+    /** One slider row of the sun card. `id` is the source field: i, a, or sigma. */
+    private fun sunSliderRow(id: String, label: String, min: Double, max: Double, step: Double,
+                             fmt: (Double) -> String): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = Style.dp(this@MainActivity, 44f)
+        }
+        row.addView(TextView(this).apply {
+            text = label
+            textSize = 12f
+            typeface = Style.word(this@MainActivity)
+            setTextColor(Style.DIM)
+        }, LinearLayout.LayoutParams(Style.dp(this, 84f), WRAP))
+        val bar = android.widget.SeekBar(this).apply {
+            this.max = Math.round((max - min) / step).toInt()
+            progressTintList = android.content.res.ColorStateList.valueOf(Style.AMBER)
+            thumbTintList = android.content.res.ColorStateList.valueOf(Style.AMBER)
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: android.widget.SeekBar?, p: Int, fromUser: Boolean) {
+                    if (fromUser) sunValues[id]?.text = fmt(min + p * step)
+                }
+                override fun onStartTrackingTouch(s: android.widget.SeekBar?) {}
+                override fun onStopTrackingTouch(s: android.widget.SeekBar) { commitSun() }
+            })
+        }
+        sunSliders[id] = bar
+        row.addView(bar, LinearLayout.LayoutParams(0, WRAP, 1f))
+        val value = TextView(this).apply {
+            textSize = 13f
+            typeface = Style.monoMedium(this@MainActivity)
+            setTextColor(Style.AMBER)
+            gravity = Gravity.END
+        }
+        sunValues[id] = value
+        row.addView(value, LinearLayout.LayoutParams(Style.dp(this, 56f), WRAP))
+        return row
+    }
+
+    /** A slider release commits all three fields as one sourceSet — one drag, one intervention. */
+    private fun commitSun() {
         val k = world.sunSel
         if (k < 0) return
+        val i = 0.0 + (sunSliders["i"]?.progress ?: 0) * 0.05
+        val a = -8.0 + (sunSliders["a"]?.progress ?: 0) * 0.5
+        val sg = 90.0 + (sunSliders["sigma"]?.progress ?: 0) * 10.0
         world.post {
-            Native.evSourceSet(k, Native.sourceNum(k, 2) + d, Native.sourceNum(k, 3), Native.sourceNum(k, 4))
+            Native.ivPush(WorldView.IV_SOURCE_SET)
+            Native.evSourceSet(k, i, a, sg)
         }
     }
+
+    /** A layout is ONE intervention (7.L): the shipped sun keeps its place; the rest is rebuilt.
+     *  Internal: the boot gate applies real layouts. */
+    internal fun applyLayout(which: Int) {
+        val layout = sourceLayouts[which]
+        world.post {
+            Native.ivPush(WorldView.IV_SOURCE_LAYOUT)
+            for (q in Native.sourceCount() - 1 downTo 1) Native.evSourceRemove(q)
+            Native.evSourceSet(0, layout[0].i, layout[0].a, layout[0].sigma)
+            for (q in 1 until layout.size)
+                Native.evSourceAdd(layout[q].x, layout[q].y, layout[q].i, layout[q].a, layout[q].sigma)
+        }
+        world.sunSel = 0
+        sunGripShown = -1 // repopulate the sliders from the reshaped sky
+    }
+
+    /** The gripped source's nature, read off its two channels — the browser's `sourceKind`. */
+    private fun sunKind(i: Double, a: Double): String = getString(when {
+        i > 0 && a > 0 -> R.string.src_hot_sun
+        i > 0 && a < 0 -> R.string.src_cold_light
+        i > 0 -> R.string.src_sun
+        a > 0 -> R.string.src_heater
+        a < 0 -> R.string.src_cold
+        else -> R.string.src_dark
+    })
 
     private val undoLabels by lazy { resources.getStringArray(R.array.undo_labels) }
 
@@ -1081,9 +1233,11 @@ class MainActivity : Activity() {
             reportView.visibility == ViewGroup.VISIBLE -> reportView.visibility = ViewGroup.GONE
             verdict.visibility == ViewGroup.VISIBLE -> verdict.visibility = ViewGroup.GONE
             world.dataOpen -> { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE }
+            evoPanel.isOpen() -> evoPanel.close()
             drawer.visibility == ViewGroup.VISIBLE -> closeDrawer()
             dialOpen -> { setDial(false); world.intervene = false }
             world.selSpecies >= 0 -> world.deselect()
+            world.placeSource != 0 -> world.placeSource = 0
             world.sunSel >= 0 -> world.sunSel = -1
             world.toolArmed != 0 -> world.toolArmed = 0
             world.wallArmed -> world.wallArmed = false

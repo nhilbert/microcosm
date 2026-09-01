@@ -32,8 +32,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         const val IV_SEED = 3
         const val IV_UNDO = 4
         const val IV_SOURCE = 5
+        const val IV_SOURCE_ADD = 7
+        const val IV_SOURCE_REMOVE = 8
         const val IV_SOURCE_SET = 9
+        const val IV_SOURCE_LAYOUT = 10
+        const val IV_MUTATION = 11
+        const val IV_LOCUS = 12
+        const val IV_PRESET = 13
         const val IV_WALL_ADD = 14
+        /** The recorder's locus channels: [mean base, sd base] per locus plane; +sp gives the row. */
+        val LOCUS_CH = arrayOf(intArrayOf(42, 49), intArrayOf(75, 82), intArrayOf(89, 96), intArrayOf(103, 110))
         private const val REC_N = 900
 
         const val TOOL_FEED = 1
@@ -160,6 +168,17 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var seedSpecies = -1
     /** The selected sun, or -1. A drag that STARTS on it moves it; other drags pan (U0.4). */
     @Volatile var sunSel = -1
+    /** The armed source-placement tool (EV sun card): 0 none, 1 a sun, 2 a heater — next tap places it. */
+    @Volatile var placeSource = 0
+    /** The gripped sun's live numbers for the card: [i, a, sigma, count], or null. Per frame. */
+    @Volatile var sunInfo: DoubleArray? = null
+        private set
+    /** Whether mutation is on — the Evolution panel's master light. Published per frame. */
+    @Volatile var mutationOn = true
+        private set
+    /** Whether the running experiment hands out the evolution apparatus (levelAllows 4). */
+    @Volatile var evolutionAllowed = true
+        private set
     /**
      * The gripped sun's screen position, published once a frame by the render thread so the
      * gesture arbiter can ask "did this drag start on the sun?" without touching the core from
@@ -244,6 +263,15 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         private set
     @Volatile var eventsText: String = ""
         private set
+    // ---- the Traits page (EV) ----
+    @Volatile var traitBands: Array<DataView.Band> = emptyArray()
+        private set
+    @Volatile var traitSeries: FloatArray = FloatArray(0)
+        private set
+    /** The (sp, locus, meanCh, sdCh) rows of the Traits page — built once, on the render thread. */
+    private var bandDefs: List<IntArray>? = null
+    /** The world's shipped mutation rates, captured at founding — the presets' "as shipped". */
+    val shippedSigma = HashMap<Int, Double>()
     private var dataFrame = 0
     private var recBuf: java.nio.FloatBuffer? = null
 
@@ -435,6 +463,17 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         val wx = worldX(sx)
         val wy = worldY(sy)
 
+        // An armed source placement (the sun card's add buttons) takes the very next tap.
+        if (intervene && placeSource != 0 && Native.levelAllows(2) != 0) {
+            if (Native.sourceCount() < 4) { // the world keeps at most four sources (P.maxSources)
+                Native.ivPush(IV_SOURCE_ADD)
+                if (placeSource == 1) Native.evSourceAdd(wx, wy, 1.0, 0.0, 130.0)
+                else Native.evSourceAdd(wx, wy, 0.0, 10.0, 130.0)
+                sunSel = Native.sourceCount() - 1 // grip the newborn, so the card shows it
+            }
+            placeSource = 0
+            return
+        }
         // In Intervene, an armed touch tool takes the tap whole: no gripping, pouring or
         // selecting while the hand is a feeder or an eraser.
         if (intervene && toolArmed != 0) {
@@ -549,6 +588,9 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         Native.markPrev()
         renderer = Renderer(density)
         ivSeen = Native.ivCount() // interventions from a restored save are history, not fresh
+        // "Shipped" for the Evolution presets = the mutation rates this world founded with.
+        if (shippedSigma.isEmpty()) for (sp in 0 until 7) for (k in 0 until Native.locusCount(sp))
+            shippedSigma[sp * 4 + k] = Native.locusGet(sp, k, 0)
         // The badge's memory survives lock/unlock (same view instance). A re-created ACTIVITY
         // re-baselines from the live sky — a standing change from before the recreation stops
         // being badged; accepted, the world itself is what must survive.
@@ -620,10 +662,15 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             if (gs in 0 until Native.sourceCount()) {
                 gripSx = (wrapDelta(Native.sourceNum(gs, 0) - cam.x) * cam.z + width / 2.0).toFloat()
                 gripSy = (wrapDelta(Native.sourceNum(gs, 1) - cam.y) * cam.z + height / 2.0).toFloat()
+                sunInfo = doubleArrayOf(Native.sourceNum(gs, 2), Native.sourceNum(gs, 3),
+                    Native.sourceNum(gs, 4), Native.sourceCount().toDouble())
             } else {
                 gripSx = Float.NaN
                 gripSy = Float.NaN
+                sunInfo = null
             }
+            mutationOn = Native.scalar(50) != 0.0
+            evolutionAllowed = Native.levelAllows(4) != 0
             selSpecies = if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0)
                 Native.org(selI, 1).toInt() else -1
             specimen = if (selSpecies >= 0) {
@@ -728,6 +775,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         series = out
         seriesN = n
 
+        publishTraits(rec, head, n)
+
         val sb = StringBuilder()
         if (Native.indOk() == 0) sb.append(s(R.string.health_gathering))
         else {
@@ -772,6 +821,62 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         }
         if (count == 0) ev.append(s(R.string.events_none))
         eventsText = ev.toString()
+    }
+
+    /**
+     * The Traits page's data (EV, mirroring src/ui-data.jsx drawTraits): per (species, locus)
+     * the mean±sd ribbon out of the recorder's locus channels, the founder value, the pole
+     * words through [L10n], and a 24-bin histogram of the living population's genotypes read
+     * straight off the organisms. Render thread only, like everything that touches the core.
+     */
+    private fun publishTraits(rec: java.nio.FloatBuffer, head: Int, n: Int) {
+        val defs = bandDefs ?: buildList {
+            for (sp in 0 until 7) {
+                if (Native.speciesFlag(sp, 1) != 0) continue // the apex carries no locus (decision 3)
+                for (k in 0 until minOf(Native.locusCount(sp), LOCUS_CH.size))
+                    add(intArrayOf(sp, k, LOCUS_CH[k][0] + sp, LOCUS_CH[k][1] + sp))
+            }
+        }.also { bandDefs = it }
+        if (defs.isEmpty()) return
+        val series = FloatArray(defs.size * 2 * n)
+        for ((b, d) in defs.withIndex()) for (k in 0 until n) {
+            val row = ((head - n + k + REC_N) % REC_N) * REC_CH
+            series[(b * 2) * n + k] = rec.get(row + d[2])
+            series[(b * 2 + 1) * n + k] = rec.get(row + d[3])
+        }
+        // one pass over the living for every band's histogram
+        val hists = Array(defs.size) { FloatArray(DataView.HIST_BINS) }
+        val alive = IntArray(defs.size)
+        val slotOf = HashMap<Int, Int>()
+        for ((b, d) in defs.withIndex()) slotOf[d[0] * 4 + d[1]] = b
+        val cnt = Native.scalar(0).toInt()
+        for (i in 0 until cnt) {
+            if (Native.org(i, 0) == 0.0) continue
+            val sp = Native.org(i, 1).toInt()
+            for (k in 0 until minOf(Native.locusCount(sp), LOCUS_CH.size)) {
+                val b = slotOf[sp * 4 + k] ?: continue
+                val g = Native.org(i, 20 + k)
+                hists[b][(g * DataView.HIST_BINS).toInt().coerceIn(0, DataView.HIST_BINS - 1)]++
+                alive[b]++
+            }
+        }
+        traitBands = Array(defs.size) { b ->
+            val d = defs[b]
+            val sp = d[0]
+            val mean = if (n > 0) series[(b * 2) * n + n - 1] else 0f
+            val sd = if (n > 0) series[(b * 2 + 1) * n + n - 1] else 0f
+            DataView.Band(
+                android.graphics.Color.rgb(Native.specNum(sp, 0, 0, 0).toInt(),
+                    Native.specNum(sp, 0, 0, 1).toInt(), Native.specNum(sp, 0, 0, 2).toInt()),
+                Native.traitText(sp, 0) + " · " + L10n.trait(Native.traitText(sp, 10 + d[1])).lowercase(),
+                s(R.string.trait_stats, mean, sd),
+                Native.locusGet(sp, d[1], 16).toFloat(),
+                L10n.trait(Native.traitText(sp, 30 + d[1])),
+                L10n.trait(Native.traitText(sp, 20 + d[1])),
+                alive[b], hists[b],
+            )
+        }
+        traitSeries = series
     }
 
     private fun popLine(): String {

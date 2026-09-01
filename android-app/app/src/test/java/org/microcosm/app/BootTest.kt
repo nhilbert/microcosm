@@ -315,6 +315,71 @@ class BootTest {
     }
 
     /**
+     * The evolution and sun levers (EV): the Evolution panel's mutation toggle and presets, and
+     * the sun card's layouts, driven through the same methods their buttons call, against the
+     * real core. What it proves: the three new JNI wrappers work (evMutation, evLocus, locusGet),
+     * a preset is one bundle that actually moves sigma, and a layout reshapes the sky.
+     */
+    @Test
+    fun theEvolutionAndSunLeversDriveTheCore() {
+        requireNativeLib()
+        org.robolectric.RuntimeEnvironment.setQualifiers("w408dp-h900dp-xxhdpi")
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val world = activity.world
+        world.surfaceCreated(world.holder)
+        world.surfaceChanged(world.holder, 0, world.width, world.height)
+        val looper = shadowOf(Looper.getMainLooper())
+        fun onCore(f: () -> Double): Double {
+            val out = DoubleArray(1)
+            val l = java.util.concurrent.CountDownLatch(1)
+            world.post { out[0] = f(); l.countDown() }
+            assertTrue("render thread went quiet", l.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            return out[0]
+        }
+        try {
+            world.speed = 0.0
+            activity.evoPanel.open()
+            onCore { 0.0 } // the fetch has run once this returns
+            looper.idle()  // and its UI-thread build is delivered
+            assertTrue("the panel should be open", activity.evoPanel.isOpen())
+            photograph(activity.evoPanel.view, "evolution@panel")
+
+            val before = onCore { Native.scalar(50) }
+            activity.evoPanel.gateToggleMutation()
+            val after = onCore { Native.scalar(50) }
+            assertTrue("the mutation toggle must reach the core", before != after)
+            activity.evoPanel.gateToggleMutation()
+            looper.idle()
+
+            val s0 = onCore { Native.locusGet(1, 0, 0) } // Drifta's display locus, sigma
+            activity.evoPanel.gatePreset(2) // wild: sigma = min(0.12, 2 * shipped)
+            val wild = onCore { Native.locusGet(1, 0, 0) }
+            assertTrue("preset wild must raise sigma ($s0 -> $wild)", wild > s0 + 1e-12)
+            activity.evoPanel.gatePreset(0) // shipped: back to founding values
+            val back = onCore { Native.locusGet(1, 0, 0) }
+            assertTrue("preset shipped must restore sigma ($back != $s0)", Math.abs(back - s0) < 1e-9)
+            looper.idle()
+            activity.evoPanel.close()
+
+            // the sun card's layouts reshape the sky as one intervention
+            world.intervene = true
+            world.sunSel = 0
+            activity.applyLayout(1) // second sun
+            assertTrue("the twin layout must add a source", onCore { Native.sourceCount().toDouble() } == 2.0)
+            activity.applyLayout(0) // one sun
+            assertTrue("the one-sun layout must remove it", onCore { Native.sourceCount().toDouble() } == 1.0)
+            looper.idleFor(Duration.ofMillis(300)) // a HUD tick, so the sun sheet shows
+            assertTrue("a gripped sun must open its card", activity.sunSheet.visibility == android.view.View.VISIBLE)
+            photograph(activity.sunSheet, "sun@card")
+            println("BOOT GATE: evolution and sun levers drive the core (mutation, preset, layout, card)")
+        } finally {
+            world.intervene = false
+            world.sunSel = -1
+            world.surfaceDestroyed(world.holder)
+        }
+    }
+
+    /**
      * The owner's screen-lock report, played back (2026-09-01): "when my screen locks, all data
      * is lost, no save." Two faults compounded. A lock destroys the surface and an unlock
      * creates a new one, and `WorldView.run()` founded a fresh world on every new surface — so

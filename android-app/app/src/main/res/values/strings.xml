@@ -38,10 +38,9 @@
     <string name="tool_kill">kill</string>
     <string name="tool_seed">seed</string>
     <string name="tool_wall">wall</string>
-    <string name="sun_dimmer">dimmer</string>
-    <string name="sun_brighter">brighter</string>
     <string name="sun_release">release</string>
     <string name="page_pops">pops</string>
+    <string name="page_traits">traits</string>
     <string name="page_chem">chem</string>
     <string name="page_metab">metab</string>
     <string name="page_health">health</string>
@@ -59,7 +58,46 @@
     <string name="hint_wall_drag">drag on the water</string>
     <string name="hint_seed_press">long-press the water</string>
     <string name="hint_tool_touch">tap or drag the water</string>
+    <string name="hint_place_source">tap the water to place it</string>
     <string name="label_sun">sun</string>
+
+    <!-- the sun card (EV) -->
+    <string name="sun_light">light</string>
+    <string name="sun_warmth">warmth</string>
+    <string name="sun_spread">spread</string>
+    <string name="sun_add">+ sun</string>
+    <string name="heater_add">+ heater</string>
+    <string name="sun_remove">remove</string>
+    <string name="src_sun">☀ sun</string>
+    <string name="src_hot_sun">☀♨ hot sun</string>
+    <string name="src_cold_light">☀❄ cold light</string>
+    <string name="src_heater">♨ heater</string>
+    <string name="src_cold">❄ cold source</string>
+    <string name="src_dark">○ dark source</string>
+    <string name="layout_one">one sun</string>
+    <string name="layout_twin">second sun</string>
+    <string name="layout_dim">dim sun</string>
+    <string name="layout_isles">archipelago</string>
+    <string name="layout_hot">hot sun</string>
+    <string name="layout_heater">heater</string>
+
+    <!-- the Evolution panel (EV) -->
+    <string name="evo_title">Evolution</string>
+    <string name="evo_mutation_on">mutation on</string>
+    <string name="evo_mutation_off">mutation off</string>
+    <string name="evo_rate">mutation rate</string>
+    <string name="evo_curve">trade-off curve</string>
+    <string name="evo_explainer">curve under 0 sweeps and splits · 0 as shipped · above 0 settles to the middle</string>
+    <string name="evo_presets">presets</string>
+    <string name="preset_shipped">shipped</string>
+    <string name="preset_settled">settled</string>
+    <string name="preset_wild">wild</string>
+    <string name="preset_frozen">frozen</string>
+    <string name="evo_prices">prices…</string>
+    <string name="evo_prices_hide">hide prices</string>
+    <string name="evo_balance">balance %1$s</string>
+    <string name="evo_locked">This experiment sets the rules of evolution itself.</string>
+    <string name="trait_stats">mean %1$.2f · spread ±%2$.2f</string>
     <string name="badge_tap_restores">tap restores</string>
     <string name="sun_badge_moved">moved</string>
     <string name="sun_badge_just">just changed</string>
@@ -162,6 +200,7 @@
         <item>Metabolism — what the world produces and burns</item>
         <item>Health — vitals against measured reference ranges</item>
         <item>Events — the world\'s story, newest first; since is not because</item>
+        <item>Traits — what is being inherited; mean and spread over time, the living now</item>
     </string-array>
 
 </resources>
