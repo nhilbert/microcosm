@@ -33,10 +33,9 @@
     <string name="tool_kill">töten</string>
     <string name="tool_seed">aussetzen</string>
     <string name="tool_wall">Wand</string>
-    <string name="sun_dimmer">dunkler</string>
-    <string name="sun_brighter">heller</string>
     <string name="sun_release">loslassen</string>
     <string name="page_pops">Arten</string>
+    <string name="page_traits">Merkmale</string>
     <string name="page_chem">Chemie</string>
     <string name="page_metab">Umsatz</string>
     <string name="page_health">Vitalwerte</string>
@@ -53,7 +52,46 @@
     <string name="hint_wall_drag">übers Wasser ziehen</string>
     <string name="hint_seed_press">Wasser lange drücken</string>
     <string name="hint_tool_touch">tippe oder zieh übers Wasser</string>
+    <string name="hint_place_source">tippe aufs Wasser, um sie zu setzen</string>
     <string name="label_sun">Sonne</string>
+
+    <!-- die Sonnen-Karte (EV) -->
+    <string name="sun_light">Licht</string>
+    <string name="sun_warmth">Wärme</string>
+    <string name="sun_spread">Streuung</string>
+    <string name="sun_add">+ Sonne</string>
+    <string name="heater_add">+ Heizer</string>
+    <string name="sun_remove">entfernen</string>
+    <string name="src_sun">☀ Sonne</string>
+    <string name="src_hot_sun">☀♨ heiße Sonne</string>
+    <string name="src_cold_light">☀❄ kaltes Licht</string>
+    <string name="src_heater">♨ Heizquelle</string>
+    <string name="src_cold">❄ Kältequelle</string>
+    <string name="src_dark">○ dunkle Quelle</string>
+    <string name="layout_one">eine Sonne</string>
+    <string name="layout_twin">zweite Sonne</string>
+    <string name="layout_dim">trübe Sonne</string>
+    <string name="layout_isles">Archipel</string>
+    <string name="layout_hot">heiße Sonne</string>
+    <string name="layout_heater">Heizquelle</string>
+
+    <!-- das Evolutions-Panel (EV) -->
+    <string name="evo_title">Evolution</string>
+    <string name="evo_mutation_on">Mutation an</string>
+    <string name="evo_mutation_off">Mutation aus</string>
+    <string name="evo_rate">Mutationsrate</string>
+    <string name="evo_curve">Preis-Kurve</string>
+    <string name="evo_explainer">Kurve unter 0 fegt und spaltet · 0 wie ab Werk · über 0 pendelt zur Mitte</string>
+    <string name="evo_presets">Vorlagen</string>
+    <string name="preset_shipped">ab Werk</string>
+    <string name="preset_settled">gesetzt</string>
+    <string name="preset_wild">wild</string>
+    <string name="preset_frozen">eingefroren</string>
+    <string name="evo_prices">Preise…</string>
+    <string name="evo_prices_hide">Preise ausblenden</string>
+    <string name="evo_balance">Balance %1$s</string>
+    <string name="evo_locked">Dieses Experiment setzt die Regeln der Evolution selbst.</string>
+    <string name="trait_stats">Mittel %1$.2f · Streuung ±%2$.2f</string>
     <string name="badge_tap_restores">Tippen stellt zurück</string>
     <string name="sun_badge_moved">verschoben</string>
     <string name="sun_badge_just">gerade geändert</string>
@@ -156,6 +194,7 @@
         <item>Umsatz — was die Welt erzeugt und verbrennt</item>
         <item>Vitalwerte — gemessen gegen gesunde Referenzbereiche</item>
         <item>Ereignisse — die Geschichte der Welt, Neuestes zuerst; seit ist nicht weil</item>
+        <item>Merkmale — was vererbt wird; Mittel und Streuung über die Zeit, der Bestand jetzt</item>
     </string-array>
 
 </resources>

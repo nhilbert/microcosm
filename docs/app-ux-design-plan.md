@@ -227,3 +227,38 @@ Gates: `theArmedToolTouchesTheWorld` (kill tool erases under the real gesture pi
 select, offers its undo); the layout gate's two new dimensions above, negative-tested — the old
 row convicted 32 times before the grid passed clean. The owner's sixth note arrived truncated
 ("species …") and is carried as an open item for round 4.
+
+## 9. EV — the evolution surfaces and the sun card (owner request, 2026-09-01)
+
+"Did we fail to port all the traits and genetics?" — no: the genetics were fully ported and
+running (11 loci, mutation on, certified by the corridor on the ported core). What was missing
+were the WINDOWS: no Traits page, no Evolution panel, and — the owner's follow-up — no detailed
+sun management. All three shipped, plus three JNI wrappers the bridge never exposed
+(`evMutation`, `evLocus`, `locusGet` — the C ABI had them all along).
+
+- **The Traits page** (sixth Data page, from ui-data.jsx `drawTraits`): one 160 dp band per
+  (species, locus) — mean ± sd ribbon off the recorder's locus channels (LOCUS_CH, all four
+  planes), the founder value dashed, a 24-bin now-histogram in the generic genotype tint (the
+  documented grammar exception; the ±52° HSL tint mirrored from frame.rs as display math), pole
+  words through L10n. The page scrolls; chart pages keep the viewport. Not ported: the per-sun
+  patch marks and intervention markers — recorded, not smuggled.
+- **The Evolution panel** (from ui.jsx `EvolutionPanel`, opened from the drawer, levelAllows(4)
+  gated): mutation toggle, per-locus sigma [0–0.12] and curve [−0.5–0.8] sliders committing on
+  release (one drag = one intervention), the seven price slopes behind a "prices" fold with the
+  6.1 balance marks, and the four presets as ONE intervention each — recipes verbatim from 6.3,
+  "shipped" meaning the sigma the world FOUNDED with (captured at founding, not at panel-open).
+- **The sun card** (from ui.jsx `SourceCard`, replacing the three-button sun bar): light
+  [0–1.5], warmth [−8..+15°], spread [90–300] sliders — a release commits one sourceSet — the
+  six additive layouts as one intervention each (L.2: the shipped sun keeps its place), + sun /
+  + heater arming a one-tap placement, remove (never the last source). The card outranks the
+  specimen sheet at the bottom; the chrome lift covers both.
+
+Gates: `theEvolutionAndSunLeversDriveTheCore` (mutation flips scalar 50, preset wild doubles a
+real sigma and shipped restores it, layouts reshape the sky, the card opens on grip — all
+against the host core through the new JNI). The layout gate measures the new presets/layouts
+grids in both locales; the prose gate convicted the browser's own Traits title ("population",
+banned since 8.4) — the port is newer than the wording it ports.
+
+Recorded gaps: evolution/sun-slider changes are logged and impact-carded but the core's undo
+slot covers world levers only (codes 1–12) — the browser's UI-side evolution undo is not
+ported; Traits patch marks per sun; the light-budget line of the browser's card.

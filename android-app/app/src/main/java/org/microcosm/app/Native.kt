@@ -117,6 +117,12 @@ object Native {
     external fun evFeed(i: Int, gen: Int, frac: Double)
     external fun evKill(i: Int, gen: Int)
     external fun evSource(k: Int, x: Double, y: Double)
+    /** Mutation on/off — the Evolution panel's master switch. */
+    external fun evMutation(v: Int)
+    /** One locus write, clamped by the core. `key`: 0 sigma, 1 curve, 2..15 price slopes. */
+    external fun evLocus(sp: Int, k: Int, key: Int, v: Double)
+    /** Read a locus field; same keys as [evLocus], plus 16 g0, 17 warmGated. */
+    external fun locusGet(sp: Int, k: Int, key: Int): Double
     external fun evSourceSet(k: Int, i: Double, a: Double, sigma: Double)
     external fun evSourceAdd(x: Double, y: Double, i: Double, a: Double, sigma: Double)
     external fun evSourceRemove(k: Int)

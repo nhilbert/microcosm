@@ -40,11 +40,15 @@ object Chrome {
     val TOOLS = listOf("feed", "kill", "seed", "wall")
     val TOOL_ICONS = listOf(R.drawable.ic_feed, R.drawable.ic_kill, R.drawable.ic_seed, R.drawable.ic_wall)
 
-    /** Shown while a sun is gripped. */
-    val SUN = listOf("dimmer", "brighter", "release")
+    /** The sun card's layout presets (EV — the browser's SOURCE_LAYOUTS, additive by the L.2
+     *  finding: the shipped sun stays what and where it is; extra sources are tight and far). */
+    val LAYOUTS = listOf("one", "twin", "dim", "isles", "hot", "heater")
 
-    /** Data mode's pages, in order. */
-    val PAGES = listOf("pops", "chem", "metab", "health", "events")
+    /** The Evolution panel's presets (6.3): one intervention each. */
+    val PRESETS = listOf("shipped", "settled", "wild", "frozen")
+
+    /** Data mode's pages, in order. `traits` is the evolution window (EV). */
+    val PAGES = listOf("pops", "chem", "metab", "health", "events", "traits")
 
     /** The sheet's utility row. `bench` is dev-mode only at runtime. */
     val UTILITY = listOf("reset", "save", "data", "bench")
@@ -73,10 +77,8 @@ object Chrome {
             "kill" -> R.string.tool_kill
             "seed" -> R.string.tool_seed
             "wall" -> R.string.tool_wall
-            "dimmer" -> R.string.sun_dimmer
-            "brighter" -> R.string.sun_brighter
-            "release" -> R.string.sun_release
             "pops" -> R.string.page_pops
+            "traits" -> R.string.page_traits
             "chem" -> R.string.page_chem
             "metab" -> R.string.page_metab
             "health" -> R.string.page_health
@@ -85,6 +87,16 @@ object Chrome {
             "save" -> R.string.util_save
             "data" -> R.string.util_data
             "bench" -> R.string.util_bench
+            "shipped" -> R.string.preset_shipped
+            "settled" -> R.string.preset_settled
+            "wild" -> R.string.preset_wild
+            "frozen" -> R.string.preset_frozen
+            "one" -> R.string.layout_one
+            "twin" -> R.string.layout_twin
+            "dim" -> R.string.layout_dim
+            "isles" -> R.string.layout_isles
+            "hot" -> R.string.layout_hot
+            "heater" -> R.string.layout_heater
             else -> 0
         }
         return if (id == 0) key else ctx.getString(id)
@@ -142,9 +154,10 @@ object Chrome {
     /** The rows wide enough to need the scroll treatment. The rest fit or share width. */
     val SCROLLS = setOf("pages")
 
-    /** Row names to their label lists — the inventory [build] and the gate walk together. */
-    val ROWS = mapOf("pace" to PACE, "tools" to TOOLS, "sun" to SUN,
-        "pages" to PAGES, "utility" to UTILITY)
+    /** Row names to their label lists — the inventory [build] and the gate walk together.
+     *  (The old "sun" row — dimmer/brighter/release — retired with the sun card's sliders, EV.) */
+    val ROWS = mapOf("pace" to PACE, "tools" to TOOLS, "pages" to PAGES,
+        "utility" to UTILITY, "presets" to PRESETS, "layouts" to LAYOUTS)
 
     /**
      * The one place a row's shipped construct is decided. `MainActivity` builds through this and
@@ -158,6 +171,8 @@ object Chrome {
         // which German ("Speichern") overflowed and even English only just survived. Two per row
         // doubles the budget and stops fitting from depending on the language.
         "utility" -> grid(ctx, UTILITY, 2, onTap)
+        "presets" -> grid(ctx, PRESETS, 2, onTap)
+        "layouts" -> grid(ctx, LAYOUTS, 2, onTap)
         in SCROLLS -> scrollRow(ctx, ROWS.getValue(name), onTap)
         else -> row(ctx, ROWS.getValue(name), onTap)
     }
