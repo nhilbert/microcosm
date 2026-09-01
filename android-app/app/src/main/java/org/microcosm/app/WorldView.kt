@@ -35,6 +35,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         const val IV_SOURCE_SET = 9
         const val IV_WALL_ADD = 14
         private const val REC_N = 900
+
+        /**
+         * Whether THIS PROCESS has founded a world in the core. The core is a process-wide
+         * singleton; the surface is not — a screen lock destroys it and an unlock creates a new
+         * one, and `run()` used to found unconditionally on every new surface, so every unlock
+         * re-founded a fresh seed-11 world (the owner's "screen lock loses everything"; the
+         * autosave couldn't catch it either, see [surfaceDestroyed]). One founding per process;
+         * every later surface resumes drawing the world that is already alive.
+         */
+        private var coreFounded = false
         private const val REC_CH = 141
     }
 
@@ -263,6 +273,11 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         running = false
         thread?.join()
         thread = null
+        // The queue must not die with the thread. On a screen lock the pause-time autosave is
+        // queued at almost the same moment the teardown kills the loop, and losing that race
+        // silently lost the save. Once the join returns, this thread is the core's sole owner
+        // (the same handover the boot gate leans on), so the leftovers run here.
+        while (true) (commands.poll() ?: break).invoke()
     }
 
     fun benchmark() { benchRequest = true }
@@ -475,13 +490,21 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
 
     override fun run() {
         Native.boot()
-        Native.resetWorld()
-        Native.initWorld(11)
-        bootWorld?.let { Native.load(it) } // the autosaved pond, if there is one (U0.6)
+        if (!coreFounded) {
+            Native.resetWorld()
+            Native.initWorld(11)
+            bootWorld?.let { Native.load(it) } // the autosaved pond, if there is one (U0.6)
+            coreFounded = true
+        }
+        // Never past founding: a surface re-created after a lock, or an activity re-created over
+        // the living core, must not load a stale autosave over the fresher world in memory.
         bootWorld = null
         Native.markPrev()
         renderer = Renderer(density)
-        captureSunBaseline()
+        // The badge's memory survives lock/unlock (same view instance). A re-created ACTIVITY
+        // re-baselines from the live sky — a standing change from before the recreation stops
+        // being badged; accepted, the world itself is what must survive.
+        if (baseSun.isEmpty()) captureSunBaseline()
 
         var last = System.nanoTime()
         var acc = 0.0

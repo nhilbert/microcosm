@@ -253,4 +253,62 @@ class BootTest {
         controller.pause().stop().destroy()
         println("BOOT GATE: MainActivity lived through create/front-door/ticks/pause/back/destroy")
     }
+
+    /**
+     * The owner's screen-lock report, played back (2026-09-01): "when my screen locks, all data
+     * is lost, no save." Two faults compounded. A lock destroys the surface and an unlock
+     * creates a new one, and `WorldView.run()` founded a fresh world on every new surface — so
+     * the unlock itself reset the pond, no process death needed. And the pause-time autosave was
+     * queued to the render thread the teardown was busy killing, so the queue died with the
+     * loop and even the fallback file was stale. This test locks and unlocks the real view and
+     * requires both fixes: the queued save survives the teardown, and the world that comes back
+     * is the same world, further along — never a re-founding.
+     */
+    @Test
+    fun theScreenLockKeepsTheWorld() {
+        requireNativeLib()
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val world = activity.world
+        world.surfaceCreated(world.holder)
+        world.surfaceChanged(world.holder, 0, world.width, world.height)
+        try {
+            world.speed = 16.0
+            val until = System.currentTimeMillis() + 8000
+            fun tickOf(s: String) = s.removePrefix("t ").trim().toLongOrNull() ?: -1L
+            while (tickOf(world.clock) < 40 && System.currentTimeMillis() < until) Thread.sleep(10)
+            assertTrue("the pond never ticked", tickOf(world.clock) >= 40)
+
+            // the lock: the autosave is queued the way onPause queues it, and the surface goes
+            // down immediately after — the exact race the phone loses
+            val saved = java.util.concurrent.atomic.AtomicReference<ByteArray?>()
+            world.save { bytes -> saved.set(bytes) }
+            world.surfaceDestroyed(world.holder)
+            shadowOf(Looper.getMainLooper()).idle() // deliver the save's UI-thread callback
+            assertTrue("the pause-time autosave must survive the surface teardown",
+                (saved.get()?.size ?: 0) > 0)
+            // after the join the test thread owns the core, same as the drain does
+            val tickAtLock = Native.tick()
+            assertTrue("the world should be past founding at the lock", tickAtLock >= 40)
+
+            // the unlock: a new surface, a new render thread — and the same world. Paused, so
+            // the verdict is deterministic: a kept world publishes exactly tickAtLock, while a
+            // re-founded one publishes 0 (at speed a re-founding could tick back past the mark
+            // and slip through a >= check).
+            world.speed = 0.0
+            world.surfaceCreated(world.holder)
+            world.surfaceChanged(world.holder, 0, world.width, world.height)
+            val alive = java.util.concurrent.CountDownLatch(1)
+            world.post { alive.countDown() }
+            assertTrue("the unlock's render thread never ran",
+                alive.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            Thread.sleep(200) // a few frames of clock publishing
+            assertTrue(
+                "unlock re-founded the world (t ${tickOf(world.clock)}, expected t $tickAtLock)",
+                tickOf(world.clock) == tickAtLock,
+            )
+            println("BOOT GATE: lock/unlock kept the world (t $tickAtLock → ${tickOf(world.clock)}), save survived teardown")
+        } finally {
+            world.surfaceDestroyed(world.holder)
+        }
+    }
 }

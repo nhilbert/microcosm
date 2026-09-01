@@ -166,3 +166,32 @@ causal); "population" is „Bestand", "specimen" is „Lebewesen"; pole words ar
 („zäher", „bleiben"/„weiterziehen") because German inflection would otherwise mangle the sweep
 sentences. Known gap, accepted: the health/benchmark developer surfaces stay English (dev-mode
 only), and number formatting follows the locale (German decimal comma) — display only.
+
+## 7. The screen-lock loss (owner report, 2026-09-01 — root cause + fix)
+
+"When my screen locks, all data is lost, no save." Two faults, and the second hid the first:
+
+1. **Every unlock re-founded the world.** A lock destroys the SurfaceView surface; an unlock
+   creates a new one and starts a new render thread — and `WorldView.run()` began with
+   `resetWorld(); initWorld(11)` unconditionally. The pond was reset by the unlock itself, no
+   process death required. `bootWorld` (the autosave) had been consumed at first boot, so there
+   was nothing to restore either.
+2. **The autosave lost the teardown race.** `onPause` queues the save onto the render thread's
+   command queue — the very thread the surface teardown joins and kills. The loop exits without
+   draining, so on a lock the save usually never ran, and the file on disk stayed stale.
+
+Why the earlier device test said "autosave works": kill-and-relaunch goes through `onCreate`,
+which re-reads the autosave file — that path was real. Lock/unlock never touches `onCreate`.
+
+The fix mirrors what the core already is — a process-wide singleton: founding happens once per
+process (`coreFounded`), every later surface resumes drawing the world that is already alive,
+and a stale `bootWorld` is never loaded over it. `surfaceDestroyed` drains the command queue
+after the join — at that point the caller is the core's sole owner, the same handover the boot
+gate has always leaned on — so the pause-time save executes even when the teardown wins.
+
+The gate: `theScreenLockKeepsTheWorld` locks and unlocks the real view. The unlock happens
+paused, which makes the verdict deterministic — a kept world publishes exactly the tick it
+locked at, a re-founded one publishes 0 (at speed, a re-founding could tick back past the mark
+and slip through). Negative-tested against the pre-fix code: "unlock re-founded the world
+(t 0, expected t 41)". A recorded side effect: a lock mid-experiment no longer loses the run —
+the world persists in memory; levels are still never autosaved to disk, by the U0.6 decision.
