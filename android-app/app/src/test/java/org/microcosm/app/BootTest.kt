@@ -167,6 +167,32 @@ class BootTest {
         assertTrue("choosing sandbox should start the pond", activity.world.speed == 1.0)
         // eight HUD rounds at 250 ms — the window in which the phone died
         repeat(8) { looper.idleFor(Duration.ofMillis(250)) }
+
+        // U2.1: the sheet's detents, photographed from the whole real screen, and back
+        // walking them down before it walks anything else.
+        val decor = activity.window.decorView
+        fun relayout() {
+            decor.measure(
+                android.view.View.MeasureSpec.makeMeasureSpec(decor.width, android.view.View.MeasureSpec.EXACTLY),
+                android.view.View.MeasureSpec.makeMeasureSpec(decor.height, android.view.View.MeasureSpec.EXACTLY),
+            )
+            decor.layout(0, 0, decor.width, decor.height)
+        }
+        relayout()
+        photograph(decor, "app@peek")
+        activity.sheetTo(MainActivity.Detent.HALF)
+        looper.idleFor(Duration.ofMillis(50))
+        relayout()
+        photograph(decor, "app@sheet-half")
+        activity.sheetTo(MainActivity.Detent.FULL)
+        looper.idleFor(Duration.ofMillis(50))
+        relayout()
+        photograph(decor, "app@sheet-full")
+        activity.onBackPressed()
+        assertTrue("back should lower the sheet a detent", activity.detent == MainActivity.Detent.HALF)
+        activity.onBackPressed()
+        assertTrue("and again to peek", activity.detent == MainActivity.Detent.PEEK)
+
         controller.pause()   // U0.6's autosave path
         controller.resume()
         activity.onBackPressed() // top level: back returns to the front door, saved

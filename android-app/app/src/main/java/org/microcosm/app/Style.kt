@@ -81,6 +81,13 @@ object Style {
     fun pill(ctx: Context, amber: Boolean = false) =
         rounded(ctx, if (amber) AMBER_FILL else Color.TRANSPARENT, if (amber) AMBER_BORDER else HAIRLINE, 20f)
 
+    /** A hidden thing's pill: the hairline goes dashed. */
+    fun pillDashed(ctx: Context) = GradientDrawable().apply {
+        setColor(Color.TRANSPARENT)
+        setStroke(dp(ctx, 1f), HAIRLINE, dp(ctx, 4f).toFloat(), dp(ctx, 3f).toFloat())
+        cornerRadius = dp(ctx, 20f).toFloat()
+    }
+
     /** The sheet/panel ground: scrim with the top corners rounded. */
     fun sheet(ctx: Context) = GradientDrawable().apply {
         setColor(SURFACE_SCRIM)
