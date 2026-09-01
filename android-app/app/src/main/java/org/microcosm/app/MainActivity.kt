@@ -34,7 +34,7 @@ import kotlin.math.abs
  */
 class MainActivity : Activity() {
 
-    private lateinit var world: WorldView
+    internal lateinit var world: WorldView // internal so the boot gate can drive the real view
     private lateinit var hud: TextView
     private lateinit var card: TextView
     private lateinit var reportView: TextView
@@ -316,6 +316,9 @@ class MainActivity : Activity() {
         root.setOnApplyWindowInsetsListener { _, insets ->
             top.setPadding(24, insets.systemWindowInsetTop + 20, 24, 16)
             bottom.setPadding(0, 0, 0, insets.systemWindowInsetBottom)
+            // The Data panel is a full-screen overlay, so it needs the insets itself — without
+            // this its title renders under the status bar clock (the owner's screenshots).
+            dataPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             insets
         }
         root.requestApplyInsets()
@@ -577,7 +580,21 @@ class MainActivity : Activity() {
             world.sunSel >= 0 -> world.sunSel = -1
             world.wallArmed -> world.wallArmed = false
             world.intervene -> world.intervene = false
-            else -> @Suppress("DEPRECATION") super.onBackPressed()
+            else -> {
+                // Leaving by back tears the surface down almost immediately, and the pause-time
+                // autosave loses that race — measured on the owner's phone: back-exit reset the
+                // pond that a home-button exit kept. So the sandbox is saved BEFORE finishing,
+                // and the finish waits for the write. The delayed fallback covers a render
+                // thread that cannot answer (surface never created): better an unsaved exit
+                // than a back button that does nothing.
+                if (running == null && !isFinishing) {
+                    ui.postDelayed({ if (!isFinishing) finish() }, 1500)
+                    world.save { bytes ->
+                        writeAtomic(autosaveFile(), bytes)
+                        if (!isFinishing) finish()
+                    }
+                } else @Suppress("DEPRECATION") super.onBackPressed()
+            }
         }
     }
 

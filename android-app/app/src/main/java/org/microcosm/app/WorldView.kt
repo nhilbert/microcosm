@@ -627,7 +627,10 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
 
     /** One frame. Returns the nanoseconds the core spent building the display list. */
     private fun paintOnce(alpha: Double): Long {
-        val c: Canvas = holder.lockHardwareCanvas() ?: return 0
+        // A holder that cannot give a hardware canvas (a surface mid-teardown; Robolectric's
+        // fake in the boot gate) gets the software one instead of killing the render thread.
+        val c: Canvas = (try { holder.lockHardwareCanvas() }
+            catch (e: IllegalStateException) { holder.lockCanvas() }) ?: return 0
         try {
             val n = renderer.draw(c, cam, width.toFloat(), height.toFloat(), alpha, hidden, selI, selGen)
             // amber last, and only in Intervene: it marks the hand, never the world
