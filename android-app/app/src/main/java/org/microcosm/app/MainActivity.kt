@@ -79,6 +79,18 @@ class MainActivity : Activity() {
     private lateinit var specimenEnergyBar: LinearLayout
     private lateinit var specimenTiles: LinearLayout
     private val specimenTileViews = ArrayList<LinearLayout>()
+    // ---- the species profile (Steckbrief) inside the specimen sheet ----
+    internal lateinit var specimenProfile: LinearLayout // internal: the boot gate asserts it opens
+    internal lateinit var profilePortrait: PortraitView
+    private lateinit var specimenChevron: TextView
+    private lateinit var profileRole: TextView
+    private lateinit var profileEats: TextView
+    private lateinit var profileEaten: TextView
+    internal lateinit var profileAbout: TextView // internal: the boot gate reads its words
+    /** Whether the Steckbrief is unfolded; remembered across selections, never across launches. */
+    private var profileOpen = false
+    /** Which species' static card content (portrait, words, tile labels) is populated. */
+    private var specimenShownSp = -1
     private val specimenDot by lazy {
         View(this).apply {
             background = android.graphics.drawable.GradientDrawable().apply { cornerRadius = 99f }
@@ -219,18 +231,20 @@ class MainActivity : Activity() {
                 (fill.layoutParams as LinearLayout.LayoutParams).weight = frac
                 (specimenEnergyBar.getChildAt(1).layoutParams as LinearLayout.LayoutParams).weight = 1f - frac
                 specimenEnergyBar.requestLayout()
-                for ((k, tile) in specimenTileViews.withIndex()) {
-                    val locus = snap.loci.getOrNull(k)
-                    tile.visibility = if (locus != null) ViewGroup.VISIBLE else ViewGroup.INVISIBLE
-                    if (locus != null) {
-                        (tile.getChildAt(0) as TextView).text = locus.first
-                        (tile.getChildAt(1) as TextView).text = "%.2f".format(locus.second)
-                        (tile.getChildAt(2) as TextView).text = locus.third
-                    }
+                // What only changes with the SPECIES — the Steckbrief and the tiles' words —
+                // is written once per selection change, not forty times a second.
+                if (snap.sp != specimenShownSp) {
+                    specimenShownSp = snap.sp
+                    populateProfile(snap)
                 }
-                specimenTiles.getChildAt(1).visibility =
-                    if (snap.loci.size > 2) ViewGroup.VISIBLE else ViewGroup.GONE
-            }
+                // The living numbers, every tick: value and marker.
+                for ((k, tile) in specimenTileViews.withIndex()) {
+                    val locus = snap.loci.getOrNull(k) ?: continue
+                    ((tile.getChildAt(0) as LinearLayout).getChildAt(1) as TextView).text =
+                        "%.2f".format(locus.g)
+                    (tile.getChildAt(1) as TraitMeter).set(locus.g, locus.g0, speciesColor(snap.sp))
+                }
+            } else specimenShownSp = -1
             for ((k, sp) in live.withIndex()) {
                 val hiddenNow = world.hidden and (1 shl sp) != 0
                 speciesPills[k].alpha = if (hiddenNow) 0.45f else 1f
@@ -359,13 +373,76 @@ class MainActivity : Activity() {
             textSize = 17f
             typeface = Style.wordMedium(this@MainActivity)
         }
+        specimenChevron = TextView(this).apply {
+            setTextColor(Style.DIM)
+            textSize = 13f
+            text = "▾"
+            setPadding(Style.dp(this@MainActivity, 8f), 0, Style.dp(this@MainActivity, 8f), 0)
+        }
         specHeader.addView(specimenDot, LinearLayout.LayoutParams(
             Style.dp(this, 12f), Style.dp(this, 12f)).apply { marginEnd = Style.dp(this@MainActivity, 9f) })
-        specHeader.addView(specimenName, LinearLayout.LayoutParams(0, WRAP, 1f))
+        specHeader.addView(specimenName, LinearLayout.LayoutParams(WRAP, WRAP))
+        specHeader.addView(specimenChevron, LinearLayout.LayoutParams(0, WRAP, 1f))
         specHeader.addView(button(Chrome.label(this, "feed")) { world.feedSelected() },
             LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = Style.dp(this@MainActivity, 8f) })
         specHeader.addView(button(Chrome.label(this, "kill")) { world.killSelected() })
+        // Tapping the header unfolds the Steckbrief; feed and kill are clickable children and
+        // keep their own taps. The whole row is the target — 12sp of chevron alone would fail
+        // every touch guideline this project measures by.
+        specHeader.minimumHeight = Style.dp(this, 44f)
+        specHeader.setOnClickListener { setProfileOpen(!profileOpen) }
         specimenSheet.addView(specHeader)
+
+        // The Steckbrief (docs/species-profiles.md): portrait beside the food-web facts, the
+        // description below. Folded by default — the sheet floats over the pond, and the pond
+        // stays the point. Every slot hides when a species has no art or no words for it.
+        specimenProfile = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = ViewGroup.GONE
+        }
+        val profileRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        profilePortrait = PortraitView(this)
+        profileRow.addView(profilePortrait, LinearLayout.LayoutParams(
+            Style.dp(this, 92f), Style.dp(this, 92f)))
+        val profileFacts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        profileRole = TextView(this).apply {
+            setTextColor(Style.TEXT)
+            textSize = 12f
+            typeface = Style.wordMedium(this@MainActivity)
+        }
+        profileEats = TextView(this).apply {
+            setTextColor(Style.DIM)
+            textSize = 11f
+            typeface = Style.word(this@MainActivity)
+            setPadding(0, Style.dp(this@MainActivity, 6f), 0, 0)
+        }
+        profileEaten = TextView(this).apply {
+            setTextColor(Style.DIM)
+            textSize = 11f
+            typeface = Style.word(this@MainActivity)
+            setPadding(0, Style.dp(this@MainActivity, 2f), 0, 0)
+        }
+        profileFacts.addView(profileRole)
+        profileFacts.addView(profileEats)
+        profileFacts.addView(profileEaten)
+        profileRow.addView(profileFacts, LinearLayout.LayoutParams(0, WRAP, 1f).apply {
+            marginStart = Style.dp(this@MainActivity, 12f)
+        })
+        specimenProfile.addView(profileRow)
+        profileAbout = TextView(this).apply {
+            setTextColor(Style.TEXT)
+            textSize = 12f
+            typeface = Style.word(this@MainActivity)
+            setLineSpacing(0f, 1.15f)
+            setPadding(0, Style.dp(this@MainActivity, 8f), 0, 0)
+        }
+        specimenProfile.addView(profileAbout)
+        specimenSheet.addView(specimenProfile, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            bottomMargin = Style.dp(this@MainActivity, 10f)
+        })
         specimenSub = TextView(this).apply {
             setTextColor(Style.DIM)
             textSize = 11f
@@ -399,7 +476,10 @@ class MainActivity : Activity() {
         specimenSheet.addView(specimenEnergyBar, LinearLayout.LayoutParams(MATCH, Style.dp(this, 5f)).apply {
             topMargin = Style.dp(this@MainActivity, 6f); bottomMargin = Style.dp(this@MainActivity, 12f)
         })
-        // the trait tiles, two a row, populated per selection; species without a locus hide them
+        // The trait tiles, two a row, populated per selection; species without a locus hide them.
+        // Each tile: label and value up top, then the pole-to-pole track (TraitMeter — marker at
+        // this creature, tick at the founding stock), the pole words at the rails, and one line
+        // on what the dial trades. Child indices are read back in tickHud — keep them in step.
         specimenTiles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         repeat(2) { r ->
             val rowOfTiles = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -409,18 +489,40 @@ class MainActivity : Activity() {
                     background = Style.quiet(this@MainActivity)
                     setPadding(Style.dp(this@MainActivity, 12f), Style.dp(this@MainActivity, 10f),
                         Style.dp(this@MainActivity, 12f), Style.dp(this@MainActivity, 10f))
-                    addView(TextView(this@MainActivity).apply {
-                        setTextColor(Style.DIM); textSize = 11f; typeface = Style.word(this@MainActivity)
+                    addView(LinearLayout(this@MainActivity).apply { // 0: label · value
+                        orientation = LinearLayout.HORIZONTAL
+                        addView(TextView(this@MainActivity).apply {
+                            setTextColor(Style.DIM); textSize = 11f; typeface = Style.word(this@MainActivity)
+                        }, LinearLayout.LayoutParams(0, WRAP, 1f))
+                        addView(TextView(this@MainActivity).apply {
+                            setTextColor(Style.BRIGHT); textSize = 12f
+                            typeface = Style.monoMedium(this@MainActivity)
+                        })
                     })
-                    addView(TextView(this@MainActivity).apply {
-                        setTextColor(Style.BRIGHT); textSize = 15f; typeface = Style.monoMedium(this@MainActivity)
+                    addView(TraitMeter(this@MainActivity), // 1: the track
+                        LinearLayout.LayoutParams(MATCH, Style.dp(this@MainActivity, 16f)).apply {
+                            topMargin = Style.dp(this@MainActivity, 4f)
+                        })
+                    addView(LinearLayout(this@MainActivity).apply { // 2: the pole words
+                        orientation = LinearLayout.HORIZONTAL
+                        addView(TextView(this@MainActivity).apply {
+                            setTextColor(Style.DIM); textSize = 10f; typeface = Style.word(this@MainActivity)
+                        }, LinearLayout.LayoutParams(0, WRAP, 1f))
+                        addView(TextView(this@MainActivity).apply {
+                            setTextColor(Style.DIM); textSize = 10f; typeface = Style.word(this@MainActivity)
+                            gravity = Gravity.END
+                        }, LinearLayout.LayoutParams(0, WRAP, 1f))
                     })
-                    addView(TextView(this@MainActivity).apply {
+                    addView(TextView(this@MainActivity).apply { // 3: what the dial trades
                         setTextColor(Style.DIM); textSize = 10f; typeface = Style.word(this@MainActivity)
+                        setLineSpacing(0f, 1.1f)
+                        setPadding(0, Style.dp(this@MainActivity, 5f), 0, 0)
                     })
                 }
                 specimenTileViews.add(tile)
-                val lp = LinearLayout.LayoutParams(0, WRAP, 1f)
+                // MATCH height: neighbouring tiles stay one box even when their explanation
+                // lines wrap differently.
+                val lp = LinearLayout.LayoutParams(0, MATCH, 1f)
                 if (c > 0) lp.marginStart = Style.dp(this@MainActivity, 8f)
                 rowOfTiles.addView(tile, lp)
             }
@@ -1219,6 +1321,49 @@ class MainActivity : Activity() {
     }
 
     private fun button(label: String, onTap: () -> Unit) = Chrome.button(this, label, onTap)
+
+    /** Fold or unfold the Steckbrief — immediately, not on the next 250 ms tick. */
+    internal fun setProfileOpen(open: Boolean) {
+        profileOpen = open
+        specimenProfile.visibility = if (open) ViewGroup.VISIBLE else ViewGroup.GONE
+        specimenChevron.text = if (open) "▴" else "▾"
+    }
+
+    /**
+     * The per-SPECIES content of the specimen sheet: portrait, role, food-web lines, description,
+     * and the tiles' words (label, poles, what the dial trades). Every slot hides when a species
+     * has no art or no words — docs/species-profiles.md's contract.
+     */
+    private fun populateProfile(snap: WorldView.Specimen) {
+        val name = Native.traitText(snap.sp, 0)
+        val art = Profiles.portrait(this, name)
+        profilePortrait.show(art)
+        fun put(view: TextView, res: Int, wrap: (String) -> String = { it }) {
+            view.visibility = if (res != 0) ViewGroup.VISIBLE else ViewGroup.GONE
+            if (res != 0) view.text = wrap(getString(res))
+        }
+        put(profileRole, Profiles.role(name))
+        put(profileEats, Profiles.eats(name)) { getString(R.string.spec_eats, it) }
+        put(profileEaten, Profiles.eatenBy(name)) { getString(R.string.spec_eaten, it) }
+        put(profileAbout, Profiles.about(name))
+        // no art and no words: nothing to unfold, so the header offers nothing
+        val hasProfile = art != null || Profiles.role(name) != 0 || Profiles.about(name) != 0
+        specimenChevron.visibility = if (hasProfile) ViewGroup.VISIBLE else ViewGroup.GONE
+        if (!hasProfile) setProfileOpen(false) else setProfileOpen(profileOpen)
+        for ((k, tile) in specimenTileViews.withIndex()) {
+            val locus = snap.loci.getOrNull(k)
+            tile.visibility = if (locus != null) ViewGroup.VISIBLE else ViewGroup.INVISIBLE
+            if (locus != null) {
+                ((tile.getChildAt(0) as LinearLayout).getChildAt(0) as TextView).text = locus.label
+                val poles = tile.getChildAt(2) as LinearLayout
+                (poles.getChildAt(0) as TextView).text = locus.lo
+                (poles.getChildAt(1) as TextView).text = locus.hi
+                put(tile.getChildAt(3) as TextView, Profiles.explain(locus.labelEn))
+            }
+        }
+        specimenTiles.getChildAt(1).visibility =
+            if (snap.loci.size > 2) ViewGroup.VISIBLE else ViewGroup.GONE
+    }
 
     /**
      * Back closes what is open instead of leaving the app (U0.5) — on Android the press is close

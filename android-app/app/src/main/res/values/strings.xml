@@ -108,6 +108,43 @@
     <string name="specimen_sub">age %1$d min · size %2$.1f · mineral %3$.2f</string>
     <string name="label_energy">energy</string>
 
+    <!-- the species profile (Steckbrief) — docs/species-profiles.md in player language.
+         Rule 6 holds here too, and the trait lines stay teleology-proof: lines out-grow and
+         out-breed each other; nothing adapts in order to. -->
+    <string name="spec_eats">eats %1$s</string>
+    <string name="spec_eaten">eaten by %1$s</string>
+    <string name="spec_role_solara">producer · the living floor</string>
+    <string name="spec_role_drifta">producer · open-water drifter</string>
+    <string name="spec_role_cilio">grazer · the middle of the web</string>
+    <string name="spec_role_bacillus">recycler · the clean-up crew</string>
+    <string name="spec_role_venator">hunter · top of the web</string>
+    <string name="spec_about_solara">A green carpet on the lit floor, growing from light and dissolved mineral until crowding stops it. The stronger the light, the thicker the mat.</string>
+    <string name="spec_about_drifta">A drifting speck of the open water — nothing in the pond grows faster. It leans toward light, and folds into a tough cyst when it starves.</string>
+    <string name="spec_about_cilio">A single cell driven by a shimmering fringe of tiny hairs. It hunts smaller creatures, Drifta above all, and flees when hurt neighbours release their alarm scent.</string>
+    <string name="spec_about_bacillus">A cluster of tiny rods that eats what dies. It frees the mineral locked in dead matter — the recycling the whole pond depends on.</string>
+    <string name="spec_about_venator">The pond\'s top hunter. It strikes in a straight line with a jet burst, and breeds slowest of all. It holds its ground against its own kind.</string>
+    <string name="spec_eats_solara">light and dissolved mineral</string>
+    <string name="spec_eaten_solara">Cilio — as poor food</string>
+    <string name="spec_eats_drifta">light and dissolved mineral</string>
+    <string name="spec_eaten_drifta">Cilio — its favourite meal</string>
+    <string name="spec_eats_cilio">Drifta first; Bacillus and Solara in lean times</string>
+    <string name="spec_eaten_cilio">Venator</string>
+    <string name="spec_eats_bacillus">dead matter</string>
+    <string name="spec_eaten_bacillus">Cilio, in lean times</string>
+    <string name="spec_eats_venator">Cilio, and nothing else</string>
+    <string name="spec_eaten_venator">nothing in this pond</string>
+
+    <!-- what each heritable dial trades, by the core\'s locus label -->
+    <string name="trait_explain_light">Sun-loving lines grow best in bright water, shade-tolerant lines in dim.</string>
+    <string name="trait_explain_defense">Tougher lines shake off more grazing bites, and grow slower for it.</string>
+    <string name="trait_explain_thermal">Heat-tolerant lines run cheaper in warm water, and gain less there.</string>
+    <string name="trait_explain_warmth_pref">The warmth this line steers toward when it moves.</string>
+    <string name="trait_explain_restlessness">Roving lines keep moving; settled lines stay where they are.</string>
+    <string name="trait_explain_pursuit">Keener lines catch more prey, and burn more energy hunting.</string>
+    <string name="trait_explain_hunting_style">After a kill: stay and search the spot, or move on at once.</string>
+    <string name="trait_explain_metabolism">Voracious lines eat fast and waste much; frugal lines waste little.</string>
+    <string name="trait_explain_search_style">Smooth-running lines travel far; twitchy lines turn often and search close.</string>
+
     <!-- save and load -->
     <string name="dlg_saved_world">Saved world</string>
     <string name="item_save_world">save the world</string>

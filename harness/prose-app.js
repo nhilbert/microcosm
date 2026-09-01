@@ -20,24 +20,40 @@
 //      the same whys map) — and all of its German within style.
 //
 // English rules are harness/prose.js's (<= 20 words a sentence, FK <= 8 on long strings, the
-// banned-science list, "since" never "because"). German rules mirror them minus FK — the
-// Flesch-Kincaid constants are calibrated on English syllable counts and would convict ordinary
-// German compounds — so the German is held to the sentence cap, its own banned list, and rule 6's
-// German form: "seit(dem)", never "weil".
+// banned-science list, "since" never "because"). German rules (sharpened in the owner's
+// language session, 2026-09-01 — docs/phase8-language-style-de.md is the writing guide this
+// gate guards): the EN word budgets apply to the level overlay too (translations bloat
+// +10-20% unbraked); the sentence cap is 18 and counts em-dash and colon as boundaries
+// (clause length is what the reader carries); readability is the Wiener Sachtextformel <= 8
+// (the German-calibrated counterpart to FK — FK's constants would convict ordinary German
+// compounds); the banned list gets its own German ladder. Rule 6's German form stays
+// "seit(dem)", never "weil" — EXCEPT in level text, where every lesson is A/B-measured by
+// the honesty gate and causal wording is earned (owner decision; chrome/impact/narration
+// keep the ban). Known instrument limits, documented not fixed: a banned stem as the SECOND
+// element of a compound ("Hauptnährstoff") is invisible to the word-start match, and German
+// syllables are counted by vowel groups (reliable enough — the orthography is phonemic).
 const fs = require("fs");
 const path = require("path");
 
 const APP = path.join(__dirname, "..", "android-app", "app", "src", "main");
 const SRC = path.join(APP, "java", "org", "microcosm", "app");
-const MAX_SENT_WORDS = 20;
+const MAX_SENT_WORDS = 20;      // English: full sentences
+const MAX_CLAUSE_DE = 18;       // German: clauses — em-dash and colon count as boundaries
 const FK_MAX = 8;
+const WSTF_MAX = 8;             // Wiener Sachtextformel grade, German bodies of 25+ words
 const FK_MIN_WORDS = 25;
+// The EN §4 budgets, applied to the German level overlay too (owner decision 2026-09-01).
+const BUDGET_DE = { briefing: 50, question: 14, prompt: 12, chip: 9, reflect: 28,
+  goalText: 8, why: 30, debrief: 75 };
+// German term ladder (phase8-language-style-de.md §6): a science name only from its level on.
+const LADDER_DE = { "tragfähigkeit": 1, "zersetzer": 3, "schlüsselart": 4, "nahrungskette": 6,
+  "besiedlung": 7, "natürliche auslese": 9, "anpassung": 10, "variation": 12 };
 const BANNED_EN = ["biomass", "nutrient", "abiotic", "biotic", "trophic", "equilibri", "destabili",
   "population", "organism", "ecosystem", "paradigm", "mechanis", "parameter", "stochastic",
   "allele", "locus", "genotype", "because"];
 const BANNED_DE = ["biomasse", "nährstoff", "abiotisch", "biotisch", "trophisch",
   "population", "organismus", "ökosystem", "paradigma", "mechanismus", "parameter",
-  "stochastisch", "allel", "genotyp", "weil"];
+  "stochastisch", "allel", "genotyp", "ressourc", "einkommen", "weil"];
 // Strings that reach only developers (dev-mode surfaces, exception text) — named, not patterned,
 // so nothing player-facing can hide here by accident.
 const DEV_ONLY = new Set([
@@ -50,13 +66,30 @@ const TEACHES = new Set([
 ]);
 
 const words = t => t.split(/\s+/).filter(w => /[A-Za-zÀ-ÿ0-9]/.test(w));
-const sentences = t => t.split(/[.!?]+/).map(s => s.trim()).filter(s => words(s).length > 0);
+// "1.300" is a German thousands separator, not a sentence break — strip digit.digit first.
+const unnumber = t => t.replace(/(\d)\.(?=\d)/g, "$1");
+const sentences = t => unnumber(t).split(/[.!?…]+/).map(s => s.trim()).filter(s => words(s).length > 0);
+// The German cap counts em-dash and colon as boundaries: clause length is the reader's load.
+const clauses = t => unnumber(t).split(/[.!?…:]+|[—–]/).map(s => s.trim()).filter(s => words(s).length > 0);
 function syl(w){ w = w.toLowerCase().replace(/[^a-z]/g, ""); if (!w) return 0;
   const m = w.replace(/e$/, "").match(/[aeiouy]{1,2}/g); return Math.max(1, m ? m.length : 1); }
 function fk(t){ const ss = sentences(t), ws = words(t);
   if (!ws.length || !ss.length) return 0;
   const sy = ws.reduce((a, w) => a + syl(w), 0);
   return 0.39 * (ws.length / ss.length) + 11.8 * (sy / ws.length) - 15.59; }
+// German syllables: vowel groups (umlauts included) — phonemic orthography makes this honest.
+function sylDe(w){ w = w.toLowerCase().replace(/[^a-zäöüß]/g, ""); if (!w) return 0;
+  const m = w.match(/[aeiouäöüy]+/g); return Math.max(1, m ? m.length : 0); }
+// Erste Wiener Sachtextformel → school grade, the German counterpart to FK.
+function wstf(t){
+  const ws = words(t), ss = sentences(t);
+  if (!ws.length || !ss.length) return 0;
+  const MS = 100 * ws.filter(w => sylDe(w) >= 3).length / ws.length;
+  const SL = ws.length / ss.length;
+  const IW = 100 * ws.filter(w => w.replace(/[^A-Za-zÀ-ÿß]/g, "").length > 6).length / ws.length;
+  const ES = 100 * ws.filter(w => sylDe(w) === 1).length / ws.length;
+  return 0.1935 * MS + 0.1672 * SL + 0.1297 * IW - 0.0327 * ES - 0.875;
+}
 
 const bad = [];
 let checked = 0;
@@ -68,22 +101,42 @@ const plainText = t => t
   .replace(/\\n/g, " ")
   .replace(/[·↔☀{}]/g, " ");
 
-function check(text, where, lang){
+// opts: budget (word cap), level (level text — the A/B-measured lessons, weil/because
+// earned), n (level number, gates the German term ladder).
+// NOTE the boundary regex: JS \b is ASCII-only, so /\bökosystem/ never matched anything —
+// (^|\P{L}) with the u flag is the umlaut-safe word start.
+function check(text, where, lang, opts = {}){
   const plain = plainText(text);
   if (words(plain).length < 3) return;      // labels and pairs are not prose
   if (DEV_ONLY.has(text) || TEACHES.has(text)) return;
   checked++;
-  for (const s of sentences(plain))
-    if (words(s).length > MAX_SENT_WORDS)
-      bad.push(`${where}  ${words(s).length}-word sentence: "${s.slice(0, 60)}…"`);
-  if (lang === "en" && words(plain).length >= FK_MIN_WORDS && fk(plain) > FK_MAX)
-    bad.push(`${where}  reads at grade ${fk(plain).toFixed(1)} (max ${FK_MAX}): "${plain.slice(0, 60)}…"`);
+  const wc = words(plain).length;
+  if (opts.budget && wc > opts.budget)
+    bad.push(`${where}  ${wc} words (budget ${opts.budget})`);
+  if (lang === "de"){
+    for (const s of clauses(plain))
+      if (words(s).length > MAX_CLAUSE_DE)
+        bad.push(`${where}  ${words(s).length}-word clause (max ${MAX_CLAUSE_DE}): "${s.slice(0, 60)}…"`);
+    if (wc >= FK_MIN_WORDS && wstf(plain) > WSTF_MAX)
+      bad.push(`${where}  reads at grade ${wstf(plain).toFixed(1)} (WSTF max ${WSTF_MAX}): "${plain.slice(0, 60)}…"`);
+  } else {
+    for (const s of sentences(plain))
+      if (words(s).length > MAX_SENT_WORDS)
+        bad.push(`${where}  ${words(s).length}-word sentence: "${s.slice(0, 60)}…"`);
+    if (wc >= FK_MIN_WORDS && fk(plain) > FK_MAX)
+      bad.push(`${where}  reads at grade ${fk(plain).toFixed(1)} (max ${FK_MAX}): "${plain.slice(0, 60)}…"`);
+  }
   const lower = plain.toLowerCase();
   for (const b of (lang === "de" ? BANNED_DE : BANNED_EN)){
-    const re = (b === "weil") ? /\bweil\b/ : new RegExp(`\\b${b}`);
+    const causal = b === "weil" || b === "because";
+    if (causal && opts.level) continue;     // measured lessons have earned their causality
+    const re = causal ? new RegExp(`(^|\\P{L})${b}(\\P{L}|$)`, "u") : new RegExp(`(^|\\P{L})${b}`, "u");
     if (re.test(lower))
       bad.push(`${where}  banned word "${b}": "${plain.slice(0, 60)}…"`);
   }
+  if (lang === "de" && opts.n != null)
+    for (const t in LADDER_DE) if (lower.includes(t) && opts.n < LADDER_DE[t])
+      bad.push(`${where}  "${t}" before its ladder level (L${LADDER_DE[t]})`);
 }
 
 // ---- 1. Kotlin literals ----
@@ -184,25 +237,27 @@ for (const l of levelsEn){
   const de = overlay[l.key];
   const at = `levels.de.json:${l.key}`;
   if (!de){ bad.push(`${at}  level not translated`); continue; }
+  const lv = { level: true, n: l.n };       // level text: budgets on, weil earned, ladder gated
   for (const f of ["title", "science", "question", "briefing", "goalText"]){
     if (!de[f]) bad.push(`${at}  missing "${f}"`);
-    else check(de[f], `${at}.${f}`, "de");
+    else check(de[f], `${at}.${f}`, "de", { ...lv, budget: BUDGET_DE[f] });
   }
   if (l.predict){
     const p = de.predict || {};
     if (!p.prompt) bad.push(`${at}  missing predict.prompt`);
-    else check(p.prompt, `${at}.predict.prompt`, "de");
+    else check(p.prompt, `${at}.predict.prompt`, "de", { ...lv, budget: BUDGET_DE.prompt });
     for (const f of ["options", "reflect"]){
       const en = l.predict[f] || [], deL = p[f] || [];
       if (deL.length !== en.length)
         bad.push(`${at}  predict.${f} has ${deL.length} entries, English has ${en.length}`);
-      deL.forEach((t, k) => check(t, `${at}.predict.${f}[${k}]`, "de"));
+      deL.forEach((t, k) => check(t, `${at}.predict.${f}[${k}]`, "de",
+        { ...lv, budget: f === "options" ? BUDGET_DE.chip : BUDGET_DE.reflect }));
     }
   }
   for (const f of ["pass", "fail"]){
     const t = (de.debrief || {})[f];
     if (!t) bad.push(`${at}  missing debrief.${f}`);
-    else check(t, `${at}.debrief.${f}`, "de");
+    else check(t, `${at}.debrief.${f}`, "de", { ...lv, budget: BUDGET_DE.debrief });
   }
   const enMeter = l.meter || [], deMeter = de.meter || [];
   if (deMeter.length !== enMeter.length)
@@ -212,7 +267,7 @@ for (const l of levelsEn){
   for (const why of reasons){
     const t = (de.whys || {})[why];
     if (!t) bad.push(`${at}  untranslated fail reason: "${why.slice(0, 50)}…"`);
-    else check(t, `${at}.why`, "de");
+    else check(t, `${at}.why`, "de", { ...lv, budget: BUDGET_DE.why });
   }
 }
 
