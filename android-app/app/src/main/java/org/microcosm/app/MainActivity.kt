@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private lateinit var undoChip: Button
     private lateinit var modeButton: Button
     private lateinit var resetButton: Button
+    private lateinit var benchButton: Button
     private var resetArmedAt = 0L
     private lateinit var wallButton: Button
     private lateinit var feedButton: Button
@@ -64,9 +65,12 @@ class MainActivity : Activity() {
     /** The species actually in play, asked of the core rather than listed here. */
     private val live by lazy { (0 until 7).filter { Native.speciesFlag(it, 0) != 0 } }
 
+    /** Developer instrumentation on the player's screen? Off unless asked for (U0.7). */
+    private var devMode = false
+
     private val tickHud = object : Runnable {
         override fun run() {
-            hud.text = world.stats
+            hud.text = if (devMode) world.stats + "\n" + world.statsDev else world.stats
             val text = world.card
             card.text = text
             card.visibility = if (text.isEmpty()) ViewGroup.GONE else ViewGroup.VISIBLE
@@ -231,6 +235,16 @@ class MainActivity : Activity() {
         }.apply { setPadding(12, 12, 12, 12) }
         modeButton = Chrome.at(bar, Chrome.BAR, "mode")
         resetButton = Chrome.at(bar, Chrome.BAR, "reset")
+        // The bench is the renderer measuring itself — developer instrumentation, not a lever.
+        // It stays in the inventory (the gate measures the full row) and off the player's bar.
+        benchButton = Chrome.at(bar, Chrome.BAR, "bench").apply { visibility = ViewGroup.GONE }
+        // The dev toggle lives where the telemetry it reveals lives: long-press the HUD.
+        hud.setOnLongClickListener {
+            devMode = !devMode
+            benchButton.visibility = if (devMode) ViewGroup.VISIBLE else ViewGroup.GONE
+            toast(if (devMode) "renderer telemetry on" else "renderer telemetry off")
+            true
+        }
         bottom.addView(bar)
         root.addView(bottom, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 

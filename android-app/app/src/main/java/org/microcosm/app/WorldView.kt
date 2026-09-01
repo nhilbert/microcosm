@@ -79,8 +79,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var report: String? = null
         private set
 
-    /** Live numbers for the HUD, published once a frame. */
+    /** The player's line — tick and census — published once a frame. */
     @Volatile var stats: String = ""
+        private set
+
+    /**
+     * The renderer's own numbers (zoom, ms/frame, core, drawn) — developer instrumentation,
+     * published separately so the shell can keep it off the player's screen (U0.7): the review
+     * found half the permanent HUD was telemetry in the same weight and colour as the census.
+     */
+    @Volatile var statsDev: String = ""
         private set
 
     /** The specimen card's text, or empty when nothing is selected. Published once a frame. */
@@ -467,8 +475,9 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             frameMs += (ms - frameMs) * 0.1
             buildMs += (build / 1e6 - buildMs) * 0.1
 
-            stats = "t %d   %s   z %.2f\n%.1f ms/frame  (core %.2f)  %d drawn".format(
-                Native.tick(), popLine(), cam.z / density, frameMs, buildMs, renderer.orgN,
+            stats = "t %d   %s".format(Native.tick(), popLine())
+            statsDev = "z %.2f   %.1f ms/frame  (core %.2f)  %d drawn".format(
+                cam.z / density, frameMs, buildMs, renderer.orgN,
             )
             card = renderer.cardText(selI, selGen)
             // Where the gripped sun is on screen this frame, for the drag-start test (U0.4).
