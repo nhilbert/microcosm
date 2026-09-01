@@ -125,7 +125,7 @@ class GermanTest {
         assertEquals("Erstes Licht", levels[0].title)
         // the fail reasons registered with L10n on the way through
         assertEquals(
-            "Die letzte Solara ist gestorben — die Matte hat das Licht nie gefangen.",
+            "Die letzte Solara ist gestorben — die Matte hat das Licht nie eingefangen.",
             L10n.why("The last Solara died — the mat never caught the light."),
         )
         println("GERMAN GATE: ${levels.size} levels wear the overlay; fail reasons registered")
