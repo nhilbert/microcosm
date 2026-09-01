@@ -37,6 +37,7 @@
     "conform:core:capture": "node harness/conform-core.js --capture",
     "port:check": "node tools/port-check.js",
     "port:levels": "MC_CORE=$PWD/rust/wasm/core.js node harness/levels.js",
+    "outrun": "MC_CORE=$PWD/rust/wasm/core.js node harness/outrun.js",
     "frame": "npm run build && node harness/fingerprint-frame.js",
     "undo": "npm run build && node harness/fingerprint-undo.js",
     "impact": "npm run build && node harness/fingerprint-impact.js",
