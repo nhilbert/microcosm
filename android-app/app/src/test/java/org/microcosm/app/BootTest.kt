@@ -180,6 +180,35 @@ class BootTest {
             assertTrue("selecting a creature must publish its card", snap != null)
             assertTrue("the card should carry the creature's traits", snap!!.loci.isNotEmpty() || snap.sp == 0)
             println("BOOT GATE: selection published a structured card (sp ${snap.sp}, ${snap.loci.size} loci)")
+
+            // The Steckbrief (species-details): a HUD tick populates the sheet from the
+            // published card, the header unfolds the profile, and the selected species'
+            // portrait decodes from the bundled assets (assets/species, via build.gradle).
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            assertTrue("a selection must open the specimen sheet",
+                activity.specimenSheet.visibility == android.view.View.VISIBLE)
+            activity.setProfileOpen(true)
+            assertTrue("the unfolded Steckbrief must be visible",
+                activity.specimenProfile.visibility == android.view.View.VISIBLE)
+            assertTrue("the Steckbrief must carry words for a founded species",
+                activity.profileAbout.text.isNotBlank())
+            assertTrue("every founded species ships with its portrait",
+                Profiles.portrait(activity, Native.traitText(snap.sp, 0)) != null)
+            assertTrue("the portrait slot must show the art",
+                activity.profilePortrait.visibility == android.view.View.VISIBLE)
+            // Lay the sheet out for real before judging it: a VISIBLE flag with zero height is
+            // exactly the kind of green a stale layout hands out (the first run of this block
+            // photographed a sheet whose unfolded profile had never been measured).
+            val sheet = activity.specimenSheet
+            sheet.measure(
+                android.view.View.MeasureSpec.makeMeasureSpec(world.width, android.view.View.MeasureSpec.EXACTLY),
+                android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED),
+            )
+            sheet.layout(0, 0, sheet.measuredWidth, sheet.measuredHeight)
+            assertTrue("the unfolded Steckbrief must take real space",
+                activity.specimenProfile.height > 0 && activity.profilePortrait.height > 0)
+            photograph(sheet, "specimen@profile")
+            println("BOOT GATE: the Steckbrief unfolds with portrait and words (sp ${snap.sp})")
         } finally {
             world.surfaceDestroyed(world.holder)
         }

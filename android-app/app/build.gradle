@@ -43,7 +43,15 @@ android {
     sourceSets {
         main {
             jniLibs.srcDirs = ["src/main/jniLibs"]
+            // The species portraits (assets/species/*.jpg, repo root) ride into the APK from
+            // their one committed home — a copy here would drift. The ignore pattern below keeps
+            // the folder's README and the gitignored full-size originals (full/) out of the APK.
+            assets.srcDirs = ["src/main/assets", "../../assets"]
         }
+    }
+
+    androidResources {
+        ignoreAssetsPattern "!README.md:!full"
     }
 
     // The layout gate (src/test) needs the app's resources and a real Android runtime; Robolectric
