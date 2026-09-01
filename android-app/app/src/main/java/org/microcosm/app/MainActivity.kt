@@ -117,8 +117,8 @@ class MainActivity : Activity() {
         val top = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         hud = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
-            textSize = 11f
-            typeface = Typeface.MONOSPACE
+            textSize = 12f
+            typeface = Style.mono(this@MainActivity)
         }
         top.addView(hud)
 
@@ -131,8 +131,8 @@ class MainActivity : Activity() {
         for (sp in live) {
             val chip = TextView(this).apply {
                 setTextColor(speciesColor(sp))
-                textSize = 11f
-                typeface = Typeface.MONOSPACE
+                textSize = 12f
+                typeface = Style.mono(this@MainActivity)
                 setPadding(0, 6, 28, 6)
                 setOnClickListener { world.hidden = world.hidden xor (1 shl sp) }
             }
@@ -145,8 +145,8 @@ class MainActivity : Activity() {
         // the world, however many lines it grows to.
         levelChip = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
-            textSize = 11f
-            typeface = Typeface.MONOSPACE
+            textSize = 13f
+            typeface = Style.word(this@MainActivity)
             setPadding(0, 10, 0, 0)
             visibility = ViewGroup.GONE
         }
@@ -157,10 +157,10 @@ class MainActivity : Activity() {
         val bottom = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         card = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
-            setBackgroundColor(Color.parseColor("#E00B131E"))
+            background = Style.card(this@MainActivity)
             textSize = 11f
-            typeface = Typeface.MONOSPACE
-            setPadding(24, 20, 24, 20)
+            typeface = Style.mono(this@MainActivity)
+            setPadding(28, 22, 28, 22)
             visibility = ViewGroup.GONE
         }
         bottom.addView(card)
@@ -192,9 +192,9 @@ class MainActivity : Activity() {
         }
         sunBar.addView(TextView(this).apply {
             text = "sun "
-            setTextColor(Color.parseColor("#F2B24A"))
-            textSize = 11f
-            typeface = Typeface.MONOSPACE
+            setTextColor(Style.AMBER)
+            textSize = 13f
+            typeface = Style.word(this@MainActivity)
             setPadding(0, 18, 8, 0)
         })
         // The row goes in whole. Moving its children out one by one ("while childCount > 0 …")
@@ -213,7 +213,8 @@ class MainActivity : Activity() {
 
         undoChip = button("undo") { world.undoLast() }.apply {
             visibility = ViewGroup.GONE
-            setTextColor(Color.parseColor("#F2B24A"))
+            setTextColor(Style.AMBER)
+            background = Style.touchable(this@MainActivity, Style.hand(this@MainActivity))
         }
         bottom.addView(undoChip)
 
@@ -260,13 +261,13 @@ class MainActivity : Activity() {
             dataPage = (dataPage + d).coerceIn(0, Chrome.PAGES.size - 1)
             refreshData()
         }.apply {
-            setBackgroundColor(Color.parseColor("#F00B131E"))
+            setBackgroundColor(Style.SURFACE_SCRIM)
             visibility = ViewGroup.GONE
         }
         dataTitle = TextView(this).apply {
-            setTextColor(Color.parseColor("#C9D7E3"))
-            textSize = 12f
-            typeface = Typeface.MONOSPACE
+            setTextColor(Style.BRIGHT)
+            textSize = 14f
+            typeface = Style.wordMedium(this@MainActivity)
             setPadding(24, 20, 24, 8)
         }
         dataPanel.addView(dataTitle)
@@ -278,7 +279,7 @@ class MainActivity : Activity() {
         dataText = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
             textSize = 11f
-            typeface = Typeface.MONOSPACE
+            typeface = Style.mono(this@MainActivity)
             setPadding(24, 12, 24, 24)
         }
         dataPanel.addView(ScrollView(this).apply { addView(dataText) },
@@ -289,10 +290,10 @@ class MainActivity : Activity() {
         // The verdict card: what happened, and why, in the level's own words.
         verdict = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
-            setBackgroundColor(Color.parseColor("#F00B131E"))
-            textSize = 12f
-            typeface = Typeface.MONOSPACE
-            setPadding(32, 32, 32, 32)
+            background = Style.card(this@MainActivity)
+            textSize = 14f
+            typeface = Style.word(this@MainActivity)
+            setPadding(40, 36, 40, 36)
             visibility = ViewGroup.GONE
             setOnClickListener { visibility = ViewGroup.GONE }
         }
@@ -301,10 +302,10 @@ class MainActivity : Activity() {
 
         reportView = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
-            setBackgroundColor(Color.parseColor("#F00B131E"))
-            textSize = 12f
-            typeface = Typeface.MONOSPACE
-            setPadding(32, 32, 32, 32)
+            background = Style.card(this@MainActivity)
+            textSize = 11f
+            typeface = Style.mono(this@MainActivity)
+            setPadding(40, 36, 40, 36)
             visibility = ViewGroup.GONE
             setOnClickListener { visibility = ViewGroup.GONE }
         }
@@ -317,25 +318,33 @@ class MainActivity : Activity() {
         // (speed 0) until the player chooses.
         startPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0B131E"))
-            gravity = Gravity.CENTER
+            setBackgroundColor(Style.ABYSS)
+            gravity = Gravity.CENTER_VERTICAL
             isClickable = true // consume touches; the pond underneath is not tappable yet
         }
+        // The title the owner chose from the canvas: Deep Signal's stacked bold on the
+        // Observatory chrome. One TextView with a two-tone spannable, so the panel's child
+        // order (which the boot gate walks) stays put.
         startPanel.addView(TextView(this).apply {
-            text = "MICROCOSM"
-            setTextColor(Color.parseColor("#C9D7E3"))
-            textSize = 26f
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 8)
+            val t = android.text.SpannableString("MICRO\nCOSM")
+            t.setSpan(android.text.style.ForegroundColorSpan(Style.BRIGHT), 0, 5,
+                android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            t.setSpan(android.text.style.ForegroundColorSpan(Color.argb(71, 232, 241, 248)), 6, 10,
+                android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            text = t
+            textSize = 58f
+            typeface = Style.wordBold(this@MainActivity)
+            setLineSpacing(0f, 0.98f)
+            gravity = Gravity.START
+            setPadding(Style.dp(this@MainActivity, 32f), 0, Style.dp(this@MainActivity, 32f), Style.dp(this@MainActivity, 4f))
         })
         startPanel.addView(TextView(this).apply {
             text = "a small pond, entirely yours"
-            setTextColor(Color.parseColor("#5E7386"))
-            textSize = 12f
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 48)
+            setTextColor(Style.DIM)
+            textSize = 15f
+            typeface = Style.word(this@MainActivity)
+            gravity = Gravity.START
+            setPadding(Style.dp(this@MainActivity, 32f), 0, Style.dp(this@MainActivity, 32f), Style.dp(this@MainActivity, 40f))
         })
         val hasAutosave = autosaveFile().baseFile.exists()
         startPanel.addView(startChoice("sandbox",
@@ -354,16 +363,17 @@ class MainActivity : Activity() {
         // The ladder, as a screen: every experiment open, none gated behind another.
         expPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0B131E"))
+            setBackgroundColor(Style.ABYSS)
             visibility = ViewGroup.GONE
             isClickable = true
         }
         expPanel.addView(TextView(this).apply {
             text = "Experiments"
-            setTextColor(Color.parseColor("#C9D7E3"))
-            textSize = 16f
-            typeface = Typeface.MONOSPACE
-            setPadding(32, 24, 32, 12)
+            setTextColor(Style.BRIGHT)
+            textSize = 20f
+            typeface = Style.wordBold(this@MainActivity)
+            setPadding(Style.dp(this@MainActivity, 24f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 24f), Style.dp(this@MainActivity, 12f))
         })
         val expList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         for (l in levels) expList.addView(startChoice("E${l.n}  ${l.title}", l.science) {
@@ -458,19 +468,27 @@ class MainActivity : Activity() {
     private fun startChoice(title: String, sub: String, onTap: () -> Unit): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 28, 48, 28)
+            background = Style.touchable(this@MainActivity, Style.card(this@MainActivity))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                leftMargin = Style.dp(this@MainActivity, 24f)
+                rightMargin = Style.dp(this@MainActivity, 24f)
+                bottomMargin = Style.dp(this@MainActivity, 14f)
+            }
+            setPadding(Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f))
             setOnClickListener { onTap() }
             addView(TextView(this@MainActivity).apply {
                 text = title
-                setTextColor(Color.parseColor("#C9D7E3"))
-                textSize = 16f
-                typeface = Typeface.MONOSPACE
+                setTextColor(Style.BRIGHT)
+                textSize = 17f
+                typeface = Style.wordMedium(this@MainActivity)
             })
             addView(TextView(this@MainActivity).apply {
                 text = sub
-                setTextColor(Color.parseColor("#5E7386"))
-                textSize = 11f
-                typeface = Typeface.MONOSPACE
+                setTextColor(Style.DIM)
+                textSize = 13f
+                typeface = Style.word(this@MainActivity)
+                setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
             })
         }
 
@@ -555,8 +573,15 @@ class MainActivity : Activity() {
         // Not amber — amber marks the player's hand on the world, and looking is not touching.
         val row = Chrome.rowOf(pagesRow)
         for (k in 0 until row.childCount) (row.getChildAt(k) as Button).apply {
-            alpha = if (k == dataPage) 1f else 0.55f
-            setTypeface(null, if (k == dataPage) Typeface.BOLD else Typeface.NORMAL)
+            if (k == dataPage) {
+                setTextColor(Style.BRIGHT)
+                typeface = Style.wordMedium(this@MainActivity)
+                background = Style.touchable(this@MainActivity, Style.selected(this@MainActivity))
+            } else {
+                setTextColor(Style.TEXT)
+                typeface = Style.word(this@MainActivity)
+                background = Style.touchable(this@MainActivity, Style.quiet(this@MainActivity))
+            }
         }
         val chart = dataPage <= 2
         dataView.visibility = if (chart) ViewGroup.VISIBLE else ViewGroup.GONE

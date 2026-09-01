@@ -40,18 +40,41 @@ object Chrome {
     /** Data mode's pages, in order. */
     val PAGES = listOf("pops", "chem", "metab", "health", "events")
 
-    const val TEXT_SP = 11f
+    const val TEXT_SP = 14f
 
+    /**
+     * Every button in the shell is born here (U2.S): the quiet voice of the approved canvas —
+     * Space Grotesk, slate on a hairline, radius 12, 44 dp minimum — instead of the framework's
+     * gray default. Because this is the single birthplace, a taste change is an edit in Style,
+     * not a hunt through the shell.
+     */
     fun button(ctx: Context, label: String, onTap: () -> Unit = {}): Button = Button(ctx).apply {
         text = label
         textSize = TEXT_SP
+        isAllCaps = false
+        typeface = Style.word(ctx)
+        setTextColor(Style.TEXT)
+        background = Style.touchable(ctx, Style.quiet(ctx))
+        stateListAnimator = null
+        // 48 dp, not the canvas's 44: the layout gate holds Material's number, deliberately
+        // stricter than WCAG — and it convicted the first build of this factory at 44.
+        minHeight = Style.dp(ctx, 48f)
+        minimumHeight = Style.dp(ctx, 48f)
+        minWidth = Style.dp(ctx, 48f)
+        minimumWidth = Style.dp(ctx, 48f)
+        setPadding(Style.dp(ctx, 18f), Style.dp(ctx, 12f), Style.dp(ctx, 18f), Style.dp(ctx, 12f))
         setOnClickListener { onTap() }
     }
 
-    /** One horizontal row of buttons. `onTap` receives the index into `labels`. */
+    /** One horizontal row of buttons, 8 dp apart. `onTap` receives the index into `labels`. */
     fun row(ctx: Context, labels: List<String>, onTap: (Int) -> Unit = {}): LinearLayout {
         val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        for ((k, label) in labels.withIndex()) row.addView(button(ctx, label) { onTap(k) })
+        for ((k, label) in labels.withIndex()) {
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            if (k > 0) lp.marginStart = Style.dp(ctx, 8f)
+            row.addView(button(ctx, label) { onTap(k) }, lp)
+        }
         return row
     }
 
