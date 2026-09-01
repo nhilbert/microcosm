@@ -41,6 +41,26 @@ import java.time.Duration
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class BootTest {
 
+    /** The camera's discipline (ChromeScreenshotTest): pictures are evidence, never a grade. */
+    private fun photograph(v: android.view.View, name: String) {
+        if (v.width == 0) { // a panel that was GONE at layout time has no size yet
+            val pw = (v.parent as? android.view.View)?.width ?: 320
+            val ph = (v.parent as? android.view.View)?.height ?: 470
+            v.measure(
+                android.view.View.MeasureSpec.makeMeasureSpec(pw, android.view.View.MeasureSpec.EXACTLY),
+                android.view.View.MeasureSpec.makeMeasureSpec(ph, android.view.View.MeasureSpec.EXACTLY),
+            )
+            v.layout(0, 0, pw, ph)
+        }
+        val w = v.width.coerceAtLeast(1)
+        val h = v.height.coerceAtLeast(1)
+        val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        v.draw(android.graphics.Canvas(bmp))
+        val f = File(File("build/reports/screens").apply { mkdirs() }, "$name.png")
+        java.io.FileOutputStream(f).use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        println("SCREEN  ${f.path}  ${w}x${h}px")
+    }
+
     private fun requireNativeLib() {
         val dir = System.getProperty("microcosm.native.dir") ?: ""
         assumeTrue(
@@ -124,19 +144,37 @@ class BootTest {
         }
     }
 
-    /** The shell's first seconds: onCreate through onResume, HUD ticks, a pause, a back press. */
+    /**
+     * The shell's first seconds: onCreate through onResume, the front door (U2.0), HUD ticks, a
+     * pause, and the back flow — top level goes to the front door, the front door exits.
+     */
     @Test
     fun theActivityBootsAndRunsItsFirstSeconds() {
         requireNativeLib()
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val looper = shadowOf(Looper.getMainLooper())
+        val activity = controller.get()
+        assertTrue("the front door should be showing at boot",
+            activity.startPanel.visibility == android.view.View.VISIBLE)
+        assertTrue("the pond must wait behind the front door", activity.world.speed == 0.0)
+        photograph(activity.startPanel, "frontdoor@boot")
+        activity.expPanel.visibility = android.view.View.VISIBLE
+        photograph(activity.expPanel, "experiments@boot")
+        activity.expPanel.visibility = android.view.View.GONE
+        activity.startPanel.getChildAt(2).performClick() // sandbox
+        assertTrue("choosing sandbox should close the front door",
+            activity.startPanel.visibility != android.view.View.VISIBLE)
+        assertTrue("choosing sandbox should start the pond", activity.world.speed == 1.0)
         // eight HUD rounds at 250 ms — the window in which the phone died
         repeat(8) { looper.idleFor(Duration.ofMillis(250)) }
         controller.pause()   // U0.6's autosave path
         controller.resume()
-        controller.get().onBackPressed() // U0.5, with nothing open: must not throw
+        activity.onBackPressed() // top level: back returns to the front door, saved
+        assertTrue("back at top level should reopen the front door",
+            activity.startPanel.visibility == android.view.View.VISIBLE)
+        activity.onBackPressed() // and from the front door, back leaves
         looper.idleFor(Duration.ofMillis(250))
         controller.pause().stop().destroy()
-        println("BOOT GATE: MainActivity lived through create/resume/ticks/pause/back/destroy")
+        println("BOOT GATE: MainActivity lived through create/front-door/ticks/pause/back/destroy")
     }
 }

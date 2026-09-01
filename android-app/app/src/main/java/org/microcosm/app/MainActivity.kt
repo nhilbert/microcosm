@@ -56,6 +56,8 @@ class MainActivity : Activity() {
     private var dataPage = 0
     private lateinit var levelChip: TextView
     private lateinit var verdict: TextView
+    internal lateinit var startPanel: LinearLayout // internal: the boot gate walks the front door
+    internal lateinit var expPanel: LinearLayout
     private val levels by lazy { Level.all() }
     private var running: Level? = null
     private var lastVerdict = 0
@@ -224,7 +226,6 @@ class MainActivity : Activity() {
                 "mode" -> world.intervene = !world.intervene
                 "reset" -> resetTapped()
                 "save" -> saveOrLoad()
-                "exp" -> experimentPicker()
                 "data" -> {
                     world.dataOpen = true
                     dataPanel.visibility = ViewGroup.VISIBLE
@@ -310,6 +311,72 @@ class MainActivity : Activity() {
         root.addView(ScrollView(this).apply { addView(reportView) },
             FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.CENTER })
 
+        // The front door (U2.0, owner decision): Sandbox | Experiments, every level open. A real
+        // screen over the world, not a dialog behind a bar button — the ladder was the most
+        // carefully built thing in the app and the least reachable. The world waits underneath
+        // (speed 0) until the player chooses.
+        startPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#0B131E"))
+            gravity = Gravity.CENTER
+            isClickable = true // consume touches; the pond underneath is not tappable yet
+        }
+        startPanel.addView(TextView(this).apply {
+            text = "MICROCOSM"
+            setTextColor(Color.parseColor("#C9D7E3"))
+            textSize = 26f
+            typeface = Typeface.MONOSPACE
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 8)
+        })
+        startPanel.addView(TextView(this).apply {
+            text = "a small pond, entirely yours"
+            setTextColor(Color.parseColor("#5E7386"))
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 48)
+        })
+        val hasAutosave = autosaveFile().baseFile.exists()
+        startPanel.addView(startChoice("sandbox",
+            if (hasAutosave) "your pond, as you left it" else "a fresh pond") {
+            world.stopLevel()
+            running = null
+            lastVerdict = 0
+            startPanel.visibility = ViewGroup.GONE
+            world.speed = 1.0
+        })
+        startPanel.addView(startChoice("experiments", "questions with a pond attached") {
+            expPanel.visibility = ViewGroup.VISIBLE
+        })
+        root.addView(startPanel, FrameLayout.LayoutParams(MATCH, MATCH))
+
+        // The ladder, as a screen: every experiment open, none gated behind another.
+        expPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#0B131E"))
+            visibility = ViewGroup.GONE
+            isClickable = true
+        }
+        expPanel.addView(TextView(this).apply {
+            text = "Experiments"
+            setTextColor(Color.parseColor("#C9D7E3"))
+            textSize = 16f
+            typeface = Typeface.MONOSPACE
+            setPadding(32, 24, 32, 12)
+        })
+        val expList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        for (l in levels) expList.addView(startChoice("E${l.n}  ${l.title}", l.science) {
+            expPanel.visibility = ViewGroup.GONE
+            briefing(l)
+        })
+        expPanel.addView(ScrollView(this).apply { addView(expList) },
+            LinearLayout.LayoutParams(MATCH, 0, 1f))
+        expPanel.addView(button("back") { expPanel.visibility = ViewGroup.GONE })
+        root.addView(expPanel, FrameLayout.LayoutParams(MATCH, MATCH))
+
+        world.speed = 0.0 // the pond waits behind the front door
+
         // targetSdk 35 draws edge to edge on Android 15, so without this the HUD sits under the
         // clock and the buttons under the gesture pill — which is what the first screenshots showed.
         @Suppress("DEPRECATION")
@@ -319,6 +386,8 @@ class MainActivity : Activity() {
             // The Data panel is a full-screen overlay, so it needs the insets itself — without
             // this its title renders under the status bar clock (the owner's screenshots).
             dataPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
+            startPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
+            expPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             insets
         }
         root.requestApplyInsets()
@@ -385,18 +454,31 @@ class MainActivity : Activity() {
     private fun toast(s: String) =
         android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_SHORT).show()
 
-    /** The start screen, as a list: every experiment open, none of them gated behind another. */
-    private fun experimentPicker() {
-        val names = levels.map { "E${it.n}  ${it.title} — ${it.science}" }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Experiments")
-            .setItems(names) { _, k -> briefing(levels[k]) }
-            .setNeutralButton("sandbox") { _, _ ->
-                world.stopLevel()
-                running = null
-                lastVerdict = 0
-            }
-            .show()
+    /** A front-door row: the choice in full strength, what it means in a quieter line under it. */
+    private fun startChoice(title: String, sub: String, onTap: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 28, 48, 28)
+            setOnClickListener { onTap() }
+            addView(TextView(this@MainActivity).apply {
+                text = title
+                setTextColor(Color.parseColor("#C9D7E3"))
+                textSize = 16f
+                typeface = Typeface.MONOSPACE
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = sub
+                setTextColor(Color.parseColor("#5E7386"))
+                textSize = 11f
+                typeface = Typeface.MONOSPACE
+            })
+        }
+
+    /** Show the front door mid-session: the pond pauses, saved, and the subtitle tells the truth. */
+    private fun showStart(sub: String) {
+        world.speed = 0.0
+        (startPanel.getChildAt(2) as LinearLayout).let { (it.getChildAt(1) as TextView).text = sub }
+        startPanel.visibility = ViewGroup.VISIBLE
     }
 
     /** The briefing, then the prediction. Committing is never graded — it is there to be contrasted. */
@@ -423,6 +505,8 @@ class MainActivity : Activity() {
         running = l
         lastVerdict = 0
         verdict.visibility = ViewGroup.GONE
+        startPanel.visibility = ViewGroup.GONE
+        expPanel.visibility = ViewGroup.GONE
         world.startLevel(levels.indexOf(l), predicted, l.meterLabels, l.meterUnits, l.deadline)
         world.speed = 1.0
     }
@@ -574,6 +658,12 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
+            expPanel.visibility == ViewGroup.VISIBLE -> expPanel.visibility = ViewGroup.GONE
+            // On the front door, back leaves the app — the pond was saved on the way here, so
+            // the exit costs nothing. (The old back-exit saved-then-finished because the
+            // pause-time autosave lost the surface-teardown race, measured on the owner's
+            // phone; routing the exit through the front door keeps that guarantee.)
+            startPanel.visibility == ViewGroup.VISIBLE -> finish()
             reportView.visibility == ViewGroup.VISIBLE -> reportView.visibility = ViewGroup.GONE
             verdict.visibility == ViewGroup.VISIBLE -> verdict.visibility = ViewGroup.GONE
             world.dataOpen -> { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE }
@@ -581,19 +671,11 @@ class MainActivity : Activity() {
             world.wallArmed -> world.wallArmed = false
             world.intervene -> world.intervene = false
             else -> {
-                // Leaving by back tears the surface down almost immediately, and the pause-time
-                // autosave loses that race — measured on the owner's phone: back-exit reset the
-                // pond that a home-button exit kept. So the sandbox is saved BEFORE finishing,
-                // and the finish waits for the write. The delayed fallback covers a render
-                // thread that cannot answer (surface never created): better an unsaved exit
-                // than a back button that does nothing.
-                if (running == null && !isFinishing) {
-                    ui.postDelayed({ if (!isFinishing) finish() }, 1500)
-                    world.save { bytes ->
-                        writeAtomic(autosaveFile(), bytes)
-                        if (!isFinishing) finish()
-                    }
-                } else @Suppress("DEPRECATION") super.onBackPressed()
+                // Top level: back goes to the front door, with the sandbox saved first. The
+                // experiment list stays one back-press away for the whole session.
+                if (running == null) world.save { bytes -> writeAtomic(autosaveFile(), bytes) }
+                showStart(if (running != null) "your pond is waiting behind the experiment"
+                          else "your pond, as it stands")
             }
         }
     }
