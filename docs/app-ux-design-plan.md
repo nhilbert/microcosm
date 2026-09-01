@@ -78,9 +78,17 @@ the code it tests. Order chosen so each step leaves the app strictly better if t
   stays the judge of taste.
 - **U2.1 — the bottom sheet, three detents.** Hand-rolled (D1): peek / half / full, drag handle
   48 dp, detail level follows detent as the browser's did. Peek carries the one line's overflow
-  (undo chip, mode); half carries the controls that today live in the scrolling bar plus the
-  species toggles (D3); full carries the specimen card's long form and the Data entry. The
-  scrolling bar — U0.1's honest stopgap — retires here. Boot gate learns detent gestures.
+  (undo chip, the mode SWITCH — owner, from the mockups: a switch, not a segmented pair; the
+  segmented version overflowed 390 dp); half carries the controls that today live in the
+  scrolling bar plus the species toggles (D3); full carries the specimen card's long form and
+  the Data entry. The scrolling bar — U0.1's honest stopgap — retires here.
+  **The intervention flow (owner's question at the mockups, decided there): the half sheet is
+  the tool chest, not the workbench.** Choosing a lever arms it AND lowers the sheet to peek;
+  the act — tap, drag, long-press — happens on the open water with the armed tool riding the
+  peek row in amber; done or cancelled, the arm clears. The sheet never covers the pond while
+  the hand is working. This generalizes the wall tool's arm-once pattern to every lever's
+  *placement* step without adding arming friction to any lever's *decision* (the outrun rule
+  holds). Boot gate learns detent gestures and the arm-lowers-sheet flow.
 - **U2.2 — the one line** (D2). Top of screen: passive, one line, census + clock; objective +
   meters during a level. Everything else that lived in the top stack moves into the sheet or
   Data. The top of the screen stops being interactive entirely.
