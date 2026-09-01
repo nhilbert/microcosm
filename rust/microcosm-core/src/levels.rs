@@ -60,6 +60,9 @@ pub enum ScriptEvent {
     SourceSet { k: usize, i: Option<f64>, a: Option<f64>, sigma: Option<f64> },
     /// L11: the timeline builds a wall (the pen's scripted sides). All fields explicit.
     WallAdd { x0: f64, y0: f64, dx: f64, dy: f64, lt: f64, ht: f64, fl: f64, pass: i32 },
+    /// L10: the timeline founds a colony (draws from the PRNG exactly as the player's seeding does —
+    /// a level world is its own world).
+    SpawnPack { sp: usize, x: f64, y: f64 },
 }
 
 #[derive(Debug)]
@@ -412,6 +415,7 @@ impl Sim {
                     spec: crate::fields::WallSpec { x0, y0, dx, dy, lt, ht, fl, pass },
                     at: None,
                 },
+                ScriptEvent::SpawnPack { sp, x, y } => Event::SpawnPack { sp, x, y },
             };
             self.lvl.fired += 1;
             let saved = core::mem::replace(&mut self.undo, crate::events::Undo::None);

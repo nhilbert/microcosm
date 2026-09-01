@@ -63,6 +63,29 @@ for (let t = 200; t < 18000; t += 200) feedHi9[t] = () => {
   }
 };
 
+// L8: feed every Venator on a cadence — the dose is the lesson (light bridges, hard strips)
+const feed8 = (every, frac) => { const o = {};
+  for (let t = 3300; t < 16000; t += every) o[t] = () => {
+    for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === 6)
+      C.applyEvent({ type: "feed", i, gen: W.gen[i], frac });
+  };
+  return o;
+};
+const cold8 = { 3100: () => C.applyEvent({ type: "sourceAdd", x: 63, y: 512, i: 0, a: -8, sigma: 210 }) };
+const pours8 = {}; for (let k = 0; k < 20; k++)
+  pours8[3200 + k * 500] = pour(512 + (k % 3 - 1) * 60, 512 + (((k / 3) | 0) % 3 - 1) * 60);
+
+// L11: close the pen's fourth side, with or without clearing the grazers inside first
+const MESHW = { lt: 0.9, ht: 0.9, fl: 0.7, pass: 11 };
+const pen11 = (t, clear) => ({ [t]: () => {
+  if (clear) for (let i = 0; i < W.n; i++)
+    if (W.alive[i] && W.sp[i] === 2 && W.x[i] > 352 && W.x[i] < 480 && W.y[i] > 544 && W.y[i] < 672)
+      C.applyEvent({ type: "kill", i, gen: W.gen[i] });
+  C.applyEvent({ type: "wallAdd", x0: 352, y0: 672, dx: 0, dy: -128, ...MESHW });
+} });
+// L12: the mutation-rate lever on Cilio's warmth preference (locus 2), the legal 0.12 ceiling
+const sig12 = t => ({ [t]: () => C.applyEvent({ type: "locus", sp: 2, locus: 2, key: "sigma", v: 0.12 }) });
+
 const CASES = [
   ["light",   "null: wait under the dim sun",        null,                                             "failed"],
   ["light",   "strategy: raise the lever at t=2000", { 2000: () => C.applyEvent({ type: "lightMul", v: 1.2 }) }, "passed"],
@@ -98,6 +121,22 @@ const CASES = [
   // produced tough sweeps of their own (packs @14,920; feeding the toughest @6,300 — differential
   // feeding IS artificial selection, not a fake). Recalibration in the record; the honest wrong
   // lever is the mutation switch. packs9/feedHi9 stay for the next measurement round.
+  // L8: the warm year — light feeding bridges the top; heavy feeding turns help into teeth
+  ["warmyear", "null: the press bills the top first",     null,           "failed"],
+  ["warmyear", "strategy: feed the hunters lightly",      feed8(900, 0.2), "passed"],
+  ["warmyear", "wrong: feed the hunters hard",            feed8(300, 0.3), "failed"],
+  ["warmyear", "wrong: a cold pocket, nothing else",      cold8,          "failed"],
+  ["warmyear", "wrong: pours (mineral pays no heat bill)", pours8,        "failed"],
+  // L11: the pen — the shepherd clears it before closing; closed dirty it farms the plankton
+  ["refuge",  "null: never close the pen",              null,             "failed"],
+  ["refuge",  "strategy: clear, then close (t=3000)",   pen11(3000, true),  "passed"],
+  ["refuge",  "strategy: clear and close late (t=8000)", pen11(8000, true), "passed"],
+  ["refuge",  "wrong: close without clearing",          pen11(3000, false), "failed"],
+  // L12: the capstone — variation before the crisis, or not at all
+  ["outrun",  "null: shipped mutation, hot sun wins",   null,          "failed"],
+  ["outrun",  "strategy: raise Cilio warmth sigma early (t=500)", sig12(500), "passed"],
+  ["outrun",  "strategy: sigma up just before the heat (t=2500)", sig12(2500), "passed"],
+  ["outrun",  "wrong: sigma up after the trap fires (t=4300)",    sig12(4300), "failed"],
 ];
 void packs9; void feedHi9;
 

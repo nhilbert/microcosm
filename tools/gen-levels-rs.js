@@ -78,6 +78,11 @@ function scriptStep(e, what) {
       `dx: ${f(ev.dx, what)}, dy: ${f(ev.dy, what)}, lt: ${f(ev.lt, what)}, ht: ${f(ev.ht, what)}, ` +
       `fl: ${f(ev.fl, what)}, pass: ${ev.pass} } }`;
   }
+  if (ev.type === "spawnPack") { // L10: the timeline founds a colony
+    if (!Number.isInteger(ev.sp) || ev.sp < 0 || ev.sp > 6) throw new Error(`${what}: bad species ${ev.sp}`);
+    return `ScriptStep { t: ${e.t}, event: ScriptEvent::SpawnPack { sp: ${ev.sp}, ` +
+      `x: ${f(ev.x, what + ".x")}, y: ${f(ev.y, what + ".y")} } }`;
+  }
   throw new Error(`${what}: unknown script event ${JSON.stringify(ev.type)}`);
 }
 

@@ -173,8 +173,9 @@ impl Sim {
         // on them surviving init. Documented in docs/android-port-plan.md; do not "fix" one side.
         for sp in 0..self.tr.len() {
             for k in 0..self.tr[sp].loci.len() {
-                self.tr[sp].loci[k].sigma = self.locus_shipped[sp][k].sigma;
-                self.tr[sp].loci[k].curve = self.locus_shipped[sp][k].curve;
+                // ALL locus fields, matching the JS (2026-09-01): the price sliders edit slopes
+                // through the same locus event, and a partial restore leaked them across resets.
+                self.tr[sp].loci[k] = self.locus_shipped[sp][k].clone();
             }
         }
 

@@ -154,7 +154,7 @@ Alles Weitere prüft `harness/prose-app.js` in `npm test`:
 | L7 | Besiedlung *(bestätigt mit der L7-Übersetzung, 2026-09-01)* |
 | L9 | natürliche Auslese (+ „Merkmal" als Arbeitswort) |
 | L10 | Anpassung (lokal) |
-| L11 | Zuflucht *(vorläufig)* |
+| L11 | Zuflucht *(bestätigt mit der L11-Übersetzung, 2026-09-01)* |
 | L12 | Variation |
 
 ## 7. Gearbeitete Beispiele (aus der Sitzung, als Maßstab)

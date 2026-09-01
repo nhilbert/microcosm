@@ -117,6 +117,7 @@ const PLAYS = {
     // Evolution panel's price fold and pull Drifta's kp slider to 0.2 through the real handler
     await h.enter("The Sorting", "Tough lines out-breed the fast lines");
     await page.keyboard.press("i");
+    await page.click("text=▸ Evolution"); // the panel folds closed by default
     await page.click("text=prices…");
     const drove = await page.evaluate(() => {
       const spans = [...document.querySelectorAll("span")];

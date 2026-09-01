@@ -1,5 +1,9 @@
-// the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul)
-const LOCUS_SHIPPED = TRAITS.map(T => T.loci.map(L => ({ sigma: L.sigma, curve: L.curve })));
+// the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul).
+// ALL locus fields, not only sigma/curve: the Phase 6 price sliders edit slopes through the same
+// locus event, and a partial restore leaked an edited price across every reset — sandbox, level
+// entry and harness case alike (caught 2026-09-01 when L9's kp case poisoned the gate cases after
+// it). Restoring values that are already shipped is a no-op, so certified runs are untouched.
+const LOCUS_SHIPPED = TRAITS.map(T => T.loci.map(L => ({ ...L })));
 function resetWorld(){
   W.initialized = false; W.n = 0; W.freeList.length = 0; W.alive.fill(0);
   W.tick = 0; W.events.length = 0; W.eventLog.length = 0;
@@ -12,7 +16,7 @@ function initWorld(seed, sc){
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
   // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
-  TRAITS.forEach((T, sp) => T.loci.forEach((L, k) => { L.sigma = LOCUS_SHIPPED[sp][k].sigma; L.curve = LOCUS_SHIPPED[sp][k].curve; }));
+  TRAITS.forEach((T, sp) => T.loci.forEach((L, k) => Object.assign(L, LOCUS_SHIPPED[sp][k])));
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
   det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0); det.adapt.fill(0); det.adaptRun.fill(0);
   det.heatRetreat.fill(0); det.heatPile=false; det.heatPileRun=0; det.heatStarve=false; det.heatStarveRun=0;
