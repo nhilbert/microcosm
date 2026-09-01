@@ -1,6 +1,7 @@
 # Player language — the style guide
 
-v1.1 · 2026-08-31 · Enforced: `harness/prose.js` runs inside `npm test` and rejects
+v1.2 · 2026-09-01 (§8 because-scope; German companion: `phase8-language-style-de.md`,
+the writing guide for every German player string) · v1.1 2026-08-31 · Enforced: `harness/prose.js` runs inside `npm test` and rejects
 any level text over the §4 budgets, the banned list, or the §5 term ladder. The v1.0
 rewrite queue (§9) is done — all shipped text passes. Governs every word a player reads: level text (briefing, prediction,
 goal, verdict, reflections), HUD lines, Observatory narrations, cards, and future UI
@@ -163,6 +164,14 @@ Lamarckism, "the species decides"). Fixed grammar for all evolution text:
 
 - Player-attributed effects say "since", never "because", unless a same-seed A/B has
   actually run (the F6 machinery will earn "because"; nothing else does).
+  **Scope sharpened (owner decision, 2026-09-01)**: level text (briefings, debriefs,
+  reflects, fail reasons) MAY use "because"/„weil" in both languages — every level
+  lesson is measured by the honesty gate's null/taught/wrong-lever runs, which is
+  exactly the A/B this rule demands. Impact cards, narration, and chrome keep the ban:
+  there the text attributes an effect to the player, and no A/B has run. The gate
+  cannot tell a measured claim from an unmeasured one inside a debrief — that
+  discipline stays with review: "because" for the lesson's core only, never for
+  "since your intervention".
 - Never claim what was not measured. If a level's lesson has a known limit (the
   refuge does NOT reliably calm the swings — 7.W), the debrief stays silent about the
   unclaimed part rather than rounding it up.
