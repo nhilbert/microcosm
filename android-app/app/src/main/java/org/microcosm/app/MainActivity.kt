@@ -103,6 +103,9 @@ class MainActivity : Activity() {
 
         val root = FrameLayout(this)
         world = WorldView(this)
+        // The autosaved pond, restored before the render thread founds anything (U0.6). One pond
+        // you keep: backgrounding the app no longer costs the world.
+        world.bootWorld = try { autosaveFile().readFully() } catch (e: Exception) { null }
         root.addView(world, FrameLayout.LayoutParams(MATCH, MATCH))
 
         val top = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -320,6 +323,22 @@ class MainActivity : Activity() {
      */
     private fun saveFile() = android.util.AtomicFile(java.io.File(filesDir, "world.mcsm"))
 
+    /** The autosave's own file (U0.6) — never the manual slot, which belongs to the player. */
+    private fun autosaveFile() = android.util.AtomicFile(java.io.File(filesDir, "autosave.mcsm"))
+
+    private fun writeAtomic(f: android.util.AtomicFile, bytes: ByteArray): Boolean {
+        var out: java.io.FileOutputStream? = null
+        return try {
+            out = f.startWrite()
+            out.write(bytes)
+            f.finishWrite(out)
+            true
+        } catch (e: Exception) {
+            if (out != null) f.failWrite(out)
+            false
+        }
+    }
+
     private fun saveOrLoad() {
         val f = saveFile()
         val has = f.baseFile.exists()
@@ -328,16 +347,8 @@ class MainActivity : Activity() {
             .setTitle("Saved world")
             .setItems(items) { _, k ->
                 if (k == 0) world.save { bytes ->
-                    var out: java.io.FileOutputStream? = null
-                    try {
-                        out = f.startWrite()
-                        out.write(bytes)
-                        f.finishWrite(out)
-                        toast("Saved — %d KB".format(bytes.size / 1024))
-                    } catch (e: Exception) {
-                        if (out != null) f.failWrite(out)
-                        toast("Could not save: ${e.message}")
-                    }
+                    if (writeAtomic(f, bytes)) toast("Saved — %d KB".format(bytes.size / 1024))
+                    else toast("Could not save")
                 } else {
                     val bytes = try { f.readFully() } catch (e: Exception) { null }
                     if (bytes == null) toast("Could not read the saved world")
@@ -560,6 +571,13 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         ui.removeCallbacks(tickHud)
+        // U0.6: the sandbox autosaves when the app goes to the background — before this, losing
+        // the process lost the world with a working save slot a few lines away. Levels are not
+        // autosaved: the snapshot carries the world and not the level runtime, and a restored
+        // half-experiment would be a lie. Best effort by nature: the save is queued to the render
+        // thread, which normally turns it around within a frame, but a process killed faster
+        // keeps the previous autosave — atomically, never a torn file.
+        if (running == null) world.save { bytes -> writeAtomic(autosaveFile(), bytes) }
     }
 
     private companion object {

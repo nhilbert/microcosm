@@ -406,6 +406,13 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     // Both run on the render thread, then hand the result back on the UI thread: a snapshot taken
     // mid-tick would be a torn world, and the tick is here.
     fun save(onDone: (ByteArray) -> Unit) = post { val b = Native.save(); ui.post { onDone(b) } }
+
+    /**
+     * A world to restore at boot instead of founding fresh (U0.6 — autosave). The shell sets it
+     * before the surface exists; the render thread consumes it once, and a byte stream that is
+     * not one of ours simply loses to the fresh world it was loaded over.
+     */
+    @Volatile var bootWorld: ByteArray? = null
     fun load(bytes: ByteArray, onDone: (Boolean) -> Unit) = post {
         val ok = Native.load(bytes) != 0
         if (ok) { selI = -1; Native.markPrev(); renderer.onTilesChanged() }
@@ -417,6 +424,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         Native.boot()
         Native.resetWorld()
         Native.initWorld(11)
+        bootWorld?.let { Native.load(it) } // the autosaved pond, if there is one (U0.6)
+        bootWorld = null
         Native.markPrev()
         renderer = Renderer(density)
 
