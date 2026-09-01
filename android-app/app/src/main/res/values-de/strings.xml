@@ -31,7 +31,7 @@
     <string name="pace_pause">Pause</string>
     <string name="tool_feed">füttern</string>
     <string name="tool_kill">töten</string>
-    <string name="tool_seed">aussetzen</string>
+    <string name="tool_seed">ansiedeln</string>
     <string name="tool_wall">Wand</string>
     <string name="sun_release">loslassen</string>
     <string name="page_pops">Arten</string>
@@ -51,7 +51,7 @@
     <!-- die Hinweise der Hand und die Sonne -->
     <string name="hint_wall_drag">übers Wasser ziehen</string>
     <string name="hint_seed_press">Wasser lange drücken</string>
-    <string name="hint_tool_touch">tippe oder zieh übers Wasser</string>
+    <string name="hint_tool_touch">tippe oder ziehe übers Wasser</string>
     <string name="hint_place_source">tippe aufs Wasser, um sie zu setzen</string>
     <string name="label_sun">Sonne</string>
 
@@ -92,7 +92,7 @@
     <string name="evo_balance">Balance %1$s</string>
     <string name="evo_locked">Dieses Experiment setzt die Regeln der Evolution selbst.</string>
     <string name="trait_stats">Mittel %1$.2f · Streuung ±%2$.2f</string>
-    <string name="badge_tap_restores">Tippen stellt zurück</string>
+    <string name="badge_tap_restores">Tippen setzt zurück</string>
     <string name="sun_badge_moved">verschoben</string>
     <string name="sun_badge_just">gerade geändert</string>
     <string name="sun_badge_standing">steht seit %1$d min</string>
@@ -147,19 +147,19 @@
     <string name="toast_loaded">Geladen</string>
     <string name="toast_not_world">Diese Datei ist keine Microcosm-Welt</string>
 
-    <!-- Aussetzen -->
-    <string name="dlg_seed_title">Welche Art aussetzen? Danach das Wasser lange drücken.</string>
+    <!-- Ansiedeln -->
+    <string name="dlg_seed_title">Welche Art ansiedeln? Danach das Wasser lange drücken.</string>
 
     <!-- Experimente -->
     <string name="goal_prefix">Ziel: %1$s</string>
     <string name="verdict_predicted">Deine Vorhersage: %1$s</string>
     <string name="verdict_dismiss">(Tippen schließt · Reset startet neu)</string>
-    <string name="pours_left">Güsse übrig %1$d</string>
+    <string name="pours_left">noch %1$d Gaben</string>
 
     <!-- Wirkungskarten. Regel 6: „Seitdem", nie „weil". -->
-    <string name="impact_rolled">die Geschichte ist darüber hinweggezogen</string>
+    <string name="impact_rolled">zu lange her — die Wirkung lässt sich nicht mehr abgrenzen</string>
     <string name="impact_watching">Wirkung wird beobachtet… %1$d%%</string>
-    <string name="impact_none">keine klare Verschiebung über das normale Schwanken hinaus — die Welt hat es geschluckt</string>
+    <string name="impact_none">keine klare Verschiebung über das normale Schwanken hinaus</string>
     <string name="impact_since">"Seitdem: "</string>
     <string name="impact_natural_swing">" (könnte eine natürliche Schwankung sein)"</string>
     <string name="impact_relaxed">nach %1$d s wieder entspannt</string>
@@ -189,7 +189,7 @@
         <item>Du hast Mineral gegossen</item>
         <item>Du hast ein Lebewesen getötet</item>
         <item>Du hast ein Lebewesen gefüttert</item>
-        <item>Du hast Lebewesen ausgesetzt</item>
+        <item>Du hast Lebewesen angesiedelt</item>
         <item>Du hast den letzten Eingriff zurückgenommen</item>
         <item>Du hast eine Energiequelle verschoben</item>
         <item>Du hast das Sonnenlicht geändert</item>
@@ -210,7 +210,7 @@
         <item>rückgängig</item>
         <item>rückgängig · %1$s gefüttert</item>
         <item>rückgängig · %1$s getötet</item>
-        <item>rückgängig · %1$s ausgesetzt</item>
+        <item>rückgängig · %1$s angesiedelt</item>
         <item>rückgängig · Mineral gegossen</item>
         <item>rückgängig · das Sonnenlicht</item>
         <item>rückgängig · Sonne verschoben</item>
@@ -224,7 +224,7 @@
 
     <!-- die Titel der Daten-Seiten -->
     <string-array name="page_titles">
-        <item>Kopfzahlen — jede Linie eine Art, auf einer Log-Achse</item>
+        <item>Bestände — jede Linie eine Art, auf einer Log-Achse</item>
         <item>Chemie — wo jede Einheit Mineral steckt; die Oberkante ist das Ganze der Welt</item>
         <item>Umsatz — was die Welt erzeugt und verbrennt</item>
         <item>Vitalwerte — gemessen gegen gesunde Referenzbereiche</item>
