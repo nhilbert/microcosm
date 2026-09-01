@@ -565,5 +565,123 @@
       "pass": "Your pack holds — a few hunters riding a wave of grazers, riding a wave of plankton. Count the layers: hundreds of plankton feed a hundred grazers feed a handful of hunters. Every meal loses most of its energy on the way up. That is the food chain's price, and why the top is always small — and always one bad season from gone.",
       "fail": "Hunters don't run out of courage — they run out of prey. The pond only makes so many grazers, and every extra mouth shrinks each hunter's share. Try one pack, seeded early, and give it room."
     }
+  },
+  {
+    "key": "outpost",
+    "n": 7,
+    "title": "The Second Sun",
+    "science": "Dispersal limitation · colonization",
+    "question": "A second sun will rise over dark water. What grows there?",
+    "briefing": "A living pond under one sun — and soon a second sun rises, far across dark water. Bright, warm, empty. The seeding bench is open, and you can pour. The old sun is part of the experiment: it stays locked.",
+    "goalText": "Settle the new sun — mat and plankton",
+    "predict": {
+      "prompt": "A bright new sun over empty water. What happens?",
+      "options": [
+        "Life drifts over and settles it",
+        "It stays empty until something is carried there",
+        "The new sun drains the old one"
+      ],
+      "reflect": [
+        "Drifting is slow. The plankton never crossed the dark water, and the mat's creep came far too late.",
+        "Right. Light was never the missing thing. A traveler was.",
+        "The old sun kept its whole pond. A second sun adds a second stage — but an empty one."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "found": {
+        "0": 120,
+        "1": 500,
+        "2": 12,
+        "3": 60,
+        "6": 0
+      }
+    },
+    "script": [
+      {
+        "t": 2000,
+        "event": { "type": "sourceAdd", "x": 0, "y": 0 }
+      }
+    ],
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": "added",
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 12000,
+    "sustain": 10,
+    "narrate": [
+      "estab",
+      "extinct",
+      "crashev",
+      "bloom"
+    ],
+    "pass": [
+      {
+        "m": "near",
+        "sp": 0,
+        "src": 1,
+        "r": 200,
+        "op": ">=",
+        "v": 100
+      },
+      {
+        "m": "near",
+        "sp": 1,
+        "src": 1,
+        "r": 200,
+        "op": ">=",
+        "v": 150
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 0,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The last Solara died. Nothing is left to carry to the new sun."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The last Drifta died. Nothing is left to carry to the new sun."
+      }
+    ],
+    "timeoutWhy": "The new sun still has no working pond. Life had to be carried there — the mat and its plankton both.",
+    "meter": [
+      {
+        "label": "Solara · sun 2",
+        "m": "near",
+        "sp": 0,
+        "src": 1,
+        "r": 200,
+        "goal": 100
+      },
+      {
+        "label": "Drifta · sun 2",
+        "m": "near",
+        "sp": 1,
+        "src": 1,
+        "r": 200,
+        "goal": 150
+      }
+    ],
+    "debrief": {
+      "pass": "You carried life across the dark, and the new sun keeps a working pond. That trip was the whole secret. The water never needed better conditions — it needed a traveler. The plankton cannot cross dark water; the mat can creep, but far too slowly. Settling a new place is called colonization. Now keep watching your outpost: the bloom is already crowding the young meadow.",
+      "fail": "The new sun was never the problem — the trip was. Pours feed water, not distance, and no drifter survives the dark crossing. Seed the mat and the plankton under the new sun. Both: alone, the mat feeds no one, and the bloom locks the meadow out."
+    }
   }
 ]

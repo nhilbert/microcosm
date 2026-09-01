@@ -236,6 +236,70 @@ true on the level's own seed for a player who keeps watching. The sustain margin
 between the doomed double (5,400) and the pass bar (7,000) is 1,600 ticks. Gate
 21/21 ALL PASS.
 
+### Level 7 · The Second Sun — dispersal limitation and colonization (shipped 2026-09-01)
+
+Built on owner request ahead of the recorded L9-first ship order (phase8-ladder-design.md §7).
+World: settled core minus Venator (S 120, D 500, C 12, B 60), seed 101, rich water. The
+level's timeline — **F4, built for this level** — raises a second sun at (0,0), toroidally
+opposite the home sun (i 1.0, σ 210, the sourceAdd defaults), at t=2,000. Goal — **F5, also
+new**: Solara ≥ 100 AND Drifta ≥ 150 within radius 200 of source 1, sustained 10 samples,
+deadline 12,000. Apparatus: pours unlimited, seeding open, sources `"added"` (new tri-state:
+the founded sky is locked, the risen sun and player additions are editable). Term ladder word:
+colonization, introduced in the pass debrief.
+
+The framework that ships with it, in both cores and gate-proved byte-identical:
+
+- `levelScript()` — the level's per-tick hook, called before every `step()` by every driver
+  (harness `drive()`, the browser's tick loop, the app's render loop). It fires script events
+  before the step that produces their tick (the harness's own action convention) and captures
+  the region census one tick before each recorder sample lands, into a level-owned ring
+  (`LVL.rg`, REC.N rows). `levelCheck` consumes samples only up to the census watermark, so
+  no caller cadence can move a verdict. Idempotent within a tick.
+- `{ m: "near", sp, src, r }` — region predicates and meter rows; squared toroidal distance
+  only (`*`, `+`), so the ported core computes it bit-identically.
+- `levelAllowsSource(k)` — the per-source lock, wired into every grip, drag, slider, layout
+  and remove path in the browser and the app (the app publishes `homeSunLocked` per frame for
+  UI-thread gating and hides the layout row).
+
+Calibration (S@2/D@2 = counts within 200 of the new sun; seeds 101/202/303 probed, 101
+pinned — slowest natural creep: S@2 = 2 at t=12k vs 89 on seed 303):
+
+| run | S@2 | D@2 | verdict |
+|---|---|---|---|
+| null | 2 @ 12k (creep only from ~12k; 105 by 15k) | 0 through 16k | FAIL (timeout) |
+| seed mat+plankton t=3,000 | 249–381 early, 191 @ 12k | 423 rising to ~1,000 | PASS ~t=3,760 |
+| seed both late, t=9,000 | 109–142 | 190 → 413 | PASS ~t=10,060 (the window is generous) |
+| ten pours at sun 2, no seeding | 1 @ 12k | 0 | FAIL |
+| Drifta alone t=3,000 | **0 through 16k** | 1,300+ | FAIL — the bloom locks the mat out |
+| Solara alone t=3,000 | 534–731 | 0 forever | fail-capable (not pinned as a case) |
+
+Two measured findings carried into the wording: the mat's slow creep DOES cross dark water
+eventually — from ~t=12k on the pinned seed — so "an added sun is inert until seeded" (7.L)
+is a statement about its measurement window; the deadline sits before the creep, and the
+Drifta goal is creep-proof and pour-proof on its own. And a Drifta-only outpost suppresses
+the mat's arrival entirely (its bloom takes the light and mineral first) — the L4 competition
+lesson returning as this level's second wrong lever. Known edge, accepted and recorded: the
+goal region tracks source *index* 1, so a sun the player adds before t=2,000 becomes the
+goal's anchor; the harness pins the scripted path, and an editable outpost sun keeping its
+goal wherever the player moves it is the intended reading.
+
+The §6 full-speed UI playthrough ran headless (Playwright over the dev server, 420×900):
+the null path start-screen → prediction → sunrise → HUD meters → timeout verdict, then Try
+again → pan to the risen sun → long-press seeding of both species → pass debrief, t≈3,500.
+**It convicted a latent browser bug on its first run**: `reset()` set `ui.chips` to `[]`,
+which is truthy, so the chips overlay dereferenced `.opts` and crashed the React tree — every
+in-level Try again and sandbox reset in the browser artifact had this. Fixed (`chips: null`),
+core untouched, playthrough green on the rerun. The instrument finding outranks the level.
+
+Gate 30/30 ALL PASS (25 verdict cases + 4 apparatus-lock guards + L7's five), byte-identical
+on the ported core (`port:levels`); `port:check`'s level fingerprint extended to 2,200 ticks
+so it covers the sunrise, the census and the lock flip on both cores. Conform and
+conform:core rebound (declared: the level table row plus the F4/F5 machinery; all four
+fingerprints bit-identical, native == wasm). Boot gate: the scripted sun rises through the
+REAL render loop and the founded sun refuses the grip through the real gesture pipeline
+(`theScriptedSunRisesAndTheFoundedSkyStaysLocked`). German overlay complete; prose gates
+EN+DE green.
+
 ## 4. The deferred ladder (arcs B–D)
 
 > **Superseded in detail (2026-08-31): docs/phase8-ladder-design.md** — the researched

@@ -12,6 +12,7 @@ function drive(def, actions){
   C.levelStart(def);
   while (W.tick < def.deadline + 40 && C.levelCheck() === "running"){
     const t = W.tick + 1;
+    C.levelScript(); // F4/F5: the level's own per-tick hook — scripted events + region census
     if (actions && actions[t]) actions[t]();
     C.step();
   }
@@ -36,6 +37,14 @@ const vpack = t => ({ [t]: () => C.applyEvent({ type: "spawnPack", sp: 6, x: 512
 const vtwo = t => ({ [t]: () => { C.applyEvent({ type: "spawnPack", sp: 6, x: 490, y: 512 });
                                   C.applyEvent({ type: "spawnPack", sp: 6, x: 534, y: 512 }); } });
 
+// L7: the new sun rises at (0,0) by script; settlers are carried there or nothing is
+const settle = (t, both) => ({ [t]: () => {
+  if (both !== "driftaOnly") C.applyEvent({ type: "spawnPack", sp: 0, x: 0, y: 0 });
+  if (both !== "solaraOnly") C.applyEvent({ type: "spawnPack", sp: 1, x: 0, y: 0 });
+} });
+const farSoup = {}; for (let k = 0; k < 10; k++)
+  farSoup[3000 + k * 300] = pour((k % 3 - 1) * 60, (((k / 3) | 0) % 2) * 60);
+
 const CASES = [
   ["light",   "null: wait under the dim sun",        null,                                             "failed"],
   ["light",   "strategy: raise the lever at t=2000", { 2000: () => C.applyEvent({ type: "lightMul", v: 1.2 }) }, "passed"],
@@ -58,6 +67,11 @@ const CASES = [
   ["hunters", "strategy: one pack at t=4000",        vpack(4000), "passed"],
   ["hunters", "strategy: one pack early (t=2000)",   vpack(2000), "passed"],
   ["hunters", "wrong: two packs at once (t=4000)",   vtwo(4000),  "failed"],
+  ["outpost", "null: watch the new sun shine on nothing", null,            "failed"],
+  ["outpost", "strategy: carry mat+plankton (t=3000)",  settle(3000),      "passed"],
+  ["outpost", "strategy: a late expedition (t=9000)",   settle(9000),      "passed"],
+  ["outpost", "wrong: ten pours under the new sun",     farSoup,           "failed"],
+  ["outpost", "wrong: plankton alone (t=3000)",         settle(3000, "driftaOnly"), "failed"],
 ];
 
 let ok = true;
@@ -68,6 +82,24 @@ for (const [key, label, actions, expect] of CASES){
   if (!good) ok = false;
   console.log(`  ${good ? "PASS" : "FAIL"}  L${def.n} ${key.padEnd(8)} ${label.padEnd(40)} -> ${r.state} at t=${r.t} (expected ${expect})`);
 }
+// L7's apparatus lock: the founded sun must be untouchable, the risen one editable —
+// there must be no unlockable home-sun edit in the apparatus (ladder design, L7 case 4).
+{
+  const def = by("outpost");
+  C.levelStart(def);
+  while (W.tick < 2100){ C.levelScript(); C.step(); }
+  const checks = [
+    ["script raised the second sun", W.sources.length === 2],
+    ["home sun locked", C.levelAllowsSource(0) === false],
+    ["risen sun editable", C.levelAllowsSource(1) === true],
+    ["sun card reachable", C.levelAllows("sources") === true],
+  ];
+  for (const [label, good] of checks){
+    if (!good) ok = false;
+    console.log(`  ${good ? "PASS" : "FAIL"}  L7 outpost  lock: ${label}`);
+  }
+}
+
 C.levelStop(); P.mutation = true;
 console.log(ok ? "LEVELS GATE: ALL PASS — every level fails untouched and passes on its lesson"
                : "LEVELS GATE: FAIL — a level is not the challenge it claims to be");

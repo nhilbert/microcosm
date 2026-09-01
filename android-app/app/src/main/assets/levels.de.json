@@ -189,5 +189,38 @@
       "The grazers are gone. Nothing now stands between the hunters and starving.": "Die Fresser sind fort. Nichts steht jetzt noch zwischen den Jägern und dem Verhungern.",
       "No lasting pack took hold. A hunter eats a lot and breeds slowly — seed early, and seed small.": "Kein Rudel hat dauerhaft Fuß gefasst. Ein Jäger frisst viel und vermehrt sich langsam — setz früh aus, und setz wenige aus."
     }
+  },
+  "outpost": {
+    "title": "Die zweite Sonne",
+    "science": "Ausbreitungsgrenzen · Kolonisation",
+    "question": "Über dunklem Wasser geht eine zweite Sonne auf. Was wächst dort?",
+    "briefing": "Ein lebendiger Teich unter einer Sonne — und bald geht eine zweite auf, weit über dunklem Wasser. Hell, warm, leer. Du kannst Arten aussetzen und gießen. Die alte Sonne gehört zum Versuch: Sie bleibt gesperrt.",
+    "goalText": "Besiedle die neue Sonne — Matte und Plankton",
+    "predict": {
+      "prompt": "Eine helle neue Sonne über leerem Wasser. Was passiert?",
+      "options": [
+        "Leben treibt hinüber und siedelt sich an",
+        "Es bleibt leer, bis etwas hingetragen wird",
+        "Die neue Sonne zehrt die alte aus"
+      ],
+      "reflect": [
+        "Treiben ist langsam. Das Plankton hat das dunkle Wasser nie überquert — und die Matte kroch viel zu spät heran.",
+        "Richtig. Licht hat nie gefehlt. Ein Reisender hat gefehlt.",
+        "Die alte Sonne behielt ihren ganzen Teich. Eine zweite Sonne ist nur eine zweite Bühne — und die stand leer."
+      ]
+    },
+    "debrief": {
+      "pass": "Du hast Leben über das Dunkel getragen, und die neue Sonne hält jetzt einen lebendigen Teich. Diese Reise war das ganze Geheimnis. Das Wasser brauchte nie bessere Bedingungen — es brauchte einen Reisenden. Das Plankton kann dunkles Wasser nicht überqueren; die Matte kriecht, aber viel zu langsam. Einen neuen Ort zu besiedeln heißt Kolonisation. Und jetzt beobachte deinen Außenposten: Die Blüte bedrängt schon die junge Matte.",
+      "fail": "Die neue Sonne war nie das Problem — der Weg dorthin war es. Gießen füttert Wasser, nicht Entfernung, und nichts, was treibt, überlebt die dunkle Strecke. Setz die Matte und das Plankton unter der neuen Sonne aus. Beides: Die Matte allein ernährt niemanden, und die Blüte allein sperrt die Matte aus."
+    },
+    "meter": [
+      { "label": "Solara · Sonne 2", "unit": "" },
+      { "label": "Drifta · Sonne 2", "unit": "" }
+    ],
+    "whys": {
+      "The last Solara died. Nothing is left to carry to the new sun.": "Die letzte Solara ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
+      "The last Drifta died. Nothing is left to carry to the new sun.": "Die letzte Drifta ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
+      "The new sun still has no working pond. Life had to be carried there — the mat and its plankton both.": "Die neue Sonne hat noch immer keinen lebendigen Teich. Leben musste dorthin getragen werden — die Matte und ihr Plankton."
+    }
   }
 }

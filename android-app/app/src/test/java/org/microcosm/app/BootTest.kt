@@ -186,6 +186,90 @@ class BootTest {
     }
 
     /**
+     * L7 (The Second Sun): the level's timeline must run through the REAL render loop — the
+     * scripted sun rises on its tick because the loop calls `levelScript` before every step —
+     * and the founded sky is locked (no grip through the real gesture pipeline) while the risen
+     * sun grips normally.
+     */
+    @Test
+    fun theScriptedSunRisesAndTheFoundedSkyStaysLocked() {
+        requireNativeLib()
+        org.robolectric.RuntimeEnvironment.setQualifiers("w408dp-h900dp-xxhdpi")
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val world = activity.world
+        world.surfaceCreated(world.holder)
+        world.surfaceChanged(world.holder, 0, world.width, world.height)
+        try {
+            // find the outpost row in the shared table, on the render thread (the core lives there)
+            val idx = intArrayOf(-1)
+            val found = java.util.concurrent.CountDownLatch(1)
+            world.post {
+                val a = org.json.JSONArray(Native.levelsJson())
+                for (i in 0 until a.length())
+                    if (a.getJSONObject(i).optString("key") == "outpost") idx[0] = i
+                found.countDown()
+            }
+            assertTrue(found.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue("the shared table should carry L7", idx[0] >= 0)
+            world.speed = 0.0
+            world.startLevel(idx[0], -1, arrayOf("S", "D"), arrayOf("", ""), 12000)
+            // walk to the eve of the sunrise the way the loop does (hook, then step)
+            val eve = java.util.concurrent.CountDownLatch(1)
+            world.post {
+                while (Native.tick() < 1990) { Native.markPrev(); Native.levelScript(); Native.step() }
+                eve.countDown()
+            }
+            assertTrue("the fast-forward never finished", eve.await(30, java.util.concurrent.TimeUnit.SECONDS))
+            // now the REAL loop carries the world across t=2000 — the loop itself must fire the script
+            world.speed = 16.0
+            val suns = intArrayOf(0)
+            val until = System.currentTimeMillis() + 20000
+            while (suns[0] < 2 && System.currentTimeMillis() < until) {
+                val read = java.util.concurrent.CountDownLatch(1)
+                world.post { suns[0] = Native.sourceCount(); read.countDown() }
+                assertTrue(read.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                if (suns[0] < 2) Thread.sleep(50)
+            }
+            world.speed = 0.0
+            assertTrue("the render loop should raise the scripted sun at t=2000", suns[0] == 2)
+            println("BOOT GATE: the scripted second sun rose through the real loop")
+
+            // the founded sun refuses the grip; the risen one grips — the real gesture pipeline
+            world.intervene = true
+            val cx = world.width / 2f
+            val cy = world.height / 2f
+            fun parkOn(k: Int) {
+                val parked = java.util.concurrent.CountDownLatch(1)
+                world.post {
+                    world.cam.x = Native.sourceNum(k, 0)
+                    world.cam.y = Native.sourceNum(k, 1)
+                    parked.countDown()
+                }
+                assertTrue(parked.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            }
+            fun tapCentre() {
+                val t = SystemClock.uptimeMillis()
+                world.onTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, cx, cy, 0))
+                world.onTouchEvent(MotionEvent.obtain(t, t + 50, MotionEvent.ACTION_UP, cx, cy, 0))
+            }
+            parkOn(0)
+            tapCentre()
+            Thread.sleep(400)
+            assertTrue("the founded sun must refuse the grip (L7 lock)", world.sunSel < 0)
+            assertTrue("the lock must be published for the UI", world.homeSunLocked)
+            parkOn(1)
+            tapCentre()
+            val grip = System.currentTimeMillis() + 3000
+            while (world.sunSel < 0 && System.currentTimeMillis() < grip) Thread.sleep(10)
+            assertTrue("the risen sun must grip", world.sunSel == 1)
+            println("BOOT GATE: founded sky locked, risen sun grips (L7)")
+        } finally {
+            world.stopLevel()
+            world.surfaceDestroyed(world.holder)
+        }
+    }
+
+    /**
      * The shell's first seconds: onCreate through onResume, the front door (U2.0), HUD ticks, a
      * pause, and the back flow — top level goes to the front door, the front door exits.
      */
