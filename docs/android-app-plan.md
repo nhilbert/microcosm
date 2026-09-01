@@ -392,6 +392,57 @@ one rule it must keep: nothing in the render layer may decide anything about the
 None of it is load-bearing for the milestone's question — can the native app run this world, with
 its levers and its honesty intact? It can.
 
+## 5j. The density defect — reported on the phone, fixed 2026-09-01
+
+The owner's screenshots of the two ends of the zoom range showed one bug at each end, and they
+turned out to be the same bug.
+
+At the far end (`z 0,25`) the pond appeared **45 times over** in a 5x9 grid — and life appeared in
+exactly one of them. The tiled layers (carpet, mineral, pall, shade, walls) are blitted once per
+visible torus copy, while `frame_of` projects every organism ONCE, through the minimal image `wd`.
+That is not a defect in the frame builder: it is correct *provided* one copy of the world covers
+the viewport, which is precisely what the browser's floor guarantees —
+
+    minZ = max(vw, vh) / WORLD          (src/ui.jsx)
+
+— the zoom at which the world exactly fills the larger screen dimension. Below it the invariant
+breaks and the organisms cannot follow the layers. The Android shell had a hand-written
+`coerceIn(0.25, 6.0)` in its place, three octaves under the floor.
+
+At the near end (`z 6,00`) the closest possible view was still mid-range. Same cause, other
+direction: **the browser's zoom is in CSS pixels and this canvas is in device pixels.** The browser
+draws on a CSS-pixel canvas and lets `dpr` scale it; Android hands the render thread device pixels.
+So a bare `6.0` ceiling is the browser's `2.0` on a 3x phone, and every screen-space constant
+ported from `src/ui-render.js` was landing at a third of its intended size.
+
+The floor needs no density factor — it is geometry, and `max(vw, vh)` is already in device pixels.
+Every *taste* constant does. Fixed, all in the shell (no core edit, so no fingerprint moves and
+conformance is untouched — `npm test` clean, no NOTE):
+
+| what | was | now |
+|---|---|---|
+| zoom floor | `0.25` | `max(vw, vh) / 1024` — one world copy, the browser's rule |
+| zoom ceiling | `6.0` | `6.0 x density` |
+| opening zoom | `1.0` | `max(density, min(vw, vh) / 620)` — the browser's, re-clamped on every viewport change |
+| LOD threshold | `frameConst(0)` | `x density` — a CSS-pixel threshold needs a CSS-pixel zoom |
+| tap radius | `pickRadius(cam.z)` | `pickRadius(cam.z / density)` — 24 CSS px is a fingertip, 24 device px is not |
+| sun grip | `44.0` | `44.0 x density` |
+| ring / stroke / pour sizes | raw px | `x dp` throughout `Renderer` |
+| chart text, pads, strokes | raw px | `x dp` throughout `DataView` (22 px axis labels were reading ~7 sp) |
+| HUD zoom readout | `cam.z` | `cam.z / density`, so the number means what the browser's means |
+| benchmark zoom rows | `0.35 .. 2.2` absolute | multiples of the floor — the old rows were views the player can never reach |
+
+Sizes *derived from the display list* (`r`, `sx`, `sy`) were left exactly alone: they carry the
+density already, through the zoom.
+
+**What this costs, and it is worth stating plainly.** The browser's rule forbids ever seeing the
+torus repeat, and on a tall phone that means the whole pond cannot be on screen at once — at the
+floor you see the full world height and about 45% of its width. Showing the whole pond would
+require the repeats to be *complete* rather than forbidden: emitting organisms and corpses once
+per visible tile in `frame_of`, a declared change to the shared grammar with a re-captured frame
+fingerprint. That is a real option and a better one for a phone, but it is a design decision about
+what the torus should look like, not a bug fix, so it is the owner's — recorded here, not taken.
+
 ## 6. Open, and honestly so
 
 - **The web artifact's `frameOf` is a second implementation until it isn't.** A.0 leaves the JS
@@ -408,6 +459,10 @@ its levers and its honesty intact? It can.
   the fields are now prescaled 4x on a software canvas where filtering is not in doubt. If the
   next screenshot is still blocky, those blocks were never the carpet and the search moves — and
   that would be worth knowing, because it would mean something else is being drawn at cell size.
+- **Whether the torus should repeat on screen at all.** See 5j: the floor now forbids it, as the
+  browser does, which costs the whole-pond view on a tall screen. The alternative is to make the
+  repeat complete — organisms and corpses emitted per visible tile in `frame_of` — and let the
+  floor drop to `min(vw, vh) / WORLD`. Owner's call; it is a declared grammar change either way.
 - **Nothing in the app has been seen running by its author.** Every increment compiled in CI and
   every gate that can run headlessly is green, but CI cannot say whether a panel overlaps, a
   gesture fights the camera, or a colour reads wrong. That is the standing gap of this milestone

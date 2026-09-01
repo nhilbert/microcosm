@@ -51,10 +51,16 @@ class DataView(context: Context) : View(context) {
 
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
-    private val padL = 46f
-    private val padT = 10f
-    private val padB = 26f
-    private val padR = 12f
+    /**
+     * This canvas is in device pixels while the browser's chart (src/ui-data.jsx) is in CSS pixels,
+     * so every size here carries the density. Without it the axis labels land at a third of their
+     * intended size on a 3x phone — legible on a desktop screenshot, not on the device.
+     */
+    private val dp = context.resources.displayMetrics.density
+    private val padL = 46f * dp
+    private val padT = 10f * dp
+    private val padB = 26f * dp
+    private val padR = 12f * dp
 
     private fun at(c: Int, k: Int): Float {
         val s = series ?: return 0f
@@ -68,18 +74,18 @@ class DataView(context: Context) : View(context) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), p)
         if (series == null || n < 5) {
             p.color = Color.parseColor("#5E7386")
-            p.textSize = 26f
+            p.textSize = 26f * dp
             canvas.drawText("gathering history…", padL, padT + ch / 2, p)
             return
         }
         // the axis corner: left edge and baseline, nothing more
         p.style = Paint.Style.STROKE
-        p.strokeWidth = 1f
+        p.strokeWidth = 1f * dp
         p.color = Color.argb(64, 94, 115, 134)
         canvas.drawLine(padL, padT, padL, padT + ch, p)
         canvas.drawLine(padL, padT + ch, padL + cw, padT + ch, p)
         p.style = Paint.Style.FILL
-        p.textSize = 22f
+        p.textSize = 22f * dp
 
         when (page) {
             PAGE_POPULATIONS -> populations(canvas, cw, ch)
@@ -88,8 +94,8 @@ class DataView(context: Context) : View(context) {
         }
 
         p.color = Color.parseColor("#5E7386")
-        canvas.drawText("-${(n - 1) * REC_STRIDE / 10}s", padL, height - 6f, p)
-        canvas.drawText("now", padL + cw - 60f, height - 6f, p)
+        canvas.drawText("-${(n - 1) * REC_STRIDE / 10}s", padL, height - 6f * dp, p)
+        canvas.drawText("now", padL + cw - 60f * dp, height - 6f * dp, p)
     }
 
     private fun xOf(k: Int, cw: Float) = padL + cw * k / max(1, n - 1)
@@ -125,14 +131,14 @@ class DataView(context: Context) : View(context) {
             canvas.drawLine(padL, y, padL + cw, y, p)
             p.style = Paint.Style.FILL
             p.color = Color.parseColor("#5E7386")
-            canvas.drawText(d.toString(), 6f, y + 7f, p)
+            canvas.drawText(d.toString(), 6f * dp, y + 7f * dp, p)
         }
         for (sp in 0 until 7) {
             var any = false
             var k = 0
             while (k < n) { if (at(sp, k) > 0) { any = true; break }; k += 7 }
             if (!any) continue
-            line(canvas, sp, cw, yOf, speciesColor[sp], 2.2f)
+            line(canvas, sp, cw, yOf, speciesColor[sp], 2.2f * dp)
         }
     }
 
@@ -174,11 +180,11 @@ class DataView(context: Context) : View(context) {
         }
         p.style = Paint.Style.STROKE
         p.color = Color.argb(204, 230, 240, 250)
-        p.strokeWidth = 1.8f
+        p.strokeWidth = 1.8f * dp
         canvas.drawPath(path, p)
         p.style = Paint.Style.FILL
         p.color = Color.parseColor("#5E7386")
-        canvas.drawText(ymax.roundToInt().toString(), 4f, padT + 18f, p)
+        canvas.drawText(ymax.roundToInt().toString(), 4f * dp, padT + 18f * dp, p)
     }
 
     /** What the world produces and burns, with recycling on its own scale. */
@@ -190,10 +196,10 @@ class DataView(context: Context) : View(context) {
         var m2 = 1f
         for (k in 0 until n) m2 = max(m2, at(minz, k))
         val yOf = { v: Float -> padT + ch * (1f - v / ymax) }
-        line(canvas, gpp, cw, yOf, Color.rgb(140, 230, 170), 2.2f)
-        line(canvas, resp, cw, yOf, Color.rgb(196, 150, 140), 2.2f)
-        line(canvas, minz, cw, { v -> padT + ch * (1f - v / (m2 * 1.15f)) }, Color.argb(179, 91, 200, 232), 1.6f)
+        line(canvas, gpp, cw, yOf, Color.rgb(140, 230, 170), 2.2f * dp)
+        line(canvas, resp, cw, yOf, Color.rgb(196, 150, 140), 2.2f * dp)
+        line(canvas, minz, cw, { v -> padT + ch * (1f - v / (m2 * 1.15f)) }, Color.argb(179, 91, 200, 232), 1.6f * dp)
         p.color = Color.parseColor("#5E7386")
-        canvas.drawText(ymax.roundToInt().toString(), 4f, padT + 18f, p)
+        canvas.drawText(ymax.roundToInt().toString(), 4f * dp, padT + 18f * dp, p)
     }
 }

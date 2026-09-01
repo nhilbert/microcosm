@@ -9,6 +9,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -47,6 +48,28 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     }
 
     val cam = Camera()
+    /**
+     * The zoom range, in device pixels per world unit.
+     *
+     * The browser's numbers (`minZ`/`clampZ` in src/ui.jsx) are in CSS pixels, with the device
+     * pixel ratio applied separately by the canvas transform. This canvas is in device pixels, so
+     * the taste constants have to carry the density or the whole range lands in the wrong place:
+     * a bare 6.0 ceiling on a 3x screen is the browser's 2.0, which is why the closest view still
+     * looked like mid-range.
+     *
+     * The floor is not taste. `max(vw, vh) / WORLD` is the zoom at which one copy of the world
+     * exactly covers the viewport, and below it the torus repeats on screen. The frame builder
+     * projects each organism ONCE, through the minimal image (`wd` in frame.rs) — correct at or
+     * above this floor, where one copy covers everything, and visibly wrong below it, where the
+     * tiled layers repeat but the organisms cannot. The old fixed 0.25 floor was three octaves
+     * under it: the pond appeared 45 times over with life in only one of them.
+     */
+    private val density: Double = context.resources.displayMetrics.density.toDouble()
+    private fun minZ(w: Int = width, h: Int = height) = max(w, h).toDouble() / Renderer.WORLD
+    private fun clampZ(z: Double, w: Int = width, h: Int = height) =
+        z.coerceIn(minZ(w, h), 6.0 * density)
+    /** The viewport has to exist before the floor means anything. */
+    private var camPlaced = false
     // Touched from the UI thread, read by the render thread.
     @Volatile var speed = 1.0
     @Volatile var hidden = 0
@@ -160,7 +183,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         thread = Thread(this, "microcosm-render").also { it.start() }
     }
 
-    override fun surfaceChanged(h: SurfaceHolder, format: Int, w: Int, ht: Int) = Unit
+    override fun surfaceChanged(h: SurfaceHolder, format: Int, w: Int, ht: Int) {
+        // A viewport change moves the floor, so the zoom must be re-clamped against it — the
+        // browser does the same in its `resize`.
+        if (!camPlaced) {
+            camPlaced = true
+            // the browser's opening zoom, max(1, min(vw, vh) / 620) in CSS pixels
+            cam.z = max(density, min(w, ht).toDouble() / 620.0)
+        }
+        cam.z = clampZ(cam.z, w, ht)
+    }
 
     override fun surfaceDestroyed(h: SurfaceHolder) {
         running = false
@@ -174,7 +206,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     // Drag pans, pinch zooms, a tap selects. Long-press is where A.3's seeding picker will go.
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(d: ScaleGestureDetector): Boolean {
-            cam.z = (cam.z * d.scaleFactor).coerceIn(0.25, 6.0)
+            cam.z = clampZ(cam.z * d.scaleFactor)
             return true
         }
     })
@@ -279,7 +311,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 val k = nearestSun(sx, sy)
                 if (k >= 0) { sunSel = k; return }
             }
-            if (Native.pick(wx, wy, Native.pickRadius(cam.z, 0)) == 0) {
+            if (Native.pick(wx, wy, Native.pickRadius(cam.z / density, 0)) == 0) {
                 if (Native.levelAllows(0) != 0 && Native.levelPourOk() != 0) {
                     Native.ivPush(IV_POUR)
                     Native.evFertilize(wx, wy, 40.0)
@@ -289,7 +321,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 return
             }
         }
-        if (Native.pick(wx, wy, Native.pickRadius(cam.z, 0)) == 0) {
+        if (Native.pick(wx, wy, Native.pickRadius(cam.z / density, 0)) == 0) {
             selI = -1
             return
         }
@@ -302,10 +334,10 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     private fun worldX(sx: Float) = wrapWorld(cam.x + (sx - width / 2.0) / cam.z)
     private fun worldY(sy: Float) = wrapWorld(cam.y + (sy - height / 2.0) / cam.z)
 
-    /** The sun under the thumb, within 44 px, or -1. */
+    /** The sun under the thumb, within a thumb's width, or -1. */
     private fun nearestSun(sx: Float, sy: Float): Int {
         var best = -1
-        var bd = 44.0
+        var bd = 44.0 * density // 44 CSS px, as the browser's grip
         for (k in 0 until Native.sourceCount()) {
             val dx = wrapDelta(Native.sourceNum(k, 0) - cam.x) * cam.z + width / 2.0 - sx
             val dy = wrapDelta(Native.sourceNum(k, 1) - cam.y) * cam.z + height / 2.0 - sy
@@ -347,7 +379,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         Native.resetWorld()
         Native.initWorld(11)
         Native.markPrev()
-        renderer = Renderer()
+        renderer = Renderer(density)
 
         var last = System.nanoTime()
         var acc = 0.0
@@ -388,7 +420,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             buildMs += (build / 1e6 - buildMs) * 0.1
 
             stats = "t %d   %s   z %.2f\n%.1f ms/frame  (core %.2f)  %d drawn".format(
-                Native.tick(), popLine(), cam.z, frameMs, buildMs, renderer.orgN,
+                Native.tick(), popLine(), cam.z / density, frameMs, buildMs, renderer.orgN,
             )
             card = renderer.cardText(selI, selGen)
             selSpecies = if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0)
@@ -578,7 +610,11 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         val fieldMs = (0 until 5).minOf { renderer.timeFieldRefresh() } / 1e6
         sb.append("fields: %.2f ms — repack + upscale, once per advancing tick\n\n".format(fieldMs))
         sb.append(" zoom  drawn    core  record present   work\n")
-        for (z in doubleArrayOf(0.35, 0.6, 0.9, 1.4, 2.2)) {
+        // multiples of the floor, not absolute numbers: the floor depends on the screen, and a
+        // row below it is a view the player can never reach
+        val z0 = minZ()
+        for (mul in doubleArrayOf(1.0, 1.3, 1.8, 2.5, 3.5)) {
+            val z = (z0 * mul).coerceAtMost(6.0 * density)
             cam.z = z
             repeat(10) { paintOnce(1.0) } // warm the pipeline before timing it
             var core = 0L

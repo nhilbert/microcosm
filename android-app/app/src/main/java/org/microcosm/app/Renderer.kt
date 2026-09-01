@@ -20,7 +20,15 @@ import kotlin.math.roundToInt
  * Nothing in this file may decide anything — if a number here would change what the player sees
  * about the *world* rather than how it is drawn, it belongs in frame.rs instead.
  */
-class Renderer {
+/**
+ * @param density device pixels per CSS pixel. The browser draws on a CSS-pixel canvas and lets the
+ * device pixel ratio scale it; this canvas is in device pixels, so every screen-space number
+ * ported from `src/ui-render.js` — stroke widths, affordance radii, the LOD threshold — has to
+ * carry the density itself, or it lands a third of its intended size on a 3x phone. Numbers
+ * derived from the display list (`r`, `sx`, `sy`) already carry it through the zoom and are left
+ * exactly alone.
+ */
+class Renderer(private val density: Double = 1.0) {
     companion object {
         val ABYSS: Int = Color.rgb(0x0B, 0x13, 0x1E)
         const val WORLD = 1024.0
@@ -29,7 +37,10 @@ class Renderer {
     private val layers = Layers()
     private val sprites: Array<Array<Bitmap>>
     private val grammar = Array(7) { sp -> DoubleArray(6) { f -> Native.grammarNum(sp, f) } }
-    private val lodZ = Native.frameConst(0)
+    /** A CSS-pixel threshold in `frame.rs`, so it has to be compared against a CSS-pixel zoom. */
+    private val lodZ = Native.frameConst(0) * density
+    /** Screen-space sizes ported from the browser are in CSS pixels; this is the conversion. */
+    private val dp = density.toFloat()
     private val orgStride = Native.frameConst(2).toInt()
     private val corpseStride = Native.frameConst(3).toInt()
 
@@ -159,11 +170,11 @@ class Renderer {
             val rr = Native.frameSel(selI, selGen, 3).toFloat()
             flat.style = Paint.Style.STROKE
             flat.color = Color.argb(242, 201, 215, 227)
-            flat.strokeWidth = 1.5f
+            flat.strokeWidth = 1.5f * dp
             c.drawCircle(sx, sy, rr, flat)
             flat.color = Color.argb(64, 201, 215, 227)
-            flat.strokeWidth = 5f
-            c.drawCircle(sx, sy, rr + 4f, flat)
+            flat.strokeWidth = 5f * dp
+            c.drawCircle(sx, sy, rr + 4f * dp, flat)
             flat.style = Paint.Style.FILL
         }
         return buildNanos
@@ -183,8 +194,8 @@ class Renderer {
         while (q + 2 < pours.size) {
             val age = pours[q + 2]
             flat.color = Color.argb(((0.7f * (1f - age)) * 255).toInt().coerceIn(0, 255), 242, 178, 74)
-            flat.strokeWidth = 2f
-            c.drawCircle(pours[q], pours[q + 1], 10f + age * 34f, flat)
+            flat.strokeWidth = 2f * dp
+            c.drawCircle(pours[q], pours[q + 1], (10f + age * 34f) * dp, flat)
             q += 3
         }
         // every sun wears a ring in Intervene; the gripped one wears a brighter one
@@ -193,18 +204,18 @@ class Renderer {
             val sy = (vh / 2 + wd(Native.sourceNum(k, 1) - cam.y) * cam.z).toFloat()
             val on = k == sunSel
             flat.color = Color.argb(if (on) 255 else 230, 242, 178, 74)
-            flat.strokeWidth = if (on) 2.5f else 1.5f
-            c.drawCircle(sx, sy, 16f, flat)
+            flat.strokeWidth = (if (on) 2.5f else 1.5f) * dp
+            c.drawCircle(sx, sy, 16f * dp, flat)
             flat.color = Color.argb(if (on) 128 else 77, 242, 178, 74)
-            flat.strokeWidth = 6f
-            c.drawCircle(sx, sy, 22f, flat)
+            flat.strokeWidth = 6f * dp
+            c.drawCircle(sx, sy, 22f * dp, flat)
         }
         if (wallDrag != null) {
             flat.color = Color.argb(230, 242, 178, 74)
-            flat.strokeWidth = 2.2f
+            flat.strokeWidth = 2.2f * dp
             c.drawLine(wallDrag[0], wallDrag[1], wallDrag[2], wallDrag[3], flat)
             flat.style = Paint.Style.FILL
-            c.drawCircle(wallDrag[0], wallDrag[1], 3f, flat)
+            c.drawCircle(wallDrag[0], wallDrag[1], 3f * dp, flat)
         }
         flat.style = Paint.Style.FILL
     }
@@ -284,7 +295,7 @@ class Renderer {
             flat.color = Color.argb((a * 255).roundToInt().coerceIn(0, 255), 158, 168, 178)
             c.drawCircle(sx, sy, r, flat)
             flat.style = Paint.Style.STROKE
-            flat.strokeWidth = 1f
+            flat.strokeWidth = 1f * dp
             flat.color = Color.argb((a * 0.8 * 255).roundToInt().coerceIn(0, 255), 110, 120, 130)
             c.drawCircle(sx, sy, r * 0.55f, flat)
         }
@@ -308,22 +319,22 @@ class Renderer {
         flat.color = Color.argb(26, 150, 200, 235)
         c.drawPath(rayPath, flat)
         flat.style = Paint.Style.STROKE
-        flat.strokeWidth = 1.6f
+        flat.strokeWidth = 1.6f * dp
         flat.color = Color.argb(217, 212, 236, 255)
         rayPath.reset()
         rayPath.moveTo(-back, w); rayPath.lineTo(l, 0f); rayPath.lineTo(-back, -w)
         c.drawPath(rayPath, flat)
-        flat.strokeWidth = 1f
+        flat.strokeWidth = 1f * dp
         flat.color = Color.argb(51, 150, 200, 235)
         rayPath.reset()
         rayPath.moveTo(-back, w); rayPath.lineTo(-notch, 0f); rayPath.lineTo(-back, -w)
         c.drawPath(rayPath, flat)
         flat.style = Paint.Style.FILL
         flat.color = Color.argb(242, 240, 250, 255)
-        c.drawCircle(l, 0f, 1.4f, flat)
+        c.drawCircle(l, 0f, 1.4f * dp, flat)
         if (striking) {
             flat.style = Paint.Style.STROKE
-            flat.strokeWidth = 2f
+            flat.strokeWidth = 2f * dp
             flat.color = Color.argb(89, 212, 236, 255)
             c.drawLine(-r * 3.2f, 0f, r * 0.8f, 0f, flat)
         }
