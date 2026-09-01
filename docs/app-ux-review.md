@@ -240,7 +240,12 @@ fights behind it.
 frozen oracle for the *renderer*, as `src/sim/` did for the simulation. Q2 — **research first**,
 against the recommendation below, which stands as recorded rather than re-argued. Q3 — **all five
 lenses, seriously**. The research is `docs/app-ux-research.md`; §7 there is what the design phase
-should build, and §8 is what only the phone can settle. The U.0 repairs are NOT done.
+should build, and §8 is what only the phone can settle.
+
+**U.0 shipped 2026-09-01** — all seven repairs of §5, one commit each, the layout gate green after
+every one and its baseline ratcheted from 35 violations to zero. Owed and open: the owner has not
+played the repaired build; every claim above the gate's (that it *feels* fixed, not merely that it
+measures fixed) waits on that.
 
 
 **Q1 — May the app's UI diverge from the browser's?** Staying in step keeps one design and one set
