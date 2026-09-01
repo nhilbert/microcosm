@@ -96,11 +96,12 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         private set
 
     // The core is single-threaded and lives on the render thread, so nothing outside may touch it.
-    // Taps and levers are queued here and picked up at the top of the loop.
-    @Volatile private var pendingTapX = Float.NaN
-    @Volatile private var pendingTapY = Float.NaN
-    @Volatile private var pendingLongX = Float.NaN
-    @Volatile private var pendingLongY = Float.NaN
+    // Taps and levers are queued here and picked up at the top of the loop. Each gesture crosses
+    // threads as ONE atomic reference: the earlier pair of volatile floats could be read torn (x
+    // set, y stale) or lost outright in the clear window — the boot gate's grip test caught the
+    // tap silently vanishing on CI, and the same race shipped in every build since A.2.
+    private val pendingTap = java.util.concurrent.atomic.AtomicReference<FloatArray?>()
+    private val pendingLong = java.util.concurrent.atomic.AtomicReference<FloatArray?>()
     private val commands = ConcurrentLinkedQueue<() -> Unit>()
     private var selI = -1
     private var selGen = 0
@@ -276,13 +277,11 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             return true
         }
         override fun onSingleTapUp(e: MotionEvent): Boolean {
-            pendingTapX = e.x
-            pendingTapY = e.y
+            pendingTap.set(floatArrayOf(e.x, e.y))
             return true
         }
         override fun onLongPress(e: MotionEvent) {
-            pendingLongX = e.x
-            pendingLongY = e.y
+            pendingLong.set(floatArrayOf(e.x, e.y))
         }
     })
 
@@ -329,24 +328,25 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     private fun takeInput() {
         while (true) (commands.poll() ?: break).invoke()
 
-        val lx = pendingLongX
-        if (!lx.isNaN()) {
-            val ly = pendingLongY
-            pendingLongY = Float.NaN
-            pendingLongX = Float.NaN
+        val lp = pendingLong.getAndSet(null)
+        if (lp != null) {
             val sp = seedSpecies
             if (intervene && sp >= 0 && Native.levelAllows(1) != 0) {
                 Native.ivPush(IV_SEED)
-                Native.evSpawnPack(sp, worldX(lx), worldY(ly))
-                pours.add(Pour(lx, ly, System.nanoTime()))
+                Native.evSpawnPack(sp, worldX(lp[0]), worldY(lp[1]))
+                pours.add(Pour(lp[0], lp[1], System.nanoTime()))
+            } else if (intervene && sp < 0 && Native.levelAllows(2) != 0) {
+                // A held press on the sun grips it too. A player whose tap seems to do nothing
+                // presses longer and harder — and a long press used to do nothing at all unless
+                // a seed species was armed, which read as "I never get to grip it".
+                val k = nearestSun(lp[0], lp[1])
+                if (k >= 0) sunSel = k
             }
         }
 
-        val sx = pendingTapX
-        if (sx.isNaN()) return
-        val sy = pendingTapY
-        pendingTapY = Float.NaN
-        pendingTapX = Float.NaN
+        val tp = pendingTap.getAndSet(null) ?: return
+        val sx = tp[0]
+        val sy = tp[1]
         val wx = worldX(sx)
         val wy = worldY(sy)
 
