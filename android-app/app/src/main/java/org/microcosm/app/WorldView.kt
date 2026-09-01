@@ -103,8 +103,17 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var wallArmed = false
     /** The species the long-press picker will seed, set by the shell before the press lands. */
     @Volatile var seedSpecies = -1
-    /** The selected sun, or -1. Dragging moves it while it is selected. */
+    /** The selected sun, or -1. A drag that STARTS on it moves it; other drags pan (U0.4). */
     @Volatile var sunSel = -1
+    /**
+     * The gripped sun's screen position, published once a frame by the render thread so the
+     * gesture arbiter can ask "did this drag start on the sun?" without touching the core from
+     * the UI thread. NaN while nothing is gripped.
+     */
+    @Volatile private var gripSx = Float.NaN
+    @Volatile private var gripSy = Float.NaN
+    /** Latched at finger-down: this gesture is a sun move. Cleared on UP/CANCEL. */
+    private var dragOnSun = false
     /** Published for the shell: what is selected, and what could be put back. */
     @Volatile var selSpecies = -1
         private set
@@ -238,7 +247,13 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 wallDrag = floatArrayOf(e1.x, e1.y, e2.x, e2.y)
                 return true
             }
-            if (intervene && sunSel >= 0) {
+            // U0.4: the grip no longer owns every drag. Moving a sun is a press — the light
+            // plan measured 5/8 core loss for it — so it takes a drag that STARTED on the sun
+            // (latched at finger-down, because the sun follows the finger and a live distance
+            // check would flip mid-gesture). Every other drag pans the camera, gripped or not.
+            // The deliberateness threshold is the GestureDetector's own touch slop, which no
+            // onScroll arrives without.
+            if (intervene && sunSel >= 0 && dragOnSun) {
                 val k = sunSel
                 val wx = wrapWorld(cam.x + (e2.x - width / 2.0) / cam.z)
                 val wy = wrapWorld(cam.y + (e2.y - height / 2.0) / cam.z)
@@ -265,10 +280,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         performClick()
+        if (e.actionMasked == MotionEvent.ACTION_DOWN) {
+            val gx = gripSx
+            val gy = gripSy
+            dragOnSun = !gx.isNaN() && hypot((e.x - gx).toDouble(), (e.y - gy).toDouble()) < 44.0 * density
+        }
         scaleDetector.onTouchEvent(e)
         tapDetector.onTouchEvent(e)
         if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) {
             sunLogged = -1
+            dragOnSun = false
             val d = wallDrag
             wallDrag = null
             if (d != null && wallArmed) {
@@ -441,6 +462,15 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 Native.tick(), popLine(), cam.z / density, frameMs, buildMs, renderer.orgN,
             )
             card = renderer.cardText(selI, selGen)
+            // Where the gripped sun is on screen this frame, for the drag-start test (U0.4).
+            val gs = sunSel
+            if (gs in 0 until Native.sourceCount()) {
+                gripSx = (wrapDelta(Native.sourceNum(gs, 0) - cam.x) * cam.z + width / 2.0).toFloat()
+                gripSy = (wrapDelta(Native.sourceNum(gs, 1) - cam.y) * cam.z + height / 2.0).toFloat()
+            } else {
+                gripSx = Float.NaN
+                gripSy = Float.NaN
+            }
             selSpecies = if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0)
                 Native.org(selI, 1).toInt() else -1
             undoKind = Native.undoKind()
