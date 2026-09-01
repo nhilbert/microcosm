@@ -19,8 +19,7 @@ import kotlin.math.roundToInt
  *
  * Nothing in this file may decide anything — if a number here would change what the player sees
  * about the *world* rather than how it is drawn, it belongs in frame.rs instead.
- */
-/**
+ *
  * @param density device pixels per CSS pixel. The browser draws on a CSS-pixel canvas and lets the
  * device pixel ratio scale it; this canvas is in device pixels, so every screen-space number
  * ported from `src/ui-render.js` — stroke widths, affordance radii, the LOD threshold — has to
