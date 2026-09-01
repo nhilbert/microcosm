@@ -29,9 +29,15 @@ import org.robolectric.annotation.Config
  * that declared its own buttons would agree with a broken app.
  *
  * Note the world is never touched: no `Native`, no core, no render thread. This measures chrome.
+ *
+ * GraphicsMode NATIVE is load-bearing, not decoration: under Robolectric's legacy graphics the
+ * text measures near zero wide, so a button whose LABEL overflows measures as fitting — which is
+ * exactly how "Speichern" overflowed on the owner's phone under a green gate. Real text metrics
+ * or the SQUEEZED check is theatre.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
+@org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
 class ChromeLayoutTest {
 
     private fun ctx(): Context = ContextThemeWrapper(
@@ -48,12 +54,22 @@ class ChromeLayoutTest {
     @Test
     fun everyControlFitsAndCanBeTouched() {
         val found = LinkedHashMap<String, LayoutGate.Violation>()
-        for (p in LayoutGate.PROFILES) {
+        for (p in LayoutGate.PROFILES) for (loc in listOf("", "de")) {
             // Reconfigure the runtime itself, then build the views. Setting the qualifiers after
-            // the views exist would measure them against the previous device.
-            RuntimeEnvironment.setQualifiers(p.qualifiers)
+            // the views exist would measure them against the previous device. Every profile runs
+            // twice since the translation: German words are longer, and "Speichern" overflowed
+            // its button on the owner's phone while the English-locale gate stayed green — a
+            // fitting problem the gate could not see in a language it never measured.
+            RuntimeEnvironment.setQualifiers(if (loc.isEmpty()) p.qualifiers else "$loc-${p.qualifiers}")
+            val prof = if (loc.isEmpty()) p else p.copy(name = "${p.name} $loc")
             val c = ctx()
-            for ((name, row) in rows(c)) for (v in LayoutGate.check(name, row, p)) found[v.key] = v
+            // A drawer row is measured at the drawer's inner width, not the screen's — that is
+            // the width it actually gets, and where "Speichern" really overflowed.
+            for ((name, row) in rows(c)) {
+                val w = if (name in Chrome.IN_DRAWER) Chrome.DRAWER_DP - 2 * Chrome.DRAWER_PAD_DP
+                        else prof.wDp
+                for (v in LayoutGate.check(name, row, prof, w)) found[v.key] = v
+            }
         }
 
         val baseline = javaClass.classLoader!!.getResourceAsStream("layout-baseline.txt")!!

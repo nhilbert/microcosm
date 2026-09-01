@@ -49,6 +49,16 @@ object Chrome {
     /** The sheet's utility row. `bench` is dev-mode only at runtime. */
     val UTILITY = listOf("reset", "save", "data", "bench")
 
+    /** The menu drawer's width and padding — declared here so the layout gate measures the
+     *  drawer's rows at the width they actually get. "Speichern" overflowed at 260 dp inner
+     *  width while every device-width sweep stayed green: a row is only measured honestly at
+     *  the width of the container it ships in. */
+    const val DRAWER_DP = 300
+    const val DRAWER_PAD_DP = 20
+
+    /** The rows that live inside the drawer, and so at its inner width, not the screen's. */
+    val IN_DRAWER = setOf("pace", "utility")
+
     const val TEXT_SP = 14f
 
     /**
@@ -144,9 +154,28 @@ object Chrome {
     fun build(ctx: Context, name: String, onTap: (Int) -> Unit = {}): View = when (name) {
         "pace" -> pace(ctx, onTap)
         "tools" -> dial(ctx, onTap)
-        "utility" -> weightedRow(ctx, UTILITY, onTap)
+        // 2x2, not 1x4 (owner round 3): four buttons sharing the drawer's ~260 dp gave each 65,
+        // which German ("Speichern") overflowed and even English only just survived. Two per row
+        // doubles the budget and stops fitting from depending on the language.
+        "utility" -> grid(ctx, UTILITY, 2, onTap)
         in SCROLLS -> scrollRow(ctx, ROWS.getValue(name), onTap)
         else -> row(ctx, ROWS.getValue(name), onTap)
+    }
+
+    /** [labels] as weighted rows of [cols], top to bottom. `onTap` gets the flat index. */
+    fun grid(ctx: Context, labels: List<String>, cols: Int, onTap: (Int) -> Unit = {}): LinearLayout {
+        val box = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+        var k = 0
+        while (k < labels.size) {
+            val slice = labels.subList(k, minOf(k + cols, labels.size))
+            val base = k
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT)
+            if (k > 0) lp.topMargin = Style.dp(ctx, 8f)
+            box.addView(weightedRow(ctx, slice) { i -> onTap(base + i) }, lp)
+            k += cols
+        }
+        return box
     }
 
     /**
@@ -324,7 +353,15 @@ object Chrome {
     fun rowOf(v: View): LinearLayout =
         if (v is HorizontalScrollView) v.getChildAt(0) as LinearLayout else v as LinearLayout
 
-    /** The named button of a construct built by [row], [scrollRow] or [build]. */
-    fun at(container: View, labels: List<String>, label: String): Button =
-        rowOf(container).getChildAt(labels.indexOf(label)) as Button
+    /** The named button of a construct built by [row], [scrollRow], [grid] or [build] — the
+     *  buttons in build order, whatever the nesting, so a grid works like a row. */
+    fun at(container: View, labels: List<String>, label: String): Button {
+        val out = ArrayList<Button>()
+        fun walk(v: View) {
+            if (v is Button) out.add(v)
+            else if (v is android.view.ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
+        }
+        walk(container)
+        return out[labels.indexOf(label)]
+    }
 }

@@ -58,6 +58,7 @@
     <!-- the hand's hints and the sun -->
     <string name="hint_wall_drag">drag on the water</string>
     <string name="hint_seed_press">long-press the water</string>
+    <string name="hint_tool_touch">tap or drag the water</string>
     <string name="label_sun">sun</string>
     <string name="badge_tap_restores">tap restores</string>
     <string name="sun_badge_moved">moved</string>

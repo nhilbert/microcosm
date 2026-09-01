@@ -255,6 +255,66 @@ class BootTest {
     }
 
     /**
+     * The armed touch tools (owner round 3): feed and kill are no longer selection errands — an
+     * armed hand feeds or erases what a tap or drag touches. This drives the real gesture
+     * pipeline with the kill tool armed and requires the creature under the finger to die, the
+     * tap NOT to select (an armed hand and an open specimen drawer were round 3's overlap mess),
+     * and the undo chip to appear while the kill is fresh.
+     */
+    @Test
+    fun theArmedToolTouchesTheWorld() {
+        requireNativeLib()
+        org.robolectric.RuntimeEnvironment.setQualifiers("w408dp-h900dp-xxhdpi")
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val world = activity.world
+        world.surfaceCreated(world.holder)
+        world.surfaceChanged(world.holder, 0, world.width, world.height)
+        try {
+            world.speed = 0.0
+            world.intervene = true
+            world.toolArmed = WorldView.TOOL_KILL
+            // park the camera on a living creature, read on the render thread where the core lives
+            val spot = DoubleArray(4)
+            val found = java.util.concurrent.CountDownLatch(1)
+            world.post {
+                val n = Native.scalar(0).toInt()
+                for (i in 0 until n) if (Native.org(i, 0) != 0.0) {
+                    spot[0] = Native.org(i, 3); spot[1] = Native.org(i, 4)
+                    spot[2] = 1.0; spot[3] = i.toDouble(); break
+                }
+                found.countDown()
+            }
+            assertTrue(found.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue("a founded world should hold something alive", spot[2] == 1.0)
+            world.cam.x = spot[0]
+            world.cam.y = spot[1]
+            val t = SystemClock.uptimeMillis()
+            val cx = activity.world.width / 2f
+            val cy = activity.world.height / 2f
+            world.onTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, cx, cy, 0))
+            world.onTouchEvent(MotionEvent.obtain(t, t + 50, MotionEvent.ACTION_UP, cx, cy, 0))
+            val dead = java.util.concurrent.CountDownLatch(1)
+            val alive = DoubleArray(1) { 1.0 }
+            val until = System.currentTimeMillis() + 3000
+            while (System.currentTimeMillis() < until) {
+                val probe = java.util.concurrent.CountDownLatch(1)
+                world.post { alive[0] = Native.org(spot[3].toInt(), 0); probe.countDown() }
+                probe.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                if (alive[0] == 0.0) { dead.countDown(); break }
+                Thread.sleep(10)
+            }
+            assertTrue("the armed kill tool must erase the creature under the tap", alive[0] == 0.0)
+            assertTrue("an armed tool's tap must not select", world.specimen == null)
+            assertTrue("a fresh kill must offer its undo", world.undoKind != 0)
+            println("BOOT GATE: the armed kill tool erased the creature it touched, without selecting")
+        } finally {
+            world.toolArmed = 0
+            world.intervene = false
+            world.surfaceDestroyed(world.holder)
+        }
+    }
+
+    /**
      * The owner's screen-lock report, played back (2026-09-01): "when my screen locks, all data
      * is lost, no save." Two faults compounded. A lock destroys the surface and an unlock
      * creates a new one, and `WorldView.run()` founded a fresh world on every new surface — so

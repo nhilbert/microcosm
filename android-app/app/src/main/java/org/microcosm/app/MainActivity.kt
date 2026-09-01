@@ -65,6 +65,12 @@ class MainActivity : Activity() {
         }
     }
     private lateinit var paceBox: LinearLayout
+    private lateinit var dialWrap: LinearLayout
+    private lateinit var centerChips: LinearLayout
+    /** How far the floating chrome is lifted above an open specimen sheet (round 3). */
+    private var chromeLift = 0
+    /** The gesture-pill inset, recorded by the insets listener for the lift arithmetic. */
+    private var insetBottom = 0
     private val speciesPills = ArrayList<LinearLayout>()
     private lateinit var dataPanel: LinearLayout
     private lateinit var pagesRow: View
@@ -109,10 +115,11 @@ class MainActivity : Activity() {
             // The floating chrome (U2.R2): the fab is the hand — amber when the mode is on,
             // wearing the armed tool's icon while one stands, × while the dial is open.
             val on = world.intervene
-            val hasSel = world.selSpecies >= 0
             val armedIcon = when {
                 world.wallArmed -> R.drawable.ic_wall
                 world.seedSpecies >= 0 -> R.drawable.ic_seed
+                world.toolArmed == WorldView.TOOL_FEED -> R.drawable.ic_feed
+                world.toolArmed == WorldView.TOOL_KILL -> R.drawable.ic_kill
                 else -> 0
             }
             Chrome.fabState(this@MainActivity, interveneFab, on,
@@ -121,14 +128,20 @@ class MainActivity : Activity() {
                 !on -> ""
                 world.wallArmed -> getString(R.string.hint_wall_drag)
                 world.seedSpecies >= 0 -> getString(R.string.hint_seed_press)
+                world.toolArmed != 0 -> getString(R.string.hint_tool_touch)
                 else -> ""
             }
             fabLabel.text = armedText
             fabLabel.visibility = if (armedText.isEmpty()) ViewGroup.GONE else ViewGroup.VISIBLE
             for (k in 0 until toolsDial.childCount) Chrome.dialRowState(this@MainActivity,
                 toolsDial.getChildAt(k) as LinearLayout,
-                (k == 3 && world.wallArmed) || (k == 2 && world.seedSpecies >= 0),
-                if (k <= 1) hasSel else true)
+                when (k) {
+                    0 -> world.toolArmed == WorldView.TOOL_FEED
+                    1 -> world.toolArmed == WorldView.TOOL_KILL
+                    2 -> world.seedSpecies >= 0
+                    else -> world.wallArmed
+                },
+                true) // round 3: no tool needs a selection any more
             Chrome.paceSelect(this@MainActivity, paceBox,
                 when { world.speed >= 16 -> 3; world.speed >= 4 -> 2; world.speed >= 1 -> 1; else -> 0 })
             sunBar.visibility = if (on && world.sunSel >= 0) ViewGroup.VISIBLE else ViewGroup.GONE
@@ -138,6 +151,20 @@ class MainActivity : Activity() {
             // the specimen drawer follows the selection — the drawer the owner found missing
             val snap = world.specimen
             specimenSheet.visibility = if (snap != null) ViewGroup.VISIBLE else ViewGroup.GONE
+            // Round 3: the drawer must not sit UNDER the floating chrome — while it is open,
+            // the fabs, the dial and the centre chips ride above it. (Its height settles a
+            // frame after it becomes visible; the next 250 ms tick corrects the lift.)
+            val lift = if (snap != null) specimenSheet.height else 0
+            if (lift != chromeLift) {
+                chromeLift = lift
+                (dialWrap.layoutParams as FrameLayout.LayoutParams).bottomMargin =
+                    Style.dp(this@MainActivity, 24f) + insetBottom + lift
+                (menuFab.layoutParams as FrameLayout.LayoutParams).bottomMargin =
+                    Style.dp(this@MainActivity, 24f) + insetBottom + lift
+                (centerChips.layoutParams as FrameLayout.LayoutParams).bottomMargin =
+                    Style.dp(this@MainActivity, 92f) + insetBottom + lift
+                dialWrap.requestLayout(); menuFab.requestLayout(); centerChips.requestLayout()
+            }
             if (snap != null) {
                 specimenName.text = Native.traitText(snap.sp, 0) +
                     if (snap.dormant) "  · " + getString(R.string.specimen_dormant) else ""
@@ -294,9 +321,9 @@ class MainActivity : Activity() {
         specHeader.addView(specimenDot, LinearLayout.LayoutParams(
             Style.dp(this, 12f), Style.dp(this, 12f)).apply { marginEnd = Style.dp(this@MainActivity, 9f) })
         specHeader.addView(specimenName, LinearLayout.LayoutParams(0, WRAP, 1f))
-        specHeader.addView(button("feed") { world.feedSelected() },
+        specHeader.addView(button(Chrome.label(this, "feed")) { world.feedSelected() },
             LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = Style.dp(this@MainActivity, 8f) })
-        specHeader.addView(button("kill") { world.killSelected() })
+        specHeader.addView(button(Chrome.label(this, "kill")) { world.killSelected() })
         specimenSheet.addView(specHeader)
         specimenSub = TextView(this).apply {
             setTextColor(Style.DIM)
@@ -364,7 +391,7 @@ class MainActivity : Activity() {
         root.addView(specimenSheet, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
         // floating centre chips: the sun's controls while gripped, undo while it applies
-        val centerChips = LinearLayout(this).apply {
+        centerChips = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
         }
@@ -405,7 +432,7 @@ class MainActivity : Activity() {
         })
 
         // the intervene fab and its speed dial
-        val dialWrap = LinearLayout(this).apply {
+        dialWrap = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.END
         }
@@ -458,8 +485,10 @@ class MainActivity : Activity() {
             setBackgroundColor(Style.ABYSS)
             visibility = ViewGroup.GONE
             isClickable = true
-            setPadding(Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f),
-                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f))
+            // width and padding come from Chrome so the layout gate measures the drawer's rows
+            // at exactly the width this gives them
+            val pad = Style.dp(this@MainActivity, Chrome.DRAWER_PAD_DP.toFloat())
+            setPadding(pad, pad, pad, pad)
         }
         val drawerBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         drawerBody.addView(TextView(this).apply {
@@ -528,7 +557,8 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(MATCH, WRAP))
         drawer.addView(ScrollView(this).apply { addView(drawerBody) },
             LinearLayout.LayoutParams(MATCH, MATCH))
-        root.addView(drawer, FrameLayout.LayoutParams(Style.dp(this, 300f), MATCH).apply {
+        root.addView(drawer, FrameLayout.LayoutParams(
+            Style.dp(this, Chrome.DRAWER_DP.toFloat()), MATCH).apply {
             gravity = Gravity.START
         })
 
@@ -674,12 +704,12 @@ class MainActivity : Activity() {
             // The floating chrome clears the gesture pill; the specimen sheet absorbs it as padding.
             specimenSheet.setPadding(Style.dp(this, 20f), Style.dp(this, 12f),
                 Style.dp(this, 20f), Style.dp(this, 14f) + ib)
+            insetBottom = ib
+            chromeLift = -1 // margins are lift+inset; a changed inset re-applies them (tickHud)
             (menuFab.layoutParams as FrameLayout.LayoutParams).bottomMargin = Style.dp(this, 24f) + ib
-            ((interveneFab.parent as View).parent as? View)?.let {
-                (it.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin = Style.dp(this, 24f) + ib
-            }
-            drawer.setPadding(Style.dp(this, 20f), Style.dp(this, 20f) + insets.systemWindowInsetTop,
-                Style.dp(this, 20f), Style.dp(this, 20f) + ib)
+            (dialWrap.layoutParams as FrameLayout.LayoutParams).bottomMargin = Style.dp(this, 24f) + ib
+            val dpad = Style.dp(this, Chrome.DRAWER_PAD_DP.toFloat())
+            drawer.setPadding(dpad, dpad + insets.systemWindowInsetTop, dpad, dpad + ib)
             // The Data panel is a full-screen overlay, so it needs the insets itself — without
             // this its title renders under the status bar clock (the owner's screenshots).
             dataPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
@@ -914,9 +944,11 @@ class MainActivity : Activity() {
 
     private fun onFabTap() {
         when {
-            world.wallArmed || world.seedSpecies >= 0 -> { // armed: stand down, offer the dial
+            world.wallArmed || world.seedSpecies >= 0 || world.toolArmed != 0 -> {
+                // armed: stand down, offer the dial
                 world.wallArmed = false
                 world.seedSpecies = -1
+                world.toolArmed = 0
                 setDial(true)
             }
             dialOpen -> { setDial(false); world.intervene = false }
@@ -924,14 +956,21 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * A tool arms the hand (owner round 3): feed and kill are no longer selection errands but
+     * armed touch tools — tap or drag the water and the creature under the finger is fed or
+     * erased. The specimen sheet keeps per-individual feed/kill for the selected one. Arming
+     * deselects: an armed hand and an open specimen drawer were the round-3 overlap mess.
+     */
     private fun onTool(k: Int) {
+        world.deselect()
         when (k) {
-            0 -> world.feedSelected()
-            1 -> world.killSelected()
-            2 -> seedPicker() // arms on choice and closes the dial there
-            else -> { world.wallArmed = true; world.seedSpecies = -1; setDial(false) }
+            0 -> { world.toolArmed = WorldView.TOOL_FEED; world.seedSpecies = -1; world.wallArmed = false }
+            1 -> { world.toolArmed = WorldView.TOOL_KILL; world.seedSpecies = -1; world.wallArmed = false }
+            2 -> { world.toolArmed = 0; seedPicker() } // arms on choice and closes the dial there
+            else -> { world.wallArmed = true; world.toolArmed = 0; world.seedSpecies = -1 }
         }
-        if (k <= 1) setDial(false)
+        if (k != 2) setDial(false)
     }
 
     internal fun openDrawer() {
@@ -960,12 +999,46 @@ class MainActivity : Activity() {
         resetButton.setTextColor(Style.TEXT)
     }
 
-    /** The seeding picker: choose a species, then long-press the water to found a pack there. */
+    /**
+     * The seeding picker: choose a species, then long-press the water to found a pack there.
+     * Each row wears the species' own colour (round 3: a bare name list said nothing) — the
+     * world's palette, from the core's bucket table, never a second one here.
+     */
     private fun seedPicker() {
-        val names = live.map { Native.traitText(it, 0) }.toTypedArray()
+        val adapter = object : android.widget.BaseAdapter() {
+            override fun getCount() = live.size
+            override fun getItem(k: Int) = live[k]
+            override fun getItemId(k: Int) = k.toLong()
+            override fun getView(k: Int, recycled: View?, parent: ViewGroup?): View {
+                val sp = live[k]
+                return LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    minimumHeight = Style.dp(this@MainActivity, 48f)
+                    setPadding(Style.dp(this@MainActivity, 20f), 0, Style.dp(this@MainActivity, 20f), 0)
+                    addView(View(this@MainActivity).apply {
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            setColor(speciesColor(sp)); cornerRadius = 99f
+                        }
+                    }, LinearLayout.LayoutParams(Style.dp(this@MainActivity, 12f),
+                        Style.dp(this@MainActivity, 12f)).apply { marginEnd = Style.dp(this@MainActivity, 12f) })
+                    addView(TextView(this@MainActivity).apply {
+                        text = Native.traitText(sp, 0)
+                        textSize = 15f
+                        typeface = Style.word(this@MainActivity)
+                        setTextColor(Style.TEXT)
+                    })
+                }
+            }
+        }
         AlertDialog.Builder(this, R.style.MicrocosmDialog)
             .setTitle(getString(R.string.dlg_seed_title))
-            .setItems(names) { _, k -> world.seedSpecies = live[k]; world.wallArmed = false; setDial(false) }
+            .setAdapter(adapter) { _, k ->
+                world.seedSpecies = live[k]
+                world.wallArmed = false
+                world.toolArmed = 0
+                setDial(false)
+            }
             .setNegativeButton(getString(R.string.btn_none)) { _, _ -> world.seedSpecies = -1 }
             .show()
     }
@@ -1012,6 +1085,7 @@ class MainActivity : Activity() {
             dialOpen -> { setDial(false); world.intervene = false }
             world.selSpecies >= 0 -> world.deselect()
             world.sunSel >= 0 -> world.sunSel = -1
+            world.toolArmed != 0 -> world.toolArmed = 0
             world.wallArmed -> world.wallArmed = false
             world.intervene -> world.intervene = false
             else -> {

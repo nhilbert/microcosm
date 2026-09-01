@@ -73,10 +73,10 @@ object LayoutGate {
      * Rows are given the width they would really get and as much height as they ask for, which is
      * how the shell's own bars are laid out.
      */
-    fun check(what: String, root: View, p: Profile): List<Violation> {
+    fun check(what: String, root: View, p: Profile, widthDp: Int = p.wDp): List<Violation> {
         // The density the runtime is actually configured at, not the one we hoped for.
         val density = root.resources.displayMetrics.density
-        val wPx = (p.wDp * density).toInt()
+        val wPx = (minOf(widthDp, p.wDp) * density).toInt()
         val hPx = (p.hDp * density).toInt()
         val minPx = MIN_TARGET_DP * density
 

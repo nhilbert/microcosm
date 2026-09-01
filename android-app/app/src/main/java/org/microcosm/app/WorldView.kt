@@ -36,6 +36,9 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         const val IV_WALL_ADD = 14
         private const val REC_N = 900
 
+        const val TOOL_FEED = 1
+        const val TOOL_KILL = 2
+
         /**
          * Whether THIS PROCESS has founded a world in the core. The core is a process-wide
          * singleton; the surface is not — a screen lock destroys it and an unlock creates a new
@@ -145,6 +148,12 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
 
     /** Observe looks; Intervene touches. Amber marks the hand, and only in Intervene. */
     @Volatile var intervene = false
+    /**
+     * The armed touch tool (owner round 3): 0 none, [TOOL_FEED] or [TOOL_KILL]. Armed, a tap or a
+     * drag feeds/kills what is under the finger — an eraser, not a selection ritual. The specimen
+     * sheet keeps its own per-individual feed/kill; these are for working the crowd.
+     */
+    @Volatile var toolArmed = 0
     /** The armed one-shot wall tool: the next drag draws a wall instead of panning. */
     @Volatile var wallArmed = false
     /** The species the long-press picker will seed, set by the shell before the press lands. */
@@ -167,6 +176,9 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         private set
     @Volatile var undoSpecies = -1
         private set
+    /** Undo-chip freshness (render thread): the chip shows for 45 s after each intervention. */
+    private var ivSeen = 0
+    private var ivFreshUntil = 0L
 
     // ---- the learning levels (A.5) ----
     // The runtime is the core's (levels.rs) and its verdicts are counted in recorder samples, so
@@ -241,6 +253,23 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     private var wallDrag: FloatArray? = null
     /** A sun drag is one intervention, not one per frame: log it when the grip starts moving. */
     private var sunLogged = -1
+    /** The armed tool's drag throttle (UI thread). */
+    private var lastToolNs = 0L
+
+    /** One touch of the armed tool: feed or kill the creature under the point, if any. */
+    private fun applyTool(wx: Double, wy: Double) {
+        if (Native.pick(wx, wy, Native.pickRadius(cam.z / density, 0)) == 0) return
+        val i = Native.pickAt(0, 0).toInt()
+        val gen = Native.pickAt(0, 1).toInt()
+        if (toolArmed == TOOL_KILL) {
+            Native.ivPush(IV_KILL)
+            Native.evKill(i, gen)
+            if (i == selI) selI = -1
+        } else {
+            Native.ivPush(IV_FEED)
+            Native.evFeed(i, gen, 0.35)
+        }
+    }
 
     /** Run something against the core on the render thread, where the core may be touched. */
     fun post(cmd: () -> Unit) { commands.add(cmd) }
@@ -298,6 +327,18 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             // is on the world, not on the view.
             if (wallArmed && e1 != null) {
                 wallDrag = floatArrayOf(e1.x, e1.y, e2.x, e2.y)
+                return true
+            }
+            // The armed touch tool sweeps: the drag feeds/kills along the path (throttled so a
+            // slow stroke is not a massacre per pixel), and the camera stays put.
+            if (intervene && toolArmed != 0) {
+                val now = System.nanoTime()
+                if (now - lastToolNs > 90_000_000L) {
+                    lastToolNs = now
+                    val wx = worldX(e2.x)
+                    val wy = worldY(e2.y)
+                    post { applyTool(wx, wy) }
+                }
                 return true
             }
             // U0.4: the grip no longer owns every drag. Moving a sun is a press — the light
@@ -394,6 +435,12 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         val wx = worldX(sx)
         val wy = worldY(sy)
 
+        // In Intervene, an armed touch tool takes the tap whole: no gripping, pouring or
+        // selecting while the hand is a feeder or an eraser.
+        if (intervene && toolArmed != 0) {
+            applyTool(wx, wy)
+            return
+        }
         // In Intervene, a tap near a sun grips it; a tap on open water pours mineral there.
         if (intervene) {
             // An experiment hands out its own apparatus: a level's sky may not be editable and its
@@ -501,6 +548,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         bootWorld = null
         Native.markPrev()
         renderer = Renderer(density)
+        ivSeen = Native.ivCount() // interventions from a restored save are history, not fresh
         // The badge's memory survives lock/unlock (same view instance). A re-created ACTIVITY
         // re-baselines from the live sky — a standing change from before the recreation stops
         // being badged; accepted, the world itself is what must survive.
@@ -588,7 +636,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                             "${L10n.trait(t[2])} ↔ ${L10n.trait(t[1])}")
                     })
             } else null
-            undoKind = Native.undoKind()
+            // The undo chip is an offer, not a monument (owner round 3: "undo pour never
+            // vanishes"): it shows while the intervention is fresh and leaves after 45 s. The
+            // outrun study's ground for the number: undo within a minute is functionally a time
+            // machine; past that the world has moved on, and so should the chrome.
+            val ivn = Native.ivCount()
+            if (ivn != ivSeen) {
+                ivSeen = ivn
+                ivFreshUntil = System.nanoTime() + 45_000_000_000L
+            }
+            undoKind = if (System.nanoTime() < ivFreshUntil) Native.undoKind() else 0
             undoSpecies = Native.undoSpecies()
             if (dataOpen && dataFrame++ % 15 == 0) publishData()
             publishLevel()

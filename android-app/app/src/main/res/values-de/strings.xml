@@ -52,6 +52,7 @@
     <!-- die Hinweise der Hand und die Sonne -->
     <string name="hint_wall_drag">übers Wasser ziehen</string>
     <string name="hint_seed_press">Wasser lange drücken</string>
+    <string name="hint_tool_touch">tippe oder zieh übers Wasser</string>
     <string name="label_sun">Sonne</string>
     <string name="badge_tap_restores">Tippen stellt zurück</string>
     <string name="sun_badge_moved">verschoben</string>

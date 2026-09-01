@@ -195,3 +195,35 @@ locked at, a re-founded one publishes 0 (at speed, a re-founding could tick back
 and slip through). Negative-tested against the pre-fix code: "unlock re-founded the world
 (t 0, expected t 41)". A recorded side effect: a lock mid-experiment no longer loses the run —
 the world persists in memory; levels are still never autosaved to disk, by the U0.6 decision.
+
+## 8. U2.R3 — the owner's round 3 (played in German, 2026-09-01)
+
+Five notes from the device, each traced before repair:
+
+1. **„Speichern" overflowed its button** — and the instrument's silence was the bigger finding.
+   Two gate gaps compounded: the layout gate measured rows at device width while the utility row
+   ships inside the drawer's 260 dp, and it ran without GraphicsMode NATIVE, under which
+   Robolectric's legacy text metrics measure labels near zero wide — so a button whose label
+   overflows measured as fitting. Both fixed (drawer rows measure at `Chrome.DRAWER_DP` inner
+   width, declared once and used by the app and the gate; NATIVE metrics), and the honest gate
+   then convicted the old 1×4 row in BOTH languages — English had been squeezed on the owner's
+   phone all along (reset 177 px laid, 214 wanted). The repair is a 2×2 grid, which stops
+   fitting from depending on the language. Every profile now runs twice, EN and DE.
+2. **The undo chip never vanished.** It is an offer, not a monument: it now leaves 45 s after
+   the intervention it names (the outrun study's ground — undo within a minute is a time
+   machine; past that the world has moved on). Interventions restored from a save are history,
+   not fresh, and get no chip.
+3. **The seed picker was a bare name list.** Each row now wears the species' own colour from
+   the core's bucket table — the world's palette, never a second one.
+4. **Feed/kill were selection errands, redundant with the specimen sheet.** They are now armed
+   touch tools: armed, a tap or a throttled drag feeds or erases what is under the finger
+   (eraser semantics, the owner's words); the sheet keeps per-individual feed/kill, now
+   localized. No dial tool needs a selection any more, and arming deselects.
+5. **The specimen sheet collected overlaps** — dial rows, undo chip and hints all landed on it.
+   The floating chrome now lifts above an open sheet (fabs, dial, centre chips), and the
+   deselect-on-arm rule removes the main way the collision arose.
+
+Gates: `theArmedToolTouchesTheWorld` (kill tool erases under the real gesture pipeline, doesn't
+select, offers its undo); the layout gate's two new dimensions above, negative-tested — the old
+row convicted 32 times before the grid passed clean. The owner's sixth note arrived truncated
+("species …") and is carried as an open item for round 4.
