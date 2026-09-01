@@ -36,6 +36,8 @@ class MainActivity : Activity() {
     private lateinit var actions: View
     private lateinit var undoChip: Button
     private lateinit var modeButton: Button
+    private lateinit var resetButton: Button
+    private var resetArmedAt = 0L
     private lateinit var wallButton: Button
     private lateinit var feedButton: Button
     private lateinit var killButton: Button
@@ -203,6 +205,7 @@ class MainActivity : Activity() {
                 "4x" -> world.speed = 4.0
                 "16x" -> world.speed = 16.0
                 "mode" -> world.intervene = !world.intervene
+                "reset" -> resetTapped()
                 "save" -> saveOrLoad()
                 "exp" -> experimentPicker()
                 "data" -> {
@@ -218,6 +221,7 @@ class MainActivity : Activity() {
             }
         }.apply { setPadding(12, 12, 12, 12) }
         modeButton = Chrome.at(bar, Chrome.BAR, "mode")
+        resetButton = Chrome.at(bar, Chrome.BAR, "reset")
         bottom.addView(bar)
         root.addView(bottom, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
@@ -405,7 +409,7 @@ class MainActivity : Activity() {
             val reflect = l.predictReflect
             if (p >= 0 && p < reflect.size) sb.append("\n\nYou predicted: ").append(l.predictOptions[p])
                 .append("\n").append(reflect[p])
-            sb.append("\n\n(tap to dismiss · \"exp\" to run it again)")
+            sb.append("\n\n(tap to dismiss · reset runs it again)")
             verdict.text = sb.toString()
             verdict.visibility = ViewGroup.VISIBLE
         }
@@ -432,6 +436,44 @@ class MainActivity : Activity() {
             dataText.text = if (dataPage == 3) world.healthText else world.eventsText
         }
     }
+
+    /**
+     * Reset, guarded the browser's way (src/ui-reset.jsx): the first tap arms for 2.6 s and asks,
+     * the second acts, and doing nothing disarms. U0.2 — the review's finding was not that reset
+     * was broken but that it did not exist, while the verdict card promised it did.
+     *
+     * Inside an experiment, reset re-runs the experiment (`restartLevel` finally gets its caller).
+     * In the sandbox it founds a fresh pond on a new random seed — UI-side randomness for reset
+     * seeds is legal (CLAUDE.md rule 5).
+     */
+    private fun resetTapped() {
+        val now = System.currentTimeMillis()
+        if (now - resetArmedAt > 2600) {
+            resetArmedAt = now
+            resetButton.text = "sure?"
+            resetButton.setTextColor(Color.parseColor("#F2B24A")) // the hand, about to act
+            ui.postDelayed({ if (System.currentTimeMillis() - resetArmedAt >= 2600) disarmReset() }, 2700)
+            return
+        }
+        disarmReset()
+        if (running != null && world.levelState != 0) {
+            lastVerdict = 0
+            verdict.visibility = ViewGroup.GONE
+            world.restartLevel()
+        } else {
+            running = null
+            world.resetWorld(kotlin.random.Random.nextInt(1, 100000))
+        }
+    }
+
+    private fun disarmReset() {
+        resetArmedAt = 0L
+        resetButton.text = "reset"
+        resetButton.setTextColor(barTextColors)
+    }
+
+    /** The buttons' resting text colour, captured once so disarm can put it back. */
+    private val barTextColors by lazy { modeButton.textColors }
 
     /** The seeding picker: choose a species, then long-press the water to found a pack there. */
     private fun seedPicker() {

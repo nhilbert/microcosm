@@ -28,7 +28,7 @@ import android.widget.LinearLayout
 object Chrome {
 
     /** Speed, then everything the shell hangs off the bottom bar. */
-    val BAR = listOf("pause", "1x", "4x", "16x", "mode", "save", "exp", "data", "bench")
+    val BAR = listOf("pause", "1x", "4x", "16x", "mode", "reset", "save", "exp", "data", "bench")
 
     /** Intervene's own row. `feed` and `kill` show only while something is selected. */
     val TOOLS = listOf("feed", "kill", "seed", "wall")

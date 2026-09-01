@@ -143,6 +143,24 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     fun restartLevel() = post { Native.levelRestart(); selI = -1 }
     fun stopLevel() = post { Native.levelStop(); levelState = 0; levelHud = "" }
 
+    /**
+     * A fresh pond on a new seed (U0.2 — the reset the review found did not exist). UI-side
+     * randomness for reset seeds is legal (CLAUDE.md rule 5); the world itself stays deterministic
+     * from the seed it is given. Everything the old world was holding — selection, grip, armed
+     * tool, the undo slot — is let go, because all of it names things that no longer exist.
+     */
+    fun resetWorld(seed: Int) = post {
+        Native.resetWorld()
+        Native.initWorld(seed)
+        Native.undoClear()
+        selI = -1
+        sunSel = -1
+        wallArmed = false
+        seedSpecies = -1
+        Native.markPrev()
+        renderer.onTilesChanged()
+    }
+
     // ---- Data mode (A.4) ----
     // Everything here is produced on the render thread and published. `indicators()` and the event
     // feed mutate the core while computing, so reading them from the UI thread would be a race on
