@@ -125,3 +125,44 @@ PNGs eyeballed, `npm test` untouched-world proof. Phase acceptance is **U.3: the
 purpose and never by accident, notice a dimmed sun within a minute without being told, and find
 nothing behind more taps than it is worth. Those are the review's five complaints, inverted into
 a checklist.
+
+## 6. DE — the German translation (shipped 2026-09-01, owner request)
+
+One increment, three mechanisms, one constraint that shaped all of them: **the core's English
+is certified, gated behavior** — narration is asserted by the K6 and heat gates, the level text
+lives inside the hashed core, the trait words are the crate's own rows. So nothing in the core
+changed; the translation is a display layer, and a sentence the layer does not know is shown in
+English rather than paraphrased (untranslated is a gap; a guessed translation would lie about
+what the Observatory said).
+
+1. **Chrome** — ordinary Android localization. Every player literal moved to
+   `res/values/strings.xml` (+ arrays for the intervention labels, undo chip, page titles) with
+   `res/values-de/` carrying du-form German. `Chrome.kt` keeps its English inventory keys — the
+   layout gate, boot gate and baseline key on them, and CI measures under the English locale —
+   while `Chrome.label()` maps a key to its face; `dialRowState` now reads the row's tag instead
+   of its display text, which the translation would have broken silently.
+2. **The core's words** — `L10n.kt` + `res/values/narration.xml`: 19 full-match regexes over the
+   observatory's templates, one German template each ({n} verbatim, {wn}/{ln} through the trait
+   vocabulary: 9 locus labels, 18 pole words, the 2 non-species impact channels). Species names
+   stay. Applied at display in `WorldView` (events feed, level narration, impact movers,
+   specimen loci).
+3. **The levels** — `assets/levels.de.json`, all six levels' player text plus a `whys` map for
+   the fail reasons, merged over the core's JSON in `Levels.kt` when the locale is German. The
+   core keeps judging over its English table, so verdicts are identical in every language.
+
+Instruments, because a translation rots silently: `harness/prose-app.js` now parses the XML and
+the overlay — English rules on `values/`, German rules on `values-de/` and the overlay (sentence
+cap and a German banned list including rule 6's „weil"; FK skipped — its constants are
+English-calibrated), key parity both directions, array-length parity, and overlay completeness
+against `src/observatory/levels.json`. Negative-tested before trusting its first PASS (banned
+word, missing key, missing why, 21-word sentence — all convicted). `GermanTest.kt` runs the
+display layer on the JVM: every one of the 19 narration templates fed a core-shaped sentence and
+required to come back German — the test that fires when a core template changes and the German
+falls behind. It shares the boot gate's exact Robolectric sandbox signature (sdk + GraphicsMode)
+because the JVM allows the JNI core in only one classloader; the locale is switched at runtime.
+
+Wording decisions on record: impact cards say „Seitdem:" (rule 6's German — temporal, never
+causal); "population" is „Bestand", "specimen" is „Lebewesen"; pole words are quotable nominals
+(„zäher", „bleiben"/„weiterziehen") because German inflection would otherwise mangle the sweep
+sentences. Known gap, accepted: the health/benchmark developer surfaces stay English (dev-mode
+only), and number formatting follows the locale (German decimal comma) — display only.
