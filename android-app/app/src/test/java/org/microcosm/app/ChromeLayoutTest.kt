@@ -7,6 +7,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
@@ -50,6 +51,9 @@ class ChromeLayoutTest {
     fun everyControlFitsAndCanBeTouched() {
         val found = LinkedHashMap<String, LayoutGate.Violation>()
         for (p in LayoutGate.PROFILES) {
+            // Reconfigure the runtime itself, then build the views. Setting the qualifiers after
+            // the views exist would measure them against the previous device.
+            RuntimeEnvironment.setQualifiers(p.qualifiers)
             val c = ctx()
             for ((name, row) in rows(c)) for (v in LayoutGate.check(name, row, p)) found[v.key] = v
         }

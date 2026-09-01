@@ -31,21 +31,28 @@ object LayoutGate {
 
     const val MIN_TARGET_DP = 48
 
-    /** A device to measure against: logical size in dp, and the density that turns it into pixels. */
-    data class Profile(val name: String, val wDp: Int, val hDp: Int, val density: Float) {
-        val wPx get() = (wDp * density).toInt()
-        val hPx get() = (hDp * density).toInt()
-    }
+    /**
+     * A device to measure against.
+     *
+     * `qualifiers` is the load-bearing field, and the reason is worth recording: the first version
+     * of this gate carried the density as a plain number and used it only to size the viewport. The
+     * views themselves were then laid out at Robolectric's default density, so every button came
+     * back exactly 60 px tall on every profile — the gate was measuring four screen sizes against
+     * one phone. Handing the qualifiers to `RuntimeEnvironment.setQualifiers` makes the runtime
+     * genuinely reconfigure, so text, padding and minimum sizes scale as they would on the device.
+     */
+    data class Profile(val name: String, val qualifiers: String, val wDp: Int, val hDp: Int)
 
     /**
      * The profiles the chrome must survive. The Fairphone 5 is the owner's phone, measured:
-     * 1224 x 2700 px at density 3. The others bracket it.
+     * 1224 x 2700 px at density 3 — 408 x 900 dp. The others bracket it. 420 dpi is density 2.625,
+     * which has no named bucket; Robolectric takes the explicit dpi.
      */
     val PROFILES = listOf(
-        Profile("small phone   320x568 @2", 320, 568, 2f),
-        Profile("Fairphone 5   408x900 @3", 408, 900, 3f),
-        Profile("large phone   411x891 @2.625", 411, 891, 2.625f),
-        Profile("tablet        800x1280 @2", 800, 1280, 2f),
+        Profile("small phone   320x568 xhdpi", "w320dp-h568dp-xhdpi", 320, 568),
+        Profile("Fairphone 5   408x900 xxhdpi", "w408dp-h900dp-xxhdpi", 408, 900),
+        Profile("large phone   411x891 420dpi", "w411dp-h891dp-420dpi", 411, 891),
+        Profile("tablet        800x1280 xhdpi", "w800dp-h1280dp-xhdpi", 800, 1280),
     )
 
     /** One thing wrong, in one place, on one device. `key` is stable; `detail` carries the numbers. */
@@ -66,7 +73,11 @@ object LayoutGate {
      * how the shell's own bars are laid out.
      */
     fun check(what: String, root: View, p: Profile): List<Violation> {
-        val minPx = MIN_TARGET_DP * p.density
+        // The density the runtime is actually configured at, not the one we hoped for.
+        val density = root.resources.displayMetrics.density
+        val wPx = (p.wDp * density).toInt()
+        val hPx = (p.hDp * density).toInt()
+        val minPx = MIN_TARGET_DP * density
 
         // What each control would like to be, before the parent divides the space up.
         val wanted = HashMap<View, Int>()
@@ -81,10 +92,10 @@ object LayoutGate {
         }
 
         root.measure(
-            View.MeasureSpec.makeMeasureSpec(p.wPx, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(p.hPx, View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(wPx, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(hPx, View.MeasureSpec.AT_MOST),
         )
-        root.layout(0, 0, p.wPx, root.measuredHeight)
+        root.layout(0, 0, wPx, root.measuredHeight)
 
         val out = ArrayList<Violation>()
         val boxes = ArrayList<Pair<View, IntArray>>()
@@ -98,9 +109,9 @@ object LayoutGate {
 
             val want = wanted[v] ?: 0
             if (want > 0 && v.width < want) say("SQUEEZED", name, "${v.width}px laid out, ${want}px wanted")
-            if (b[0] < 0 || b[2] > p.wPx) say("CLIPPED", name, "x ${b[0]}..${b[2]} outside 0..${p.wPx}")
+            if (b[0] < 0 || b[2] > wPx) say("CLIPPED", name, "x ${b[0]}..${b[2]} outside 0..$wPx")
             if (v.width < minPx || v.height < minPx)
-                say("TINY", name, "${px(v.width, p)}x${px(v.height, p)}dp under ${MIN_TARGET_DP}dp")
+                say("TINY", name, "${dp(v.width, density)}x${dp(v.height, density)}dp under ${MIN_TARGET_DP}dp")
         }
         for (i in boxes.indices) for (j in i + 1 until boxes.size) {
             val (a, ab) = boxes[i]
@@ -112,7 +123,7 @@ object LayoutGate {
         return out
     }
 
-    private fun px(v: Int, p: Profile) = (v / p.density).toInt()
+    private fun dp(v: Int, density: Float) = (v / density).toInt()
 
     private fun absolute(v: View, root: View): IntArray {
         var x = 0
