@@ -102,6 +102,41 @@
     <string name="specimen_sub">Alter %1$d min · Größe %2$.1f · Mineral %3$.2f</string>
     <string name="label_energy">Energie</string>
 
+    <!-- der Steckbrief -->
+    <string name="spec_eats">frisst %1$s</string>
+    <string name="spec_eaten">gefressen von %1$s</string>
+    <string name="spec_role_solara">Erzeuger · der lebende Boden</string>
+    <string name="spec_role_drifta">Erzeuger · Treiber im offenen Wasser</string>
+    <string name="spec_role_cilio">Weidegänger · die Mitte des Netzes</string>
+    <string name="spec_role_bacillus">Verwerter · die Aufräumtruppe</string>
+    <string name="spec_role_venator">Jäger · die Spitze des Netzes</string>
+    <string name="spec_about_solara">Ein grüner Teppich auf dem hellen Grund, der aus Licht und gelöstem Mineral wächst, bis Gedränge ihn stoppt. Je stärker das Licht, desto dichter die Matte.</string>
+    <string name="spec_about_drifta">Ein treibendes Pünktchen im offenen Wasser — nichts im Teich wächst schneller. Es zieht zum Licht und kapselt sich als zähe Zyste ein, wenn es hungert.</string>
+    <string name="spec_about_cilio">Eine einzelne Zelle, getrieben von einem flimmernden Saum feiner Härchen. Sie jagt kleinere Wesen, Drifta vor allem, und flieht, wenn verletzte Nachbarn ihren Alarmduft abgeben.</string>
+    <string name="spec_about_bacillus">Ein Haufen winziger Stäbchen, der frisst, was stirbt. Er setzt das Mineral aus toter Masse wieder frei — das Recycling, von dem der ganze Teich abhängt.</string>
+    <string name="spec_about_venator">Der oberste Jäger des Teichs. Er stößt in gerader Linie vor, mit einem Düsenschub, und vermehrt sich am langsamsten von allen. Sein Revier hält er gegen die eigene Art.</string>
+    <string name="spec_eats_solara">Licht und gelöstes Mineral</string>
+    <string name="spec_eaten_solara">Cilio — als magere Kost</string>
+    <string name="spec_eats_drifta">Licht und gelöstes Mineral</string>
+    <string name="spec_eaten_drifta">Cilio — seine Lieblingsbeute</string>
+    <string name="spec_eats_cilio">Drifta zuerst; Bacillus und Solara in mageren Zeiten</string>
+    <string name="spec_eaten_cilio">Venator</string>
+    <string name="spec_eats_bacillus">tote Masse</string>
+    <string name="spec_eaten_bacillus">Cilio, in mageren Zeiten</string>
+    <string name="spec_eats_venator">Cilio, sonst nichts</string>
+    <string name="spec_eaten_venator">nichts in diesem Teich</string>
+
+    <!-- was jeder erbliche Regler tauscht -->
+    <string name="trait_explain_light">Sonnenhungrige Linien wachsen am besten im hellen Wasser, schattenfeste im trüben.</string>
+    <string name="trait_explain_defense">Zähere Linien stecken mehr Fressbisse weg und wachsen dafür langsamer.</string>
+    <string name="trait_explain_thermal">Hitzefeste Linien leben im warmen Wasser günstiger, nehmen dort aber weniger auf.</string>
+    <string name="trait_explain_warmth_pref">Die Wärme, auf die diese Linie beim Bewegen zusteuert.</string>
+    <string name="trait_explain_restlessness">Rastlose Linien bleiben in Bewegung; sesshafte bleiben, wo sie sind.</string>
+    <string name="trait_explain_pursuit">Schärfere Linien fangen mehr Beute und verbrennen mehr Energie bei der Jagd.</string>
+    <string name="trait_explain_hunting_style">Nach einem Fang: bleiben und die Stelle absuchen — oder gleich weiterziehen.</string>
+    <string name="trait_explain_metabolism">Gefräßige Linien fressen schnell und verschwenden viel; genügsame verschwenden wenig.</string>
+    <string name="trait_explain_search_style">Geradlinige Linien kommen weit; zappelige drehen oft und suchen eng.</string>
+
     <!-- Speichern und Laden -->
     <string name="dlg_saved_world">Gespeicherte Welt</string>
     <string name="item_save_world">die Welt speichern</string>

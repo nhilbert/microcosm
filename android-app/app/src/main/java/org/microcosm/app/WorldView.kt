@@ -539,10 +539,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
      * the render thread and published whole. `cap` mirrors P.capMul (10) for the energy bar —
      * display only, never simulation.
      */
+    /** One heritable dial as the sheet draws it: labelEn keys the explanation and stays the
+     *  core's English; label/lo/hi are display words, already through L10n. */
+    class Locus(
+        val label: String, val labelEn: String, val g: Double, val g0: Double,
+        val lo: String, val hi: String,
+    )
     class Specimen(
         val sp: Int, val dormant: Boolean, val energy: Double, val cap: Double,
         val size: Double, val mineral: Double, val ageMin: Long,
-        val loci: List<Triple<String, Double, String>>, // label, genotype, "low ↔ high"
+        val loci: List<Locus>,
     )
     @Volatile var specimen: Specimen? = null
         private set
@@ -679,8 +685,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                     10.0 * Native.org(selI, 6), Native.org(selI, 6), Native.org(selI, 7),
                     (Native.tick() - Native.org(selI, 8).toLong()) / 600,
                     renderer.locusText[sp].mapIndexed { k, t ->
-                        Triple(L10n.trait(t[0]), Native.org(selI, 20 + k),
-                            "${L10n.trait(t[2])} ↔ ${L10n.trait(t[1])}")
+                        Locus(L10n.trait(t[0]), t[0], Native.org(selI, 20 + k),
+                            Native.locusGet(sp, k, 16), L10n.trait(t[2]), L10n.trait(t[1]))
                     })
             } else null
             // The undo chip is an offer, not a monument (owner round 3: "undo pour never

@@ -262,3 +262,41 @@ banned since 8.4) — the port is newer than the wording it ports.
 Recorded gaps: evolution/sun-slider changes are logged and impact-carded but the core's undo
 slot covers world levers only (codes 1–12) — the browser's UI-side evolution undo is not
 ported; Traits patch marks per sun; the light-budget line of the browser's card.
+
+## 10. SP — the species Steckbrief and trait tracks (2026-09-01)
+
+The specimen sheet knew a creature's numbers but not its species: four bare tiles (label,
+genotype, pole pair) and no answer to "what IS this thing?". docs/species-profiles.md had
+already designed the answer — a profile per species with a portrait slot — and the art existed
+in `assets/species/` without a single consumer. This increment wires both in.
+
+- **The portraits ride in from their one committed home**: `build.gradle` adds the repo's
+  `assets/` to the source set (no second copy to drift) and `ignoreAssetsPattern` keeps the
+  folder's README and the gitignored full-size originals out of the APK — verified by merging
+  with a probe file planted in `full/`: five jpgs and the level overlay ship, nothing else.
+- **The Steckbrief** (`Profiles.kt` + the sheet): tapping the specimen header unfolds a profile
+  block — rounded portrait (`PortraitView`, shader-clipped, dependency-free), role line,
+  "eats" / "eaten by", and a two-sentence description. Folded by default: the sheet floats over
+  the pond and the pond stays the point. Every slot hides when a species has no art or no words
+  (species-profiles.md's contract), so Mycora and Necro degrade to the identity dot, never a
+  crash. Keys are the CORE's English names (species name for art, locus label for trait text) —
+  a core rename surfaces as a missing profile, never a wrong one.
+- **The trait tiles grew a track** (`TraitMeter`): pole-to-pole rail, hollow tick at the
+  founding value (locusGet key 16), marker in the species' own colour at THIS creature's
+  genotype, pole words at the rails, and one line on what the dial trades — nine explanation
+  strings keyed by locus label, shared where the trade is shared (Thermal serves Drifta and
+  Bacillus, deliberately). The lines are teleology-proof per the style guide: lines out-grow
+  and out-breed; nothing adapts in order to.
+- **Words within the gates**: all strings EN+DE in the resource files, prose gate PASS (330
+  strings) — the profile texts are species-profiles.md rewritten into player language, since
+  the originals lean on half the banned-science list.
+
+Gates: the boot gate's selection block now unfolds the Steckbrief against the host core and
+requires the portrait to decode from the BUNDLED assets, the words to be non-blank, and — after
+its first run photographed a sheet whose VISIBLE profile had never been measured — the unfolded
+block to take real laid-out space before it is photographed (`specimen@profile.png`). Layout
+gate 0 violations across 4 profiles × EN/DE; German gate green; `npm test` green.
+
+Recorded gaps: the Steckbrief is per-species, not per-individual (age/size/energy stay the
+individual's rows above it); no portrait in the seed picker yet; the browser's specimen card
+keeps its text-only form — the app is the product, the browser the renderer's oracle.
