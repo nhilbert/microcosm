@@ -436,6 +436,19 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     /** Let go of the selection — the specimen drawer's dismiss (U2.R2). */
     fun deselect() = post { selI = -1 }
 
+    /**
+     * The selected creature, structured (U2.R2's rich card): everything the sheet draws, read on
+     * the render thread and published whole. `cap` mirrors P.capMul (10) for the energy bar —
+     * display only, never simulation.
+     */
+    class Specimen(
+        val sp: Int, val dormant: Boolean, val energy: Double, val cap: Double,
+        val size: Double, val mineral: Double, val ageMin: Long,
+        val loci: List<Triple<String, Double, String>>, // label, genotype, "low ↔ high"
+    )
+    @Volatile var specimen: Specimen? = null
+        private set
+
     /** Feed and kill act on what is selected, so the shell does not need the slot index. */
     fun feedSelected() = post {
         if (selI >= 0) { Native.ivPush(IV_FEED); Native.evFeed(selI, selGen, 0.35) }
@@ -544,6 +557,15 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             }
             selSpecies = if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0)
                 Native.org(selI, 1).toInt() else -1
+            specimen = if (selSpecies >= 0) {
+                val sp = selSpecies
+                Specimen(sp, Native.org(selI, 9) != 0.0, Native.org(selI, 5),
+                    10.0 * Native.org(selI, 6), Native.org(selI, 6), Native.org(selI, 7),
+                    (Native.tick() - Native.org(selI, 8).toLong()) / 600,
+                    renderer.locusText[sp].mapIndexed { k, t ->
+                        Triple(t[0], Native.org(selI, 20 + k), "${t[2]} ↔ ${t[1]}")
+                    })
+            } else null
             undoKind = Native.undoKind()
             undoSpecies = Native.undoSpecies()
             if (dataOpen && dataFrame++ % 15 == 0) publishData()

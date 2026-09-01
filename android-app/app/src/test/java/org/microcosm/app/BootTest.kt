@@ -156,6 +156,30 @@ class BootTest {
             Thread.sleep(300)
             assertTrue("a tap in Observe mode must not grip the sun", world.sunSel < 0)
             println("BOOT GATE: the same tap in Observe grips nothing, as designed")
+
+            // U2.R2b: selecting a living creature must publish its structured card for the sheet.
+            val spot = DoubleArray(3)
+            val foundOne = java.util.concurrent.CountDownLatch(1)
+            world.post {
+                val n = Native.scalar(0).toInt()
+                for (i in 0 until n) if (Native.org(i, 0) != 0.0) {
+                    spot[0] = Native.org(i, 3); spot[1] = Native.org(i, 4); spot[2] = 1.0; break
+                }
+                foundOne.countDown()
+            }
+            assertTrue(foundOne.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue("a founded world should hold something alive", spot[2] == 1.0)
+            world.cam.x = spot[0]
+            world.cam.y = spot[1]
+            val t3 = SystemClock.uptimeMillis()
+            world.onTouchEvent(MotionEvent.obtain(t3, t3, MotionEvent.ACTION_DOWN, cx, cy, 0))
+            world.onTouchEvent(MotionEvent.obtain(t3, t3 + 50, MotionEvent.ACTION_UP, cx, cy, 0))
+            until = System.currentTimeMillis() + 3000
+            while (world.specimen == null && System.currentTimeMillis() < until) Thread.sleep(10)
+            val snap = world.specimen
+            assertTrue("selecting a creature must publish its card", snap != null)
+            assertTrue("the card should carry the creature's traits", snap!!.loci.isNotEmpty() || snap.sp == 0)
+            println("BOOT GATE: selection published a structured card (sp ${snap.sp}, ${snap.loci.size} loci)")
         } finally {
             world.surfaceDestroyed(world.holder)
         }

@@ -36,7 +36,6 @@ class MainActivity : Activity() {
 
     internal lateinit var world: WorldView // internal so the boot gate can drive the real view
     private lateinit var hud: TextView
-    private lateinit var card: TextView
     private lateinit var reportView: TextView
     private lateinit var undoChip: Button
     private lateinit var resetButton: Button
@@ -55,6 +54,16 @@ class MainActivity : Activity() {
     private lateinit var fabLabel: TextView
     private lateinit var drawerScrim: View
     private lateinit var specimenName: TextView
+    private lateinit var specimenSub: TextView
+    private lateinit var specimenEnergyText: TextView
+    private lateinit var specimenEnergyBar: LinearLayout
+    private lateinit var specimenTiles: LinearLayout
+    private val specimenTileViews = ArrayList<LinearLayout>()
+    private val specimenDot by lazy {
+        View(this).apply {
+            background = android.graphics.drawable.GradientDrawable().apply { cornerRadius = 99f }
+        }
+    }
     private lateinit var paceBox: LinearLayout
     private val speciesPills = ArrayList<LinearLayout>()
     private lateinit var dataPanel: LinearLayout
@@ -91,7 +100,6 @@ class MainActivity : Activity() {
             // In an experiment the objective IS the line (D2): the census yields to it.
             strip.visibility = if (running != null && world.levelState != 0) ViewGroup.GONE
                                else ViewGroup.VISIBLE
-            card.text = world.card
             for ((k, sp) in live.withIndex()) {
                 val hiddenNow = world.hidden and (1 shl sp) != 0
                 chips[k].text = "%s %d".format(shortName(sp), world.popOf(sp))
@@ -127,8 +135,33 @@ class MainActivity : Activity() {
                 if (world.undoKind != 0 && armedText.isEmpty()) ViewGroup.VISIBLE else ViewGroup.GONE
             undoChip.text = undoLabel(world.undoKind, world.undoSpecies)
             // the specimen drawer follows the selection — the drawer the owner found missing
-            specimenSheet.visibility = if (hasSel) ViewGroup.VISIBLE else ViewGroup.GONE
-            if (hasSel) specimenName.text = Native.traitText(world.selSpecies, 0)
+            val snap = world.specimen
+            specimenSheet.visibility = if (snap != null) ViewGroup.VISIBLE else ViewGroup.GONE
+            if (snap != null) {
+                specimenName.text = Native.traitText(snap.sp, 0) + if (snap.dormant) "  · dormant" else ""
+                (specimenDot.background as android.graphics.drawable.GradientDrawable)
+                    .setColor(speciesColor(snap.sp))
+                specimenSub.text = "age %d min · size %.1f · mineral %.2f"
+                    .format(snap.ageMin, snap.size, snap.mineral)
+                specimenEnergyText.text = "%.1f / %.0f".format(snap.energy, snap.cap)
+                val frac = (snap.energy / snap.cap).coerceIn(0.02, 1.0).toFloat()
+                val fill = specimenEnergyBar.getChildAt(0)
+                (fill.background as android.graphics.drawable.GradientDrawable).setColor(speciesColor(snap.sp))
+                (fill.layoutParams as LinearLayout.LayoutParams).weight = frac
+                (specimenEnergyBar.getChildAt(1).layoutParams as LinearLayout.LayoutParams).weight = 1f - frac
+                specimenEnergyBar.requestLayout()
+                for ((k, tile) in specimenTileViews.withIndex()) {
+                    val locus = snap.loci.getOrNull(k)
+                    tile.visibility = if (locus != null) ViewGroup.VISIBLE else ViewGroup.INVISIBLE
+                    if (locus != null) {
+                        (tile.getChildAt(0) as TextView).text = locus.first
+                        (tile.getChildAt(1) as TextView).text = "%.2f".format(locus.second)
+                        (tile.getChildAt(2) as TextView).text = locus.third
+                    }
+                }
+                specimenTiles.getChildAt(1).visibility =
+                    if (snap.loci.size > 2) ViewGroup.VISIBLE else ViewGroup.GONE
+            }
             for ((k, sp) in live.withIndex()) {
                 val hiddenNow = world.hidden and (1 shl sp) != 0
                 speciesPills[k].alpha = if (hiddenNow) 0.45f else 1f
@@ -256,19 +289,76 @@ class MainActivity : Activity() {
             textSize = 17f
             typeface = Style.wordMedium(this@MainActivity)
         }
+        specHeader.addView(specimenDot, LinearLayout.LayoutParams(
+            Style.dp(this, 12f), Style.dp(this, 12f)).apply { marginEnd = Style.dp(this@MainActivity, 9f) })
         specHeader.addView(specimenName, LinearLayout.LayoutParams(0, WRAP, 1f))
         specHeader.addView(button("feed") { world.feedSelected() },
             LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = Style.dp(this@MainActivity, 8f) })
         specHeader.addView(button("kill") { world.killSelected() })
         specimenSheet.addView(specHeader)
-        card = TextView(this).apply {
-            setTextColor(Color.parseColor("#C9D7E3"))
+        specimenSub = TextView(this).apply {
+            setTextColor(Style.DIM)
             textSize = 11f
             typeface = Style.mono(this@MainActivity)
-            setPadding(0, Style.dp(this@MainActivity, 8f), 0, 0)
+            setPadding(Style.dp(this@MainActivity, 21f), 0, 0, Style.dp(this@MainActivity, 10f))
         }
-        specimenSheet.addView(ScrollView(this).apply { addView(card) },
-            LinearLayout.LayoutParams(MATCH, Style.dp(this@MainActivity, 200f)))
+        specimenSheet.addView(specimenSub)
+        // the energy bar: the one meter whose ceiling the shell truly knows
+        val energyRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        energyRow.addView(TextView(this).apply {
+            text = "energy"
+            setTextColor(Style.DIM); textSize = 12f; typeface = Style.word(this@MainActivity)
+        }, LinearLayout.LayoutParams(0, WRAP, 1f))
+        specimenEnergyText = TextView(this).apply {
+            setTextColor(Style.TEXT); textSize = 12f; typeface = Style.mono(this@MainActivity)
+        }
+        energyRow.addView(specimenEnergyText)
+        specimenSheet.addView(energyRow)
+        specimenEnergyBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.argb(31, 148, 178, 204)); cornerRadius = Style.dp(this@MainActivity, 3f).toFloat()
+            }
+        }
+        specimenEnergyBar.addView(View(this).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = Style.dp(this@MainActivity, 3f).toFloat()
+            }
+        }, LinearLayout.LayoutParams(0, Style.dp(this, 5f), 0.5f))
+        specimenEnergyBar.addView(View(this), LinearLayout.LayoutParams(0, 1, 0.5f))
+        specimenSheet.addView(specimenEnergyBar, LinearLayout.LayoutParams(MATCH, Style.dp(this, 5f)).apply {
+            topMargin = Style.dp(this@MainActivity, 6f); bottomMargin = Style.dp(this@MainActivity, 12f)
+        })
+        // the trait tiles, two a row, populated per selection; species without a locus hide them
+        specimenTiles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        repeat(2) { r ->
+            val rowOfTiles = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            repeat(2) { c ->
+                val tile = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    background = Style.quiet(this@MainActivity)
+                    setPadding(Style.dp(this@MainActivity, 12f), Style.dp(this@MainActivity, 10f),
+                        Style.dp(this@MainActivity, 12f), Style.dp(this@MainActivity, 10f))
+                    addView(TextView(this@MainActivity).apply {
+                        setTextColor(Style.DIM); textSize = 11f; typeface = Style.word(this@MainActivity)
+                    })
+                    addView(TextView(this@MainActivity).apply {
+                        setTextColor(Style.BRIGHT); textSize = 15f; typeface = Style.monoMedium(this@MainActivity)
+                    })
+                    addView(TextView(this@MainActivity).apply {
+                        setTextColor(Style.DIM); textSize = 10f; typeface = Style.word(this@MainActivity)
+                    })
+                }
+                specimenTileViews.add(tile)
+                val lp = LinearLayout.LayoutParams(0, WRAP, 1f)
+                if (c > 0) lp.marginStart = Style.dp(this@MainActivity, 8f)
+                rowOfTiles.addView(tile, lp)
+            }
+            specimenTiles.addView(rowOfTiles, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                if (r > 0) topMargin = Style.dp(this@MainActivity, 8f)
+            })
+        }
+        specimenSheet.addView(specimenTiles)
         root.addView(specimenSheet, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
         // floating centre chips: the sun's controls while gripped, undo while it applies
