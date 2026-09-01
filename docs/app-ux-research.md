@@ -221,7 +221,13 @@ levels on them. What it never designed is *arrival*: today Experiments is an `Al
 behind a button that, on the owner's phone, is off the screen. The ladder is the most carefully
 built thing in the app and the least reachable.
 
-**The unresolved question is which is the front door.** The browser answers "both, choose" — a start
+**The front door is decided (owner, 2026-09-01): the start screen.** Sandbox and Experiments side
+by side, every level open, none gated — the browser's answer, kept. So the ladder stops being a
+dialog behind a clipped button and becomes one of the two things the app opens with. The paragraph
+below records the alternatives that were weighed, because the reasons they lost are design
+constraints for what gets built.
+
+**The question, as it was put.** The browser answers "both, choose" — a start
 screen with Sandbox and Experiments side by side, every level open, none gated. PhET answers "one
 environment, tabs to move between framings". Sandbox-as-tutorial answers "free play first, structure
 when you want it". These are three different products, and the literature does not choose between
@@ -290,9 +296,13 @@ Pre-design conclusions, in the order they constrain each other. None of this is 
    drag is believed, 48 dp targets everywhere, insets applied once at the root.
 5. **Fix the reach inversion** (Lens 3): interactive species chips sit at the top of a 2,700 px
    screen; the passive specimen card sits in the thumb zone. One of the two is in the wrong half.
-6. **Decide the front door explicitly** (Lens 5). Three defensible answers; the literature rules out
-   only the current one. Since every level is already open and ungated, arriving at the questions
-   costs the player nothing they cannot immediately leave.
+6. **The front door is the start screen** (Lens 5, owner 2026-09-01). Sandbox and Experiments side
+   by side, every level open and ungated. Two consequences for the design: the ladder needs a real
+   screen rather than an `AlertDialog`, and the sandbox needs to be reachable in one tap from
+   launch, because most sessions will want it. PhET-style staged tabs were considered and rejected
+   for the sandbox — a PhET tab is its own model instance, and Microcosm's premise is one pond you
+   keep — but their *withholding* principle survives the rejection: the opening minutes can show
+   few levers and let the rest appear, without ever resetting the world.
 7. **Build the layout gate before the redesign, not after** (review §6). The bar overflow shipped
    through nine green CI runs because every gate in this project is about the world and none is
    about the screen. The precedent for what a gate is worth is `harness/prose.js`: promoting the
@@ -312,7 +322,7 @@ Listed so the design phase does not mistake reading for measurement.
 - **Whether the world screen wants tabs at all**, or whether tabs belong only to Data.
 - **Whether a contextual, object-triggered menu beats a persistent bar** given more than eight
   levers — the sources like the idea and concede the form does not scale.
-- **The front door** (§7.6), which is a product decision rather than a research finding.
+- ~~The front door~~ — decided: the start screen (§5).
 - **Everything about how it looks.** This document is about structure and behaviour. The visual
   grammar of the *world* is settled, shared and gate-proved (`frame.rs`); the visual grammar of the
   *shell* is not designed here.

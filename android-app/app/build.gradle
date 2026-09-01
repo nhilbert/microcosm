@@ -51,6 +51,14 @@ android {
     testOptions {
         unitTests {
             includeAndroidResources = true
+            // The gate's whole output is its violation list. Without this Gradle files it in an
+            // HTML report nobody reads and prints one line of stack trace instead.
+            all {
+                testLogging {
+                    showStandardStreams = true
+                    exceptionFormat = "full"
+                }
+            }
         }
     }
 

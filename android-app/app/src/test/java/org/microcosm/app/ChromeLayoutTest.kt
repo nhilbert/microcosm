@@ -63,7 +63,12 @@ class ChromeLayoutTest {
         val fresh = found.values.filter { it.key !in baseline }
         val stale = baseline.filter { it !in found.keys }
 
-        if (fresh.isEmpty() && stale.isEmpty()) return
+        if (fresh.isEmpty() && stale.isEmpty()) {
+            println("LAYOUT GATE: PASS — ${found.size} known violation(s), all in the baseline, " +
+                "across ${LayoutGate.PROFILES.size} device profiles")
+            for (v in found.values) println("  $v")
+            return
+        }
 
         val msg = StringBuilder("\nLAYOUT GATE\n")
         if (fresh.isNotEmpty()) {
@@ -78,7 +83,11 @@ class ChromeLayoutTest {
             msg.append("\n  Delete them from layout-baseline.txt. A baseline that outlives its\n")
             msg.append("  violations stops being a record of anything.\n")
         }
-        msg.append("\n  ${found.size} violation(s) total across ${LayoutGate.PROFILES.size} device profiles.\n")
+        msg.append("\n  ${found.size} violation(s) total across ${LayoutGate.PROFILES.size} device profiles:\n")
+        for (v in found.values) msg.append("    $v\n")
+        // Printed as well as thrown: an assertion message reaches an HTML report nobody opens,
+        // and this list is the entire point of the gate.
+        println(msg)
         fail(msg.toString())
     }
 }
