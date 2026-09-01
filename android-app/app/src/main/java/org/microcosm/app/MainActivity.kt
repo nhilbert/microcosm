@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
@@ -32,7 +33,7 @@ class MainActivity : Activity() {
     private lateinit var hud: TextView
     private lateinit var card: TextView
     private lateinit var reportView: TextView
-    private lateinit var actions: LinearLayout
+    private lateinit var actions: View
     private lateinit var undoChip: Button
     private lateinit var modeButton: Button
     private lateinit var wallButton: Button
@@ -148,22 +149,19 @@ class MainActivity : Activity() {
         bottom.addView(card)
 
         // Intervene's own row: the levers that need a button rather than a touch on the world.
-        actions = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 0, 12, 0)
-            visibility = ViewGroup.GONE
-        }
-        // Rows come from Chrome so the layout gate measures the row that ships, not a copy of
-        // it (docs/app-ux-review.md §6).
-        val tools = Chrome.row(this, Chrome.TOOLS) { k ->
+        // Rows come from Chrome.build so the layout gate measures the construct that ships —
+        // scroll wrapper included — not a copy of it (docs/app-ux-review.md §6).
+        actions = Chrome.build(this, "tools") { k ->
             when (k) {
                 0 -> world.feedSelected()
                 1 -> world.killSelected()
                 2 -> seedPicker()
                 else -> world.wallArmed = !world.wallArmed
             }
+        }.apply {
+            setPadding(12, 0, 12, 0)
+            visibility = ViewGroup.GONE
         }
-        while (tools.childCount > 0) actions.addView(tools.getChildAt(0))
         feedButton = Chrome.at(actions, Chrome.TOOLS, "feed")
         killButton = Chrome.at(actions, Chrome.TOOLS, "kill")
         wallButton = Chrome.at(actions, Chrome.TOOLS, "wall")
@@ -198,11 +196,7 @@ class MainActivity : Activity() {
         }
         bottom.addView(undoChip)
 
-        val bar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 12, 12, 12)
-        }
-        val barRow = Chrome.row(this, Chrome.BAR) { k ->
+        val bar = Chrome.build(this, "bar") { k ->
             when (Chrome.BAR[k]) {
                 "pause" -> world.speed = 0.0
                 "1x" -> world.speed = 1.0
@@ -222,8 +216,7 @@ class MainActivity : Activity() {
                     world.benchmark()
                 }
             }
-        }
-        while (barRow.childCount > 0) bar.addView(barRow.getChildAt(0))
+        }.apply { setPadding(12, 12, 12, 12) }
         modeButton = Chrome.at(bar, Chrome.BAR, "mode")
         bottom.addView(bar)
         root.addView(bottom, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
@@ -242,9 +235,8 @@ class MainActivity : Activity() {
             setPadding(24, 20, 24, 8)
         }
         dataPanel.addView(dataTitle)
-        val pages = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12, 0, 12, 0) }
-        val pageRow = Chrome.row(this, Chrome.PAGES) { k -> dataPage = k; refreshData() }
-        while (pageRow.childCount > 0) pages.addView(pageRow.getChildAt(0))
+        val pages = Chrome.build(this, "pages") { k -> dataPage = k; refreshData() }
+            .apply { setPadding(12, 0, 12, 0) }
         dataPanel.addView(pages)
         dataView = DataView(this)
         dataPanel.addView(dataView, LinearLayout.LayoutParams(MATCH, 0, 1f))

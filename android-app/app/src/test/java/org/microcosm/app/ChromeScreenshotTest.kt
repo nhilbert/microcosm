@@ -54,12 +54,9 @@ class ChromeScreenshotTest {
             val c = ctx()
             val density = c.resources.displayMetrics.density
             val wPx = (p.wDp * density).toInt()
-            val rows = listOf(
-                "bar" to Chrome.row(c, Chrome.BAR),
-                "tools" to Chrome.row(c, Chrome.TOOLS),
-                "sun" to Chrome.row(c, Chrome.SUN),
-                "pages" to Chrome.row(c, Chrome.PAGES),
-            )
+            // The shipped constructs, scroll wrappers included — the picture shows the viewport
+            // the player gets, with off-screen content cropped exactly as the screen crops it.
+            val rows = Chrome.ROWS.keys.map { it to Chrome.build(c, it) }
             for ((name, row) in rows) {
                 row.measure(
                     View.MeasureSpec.makeMeasureSpec(wPx, View.MeasureSpec.EXACTLY),

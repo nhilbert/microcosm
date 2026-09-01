@@ -2,6 +2,7 @@ package org.microcosm.app
 
 import android.view.View
 import android.view.ViewGroup
+import android.widget.HorizontalScrollView
 import android.widget.TextView
 
 /**
@@ -97,6 +98,14 @@ object LayoutGate {
         )
         root.layout(0, 0, wPx, root.measuredHeight)
 
+        // A scrollable row's content is wider than the viewport BY DESIGN: every child is laid
+        // out at the width it asked for, and what lies past the right edge is a swipe away, not
+        // gone. So the clip bound for CLIPPED is the content's width, not the viewport's. The
+        // gate's honesty caveat applies here with extra force: it can prove a control exists and
+        // is reachable, and cannot prove the player knows the row scrolls.
+        val clipW = if (root is HorizontalScrollView)
+            maxOf(wPx, root.getChildAt(0)?.width ?: wPx) else wPx
+
         val out = ArrayList<Violation>()
         val boxes = ArrayList<Pair<View, IntArray>>()
         walk(root) { v ->
@@ -109,7 +118,7 @@ object LayoutGate {
 
             val want = wanted[v] ?: 0
             if (want > 0 && v.width < want) say("SQUEEZED", name, "${v.width}px laid out, ${want}px wanted")
-            if (b[0] < 0 || b[2] > wPx) say("CLIPPED", name, "x ${b[0]}..${b[2]} outside 0..$wPx")
+            if (b[0] < 0 || b[2] > clipW) say("CLIPPED", name, "x ${b[0]}..${b[2]} outside 0..$clipW")
             if (v.width < minPx || v.height < minPx)
                 say("TINY", name, "${dp(v.width, density)}x${dp(v.height, density)}dp under ${MIN_TARGET_DP}dp")
         }

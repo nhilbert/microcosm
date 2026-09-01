@@ -7,56 +7,17 @@
 #
 # Format: one violation key per line, "KIND subject @ profile". Comments after '#'.
 #
-# MEASURED 2026-09-01 by the gate's own first correct run (CI run 14). 35 violations across four
-# device profiles. Two things in the numbers are worth keeping:
+# HISTORY
 #
-#   * The bar wants 88 dp per button — Material's minimum width — so nine of them need 792 dp.
-#     The review estimated 576 dp from a 64 dp guess, so the real overflow is worse than reported.
-#   * The TABLET PROFILE IS CLEAN. Not one violation at 800 dp. That is the proof this is a width
-#     problem and nothing deeper: the rows are structurally fine and simply have nowhere to go.
+# 2026-09-01, first measured run (CI run 14): 35 violations across four device profiles. The bar
+# wanted 88 dp per button — 792 dp for nine — and the Fairphone 5 laid out save/exp/data/bench at
+# 0 px each; the tablet was clean, proving the problem was width and nothing deeper.
 #
-# The Fairphone 5 lines are the owner's screenshot, reproduced from source: save, exp, data and
-# bench laid out at 0 px each, having asked for 264 px.
-
-# --- small phone 320x568 xhdpi: the bar loses five controls, and Data loses its last page
-SQUEEZED bar/16x @ small phone   320x568 xhdpi
-SQUEEZED bar/mode @ small phone   320x568 xhdpi
-TINY bar/mode @ small phone   320x568 xhdpi
-SQUEEZED bar/save @ small phone   320x568 xhdpi
-TINY bar/save @ small phone   320x568 xhdpi
-SQUEEZED bar/exp @ small phone   320x568 xhdpi
-TINY bar/exp @ small phone   320x568 xhdpi
-SQUEEZED bar/data @ small phone   320x568 xhdpi
-TINY bar/data @ small phone   320x568 xhdpi
-SQUEEZED bar/bench @ small phone   320x568 xhdpi
-TINY bar/bench @ small phone   320x568 xhdpi
-SQUEEZED tools/wall @ small phone   320x568 xhdpi
-SQUEEZED pages/health @ small phone   320x568 xhdpi
-SQUEEZED pages/events @ small phone   320x568 xhdpi
-TINY pages/events @ small phone   320x568 xhdpi
-
-# --- Fairphone 5 408x900 xxhdpi: the owner's phone. Four controls at zero width.
-SQUEEZED bar/mode @ Fairphone 5   408x900 xxhdpi
-SQUEEZED bar/save @ Fairphone 5   408x900 xxhdpi
-TINY bar/save @ Fairphone 5   408x900 xxhdpi
-SQUEEZED bar/exp @ Fairphone 5   408x900 xxhdpi
-TINY bar/exp @ Fairphone 5   408x900 xxhdpi
-SQUEEZED bar/data @ Fairphone 5   408x900 xxhdpi
-TINY bar/data @ Fairphone 5   408x900 xxhdpi
-SQUEEZED bar/bench @ Fairphone 5   408x900 xxhdpi
-TINY bar/bench @ Fairphone 5   408x900 xxhdpi
-SQUEEZED pages/events @ Fairphone 5   408x900 xxhdpi
-
-# --- large phone 411x891 420dpi: three more dp of width buys nothing
-SQUEEZED bar/mode @ large phone   411x891 420dpi
-SQUEEZED bar/save @ large phone   411x891 420dpi
-TINY bar/save @ large phone   411x891 420dpi
-SQUEEZED bar/exp @ large phone   411x891 420dpi
-TINY bar/exp @ large phone   411x891 420dpi
-SQUEEZED bar/data @ large phone   411x891 420dpi
-TINY bar/data @ large phone   411x891 420dpi
-SQUEEZED bar/bench @ large phone   411x891 420dpi
-TINY bar/bench @ large phone   411x891 420dpi
-SQUEEZED pages/events @ large phone   411x891 420dpi
-
-# --- tablet 800x1280 xhdpi: clean. Nothing to record.
+# 2026-09-01, U0.1: the wide rows (bar, tools, pages) became scroll rows — every button laid out
+# at the width it asked for, everything past the edge a swipe away. All 35 lines stopped occurring
+# and were deleted per the ratchet. The gate's caveat stands: it proves each control exists at
+# full size and is reachable; it cannot prove the player knows the row scrolls, and it cannot see
+# the species chips, which are built in MainActivity and not measured here (their ~2 dp padding is
+# docs/app-ux-review.md §2, owned by the redesign's reach-inversion finding, not by U0).
+#
+# Nothing to record. Keep it that way.

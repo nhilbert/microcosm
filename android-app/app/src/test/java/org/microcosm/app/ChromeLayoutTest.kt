@@ -39,13 +39,11 @@ class ChromeLayoutTest {
         android.R.style.Theme_Material_NoActionBar,
     )
 
-    /** Every row the player can be shown, by the name the baseline knows it as. */
-    private fun rows(c: Context) = listOf(
-        "bar" to Chrome.row(c, Chrome.BAR),
-        "tools" to Chrome.row(c, Chrome.TOOLS),
-        "sun" to Chrome.row(c, Chrome.SUN),
-        "pages" to Chrome.row(c, Chrome.PAGES),
-    )
+    /**
+     * Every row the player can be shown, by the name the baseline knows it as, in the construct
+     * it ships in — `Chrome.build` is the same call `MainActivity` makes, scroll wrapper and all.
+     */
+    private fun rows(c: Context) = Chrome.ROWS.keys.map { it to Chrome.build(c, it) }
 
     @Test
     fun everyControlFitsAndCanBeTouched() {
