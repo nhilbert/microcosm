@@ -62,6 +62,9 @@ class MainActivity : Activity() {
     private lateinit var dataTitle: TextView
     private var dataPage = 0
     private lateinit var levelChip: TextView
+    private lateinit var strip: LinearLayout
+    private lateinit var clockView: TextView
+    private lateinit var sunBadgeView: TextView
     private lateinit var verdict: TextView
     internal lateinit var startPanel: LinearLayout // internal: the boot gate walks the front door
     internal lateinit var expPanel: LinearLayout
@@ -79,7 +82,13 @@ class MainActivity : Activity() {
 
     private val tickHud = object : Runnable {
         override fun run() {
-            hud.text = if (devMode) world.stats + "\n" + world.statsDev else world.stats
+            if (devMode) hud.text = world.stats + "\n" + world.statsDev
+            clockView.text = world.clock
+            sunBadgeView.text = world.sunBadge + if (world.sunBadge.isEmpty()) "" else " · tap restores"
+            sunBadgeView.visibility = if (world.sunBadge.isEmpty()) ViewGroup.GONE else ViewGroup.VISIBLE
+            // In an experiment the objective IS the line (D2): the census yields to it.
+            strip.visibility = if (running != null && world.levelState != 0) ViewGroup.GONE
+                               else ViewGroup.VISIBLE
             val text = world.card
             card.text = if (text.isEmpty()) "tap a creature in the pond to read it here" else text
             for ((k, sp) in live.withIndex()) {
@@ -139,30 +148,64 @@ class MainActivity : Activity() {
         root.addView(world, FrameLayout.LayoutParams(MATCH, MATCH))
 
         val top = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        // Developer telemetry, dev-mode only (U0.7); since U2.2 the whole TextView hides with it.
         hud = TextView(this).apply {
             setTextColor(Color.parseColor("#C9D7E3"))
             textSize = 12f
             typeface = Style.mono(this@MainActivity)
+            visibility = ViewGroup.GONE
         }
         top.addView(hud)
 
-        // The status strip: one chip per live species, coloured as the world colours it, tapping to
-        // hide and show. `hidden` is the same bitmask the frame builder culls with.
-        val strip = LinearLayout(this).apply {
+        // THE ONE LINE (U2.2, D2): the clock and the census, passive, in the world's colours.
+        // Everything else earns its place by being asked for. Long-press toggles dev telemetry.
+        strip = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 12, 0, 0)
+            setPadding(0, 0, 0, 0)
         }
+        clockView = TextView(this).apply {
+            setTextColor(Style.DIM)
+            textSize = 12f
+            typeface = Style.mono(this@MainActivity)
+            setPadding(0, 6, 32, 6)
+        }
+        strip.addView(clockView)
         for (sp in live) {
             val chip = TextView(this).apply {
                 setTextColor(speciesColor(sp))
                 textSize = 12f
                 typeface = Style.mono(this@MainActivity)
-                setPadding(0, 6, 28, 6) // passive since U2.1: the toggles live in the sheet (D3)
+                setPadding(0, 6, 28, 6) // passive: the toggles live in the sheet (D3)
             }
             chips.add(chip)
             strip.addView(chip)
         }
+        strip.setOnLongClickListener {
+            devMode = !devMode
+            hud.visibility = if (devMode) ViewGroup.VISIBLE else ViewGroup.GONE
+            benchButton.visibility = if (devMode) ViewGroup.VISIBLE else ViewGroup.GONE
+            toast(if (devMode) "renderer telemetry on" else "renderer telemetry off")
+            true
+        }
         top.addView(strip)
+
+        // The standing-change badge (U2.3): the one lever measured to outrun its undo is a sun
+        // change left standing unnoticed — so a standing change wears amber until it is put back,
+        // and names its age instead of shouting. Tapping it puts the sun back as founded.
+        sunBadgeView = TextView(this).apply {
+            setTextColor(Style.AMBER)
+            textSize = 12f
+            typeface = Style.mono(this@MainActivity)
+            background = Style.touchable(this@MainActivity, Style.pill(this@MainActivity, amber = true))
+            minHeight = Style.dp(this@MainActivity, 40f)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(Style.dp(this@MainActivity, 14f), 0, Style.dp(this@MainActivity, 14f), 0)
+            visibility = ViewGroup.GONE
+            setOnClickListener { world.putSunBack() }
+        }
+        top.addView(sunBadgeView, LinearLayout.LayoutParams(WRAP, WRAP).apply {
+            topMargin = Style.dp(this@MainActivity, 6f)
+        })
 
         // The experiment's objective, in the top stack's flow rather than over it: it never covers
         // the world, however many lines it grows to.
@@ -362,14 +405,6 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(MATCH, 0, 1f))
         sheet.addView(fullSection, LinearLayout.LayoutParams(MATCH, WRAP))
 
-        // the dev toggle lives where the telemetry it reveals lives: long-press the HUD
-        hud.setOnLongClickListener {
-            devMode = !devMode
-            benchButton.visibility = if (devMode) ViewGroup.VISIBLE else ViewGroup.GONE
-            toast(if (devMode) "renderer telemetry on" else "renderer telemetry off")
-            true
-        }
-
         bottom.addView(sheet, LinearLayout.LayoutParams(MATCH, WRAP))
         root.addView(bottom, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
@@ -562,7 +597,7 @@ class MainActivity : Activity() {
         val f = saveFile()
         val has = f.baseFile.exists()
         val items = if (has) arrayOf("save the world", "load the saved world") else arrayOf("save the world")
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.MicrocosmDialog)
             .setTitle("Saved world")
             .setItems(items) { _, k ->
                 if (k == 0) world.save { bytes ->
@@ -620,7 +655,7 @@ class MainActivity : Activity() {
 
     /** The briefing, then the prediction. Committing is never graded — it is there to be contrasted. */
     private fun briefing(l: Level) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.MicrocosmDialog)
             .setTitle("E${l.n}  ${l.title}")
             .setMessage("${l.question}\n\n${l.briefing}\n\nGoal: ${l.goalText}")
             .setPositiveButton("begin") { _, _ -> predict(l) }
@@ -631,7 +666,7 @@ class MainActivity : Activity() {
     private fun predict(l: Level) {
         val opts = l.predictOptions
         if (opts.isEmpty()) { begin(l, -1); return }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.MicrocosmDialog)
             .setTitle(l.predictPrompt)
             .setItems(opts.toTypedArray()) { _, k -> begin(l, k) }
             .setNegativeButton("skip") { _, _ -> begin(l, -1) }
@@ -772,7 +807,7 @@ class MainActivity : Activity() {
     /** The seeding picker: choose a species, then long-press the water to found a pack there. */
     private fun seedPicker() {
         val names = live.map { Native.traitText(it, 0) }.toTypedArray()
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.MicrocosmDialog)
             .setTitle("Seed which species? Then long-press the water.")
             .setItems(names) { _, k -> world.seedSpecies = live[k]; world.wallArmed = false; sheetTo(Detent.PEEK) }
             .setNegativeButton("none") { _, _ -> world.seedSpecies = -1 }

@@ -128,6 +128,23 @@ class BootTest {
             assertTrue("a tap dead on the sun did not grip it", world.sunSel >= 0)
             println("BOOT GATE: the tap gripped sun ${world.sunSel}")
 
+            // U2.3: a standing sun change must wear the badge, and putting the sun back clears it.
+            val moved = java.util.concurrent.CountDownLatch(1)
+            world.post {
+                Native.ivPush(WorldView.IV_SOURCE)
+                Native.evSource(0, Native.sourceNum(0, 0) + 128.0, Native.sourceNum(0, 1))
+                moved.countDown()
+            }
+            assertTrue(moved.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            var until = System.currentTimeMillis() + 3000
+            while (world.sunBadge.isEmpty() && System.currentTimeMillis() < until) Thread.sleep(10)
+            assertTrue("a moved sun must wear the standing-change badge", world.sunBadge.isNotEmpty())
+            world.putSunBack()
+            until = System.currentTimeMillis() + 3000
+            while (world.sunBadge.isNotEmpty() && System.currentTimeMillis() < until) Thread.sleep(10)
+            assertTrue("putting the sun back must clear the badge", world.sunBadge.isEmpty())
+            println("BOOT GATE: the standing-change badge appears on a moved sun and clears on restore")
+
             // And the gate the grip sits behind, made explicit: in Observe the same tap does
             // nothing — levers are Intervene's, and always were. Documented here because the
             // owner's "I never get to grip it" is exactly what Observe mode looks like.

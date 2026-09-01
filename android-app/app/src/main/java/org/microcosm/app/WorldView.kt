@@ -95,6 +95,36 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var card: String = ""
         private set
 
+    /** The one line's clock (U2.2). */
+    @Volatile var clock: String = ""
+        private set
+
+    /**
+     * The standing sun change (U2.3, the outrun study's one conviction): "" while the sun is as
+     * this world founded it, else what stands and for how long — in the world's own minutes.
+     */
+    @Volatile var sunBadge: String = ""
+        private set
+    private var baseSun = DoubleArray(0) // x,y,i,a,sigma at founding; render thread only
+    private var sunChangeTick = -1L
+
+    /** Remember the sun as this world was founded; the badge measures departure from here. */
+    private fun captureSunBaseline() {
+        baseSun = if (Native.sourceCount() > 0) DoubleArray(5) { Native.sourceNum(0, it) }
+                  else DoubleArray(0)
+        sunChangeTick = -1L
+    }
+
+    /** Put the sun back as founded — the badge's tap, logged as the presses it is. */
+    fun putSunBack() = post {
+        if (baseSun.size < 5 || Native.sourceCount() == 0) return@post
+        if (Native.levelAllows(2) == 0) return@post
+        Native.ivPush(IV_SOURCE_SET)
+        Native.evSourceSet(0, baseSun[2], baseSun[3], baseSun[4])
+        Native.ivPush(IV_SOURCE)
+        Native.evSource(0, baseSun[0], baseSun[1])
+    }
+
     // The core is single-threaded and lives on the render thread, so nothing outside may touch it.
     // Taps and levers are queued here and picked up at the top of the loop. Each gesture crosses
     // threads as ONE atomic reference: the earlier pair of volatile floats could be read torn (x
@@ -157,6 +187,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         levelDeadline = deadline
         Native.levelStart(idx, predicted)
         selI = -1
+        captureSunBaseline() // the level founds its own sky; the badge measures from there
     }
     fun restartLevel() = post { Native.levelRestart(); selI = -1 }
     fun stopLevel() = post { Native.levelStop(); levelState = 0; levelHud = "" }
@@ -177,6 +208,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         seedSpecies = -1
         Native.markPrev()
         renderer.onTilesChanged()
+        captureSunBaseline()
     }
 
     // ---- Data mode (A.4) ----
@@ -423,7 +455,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var bootWorld: ByteArray? = null
     fun load(bytes: ByteArray, onDone: (Boolean) -> Unit) = post {
         val ok = Native.load(bytes) != 0
-        if (ok) { selI = -1; Native.markPrev(); renderer.onTilesChanged() }
+        if (ok) { selI = -1; Native.markPrev(); renderer.onTilesChanged(); captureSunBaseline() }
         ui.post { onDone(ok) }
     }
     private val ui = android.os.Handler(android.os.Looper.getMainLooper())
@@ -436,6 +468,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         bootWorld = null
         Native.markPrev()
         renderer = Renderer(density)
+        captureSunBaseline()
 
         var last = System.nanoTime()
         var acc = 0.0
@@ -480,6 +513,23 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 cam.z / density, frameMs, buildMs, renderer.orgN,
             )
             card = renderer.cardText(selI, selGen)
+            clock = "t %d".format(Native.tick())
+            // The standing-change badge (U2.3): does the sun differ from this world's founding?
+            if (baseSun.size == 5 && Native.sourceCount() > 0) {
+                val di = Native.sourceNum(0, 2) - baseSun[2]
+                val moved = hypot(wrapDelta(Native.sourceNum(0, 0) - baseSun[0]),
+                    wrapDelta(Native.sourceNum(0, 1) - baseSun[1])) > 2.0
+                val dimmed = kotlin.math.abs(di) > 0.005
+                if (moved || dimmed) {
+                    if (sunChangeTick < 0) sunChangeTick = Native.tick()
+                    val mins = (Native.tick() - sunChangeTick) / 600
+                    val what = StringBuilder("sun")
+                    if (dimmed) what.append(" %+.1f".format(di))
+                    if (moved) what.append(" · moved")
+                    what.append(if (mins < 1) " · just changed" else " · standing $mins min")
+                    sunBadge = what.toString()
+                } else { sunChangeTick = -1L; sunBadge = "" }
+            } else sunBadge = ""
             // Where the gripped sun is on screen this frame, for the drag-start test (U0.4).
             val gs = sunSel
             if (gs in 0 until Native.sourceCount()) {
