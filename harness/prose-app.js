@@ -16,7 +16,8 @@
 //      narration/vocabulary arrays are pairwise aligned.
 //   5. The level overlay (assets/levels.de.json) is COMPLETE against src/observatory/levels.json:
 //      every level, every player-text field, option/reflect/meter counts equal, every English
-//      fail reason translated — and all of its German within style.
+//      fail reason translated (the timeoutWhy verdicts included — they reach the player through
+//      the same whys map) — and all of its German within style.
 //
 // English rules are harness/prose.js's (<= 20 words a sentence, FK <= 8 on long strings, the
 // banned-science list, "since" never "because"). German rules mirror them minus FK — the
@@ -206,7 +207,9 @@ for (const l of levelsEn){
   const enMeter = l.meter || [], deMeter = de.meter || [];
   if (deMeter.length !== enMeter.length)
     bad.push(`${at}  meter has ${deMeter.length} rows, English has ${enMeter.length}`);
-  for (const why of whysOf(l)){
+  const reasons = whysOf(l);
+  if (l.timeoutWhy) reasons.push(l.timeoutWhy); // the timeout verdict reaches the player through the same whys map
+  for (const why of reasons){
     const t = (de.whys || {})[why];
     if (!t) bad.push(`${at}  untranslated fail reason: "${why.slice(0, 50)}…"`);
     else check(t, `${at}.why`, "de");
