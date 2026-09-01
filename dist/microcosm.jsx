@@ -2343,6 +2343,100 @@ const LEVEL_ROWS = [
       "pass": "You carried life across the dark, and the new sun keeps a working pond. That trip was the whole secret. The water never needed better conditions — it needed a traveler. The plankton cannot cross dark water; the mat can creep, but far too slowly. Settling a new place is called colonization. Now keep watching your outpost: the bloom is already crowding the young meadow.",
       "fail": "The new sun was never the problem — the trip was. Pours feed water, not distance, and no drifter survives the dark crossing. Seed the mat and the plankton under the new sun. Both: alone, the mat feeds no one, and the bloom locks the meadow out."
     }
+  },
+  {
+    "key": "sorting",
+    "n": 9,
+    "title": "The Sorting",
+    "science": "Natural selection · heritable variation",
+    "question": "Two Drifta lines share the water. What decides which one wins?",
+    "briefing": "The full pond, and nothing is frozen: young Drifta can differ from their parents. Tough ones dodge grazers; fast ones out-breed them. The pond keeps both, because armor is expensive. Open the Evolution panel and make armor cheaper: under Drifta's defense prices, pull kp well below its balance mark.",
+    "goalText": "Make the tough Drifta line win",
+    "predict": {
+      "prompt": "Armor gets cheap. What changes in Drifta?",
+      "options": [
+        "Each Drifta grows itself tougher armor",
+        "Tough lines out-breed the fast lines",
+        "Nothing heritable changes at all"
+      ],
+      "reflect": [
+        "Tap any Drifta and watch its card: it never changed. Only the mix of lines changed. Bodies don't learn — births count.",
+        "Right. Cheap armor tips the ledger, and births do the rest — no creature changed, the count did.",
+        "The change was heritable, and that was the point. Turn mutation off and the same cheap armor sorts nothing."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "mutation": true
+    },
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": true
+    },
+    "deadline": 18000,
+    "sustain": 10,
+    "narrate": [
+      "sweep",
+      "diverse",
+      "uniform",
+      "rail",
+      "estab",
+      "extinct"
+    ],
+    "pass": [
+      {
+        "m": "ch",
+        "c": 43,
+        "op": ">=",
+        "v": 0.6
+      },
+      {
+        "m": "share",
+        "sp": 1,
+        "plane": 0,
+        "side": 1,
+        "op": ">=",
+        "v": 0.6
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The plankton is gone — grazed to nothing. Nothing is left to sort."
+      }
+    ],
+    "timeoutWhy": "The tough line never took over in time. At full price, armor spreads too slowly — if at all. The price is the lever that tips it.",
+    "meter": [
+      {
+        "label": "tough line",
+        "m": "share",
+        "sp": 1,
+        "plane": 0,
+        "side": 1,
+        "pct": true,
+        "goal": 60,
+        "unit": "%"
+      },
+      {
+        "label": "Drifta",
+        "m": "pop",
+        "sp": 1
+      }
+    ],
+    "debrief": {
+      "pass": "No single Drifta changed — whole lines did. You made armor cheap, and the tough line out-bred the fast one, birth by birth. The variation was there all along; your price change only tilted the sorting. That sorting is natural selection. It plans nothing and improves nothing — it counts births. And at full price, keeping both lines was selection too.",
+      "fail": "Nothing was sorted your way. Check the one switch that decides it all: with mutation off, the lines freeze. Nothing varies, so nothing can win. Sorting works only where the young can differ. Open the panel, keep mutation on, lower Drifta's kp price, and let the pond count births."
+    }
   }
 ];
 // ============================================================
@@ -2379,11 +2473,14 @@ function lvlSample(back){
   const r = ((W.recHead - 1 - back + REC.N) % REC.N) * REC.CH, B = W.rec;
   const total = B[r+14] + B[r+15] + B[r+16] + B[r+17];
   return { pop: sp => B[r+sp], free: B[r+14],
-    lockShare: (B[r+16] + B[r+17]) / Math.max(1, total) };
+    lockShare: (B[r+16] + B[r+17]) / Math.max(1, total),
+    raw: c => B[r + c] }; // any recorder channel — the "ch" metric (L9 reads locus means)
 }
 
 function levelStart(def, predicted){
-  P.mutation = false;   // experiments run on the certified silent world; the sandbox restores true
+  // Experiments run on the certified silent world unless the level DECLARES the evolving one
+  // (L9+: world.mutation true). The sandbox restores true on its own entry either way.
+  P.mutation = def.world.mutation === true;
   P.lightMul = 1.0;
   resetWorld();
   initWorld(def.world.seed, { found: def.world.found, M0: def.world.M0 });
@@ -2393,10 +2490,17 @@ function levelStart(def, predicted){
   LVL.predicted = predicted === undefined ? -1 : predicted; // F1: committed before the run; contrast, never grade
   LVL.mem = {};
   LVL.fired = 0; LVL.src0 = W.sources.length;
-  // F5: collect the level's region reads (deduplicated) from every predicate and meter row
+  // F5: collect the level's census reads (deduplicated) from every predicate and meter row —
+  // "near" region counts (L7) and "share" locus shares (L9), one ring column each
   const rgDef = [];
-  const need = c => { if (c.m === "near" &&
-    !rgDef.some(d => d.sp === c.sp && d.src === c.src && d.r === c.r)) rgDef.push({ sp: c.sp, src: c.src, r: c.r }); };
+  const need = c => {
+    if (c.m === "near" && !rgDef.some(d => d.k === "near" && d.sp === c.sp && d.src === c.src && d.r === c.r))
+      rgDef.push({ k: "near", sp: c.sp, src: c.src, r: c.r });
+    if (c.m === "at" && !rgDef.some(d => d.k === "at" && d.sp === c.sp && d.x === c.x && d.y === c.y && d.r === c.r))
+      rgDef.push({ k: "at", sp: c.sp, x: c.x, y: c.y, r: c.r }); // L11: a fixed-point region (the pen site)
+    if (c.m === "share" && !rgDef.some(d => d.k === "share" && d.sp === c.sp && d.plane === c.plane && d.side === c.side))
+      rgDef.push({ k: "share", sp: c.sp, plane: c.plane, side: c.side });
+  };
   for (const c of def.pass) need(c);
   if (def.latch) for (const l of def.latch) for (const c of l.when) need(c);
   for (const f of def.failNow) for (const c of f.when) need(c);
@@ -2404,10 +2508,25 @@ function levelStart(def, predicted){
   LVL.rgDef = rgDef; LVL.rg = rgDef.length ? new Float64Array(REC.N * rgDef.length) : null; LVL.rgS = 0;
 }
 
-// F5: one region census — live members of a species within toroidal radius r of a source.
-// Pure read; squared distance only (*, +), so the ported core computes it bit-identically.
+// F5b (L9): the live share of a species' locus plane beyond the detector's own ±0.05 band
+// around g0 — the recorder's sweep-share definition, captured on the sample clock like a region.
+function lvlShare(g){
+  const L = TRAITS[g.sp].loci[g.plane]; if (!L) return 0;
+  const off = g.plane * MAXN; let n = 0, m = 0;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i] || W.sp[i] !== g.sp) continue;
+    n++;
+    const v = W.g[off + i];
+    if (g.side > 0 ? v > L.g0 + 0.05 : v < L.g0 - 0.05) m++;
+  }
+  return n ? m / n : 0;
+}
+
+// F5: one region census — live members of a species within toroidal radius r of a source
+// ("near") or of a fixed point ("at", L11's pen site). Pure read; squared distance only
+// (*, +), so the ported core computes it bit-identically.
 function lvlNear(g){
-  const s = W.sources[g.src]; if (!s) return 0;
+  const s = g.k === "at" ? g : W.sources[g.src]; if (!s) return 0;
   const HW = P.WORLD / 2; let n = 0;
   for (let i = 0; i < W.n; i++){
     if (!W.alive[i] || W.sp[i] !== g.sp) continue;
@@ -2435,7 +2554,10 @@ function levelScript(){
     const s = (W.tick + 1) / REC.STRIDE;
     if (s > LVL.rgS){
       const row = (s % REC.N) * nr;
-      for (let j = 0; j < nr; j++) LVL.rg[row + j] = lvlNear(LVL.rgDef[j]);
+      for (let j = 0; j < nr; j++){
+        const d = LVL.rgDef[j];
+        LVL.rg[row + j] = d.k === "share" ? lvlShare(d) : lvlNear(d);
+      }
       LVL.rgS = s;
     }
   }
@@ -2470,7 +2592,15 @@ function levelNotePour(d){ if (LVL.def && LVL.pourLeft !== Infinity) LVL.pourLef
 //   condition  { m: "pop", sp } | { m: "lockShare" } | { m: "free" }, with op one of
 //              >= <= > < ==, and v the right-hand side; or { latched: id } for a set latch;
 //              or { m: "near", sp, src, r } (F5) — the census of a species within toroidal
-//              radius r of source src, captured by levelScript on the sample clock.
+//              radius r of source src, captured by levelScript on the sample clock;
+//              or { m: "at", sp, x, y, r } (L11) — the same census around a fixed point
+//              (a marked site rather than a source);
+//              or { m: "share", sp, plane, side } (L9) — the live share of that species'
+//              locus plane beyond g0±0.05 (side 1 = hi, -1 = lo; the sweep detector's own
+//              definition), captured like a region; or { m: "ch", c } — a raw recorder
+//              channel (L9 reads the locus mean at 42+sp).
+//   world.mutation  true runs the EVOLVING world (L9+); absent/false runs the certified
+//              silent world, as every earlier level does.
 //   script     [{ t, event }] (F4) — events the LEVEL fires at fixed ticks (before the step
 //              that produces tick t), through levelScript's per-tick call site.
 //   apparatus.sources  false | true | "added" — "added" locks the founded sky and opens only
@@ -2483,13 +2613,18 @@ function levelNotePour(d){ if (LVL.def && LVL.pourLeft !== Infinity) LVL.pourLef
 //   meter      [{ label, m, sp?, pct?, goal?, dir?, unit? }] — pct reads the share as a rounded
 //              percentage. A row with no goal is information, not an objective.
 function lvlMetric(S, r){
-  if (r.m === "near"){ // F5: the census the levelScript ring holds for this sample (S.s absolute)
+  if (r.m === "near" || r.m === "at" || r.m === "share"){ // F5: the census the levelScript ring holds for this sample (S.s absolute)
     const D = LVL.rgDef;
-    for (let j = 0; j < D.length; j++)
-      if (D[j].sp === r.sp && D[j].src === r.src && D[j].r === r.r)
-        return LVL.rg[(S.s % REC.N) * D.length + j];
+    for (let j = 0; j < D.length; j++){
+      const d = D[j];
+      const hit = r.m === "near" ? d.k === "near" && d.sp === r.sp && d.src === r.src && d.r === r.r
+        : r.m === "at" ? d.k === "at" && d.sp === r.sp && d.x === r.x && d.y === r.y && d.r === r.r
+        : d.k === "share" && d.sp === r.sp && d.plane === r.plane && d.side === r.side;
+      if (hit) return LVL.rg[(S.s % REC.N) * D.length + j];
+    }
     return 0;
   }
+  if (r.m === "ch") return S.raw(r.c); // any recorder channel (L9: locus mean 42+sp)
   return r.m === "lockShare" ? S.lockShare : r.m === "free" ? S.free : S.pop(r.sp);
 }
 function lvlCond(S, M, c){

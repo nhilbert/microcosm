@@ -300,6 +300,67 @@ REAL render loop and the founded sun refuses the grip through the real gesture p
 (`theScriptedSunRisesAndTheFoundedSkyStaysLocked`). German overlay complete; prose gates
 EN+DE green.
 
+### Level 9 · The Sorting — natural selection (shipped 2026-09-01; the planned design
+### was overturned by measurement and rebuilt around the price lever)
+
+The ladder spec's design — added grazer packs drive Drifta's tough sweep — **died in
+calibration, twice over**, and the deaths are the level's real foundation:
+
+1. **Added packs sweep the WRONG way, unreliably.** On seed 101, two packs at t=2,000
+   drove a *faster-growing* sweep (mean 0.31, lo-share 75–77% by 17k) — crash-grazing
+   rewards r-strategists, not armor; the 5.7 price (kpSlope 0.5) makes toughness too
+   expensive for boom–bust water. And the timing is a one-stream lottery: the pinned
+   stream passed at 16.2k, while three player-realistic seeding variants (positions
+   ±30, timing +100/+300) all failed to complete ANY sweep by 18k; one wandered
+   hi-side to 24k. Three packs at once peaked at 67%/0.404 and decayed.
+2. **The null sorts itself.** Left alone, seed 101's own late grazer boom (after the
+   t≈17k Drifta crash) drives the same fast-line sweep from ~t=22k — so no deadline
+   extension could rescue the pack design without the null passing it.
+
+The rebuilt level uses the lever the 5.x record said is robust: **the armor price**.
+The Evolution panel's kp slider (a shipped 6.x surface with its measured balance mark
+at 0.5) is the taught move — pull it well under balance and the tough line sweeps
+under the pond's own grazing. Measured (pass = mean ≥ 0.60 AND hi-share ≥ 0.60,
+sustained 10 samples):
+
+**A second instrument lesson, recorded before the numbers**: the first calibration
+round ran raw probes (mutation set after founding) — a DIFFERENT stream family than
+the level machinery (which sets it before). The gate convicted two wrong-lever pins
+that had held on raw streams and failed on level streams. Every number below is from
+the level machinery; that is now the calibration rule for evolving levels.
+
+| run (level machinery, seed 101, to 20k) | trajectory (mean / hi-share) | verdict at 0.60·60%·sustain 10, deadline 18k |
+|---|---|---|
+| null (full price) | 0.51 / 42% at 20k, never near | FAIL (timeout) — robust |
+| kp 0.20 at t=1,000 | monotone: 0.60/59 @10k → 0.80/99 @20k | PASS ~t=10,280 |
+| kp 0.20 at t=3,000 | 0.587/66 @12k → 0.80/98 @20k | PASS ~t=12,760 |
+| mutation OFF + kp 0.20 | pinned 0.48–0.51, shares 0% for 18k | FAIL — nothing varies, nothing wins |
+| two grazer packs, price untouched | slow tough climb, 0.73/85 @18k | passed ~14.9k — NOT a wrong lever (see below) |
+| hand-feed the 10 toughest every 200 ticks | 0.92/100 by 18k, the strongest run | passed ~6.3k — artificial selection, working as selection does |
+
+The two overturned pins, recorded as findings rather than smoothed over:
+**extra grazing is stream-chaotic, not wrong** — on raw streams it swept FAST
+(crash-grazing pays r-strategists) or nowhere; on the level stream it drifts TOUGH
+and passes late; no criterion separates it robustly from the taught lever, so it is
+*unpinned* and the record keeps both faces. And **husbandry is not a fake**: feeding
+the toughest is differential reproduction by the player's hand — Darwin's pigeons —
+and it produces the cleanest sweep in the table. The ladder spec's worry ("it cannot
+move W.g") missed that selection never moves genes, it moves *counts*. Both stand as
+legitimate alternative pressures a player may discover; the shipped harness pins what
+is provable: null, the two price runs, and mutation-off — the spec's own deepest
+lesson, flat to the fourth sample for 18,000 ticks.
+
+Margins: pass at 10.3–12.8k against deadline 18,000; the null needs +0.09 mean and
++18 points of share it never approaches. Machinery built for it (both cores,
+gate-proved): `world.mutation` (the first evolving-world level), the `{m:"ch",c}`
+raw-channel metric (locus mean at 42+sp) and the `{m:"share",sp,plane,side}` census
+(the sweep detector's own ±0.05 definition, captured on the levelScript clock).
+Term ladder: natural selection. The kp slider's player-facing name is the panel's
+own terse "kp · balance 0.5" (a pre-existing 6.x surface); the briefing points at
+it by name. **Owner review flag**: the taught lever is a world-price knob rather
+than an ecological act — sanctioned as a shipped Evolution-panel surface, but a
+deliberate design pivot from the ladder spec, decided by measurement in-session.
+
 ## 4. The deferred ladder (arcs B–D)
 
 > **Superseded in detail (2026-08-31): docs/phase8-ladder-design.md** — the researched

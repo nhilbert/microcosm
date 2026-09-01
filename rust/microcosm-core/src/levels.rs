@@ -33,14 +33,21 @@ pub enum Metric {
     /// F5: census of a species within toroidal radius `r` of source `src`, captured by
     /// `level_script` on the sample clock (one tick before each recorder sample lands).
     Near { sp: usize, src: usize, r: f64 },
+    /// L11: the same census around a fixed point (a marked site rather than a source).
+    At { sp: usize, x: f64, y: f64, r: f64 },
+    /// L9: the live share of a species' locus plane beyond the sweep detector's ±0.05 band
+    /// around g0 (`side` 1 = hi, -1 = lo), captured like a region.
+    Share { sp: usize, plane: usize, side: i32 },
+    /// A raw recorder channel (L9 reads the locus mean at 42+sp).
+    Ch(usize),
 }
 
-/// F5: one deduplicated region read of the running level (built at `level_start`).
+/// F5: one deduplicated census read of the running level (built at `level_start`).
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Region {
-    pub sp: usize,
-    pub src: usize,
-    pub r: f64,
+pub enum Region {
+    Near { sp: usize, src: usize, r: f64 },
+    At { sp: usize, x: f64, y: f64, r: f64 },
+    Share { sp: usize, plane: usize, side: i32 },
 }
 
 /// F4: an event the LEVEL fires at a fixed tick — before the step that produces tick `t`,
@@ -49,6 +56,10 @@ pub struct Region {
 #[derive(Clone, Copy, Debug)]
 pub enum ScriptEvent {
     SourceAdd { x: f64, y: f64, i: Option<f64>, a: Option<f64>, sigma: Option<f64> },
+    /// L12: the timeline re-shapes an existing source (the sun turning hot).
+    SourceSet { k: usize, i: Option<f64>, a: Option<f64>, sigma: Option<f64> },
+    /// L11: the timeline builds a wall (the pen's scripted sides). All fields explicit.
+    WallAdd { x0: f64, y0: f64, dx: f64, dy: f64, lt: f64, ht: f64, fl: f64, pass: i32 },
 }
 
 #[derive(Debug)]
@@ -116,6 +127,8 @@ pub struct LevelDef {
     pub found: [i32; 7],
     pub m0: f64,
     pub has_m0: bool,
+    /// `world.mutation`: true founds the EVOLVING world (L9+); false the certified silent one.
+    pub mutation: bool,
     pub light_mul: f64,
     pub has_light_mul: bool,
     /// Mineral doses the player carries; -1 is unlimited.
@@ -227,9 +240,11 @@ pub struct LvlSample {
     pop: [f64; 7],
     pub free: f64,
     pub lock_share: f64,
-    /// Absolute sample index — the key into the region census ring (F5). Set by the callers
-    /// that walk samples; region-free levels never read it.
+    /// Absolute sample index — the key into the census ring (F5). Set by the callers that
+    /// walk samples; census-free levels never read it.
     pub s: i64,
+    /// This sample's base offset into the recorder ring, for the raw `Ch` metric.
+    pub row: usize,
 }
 
 impl LvlSample {
@@ -239,31 +254,35 @@ impl LvlSample {
     }
 
     #[inline]
-    #[allow(clippy::float_cmp)] // region specs match structurally, exactly as the JS `===` does
-    fn metric(&self, m: Metric, lvl: &Lvl) -> f64 {
+    #[allow(clippy::float_cmp)] // census specs match structurally, exactly as the JS `===` does
+    fn metric(&self, m: Metric, lvl: &Lvl, rec: &[f32]) -> f64 {
+        let census = |want: Region| {
+            let d = &lvl.rg_def;
+            for (j, g) in d.iter().enumerate() {
+                if *g == want {
+                    return lvl.rg[(self.s as usize % REC_N) * d.len() + j];
+                }
+            }
+            0.0
+        };
         match m {
             Metric::Pop(sp) => self.pop[sp],
             Metric::LockShare => self.lock_share,
             Metric::Free => self.free,
-            Metric::Near { sp, src, r } => {
-                let d = &lvl.rg_def;
-                for (j, g) in d.iter().enumerate() {
-                    if g.sp == sp && g.src == src && g.r == r {
-                        return lvl.rg[(self.s as usize % REC_N) * d.len() + j];
-                    }
-                }
-                0.0
-            }
+            Metric::Near { sp, src, r } => census(Region::Near { sp, src, r }),
+            Metric::At { sp, x, y, r } => census(Region::At { sp, x, y, r }),
+            Metric::Share { sp, plane, side } => census(Region::Share { sp, plane, side }),
+            Metric::Ch(c) => rec[self.row + c] as f64,
         }
     }
 }
 
 #[allow(clippy::float_cmp)] // the JS compares recorder counts with `===`; so does this
-fn cond(s: &LvlSample, lvl: &Lvl, c: &Cond) -> bool {
+fn cond(s: &LvlSample, lvl: &Lvl, rec: &[f32], c: &Cond) -> bool {
     match *c {
         Cond::Latched(k) => lvl.mem[k] != 0,
         Cond::Cmp(m, op, v) => {
-            let a = s.metric(m, lvl);
+            let a = s.metric(m, lvl, rec);
             match op {
                 Op::Ge => a >= v,
                 Op::Le => a <= v,
@@ -275,8 +294,8 @@ fn cond(s: &LvlSample, lvl: &Lvl, c: &Cond) -> bool {
     }
 }
 
-fn all(s: &LvlSample, lvl: &Lvl, list: &[Cond]) -> bool {
-    list.iter().all(|c| cond(s, lvl, c))
+fn all(s: &LvlSample, lvl: &Lvl, rec: &[f32], list: &[Cond]) -> bool {
+    list.iter().all(|c| cond(s, lvl, rec, c))
 }
 
 /// `Math.round` — half away from zero towards +infinity, which is what JavaScript does.
@@ -312,32 +331,60 @@ impl Sim {
             free: b(14),
             lock_share: (b(16) + b(17)) / if total > 1.0 { total } else { 1.0 },
             s: 0,
+            row: r,
         }
+    }
+
+    /// L9: the live share of a species' locus plane beyond the sweep detector's ±0.05 band
+    /// around g0 — bit-identical to the JS census (comparisons on f32-promoted values only).
+    fn lvl_share(&self, sp: usize, plane: usize, side: i32) -> f64 {
+        let l = match self.tr[sp].loci.get(plane) {
+            Some(l) => l,
+            None => return 0.0,
+        };
+        let off = plane * crate::params::MAXN;
+        let (mut n, mut m) = (0.0f64, 0.0f64);
+        for i in 0..self.w.n {
+            if self.w.alive[i] == 0 || self.w.sp[i] as usize != sp {
+                continue;
+            }
+            n += 1.0;
+            let v = self.w.g[off + i] as f64;
+            if if side > 0 { v > l.g0 + 0.05 } else { v < l.g0 - 0.05 } {
+                m += 1.0;
+            }
+        }
+        if n > 0.0 { m / n } else { 0.0 }
     }
 
     /// F5: one region census — live members of a species within toroidal radius `r` of a
     /// source. Pure read; squared distance only (`*`, `+`), so it is bit-identical to the JS.
-    fn lvl_near(&self, g: &Region) -> f64 {
-        let s = match self.w.sources.get(g.src) {
+    fn lvl_near(&self, g_sp: usize, g_src: usize, g_r: f64) -> f64 {
+        let s = match self.w.sources.get(g_src) {
             Some(s) => s,
             None => return 0.0,
         };
+        let (sx, sy) = (s.x, s.y);
+        self.lvl_near_pt(g_sp, sx, sy, g_r)
+    }
+
+    fn lvl_near_pt(&self, g_sp: usize, cx: f64, cy: f64, g_r: f64) -> f64 {
         let hw = crate::params::WORLD / 2.0;
         let world = crate::params::WORLD;
         let mut n = 0.0;
         for i in 0..self.w.n {
-            if self.w.alive[i] == 0 || self.w.sp[i] as usize != g.sp {
+            if self.w.alive[i] == 0 || self.w.sp[i] as usize != g_sp {
                 continue;
             }
-            let mut dx = (self.w.x[i] as f64 - s.x).abs();
+            let mut dx = (self.w.x[i] as f64 - cx).abs();
             if dx > hw {
                 dx = world - dx;
             }
-            let mut dy = (self.w.y[i] as f64 - s.y).abs();
+            let mut dy = (self.w.y[i] as f64 - cy).abs();
             if dy > hw {
                 dy = world - dy;
             }
-            if dx * dx + dy * dy <= g.r * g.r {
+            if dx * dx + dy * dy <= g_r * g_r {
                 n += 1.0;
             }
         }
@@ -360,6 +407,11 @@ impl Sim {
                 ScriptEvent::SourceAdd { x, y, i, a, sigma } => {
                     Event::SourceAdd { x, y, i, a, sigma, at: None }
                 }
+                ScriptEvent::SourceSet { k, i, a, sigma } => Event::SourceSet { k, i, a, sigma },
+                ScriptEvent::WallAdd { x0, y0, dx, dy, lt, ht, fl, pass } => Event::WallAdd {
+                    spec: crate::fields::WallSpec { x0, y0, dx, dy, lt, ht, fl, pass },
+                    at: None,
+                },
             };
             self.lvl.fired += 1;
             let saved = core::mem::replace(&mut self.undo, crate::events::Undo::None);
@@ -372,7 +424,11 @@ impl Sim {
             if s > self.lvl.rg_s {
                 let row = (s as usize % REC_N) * nr;
                 for j in 0..nr {
-                    let v = self.lvl_near(&self.lvl.rg_def[j]);
+                    let v = match self.lvl.rg_def[j] {
+                        Region::Near { sp, src, r } => self.lvl_near(sp, src, r),
+                        Region::At { sp, x, y, r } => self.lvl_near_pt(sp, x, y, r),
+                        Region::Share { sp, plane, side } => self.lvl_share(sp, plane, side),
+                    };
                     self.lvl.rg[row + j] = v;
                 }
                 self.lvl.rg_s = s;
@@ -383,7 +439,8 @@ impl Sim {
     /// `levelStart(def, predicted)` — found the level's world and arm the verdict loop.
     pub fn level_start(&mut self, idx: usize, predicted: i32) {
         let def = &LEVELS[idx];
-        self.p.mutation = false; // experiments run on the certified silent world; the sandbox restores true
+        // Silent world unless the level declares the evolving one (L9+); the sandbox restores true.
+        self.p.mutation = def.mutation;
         self.p.light_mul = 1.0;
         self.reset_world();
         let mut sc = Scenario::default();
@@ -399,37 +456,40 @@ impl Sim {
         if def.has_light_mul {
             self.apply_event(Event::LightMul { v: def.light_mul });
         }
-        // F5: collect the level's region reads (deduplicated) from every predicate and meter row
+        // F5: collect the level's census reads (deduplicated) from every predicate and meter row
         let mut rg_def: Vec<Region> = Vec::new();
         {
-            let mut need = |c: &Cond| {
-                if let Cond::Cmp(Metric::Near { sp, src, r }, _, _) = *c {
-                    let g = Region { sp, src, r };
-                    if !rg_def.contains(&g) {
-                        rg_def.push(g);
-                    }
+            let mut need_m = |m: Metric, rg_def: &mut Vec<Region>| {
+                let g = match m {
+                    Metric::Near { sp, src, r } => Region::Near { sp, src, r },
+                    Metric::At { sp, x, y, r } => Region::At { sp, x, y, r },
+                    Metric::Share { sp, plane, side } => Region::Share { sp, plane, side },
+                    _ => return,
+                };
+                if !rg_def.contains(&g) {
+                    rg_def.push(g);
+                }
+            };
+            let mut need = |c: &Cond, rg_def: &mut Vec<Region>| {
+                if let Cond::Cmp(m, _, _) = *c {
+                    need_m(m, rg_def);
                 }
             };
             for c in def.pass {
-                need(c);
+                need(c, &mut rg_def);
             }
             for l in def.latch {
                 for c in l.when {
-                    need(c);
+                    need(c, &mut rg_def);
                 }
             }
             for f in def.fail_now {
                 for c in f.when {
-                    need(c);
+                    need(c, &mut rg_def);
                 }
             }
             for m in def.meter {
-                if let Metric::Near { sp, src, r } = m.m {
-                    let g = Region { sp, src, r };
-                    if !rg_def.contains(&g) {
-                        rg_def.push(g);
-                    }
-                }
+                need_m(m.m, &mut rg_def);
             }
         }
         let rg = vec![0.0; REC_N * rg_def.len()];
@@ -486,21 +546,22 @@ impl Sim {
                 let mut s = self.lvl_sample((s_now - s_eval + k) as usize);
                 s.s = s_eval - k;
                 for l in def.latch {
-                    if all(&s, &self.lvl, l.when) {
+                    if all(&s, &self.lvl, &self.obs.rec, l.when) {
                         self.lvl.mem[l.id] = 1;
                     }
                 }
                 let why = def
                     .fail_now
                     .iter()
-                    .find(|r| all(&s, &self.lvl, r.when))
+                    .find(|r| all(&s, &self.lvl, &self.obs.rec, r.when))
                     .map(|r| r.why);
                 if let Some(why) = why {
                     self.lvl.state = LvlState::Failed;
                     self.lvl.fail_why = why;
                     break;
                 }
-                self.lvl.run = if all(&s, &self.lvl, def.pass) { self.lvl.run + 1 } else { 0 };
+                self.lvl.run =
+                    if all(&s, &self.lvl, &self.obs.rec, def.pass) { self.lvl.run + 1 } else { 0 };
                 if self.lvl.run >= if def.sustain != 0 { def.sustain } else { 10 } {
                     self.lvl.state = LvlState::Passed;
                 }
@@ -576,9 +637,9 @@ impl Sim {
             .map(|m| MeterOut {
                 label: m.label,
                 v: if m.pct {
-                    js_round(s.metric(m.m, &self.lvl) * 100.0)
+                    js_round(s.metric(m.m, &self.lvl, &self.obs.rec) * 100.0)
                 } else {
-                    s.metric(m.m, &self.lvl)
+                    s.metric(m.m, &self.lvl, &self.obs.rec)
                 },
                 goal: m.goal,
                 dir: m.dir,

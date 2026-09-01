@@ -683,5 +683,99 @@
       "pass": "You carried life across the dark, and the new sun keeps a working pond. That trip was the whole secret. The water never needed better conditions — it needed a traveler. The plankton cannot cross dark water; the mat can creep, but far too slowly. Settling a new place is called colonization. Now keep watching your outpost: the bloom is already crowding the young meadow.",
       "fail": "The new sun was never the problem — the trip was. Pours feed water, not distance, and no drifter survives the dark crossing. Seed the mat and the plankton under the new sun. Both: alone, the mat feeds no one, and the bloom locks the meadow out."
     }
+  },
+  {
+    "key": "sorting",
+    "n": 9,
+    "title": "The Sorting",
+    "science": "Natural selection · heritable variation",
+    "question": "Two Drifta lines share the water. What decides which one wins?",
+    "briefing": "The full pond, and nothing is frozen: young Drifta can differ from their parents. Tough ones dodge grazers; fast ones out-breed them. The pond keeps both, because armor is expensive. Open the Evolution panel and make armor cheaper: under Drifta's defense prices, pull kp well below its balance mark.",
+    "goalText": "Make the tough Drifta line win",
+    "predict": {
+      "prompt": "Armor gets cheap. What changes in Drifta?",
+      "options": [
+        "Each Drifta grows itself tougher armor",
+        "Tough lines out-breed the fast lines",
+        "Nothing heritable changes at all"
+      ],
+      "reflect": [
+        "Tap any Drifta and watch its card: it never changed. Only the mix of lines changed. Bodies don't learn — births count.",
+        "Right. Cheap armor tips the ledger, and births do the rest — no creature changed, the count did.",
+        "The change was heritable, and that was the point. Turn mutation off and the same cheap armor sorts nothing."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "mutation": true
+    },
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": true
+    },
+    "deadline": 18000,
+    "sustain": 10,
+    "narrate": [
+      "sweep",
+      "diverse",
+      "uniform",
+      "rail",
+      "estab",
+      "extinct"
+    ],
+    "pass": [
+      {
+        "m": "ch",
+        "c": 43,
+        "op": ">=",
+        "v": 0.6
+      },
+      {
+        "m": "share",
+        "sp": 1,
+        "plane": 0,
+        "side": 1,
+        "op": ">=",
+        "v": 0.6
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The plankton is gone — grazed to nothing. Nothing is left to sort."
+      }
+    ],
+    "timeoutWhy": "The tough line never took over in time. At full price, armor spreads too slowly — if at all. The price is the lever that tips it.",
+    "meter": [
+      {
+        "label": "tough line",
+        "m": "share",
+        "sp": 1,
+        "plane": 0,
+        "side": 1,
+        "pct": true,
+        "goal": 60,
+        "unit": "%"
+      },
+      {
+        "label": "Drifta",
+        "m": "pop",
+        "sp": 1
+      }
+    ],
+    "debrief": {
+      "pass": "No single Drifta changed — whole lines did. You made armor cheap, and the tough line out-bred the fast one, birth by birth. The variation was there all along; your price change only tilted the sorting. That sorting is natural selection. It plans nothing and improves nothing — it counts births. And at full price, keeping both lines was selection too.",
+      "fail": "Nothing was sorted your way. Check the one switch that decides it all: with mutation off, the lines freeze. Nothing varies, so nothing can win. Sorting works only where the young can differ. Open the panel, keep mutation on, lower Drifta's kp price, and let the pond count births."
+    }
   }
 ]

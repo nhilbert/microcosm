@@ -247,7 +247,7 @@
       ]
     },
     "debrief": {
-      "pass": "Du hast Leben über das Dunkel getragen, und die neue Sonne hält jetzt einen lebendigen Teich. Diese Reise war das ganze Geheimnis. Das Wasser brauchte nie bessere Bedingungen — es brauchte einen Reisenden. Das Plankton kann dunkles Wasser nicht überqueren; die Matte kriecht, aber viel zu langsam. Einen neuen Ort zu besiedeln heißt Kolonisation. Und jetzt beobachte deinen Außenposten: Die Blüte bedrängt schon die junge Matte.",
+      "pass": "Du hast Leben über das Dunkel getragen, und die neue Sonne hält jetzt einen lebendigen Teich. Diese Reise war das ganze Geheimnis. Das Wasser brauchte nie bessere Bedingungen — es brauchte einen Reisenden. Das Plankton kann dunkles Wasser nicht überqueren; die Matte kriecht, aber viel zu langsam. Dass Leben so an neue Orte kommt, nennt man Besiedlung. Und jetzt beobachte deinen Außenposten: Die Blüte bedrängt schon die junge Matte.",
       "fail": "Die neue Sonne war nie das Problem — der Weg dorthin war es. Gießen füttert Wasser, nicht Entfernung, und nichts, was treibt, überlebt die dunkle Strecke. Setz die Matte und das Plankton unter der neuen Sonne aus. Beides: Die Matte allein ernährt niemanden, und die Blüte allein sperrt die Matte aus."
     },
     "meter": [
@@ -258,6 +258,38 @@
       "The last Solara died. Nothing is left to carry to the new sun.": "Die letzte Solara ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
       "The last Drifta died. Nothing is left to carry to the new sun.": "Die letzte Drifta ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
       "The new sun still has no working pond. Life had to be carried there — the mat and its plankton both.": "Die neue Sonne hat noch immer keinen lebendigen Teich. Leben musste dorthin getragen werden — die Matte und ihr Plankton."
+    }
+  },
+  "sorting": {
+    "title": "Das große Sortieren",
+    "science": "Natürliche Auslese · erbliche Vielfalt",
+    "question": "Zwei Drifta-Linien teilen sich das Wasser. Was entscheidet, welche gewinnt?",
+    "briefing": "Der volle Teich, und nichts steht still: Junge Drifta können sich von ihren Eltern unterscheiden. Zähe weichen Planktonfressern aus; schnelle vermehren sich stärker. Der Teich behält beide, weil Panzer teuer ist. Öffne das Evolutions-Panel und mache Panzer billiger: Ziehe bei Driftas Verteidigungs-Preisen kp deutlich unter die Balance-Marke.",
+    "goalText": "Die zähe Drifta-Linie gewinnt",
+    "predict": {
+      "prompt": "Panzer wird billig. Was ändert sich an Drifta?",
+      "options": [
+        "Jede Drifta baut sich zäheren Panzer",
+        "Zähe Linien verdrängen die schnellen Linien",
+        "Nichts Erbliches ändert sich"
+      ],
+      "reflect": [
+        "Tippe eine Drifta an und schaue auf ihre Karte: Sie selbst ändert sich nie. Nur die Mischung der Linien ändert sich. Körper lernen nicht, Geburten zählen.",
+        "Richtig. Billiger Panzer kippt die Rechnung, und Geburten erledigen den Rest. Kein Tier hat sich verändert, nur die Zählung.",
+        "Die Änderung war erblich, und genau das zählte. Schalte die Mutation aus, und derselbe billige Panzer sortiert nichts."
+      ]
+    },
+    "debrief": {
+      "pass": "Keine einzelne Drifta hat sich verändert. Ganze Linien haben es. Du hast Panzer billig gemacht, und die zähe Linie hat die schnelle verdrängt, Geburt um Geburt. Die Vielfalt war längst da; dein Preis hat das Sortieren nur gekippt. Dieses Sortieren heißt natürliche Auslese. Sie plant nichts und verbessert nichts. Sie zählt Geburten. Und beim vollen Preis war das Gleichgewicht selbst schon Auslese.",
+      "fail": "Nichts wurde in deine Richtung sortiert. Prüfe den einen Schalter, der alles entscheidet: Ohne Mutation frieren die Linien ein. Nichts variiert, also kann nichts gewinnen. Auslese wirkt nur, wo das Erbe sich unterscheidet. Öffne das Evolutions-Panel, lass die Mutation an, senke Driftas kp-Preis, und lass den Teich Geburten zählen."
+    },
+    "meter": [
+      { "label": "zähe Linie", "unit": "%" },
+      { "label": "Drifta", "unit": "" }
+    ],
+    "whys": {
+      "The plankton is gone — grazed to nothing. Nothing is left to sort.": "Das Plankton ist fort, restlos abgeweidet. Zum Sortieren ist nichts mehr übrig.",
+      "The tough line never took over in time. At full price, armor spreads too slowly — if at all. The price is the lever that tips it.": "Die zähe Linie hat nicht rechtzeitig übernommen. Beim vollen Preis breitet Panzer sich zu langsam aus, wenn überhaupt. Der Preis ist der Hebel, der das kippt."
     }
   }
 }

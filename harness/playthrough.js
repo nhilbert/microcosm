@@ -111,6 +111,35 @@ const PLAYS = {
     if (!passed) throw new Error("strategy run failed instead of passing");
     console.log(`  outpost/strategy: pass debrief shown (t=${await h.tick()})`);
   },
+
+  sorting: async (page, h) => {
+    // strategy only (the null is a 18k-tick timeout — the levels gate owns it): open the
+    // Evolution panel's price fold and pull Drifta's kp slider to 0.2 through the real handler
+    await h.enter("The Sorting", "Tough lines out-breed the fast lines");
+    await page.keyboard.press("i");
+    await page.click("text=prices…");
+    const drove = await page.evaluate(() => {
+      const spans = [...document.querySelectorAll("span")];
+      const head = spans.find(s => s.textContent.trim().startsWith("Drifta defense prices"));
+      if (!head) return "no Drifta defense section";
+      const labels = [...head.nextElementSibling.querySelectorAll("span")];
+      const kp = labels.find(s => s.textContent.trim().startsWith("kp"));
+      if (!kp) return "no kp label";
+      const input = kp.nextElementSibling;
+      if (!input || input.type !== "range") return "no slider after the kp label";
+      const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      set.call(input, "0.2");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      return "ok";
+    });
+    if (drove !== "ok") throw new Error("kp slider not driven: " + drove);
+    console.log("  sorting/strategy: kp pulled to 0.2 through the panel's own slider");
+    await page.keyboard.press("3");
+    const passed = await h.untilText("natural selection", 420000, "never took over");
+    if (!passed) throw new Error("strategy run failed instead of passing");
+    console.log(`  sorting/strategy: pass debrief shown (t=${await h.tick()})`);
+  },
 };
 
 (async () => {

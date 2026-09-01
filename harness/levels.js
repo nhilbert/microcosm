@@ -45,6 +45,24 @@ const settle = (t, both) => ({ [t]: () => {
 const farSoup = {}; for (let k = 0; k < 10; k++)
   farSoup[3000 + k * 300] = pour((k % 3 - 1) * 60, (((k / 3) | 0) % 2) * 60);
 
+// L9: the lever is the armor price (Evolution panel); the wrong levers are the mutation
+// switch, harder grazing (this pond's crash-grazing pays SPEED — measured, see the record),
+// and husbandry
+const cheapArmor = t => ({ [t]: () => C.applyEvent({ type: "locus", sp: 1, locus: 0, key: "kpSlope", v: 0.2 }) });
+const packs9 = t => ({ [t]: () => { C.applyEvent({ type: "spawnPack", sp: 2, x: 470, y: 512 });
+                                    C.applyEvent({ type: "spawnPack", sp: 2, x: 554, y: 512 }); } });
+const mutOff9 = { 500: () => C.applyEvent({ type: "mutation", v: false }), ...cheapArmor(1000) };
+const feedHi9 = {}; // keep the 10 toughest Drifta fed by hand, every 200 ticks — must NOT fake a sweep
+for (let t = 200; t < 18000; t += 200) feedHi9[t] = () => {
+  const tough = [];
+  for (let i = 0; i < W.n; i++) if (W.alive[i] && W.sp[i] === 1) tough.push([W.g[i], i]);
+  tough.sort((a, b) => b[0] - a[0]);
+  for (let k = 0; k < Math.min(10, tough.length); k++){
+    const i = tough[k][1];
+    C.applyEvent({ type: "feed", i, gen: W.gen[i], frac: 0.5 });
+  }
+};
+
 const CASES = [
   ["light",   "null: wait under the dim sun",        null,                                             "failed"],
   ["light",   "strategy: raise the lever at t=2000", { 2000: () => C.applyEvent({ type: "lightMul", v: 1.2 }) }, "passed"],
@@ -72,7 +90,16 @@ const CASES = [
   ["outpost", "strategy: a late expedition (t=9000)",   settle(9000),      "passed"],
   ["outpost", "wrong: ten pours under the new sun",     farSoup,           "failed"],
   ["outpost", "wrong: plankton alone (t=3000)",         settle(3000, "driftaOnly"), "failed"],
+  ["sorting", "null: the balance holds at full price",   null,             "failed"],
+  ["sorting", "strategy: cheap armor at t=1000",         cheapArmor(1000), "passed"],
+  ["sorting", "strategy: cheap armor late (t=3000)",     cheapArmor(3000), "passed"],
+  ["sorting", "wrong: mutation off, same cheap armor",   mutOff9,          "failed"],
+  // The pack-pressure and husbandry cases are NOT pinned: on the level machinery's streams both
+  // produced tough sweeps of their own (packs @14,920; feeding the toughest @6,300 — differential
+  // feeding IS artificial selection, not a fake). Recalibration in the record; the honest wrong
+  // lever is the mutation switch. packs9/feedHi9 stay for the next measurement round.
 ];
+void packs9; void feedHi9;
 
 let ok = true;
 for (const [key, label, actions, expect] of CASES){

@@ -151,7 +151,7 @@ Alles Weitere prüft `harness/prose-app.js` in `npm test`:
 | L3 | Zersetzer |
 | L4 | Schlüsselart |
 | L6 | Nahrungskette |
-| L7 | Besiedlung *(vorläufig — fällt mit der Übersetzung)* |
+| L7 | Besiedlung *(bestätigt mit der L7-Übersetzung, 2026-09-01)* |
 | L9 | natürliche Auslese (+ „Merkmal" als Arbeitswort) |
 | L10 | Anpassung (lokal) |
 | L11 | Zuflucht *(vorläufig)* |

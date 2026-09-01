@@ -39,6 +39,20 @@ function metric(c, what) {
     if (!Number.isInteger(c.src) || c.src < 0) throw new Error(`bad source index in ${what}: ${c.src}`);
     return `Metric::Near { sp: ${c.sp}, src: ${c.src}, r: ${f(c.r, what + ".r")} }`;
   }
+  if (c.m === "at") { // L11: the census around a fixed point (a marked site)
+    if (!Number.isInteger(c.sp) || c.sp < 0 || c.sp > 6) throw new Error(`bad species in ${what}: ${c.sp}`);
+    return `Metric::At { sp: ${c.sp}, x: ${f(c.x, what + ".x")}, y: ${f(c.y, what + ".y")}, r: ${f(c.r, what + ".r")} }`;
+  }
+  if (c.m === "share") { // L9: locus-plane share beyond g0±0.05, side 1 = hi / -1 = lo
+    if (!Number.isInteger(c.sp) || c.sp < 0 || c.sp > 6) throw new Error(`bad species in ${what}: ${c.sp}`);
+    if (!Number.isInteger(c.plane) || c.plane < 0 || c.plane > 3) throw new Error(`bad plane in ${what}: ${c.plane}`);
+    if (c.side !== 1 && c.side !== -1) throw new Error(`bad side in ${what}: ${c.side}`);
+    return `Metric::Share { sp: ${c.sp}, plane: ${c.plane}, side: ${c.side} }`;
+  }
+  if (c.m === "ch") { // a raw recorder channel
+    if (!Number.isInteger(c.c) || c.c < 0 || c.c > 140) throw new Error(`bad channel in ${what}: ${c.c}`);
+    return `Metric::Ch(${c.c})`;
+  }
   throw new Error(`unknown metric in ${what}: ${JSON.stringify(c.m)}`);
 }
 
@@ -47,10 +61,22 @@ function metric(c, what) {
 function scriptStep(e, what) {
   if (!Number.isInteger(e.t) || e.t < 0) throw new Error(`${what}: bad script tick ${e.t}`);
   const ev = e.event;
+  const opt = k => ev[k] === undefined ? "None" : `Some(${f(ev[k], `${what}.${k}`)})`;
   if (ev.type === "sourceAdd") {
-    const opt = k => ev[k] === undefined ? "None" : `Some(${f(ev[k], `${what}.${k}`)})`;
     return `ScriptStep { t: ${e.t}, event: ScriptEvent::SourceAdd { x: ${f(ev.x, what + ".x")}, ` +
       `y: ${f(ev.y, what + ".y")}, i: ${opt("i")}, a: ${opt("a")}, sigma: ${opt("sigma")} } }`;
+  }
+  if (ev.type === "sourceSet") {
+    if (!Number.isInteger(ev.k) || ev.k < 0) throw new Error(`${what}: bad source index ${ev.k}`);
+    return `ScriptStep { t: ${e.t}, event: ScriptEvent::SourceSet { k: ${ev.k}, ` +
+      `i: ${opt("i")}, a: ${opt("a")}, sigma: ${opt("sigma")} } }`;
+  }
+  if (ev.type === "wallAdd") { // L11: scripted pen sides — every field explicit, no defaults
+    for (const k of ["x0", "y0", "dx", "dy", "lt", "ht", "fl"]) f(ev[k], `${what}.${k}`);
+    if (!Number.isInteger(ev.pass)) throw new Error(`${what}: bad wall pass mask ${ev.pass}`);
+    return `ScriptStep { t: ${e.t}, event: ScriptEvent::WallAdd { x0: ${f(ev.x0, what)}, y0: ${f(ev.y0, what)}, ` +
+      `dx: ${f(ev.dx, what)}, dy: ${f(ev.dy, what)}, lt: ${f(ev.lt, what)}, ht: ${f(ev.ht, what)}, ` +
+      `fl: ${f(ev.fl, what)}, pass: ${ev.pass} } }`;
   }
   throw new Error(`${what}: unknown script event ${JSON.stringify(ev.type)}`);
 }
@@ -115,6 +141,7 @@ for (const L of ROWS) {
   out.push(`        seed: ${L.world.seed | 0},`);
   out.push(`        found: [${found.join(", ")}],`);
   out.push(`        m0: ${L.world.M0 === undefined ? "0.0" : f(L.world.M0, what + ".M0")}, has_m0: ${b(L.world.M0 !== undefined)},`);
+  out.push(`        mutation: ${b(L.world.mutation === true)},`);
   out.push(`        light_mul: ${L.world.lightMul === undefined ? "0.0" : f(L.world.lightMul, what + ".lightMul")}, has_light_mul: ${b(L.world.lightMul !== undefined)},`);
   out.push(`        pours: ${pours}, seed_all: ${b(ap.seed === "all")},`);
   out.push(`        sources: ${sources}, walls: ${b(ap.walls)}, evolution: ${b(ap.evolution)},`);
