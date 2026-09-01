@@ -58,6 +58,13 @@ android {
                     showStandardStreams = true
                     exceptionFormat = "full"
                 }
+                // The boot gate (BootTest) loads the HOST build of the native core, so the JVM
+                // needs it on java.library.path. Built by `cargo build --release` in
+                // rust/microcosm-android; CI does this right before the tests. When absent the
+                // boot gate skips (loudly) and everything else still runs.
+                def nativeDir = "${rootDir}/../rust/microcosm-android/target/release"
+                systemProperty "microcosm.native.dir", nativeDir
+                systemProperty "java.library.path", nativeDir
             }
         }
     }

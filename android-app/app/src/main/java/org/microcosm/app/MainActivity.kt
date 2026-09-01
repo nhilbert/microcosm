@@ -195,14 +195,18 @@ class MainActivity : Activity() {
             typeface = Typeface.MONOSPACE
             setPadding(0, 18, 8, 0)
         })
-        val sunRow = Chrome.row(this, Chrome.SUN) { k ->
+        // The row goes in whole. Moving its children out one by one ("while childCount > 0 …")
+        // throws "the specified child already has a parent" the moment onCreate runs — addView
+        // never detaches from the old parent — and that line was the U.0 splash crash: it shipped
+        // through green CI because the layout gate measures the rows Chrome BUILDS, and nothing
+        // executed MainActivity until BootTest existed.
+        sunBar.addView(Chrome.row(this, Chrome.SUN) { k ->
             when (k) {
                 0 -> nudgeSun(-0.15)
                 1 -> nudgeSun(0.15)
                 else -> world.sunSel = -1
             }
-        }
-        while (sunRow.childCount > 0) sunBar.addView(sunRow.getChildAt(0))
+        })
         bottom.addView(sunBar)
 
         undoChip = button("undo") { world.undoLast() }.apply {
