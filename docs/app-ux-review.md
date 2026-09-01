@@ -236,6 +236,13 @@ fights behind it.
 
 ## 7. Pre-declared decisions for the owner
 
+**Answered 2026-09-01.** Q1 — **the app becomes the product**: the browser retires to being the
+frozen oracle for the *renderer*, as `src/sim/` did for the simulation. Q2 — **research first**,
+against the recommendation below, which stands as recorded rather than re-argued. Q3 — **all five
+lenses, seriously**. The research is `docs/app-ux-research.md`; §7 there is what the design phase
+should build, and §8 is what only the phone can settle. The U.0 repairs are NOT done.
+
+
 **Q1 — May the app's UI diverge from the browser's?** Staying in step keeps one design and one set
 of words, at the price of a phone UI shaped by a desktop-and-mobile-web artifact. Diverging gets a
 phone-native app and creates a second design to maintain (§3c). A third answer exists: the browser
