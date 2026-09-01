@@ -63,6 +63,19 @@ the code it tests. Order chosen so each step leaves the app strictly better if t
   Sandbox when one exists). The experiment list becomes a real screen, not an `AlertDialog`
   behind a bar button; briefing and prediction keep their flow. `exp` leaves the bar. Cut line:
   none — this is the owner-decided front door and ships first.
+- **U2.S — the shell's design language** (added 2026-09-01 after the owner's verdict on U2.0's
+  look: "everything looks like a 2000 webpage" — accurate, and until now unowned: the research
+  explicitly excluded the shell's visual grammar and no phase had claimed it). The shell today
+  wears two defaults — bare framework buttons on the stock theme, and monospace as the voice of
+  everything rather than of numbers. Defined once, before the sheet ships gray: a type scale
+  (a proper UI face for words; monospace kept for numbers, census, meters), buttons/chips/rows
+  drawn by us — `Chrome.button` is already the single birthplace of every button, so one factory
+  restyles the whole shell — a spacing system, and a palette derived from what the world already
+  owns (abyss ground, slate text, species colours, amber the hand, rule 7 untouched). Every
+  later increment ships styled; nothing gets built gray and repainted. Dependency-free holds:
+  the pond itself is the proof that hand-drawn and beautiful coexist. Caveat recorded:
+  Robolectric's camera shows the shapes, not the device's font rendering — the owner's phone
+  stays the judge of taste.
 - **U2.1 — the bottom sheet, three detents.** Hand-rolled (D1): peek / half / full, drag handle
   48 dp, detail level follows detent as the browser's did. Peek carries the one line's overflow
   (undo chip, mode); half carries the controls that today live in the scrolling bar plus the
