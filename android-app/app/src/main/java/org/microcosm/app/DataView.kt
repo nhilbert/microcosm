@@ -78,7 +78,7 @@ class DataView(context: Context) : View(context) {
         if (series == null || n < 5) {
             p.color = Color.parseColor("#5E7386")
             p.textSize = 26f * dp
-            canvas.drawText("gathering history…", padL, padT + ch / 2, p)
+            canvas.drawText(context.getString(R.string.health_gathering), padL, padT + ch / 2, p)
             return
         }
         // the axis corner: left edge and baseline, nothing more
@@ -98,7 +98,7 @@ class DataView(context: Context) : View(context) {
 
         p.color = Color.parseColor("#5E7386")
         canvas.drawText("-${(n - 1) * REC_STRIDE / 10}s", padL, height - 6f * dp, p)
-        canvas.drawText("now", padL + cw - 60f * dp, height - 6f * dp, p)
+        canvas.drawText(context.getString(R.string.axis_now), padL + cw - 60f * dp, height - 6f * dp, p)
     }
 
     private fun xOf(k: Int, cw: Float) = padL + cw * k / max(1, n - 1)

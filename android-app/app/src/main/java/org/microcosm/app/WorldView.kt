@@ -34,20 +34,17 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         const val IV_SOURCE = 5
         const val IV_SOURCE_SET = 9
         const val IV_WALL_ADD = 14
-        /** What the Events page calls each one. */
-        val IV_LABEL = arrayOf(
-            "You poured mineral", "You killed a specimen", "You fed a specimen",
-            "You introduced creatures", "You undid the last action", "You moved an energy source",
-            "You changed the sunlight", "You added an energy source", "You removed an energy source",
-            "You changed an energy source", "You changed the source layout", "You switched mutation",
-            "You changed an evolution setting", "You applied an evolution preset",
-            "You built a wall", "You removed a wall", "You changed a wall",
-        )
         private const val REC_N = 900
         private const val REC_CH = 141
     }
 
     val cam = Camera()
+
+    /** What the Events page calls each intervention, in the display language (DE.1). */
+    private val ivLabel = context.resources.getStringArray(R.array.iv_labels)
+    /** Resource shorthand — every published string speaks the display language. */
+    private fun s(id: Int, vararg a: Any?) =
+        if (a.isEmpty()) context.getString(id) else context.getString(id, *a)
     /**
      * The zoom range, in device pixels per world unit.
      *
@@ -539,10 +536,11 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 if (moved || dimmed) {
                     if (sunChangeTick < 0) sunChangeTick = Native.tick()
                     val mins = (Native.tick() - sunChangeTick) / 600
-                    val what = StringBuilder("sun")
+                    val what = StringBuilder(s(R.string.label_sun))
                     if (dimmed) what.append(" %+.1f".format(di))
-                    if (moved) what.append(" · moved")
-                    what.append(if (mins < 1) " · just changed" else " · standing $mins min")
+                    if (moved) what.append(" · ").append(s(R.string.sun_badge_moved))
+                    what.append(" · ").append(
+                        if (mins < 1) s(R.string.sun_badge_just) else s(R.string.sun_badge_standing, mins))
                     sunBadge = what.toString()
                 } else { sunChangeTick = -1L; sunBadge = "" }
             } else sunBadge = ""
@@ -563,7 +561,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                     10.0 * Native.org(selI, 6), Native.org(selI, 6), Native.org(selI, 7),
                     (Native.tick() - Native.org(selI, 8).toLong()) / 600,
                     renderer.locusText[sp].mapIndexed { k, t ->
-                        Triple(t[0], Native.org(selI, 20 + k), "${t[2]} ↔ ${t[1]}")
+                        Triple(L10n.trait(t[0]), Native.org(selI, 20 + k),
+                            "${L10n.trait(t[2])} ↔ ${L10n.trait(t[1])}")
                     })
             } else null
             undoKind = Native.undoKind()
@@ -576,29 +575,29 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     /** What the Observatory can say about one intervention. Render thread only. */
     private fun impactLine(i: Int): String {
         return when (Native.impact(i)) {
-            0 -> "history has rolled past this one"
-            1 -> "watching impact… ${Native.impactNum(0).toInt()}%"
+            0 -> s(R.string.impact_rolled)
+            1 -> s(R.string.impact_watching, Native.impactNum(0).toInt())
             else -> {
                 val n = Native.impactNum(2).toInt()
                 val sb = StringBuilder()
-                if (n == 0) sb.append("no clear shift beyond normal variability — the world absorbed it")
+                if (n == 0) sb.append(s(R.string.impact_none))
                 else {
-                    sb.append("Since: ")
+                    sb.append(s(R.string.impact_since))
                     for (k in 0 until n) {
                         if (k > 0) sb.append(" · ")
                         val pct = Native.impactMover(k, 1)
-                        sb.append(Native.impactMoverName(k)).append(' ')
+                        sb.append(L10n.trait(Native.impactMoverName(k))).append(' ')
                             .append(if (pct > 0) "+" else "").append(pct.toInt()).append('%')
-                        if (Native.impactMover(k, 2) == 0.0) sb.append(" (could be a natural swing)")
+                        if (Native.impactMover(k, 2) == 0.0) sb.append(s(R.string.impact_natural_swing))
                     }
                 }
                 val tails = ArrayList<String>()
                 val rec = Native.impactNum(3)
-                if (!rec.isNaN() && rec != 0.0) tails.add("relaxed back after ${rec.toInt()} s")
-                else if (Native.impactNum(1) != 0.0) tails.add("settling toward a new regime")
-                else if (Native.impactNum(6) == 0.0) tails.add("still developing")
-                if (Native.impactNum(4) != 0.0) tails.add("mixed with other interventions")
-                if (Native.impactNum(5) != 0.0) tails.add("under a changed-sun regime — attribution weak")
+                if (!rec.isNaN() && rec != 0.0) tails.add(s(R.string.impact_relaxed, rec.toInt()))
+                else if (Native.impactNum(1) != 0.0) tails.add(s(R.string.impact_settling))
+                else if (Native.impactNum(6) == 0.0) tails.add(s(R.string.impact_developing))
+                if (Native.impactNum(4) != 0.0) tails.add(s(R.string.impact_mixed))
+                if (Native.impactNum(5) != 0.0) tails.add(s(R.string.impact_sun_regime))
                 if (tails.isNotEmpty()) sb.append(" · ").append(tails.joinToString(" · "))
                 sb.toString()
             }
@@ -626,12 +625,12 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             sb.append("   ")
         }
         val left = Native.levelNum(5)
-        if (left >= 0) sb.append("pours left ").append(left.toInt())
+        if (left >= 0) sb.append(s(R.string.pours_left, left.toInt()))
         levelHud = "t ${Native.tick()}/$levelDeadline   $sb"
-        levelWhy = if (st == 3) Native.levelFailWhy() else ""
+        levelWhy = if (st == 3) L10n.why(Native.levelFailWhy()) else ""
         levelPredicted = Native.levelNum(4).toInt()
         val nk = Native.levelNarration()
-        levelNarration = if (nk >= 0) Native.sysEventText(nk, 1) else ""
+        levelNarration = if (nk >= 0) L10n.narrate(Native.sysEventText(nk, 1)) else ""
     }
 
     /** Copy the channels the charts need, and write out the two text pages. Render thread only. */
@@ -650,29 +649,31 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         seriesN = n
 
         val sb = StringBuilder()
-        if (Native.indOk() == 0) sb.append("gathering history…")
+        if (Native.indOk() == 0) sb.append(s(R.string.health_gathering))
         else {
-            sb.append("VARIETY %.2f    P/R %.2f\n".format(Native.indNum(1), Native.indNum(2)))
+            sb.append(s(R.string.health_variety, Native.indNum(1), Native.indNum(2))).append('\n')
             val rec2 = Native.indNum(3)
-            sb.append("RECYCLING %s    LOCKED %d%%\n".format(
-                if (rec2.isNaN()) "–" else "every ${(rec2 * 60).roundToInt()} s", Native.indNum(4).toInt()))
+            sb.append(s(R.string.health_recycling,
+                if (rec2.isNaN()) "–" else s(R.string.health_every, (rec2 * 60).roundToInt()),
+                Native.indNum(4).toInt())).append('\n')
             val ad = Native.indNum(0)
-            if (!ad.isNaN()) sb.append("ADAPTABILITY %.2f\n".format(ad))
-            sb.append("\nSPECIES VITALS\n")
+            if (!ad.isNaN()) sb.append(s(R.string.health_adapt, ad)).append('\n')
+            sb.append('\n').append(s(R.string.health_vitals_header)).append('\n')
             for (sp in 0 until 7) {
                 if (Native.indStrain(sp, 0) == 0.0) continue
                 val lvl = Native.indStrain(sp, 1).toInt()
-                val word = if (lvl == 2) "critical" else if (lvl == 1) "tense" else "calm"
+                val word = s(if (lvl == 2) R.string.vital_critical
+                             else if (lvl == 1) R.string.vital_tense else R.string.vital_calm)
                 val trend = Native.indStrain(sp, 3)
                 val arrow = if (trend < -0.03) "↓" else if (trend > 0.03) "↑" else "→"
-                sb.append("%-9s reserve %3d%% %s  pop x%.2f   %s\n".format(
+                sb.append(s(R.string.health_row,
                     renderer.speciesName[sp], (Native.indStrain(sp, 2) * 100).toInt(), arrow,
-                    Native.indStrain(sp, 4), word))
+                    Native.indStrain(sp, 4), word)).append('\n')
             }
             if (Native.indVenator(0) != 0.0)
-                sb.append("%-9s reserve %3d%%    prey losses %.1f/s\n".format(
-                    "Venator", (Native.indVenator(1) * 100).toInt(), Native.indVenator(2)))
-            sb.append("\nReference ranges measured on six healthy archived worlds.")
+                sb.append(s(R.string.health_venator,
+                    "Venator", (Native.indVenator(1) * 100).toInt(), Native.indVenator(2))).append('\n')
+            sb.append('\n').append(s(R.string.health_reference))
         }
         healthText = sb.toString()
 
@@ -680,15 +681,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         val ev = StringBuilder()
         val ivs = Native.ivCount()
         for (i in ivs - 1 downTo maxOf(0, ivs - 8)) {
-            ev.append("t %-6d %s\n".format(Native.ivAt(i, 0).toLong(), IV_LABEL[Native.ivAt(i, 1).toInt()]))
+            ev.append("t %-6d %s\n".format(Native.ivAt(i, 0).toLong(), ivLabel[Native.ivAt(i, 1).toInt()]))
             ev.append("        ").append(impactLine(i)).append('\n')
         }
         if (ivs > 0) ev.append('\n')
         val count = Native.sysEventCount()
         for (i in count - 1 downTo maxOf(0, count - 40)) {
-            ev.append("t %-6d %s\n".format(Native.sysEventNum(i, 0).toLong(), Native.sysEventText(i, 1)))
+            ev.append("t %-6d %s\n".format(Native.sysEventNum(i, 0).toLong(),
+                L10n.narrate(Native.sysEventText(i, 1))))
         }
-        if (count == 0) ev.append("nothing to report yet.")
+        if (count == 0) ev.append(s(R.string.events_none))
         eventsText = ev.toString()
     }
 

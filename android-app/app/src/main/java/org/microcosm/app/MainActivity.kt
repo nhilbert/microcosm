@@ -79,7 +79,7 @@ class MainActivity : Activity() {
     private lateinit var verdict: TextView
     internal lateinit var startPanel: LinearLayout // internal: the boot gate walks the front door
     internal lateinit var expPanel: LinearLayout
-    private val levels by lazy { Level.all() }
+    private val levels by lazy { Level.all(this) }
     private var running: Level? = null
     private var lastVerdict = 0
     private val chips = ArrayList<TextView>()
@@ -95,7 +95,8 @@ class MainActivity : Activity() {
         override fun run() {
             if (devMode) hud.text = world.stats + "\n" + world.statsDev
             clockView.text = world.clock
-            sunBadgeView.text = world.sunBadge + if (world.sunBadge.isEmpty()) "" else " · tap restores"
+            sunBadgeView.text = world.sunBadge +
+                if (world.sunBadge.isEmpty()) "" else " · " + getString(R.string.badge_tap_restores)
             sunBadgeView.visibility = if (world.sunBadge.isEmpty()) ViewGroup.GONE else ViewGroup.VISIBLE
             // In an experiment the objective IS the line (D2): the census yields to it.
             strip.visibility = if (running != null && world.levelState != 0) ViewGroup.GONE
@@ -118,8 +119,8 @@ class MainActivity : Activity() {
                 when { armedIcon != 0 -> armedIcon; dialOpen -> R.drawable.ic_close; else -> R.drawable.ic_plus })
             val armedText = when {
                 !on -> ""
-                world.wallArmed -> "drag on the water"
-                world.seedSpecies >= 0 -> "long-press the water"
+                world.wallArmed -> getString(R.string.hint_wall_drag)
+                world.seedSpecies >= 0 -> getString(R.string.hint_seed_press)
                 else -> ""
             }
             fabLabel.text = armedText
@@ -138,11 +139,11 @@ class MainActivity : Activity() {
             val snap = world.specimen
             specimenSheet.visibility = if (snap != null) ViewGroup.VISIBLE else ViewGroup.GONE
             if (snap != null) {
-                specimenName.text = Native.traitText(snap.sp, 0) + if (snap.dormant) "  · dormant" else ""
+                specimenName.text = Native.traitText(snap.sp, 0) +
+                    if (snap.dormant) "  · " + getString(R.string.specimen_dormant) else ""
                 (specimenDot.background as android.graphics.drawable.GradientDrawable)
                     .setColor(speciesColor(snap.sp))
-                specimenSub.text = "age %d min · size %.1f · mineral %.2f"
-                    .format(snap.ageMin, snap.size, snap.mineral)
+                specimenSub.text = getString(R.string.specimen_sub, snap.ageMin, snap.size, snap.mineral)
                 specimenEnergyText.text = "%.1f / %.0f".format(snap.energy, snap.cap)
                 val frac = (snap.energy / snap.cap).coerceIn(0.02, 1.0).toFloat()
                 val fill = specimenEnergyBar.getChildAt(0)
@@ -181,6 +182,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Native.boot() // before anything asks the core for a name or a flag
+        L10n.init(this) // the display language, before anything shows the core's words (DE.4)
 
         val root = FrameLayout(this)
         world = WorldView(this)
@@ -306,7 +308,7 @@ class MainActivity : Activity() {
         // the energy bar: the one meter whose ceiling the shell truly knows
         val energyRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         energyRow.addView(TextView(this).apply {
-            text = "energy"
+            text = getString(R.string.label_energy)
             setTextColor(Style.DIM); textSize = 12f; typeface = Style.word(this@MainActivity)
         }, LinearLayout.LayoutParams(0, WRAP, 1f))
         specimenEnergyText = TextView(this).apply {
@@ -375,7 +377,7 @@ class MainActivity : Activity() {
             visibility = ViewGroup.GONE
         }
         sunBar.addView(TextView(this).apply {
-            text = "sun "
+            text = getString(R.string.label_sun) + " "
             setTextColor(Style.AMBER)
             textSize = 13f
             typeface = Style.word(this@MainActivity)
@@ -389,7 +391,7 @@ class MainActivity : Activity() {
             }
         })
         centerChips.addView(sunBar)
-        undoChip = button("undo") { world.undoLast() }.apply {
+        undoChip = button(getString(R.string.btn_undo)) { world.undoLast() }.apply {
             visibility = ViewGroup.GONE
             setTextColor(Style.AMBER)
             background = Style.touchable(this@MainActivity, Style.hand(this@MainActivity))
@@ -467,12 +469,12 @@ class MainActivity : Activity() {
             typeface = Style.wordBold(this@MainActivity)
             setPadding(0, 0, 0, Style.dp(this@MainActivity, 8f))
         })
-        drawerBody.addView(sectionLabel("pace"))
+        drawerBody.addView(sectionLabel(getString(R.string.section_pace)))
         paceBox = Chrome.build(this, "pace") { k ->
             world.speed = when (k) { 0 -> 0.0; 1 -> 1.0; 2 -> 4.0; else -> 16.0 }
         } as LinearLayout
         drawerBody.addView(paceBox, LinearLayout.LayoutParams(MATCH, WRAP))
-        drawerBody.addView(sectionLabel("species · tap to hide"))
+        drawerBody.addView(sectionLabel(getString(R.string.section_species)))
         for (sp in live) {
             val pill = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -522,7 +524,7 @@ class MainActivity : Activity() {
         benchButton = Chrome.at(utility, Chrome.UTILITY, "bench").apply { visibility = ViewGroup.GONE }
         drawerBody.addView(utility, LinearLayout.LayoutParams(MATCH, WRAP))
         drawerBody.addView(sectionLabel(""))
-        drawerBody.addView(button("experiments") { closeDrawer(); expPanel.visibility = ViewGroup.VISIBLE },
+        drawerBody.addView(button(getString(R.string.btn_experiments)) { closeDrawer(); expPanel.visibility = ViewGroup.VISIBLE },
             LinearLayout.LayoutParams(MATCH, WRAP))
         drawer.addView(ScrollView(this).apply { addView(drawerBody) },
             LinearLayout.LayoutParams(MATCH, MATCH))
@@ -560,7 +562,7 @@ class MainActivity : Activity() {
         }
         dataPanel.addView(ScrollView(this).apply { addView(dataText) },
             LinearLayout.LayoutParams(MATCH, 0, 1f))
-        dataPanel.addView(button("close") { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE })
+        dataPanel.addView(button(getString(R.string.btn_close)) { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE })
         root.addView(dataPanel, FrameLayout.LayoutParams(MATCH, MATCH))
 
         // The verdict card: what happened, and why, in the level's own words.
@@ -615,7 +617,7 @@ class MainActivity : Activity() {
             setPadding(Style.dp(this@MainActivity, 32f), 0, Style.dp(this@MainActivity, 32f), Style.dp(this@MainActivity, 4f))
         })
         startPanel.addView(TextView(this).apply {
-            text = "a small pond, entirely yours"
+            text = getString(R.string.app_tagline)
             setTextColor(Style.DIM)
             textSize = 15f
             typeface = Style.word(this@MainActivity)
@@ -623,15 +625,15 @@ class MainActivity : Activity() {
             setPadding(Style.dp(this@MainActivity, 32f), 0, Style.dp(this@MainActivity, 32f), Style.dp(this@MainActivity, 40f))
         })
         val hasAutosave = autosaveFile().baseFile.exists()
-        startPanel.addView(startChoice("sandbox",
-            if (hasAutosave) "your pond, as you left it" else "a fresh pond") {
+        startPanel.addView(startChoice(getString(R.string.choice_sandbox),
+            getString(if (hasAutosave) R.string.sub_sandbox_resume else R.string.sub_sandbox_fresh)) {
             world.stopLevel()
             running = null
             lastVerdict = 0
             startPanel.visibility = ViewGroup.GONE
             world.speed = 1.0
         })
-        startPanel.addView(startChoice("experiments", "questions with a pond attached") {
+        startPanel.addView(startChoice(getString(R.string.choice_experiments), getString(R.string.sub_experiments)) {
             expPanel.visibility = ViewGroup.VISIBLE
         })
         root.addView(startPanel, FrameLayout.LayoutParams(MATCH, MATCH))
@@ -644,7 +646,7 @@ class MainActivity : Activity() {
             isClickable = true
         }
         expPanel.addView(TextView(this).apply {
-            text = "Experiments"
+            text = getString(R.string.experiments_title)
             setTextColor(Style.BRIGHT)
             textSize = 20f
             typeface = Style.wordBold(this@MainActivity)
@@ -658,7 +660,7 @@ class MainActivity : Activity() {
         })
         expPanel.addView(ScrollView(this).apply { addView(expList) },
             LinearLayout.LayoutParams(MATCH, 0, 1f))
-        expPanel.addView(button("back") { expPanel.visibility = ViewGroup.GONE })
+        expPanel.addView(button(getString(R.string.btn_back)) { expPanel.visibility = ViewGroup.GONE })
         root.addView(expPanel, FrameLayout.LayoutParams(MATCH, MATCH))
 
         world.speed = 0.0 // the pond waits behind the front door
@@ -727,22 +729,23 @@ class MainActivity : Activity() {
     private fun saveOrLoad() {
         val f = saveFile()
         val has = f.baseFile.exists()
-        val items = if (has) arrayOf("save the world", "load the saved world") else arrayOf("save the world")
+        val save = getString(R.string.item_save_world)
+        val items = if (has) arrayOf(save, getString(R.string.item_load_world)) else arrayOf(save)
         AlertDialog.Builder(this, R.style.MicrocosmDialog)
-            .setTitle("Saved world")
+            .setTitle(getString(R.string.dlg_saved_world))
             .setItems(items) { _, k ->
                 if (k == 0) world.save { bytes ->
-                    if (writeAtomic(f, bytes)) toast("Saved — %d KB".format(bytes.size / 1024))
-                    else toast("Could not save")
+                    if (writeAtomic(f, bytes)) toast(getString(R.string.toast_saved, bytes.size / 1024))
+                    else toast(getString(R.string.toast_save_failed))
                 } else {
                     val bytes = try { f.readFully() } catch (e: Exception) { null }
-                    if (bytes == null) toast("Could not read the saved world")
+                    if (bytes == null) toast(getString(R.string.toast_load_unreadable))
                     else world.load(bytes) { ok ->
-                        toast(if (ok) "Loaded" else "That file is not a Microcosm world")
+                        toast(getString(if (ok) R.string.toast_loaded else R.string.toast_not_world))
                     }
                 }
             }
-            .setNegativeButton("cancel", null)
+            .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
     }
 
@@ -788,9 +791,9 @@ class MainActivity : Activity() {
     private fun briefing(l: Level) {
         AlertDialog.Builder(this, R.style.MicrocosmDialog)
             .setTitle("E${l.n}  ${l.title}")
-            .setMessage("${l.question}\n\n${l.briefing}\n\nGoal: ${l.goalText}")
-            .setPositiveButton("begin") { _, _ -> predict(l) }
-            .setNegativeButton("back", null)
+            .setMessage("${l.question}\n\n${l.briefing}\n\n" + getString(R.string.goal_prefix, l.goalText))
+            .setPositiveButton(getString(R.string.btn_begin)) { _, _ -> predict(l) }
+            .setNegativeButton(getString(R.string.btn_back), null)
             .show()
     }
 
@@ -800,7 +803,7 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this, R.style.MicrocosmDialog)
             .setTitle(l.predictPrompt)
             .setItems(opts.toTypedArray()) { _, k -> begin(l, k) }
-            .setNegativeButton("skip") { _, _ -> begin(l, -1) }
+            .setNegativeButton(getString(R.string.btn_skip)) { _, _ -> begin(l, -1) }
             .show()
     }
 
@@ -835,25 +838,20 @@ class MainActivity : Activity() {
             // F1: contrast the prediction, never grade it
             val p = world.levelPredicted
             val reflect = l.predictReflect
-            if (p >= 0 && p < reflect.size) sb.append("\n\nYou predicted: ").append(l.predictOptions[p])
-                .append("\n").append(reflect[p])
-            sb.append("\n\n(tap to dismiss · reset runs it again)")
+            if (p >= 0 && p < reflect.size)
+                sb.append("\n\n").append(getString(R.string.verdict_predicted, l.predictOptions[p]))
+                    .append("\n").append(reflect[p])
+            sb.append("\n\n").append(getString(R.string.verdict_dismiss))
             verdict.text = sb.toString()
             verdict.visibility = ViewGroup.VISIBLE
         }
     }
 
-    private val PAGE_TITLES = listOf(
-        "Head counts — every line a species, on a log axis",
-        "Chemistry — where every unit of mineral sits; the top edge is the world's total",
-        "Metabolism — what the world produces and burns",
-        "Health — vitals against measured reference ranges",
-        "Events — the world's story, newest first; since is not because",
-    )
+    private val pageTitles by lazy { resources.getStringArray(R.array.page_titles) }
 
     /** Chart pages draw; Health and Events are text. Only one of the two is ever visible. */
     private fun refreshData() {
-        dataTitle.text = PAGE_TITLES[dataPage]
+        dataTitle.text = pageTitles[dataPage]
         // The selected page reads as selected (U0.3): full strength and bold, the rest receded.
         // Not amber — amber marks the player's hand on the world, and looking is not touching.
         val row = Chrome.rowOf(pagesRow)
@@ -892,7 +890,7 @@ class MainActivity : Activity() {
         val now = System.currentTimeMillis()
         if (now - resetArmedAt > 2600) {
             resetArmedAt = now
-            resetButton.text = "sure?"
+            resetButton.text = getString(R.string.btn_reset_sure)
             resetButton.setTextColor(Color.parseColor("#F2B24A")) // the hand, about to act
             ui.postDelayed({ if (System.currentTimeMillis() - resetArmedAt >= 2600) disarmReset() }, 2700)
             return
@@ -958,7 +956,7 @@ class MainActivity : Activity() {
 
     private fun disarmReset() {
         resetArmedAt = 0L
-        resetButton.text = "reset"
+        resetButton.text = Chrome.label(this, "reset")
         resetButton.setTextColor(Style.TEXT)
     }
 
@@ -966,9 +964,9 @@ class MainActivity : Activity() {
     private fun seedPicker() {
         val names = live.map { Native.traitText(it, 0) }.toTypedArray()
         AlertDialog.Builder(this, R.style.MicrocosmDialog)
-            .setTitle("Seed which species? Then long-press the water.")
+            .setTitle(getString(R.string.dlg_seed_title))
             .setItems(names) { _, k -> world.seedSpecies = live[k]; world.wallArmed = false; setDial(false) }
-            .setNegativeButton("none") { _, _ -> world.seedSpecies = -1 }
+            .setNegativeButton(getString(R.string.btn_none)) { _, _ -> world.seedSpecies = -1 }
             .show()
     }
 
@@ -981,24 +979,12 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Names the thing that would be put back, in the world's own words. */
+    private val undoLabels by lazy { resources.getStringArray(R.array.undo_labels) }
+
+    /** Names the thing that would be put back, in the world's own words. Kinds 1–3 take a name. */
     private fun undoLabel(kind: Int, sp: Int): String {
-        val who = if (sp >= 0) Native.traitText(sp, 0) else ""
-        return when (kind) {
-            1 -> "undo · fed $who"
-            2 -> "undo · killed $who"
-            3 -> "undo · seeded $who"
-            4 -> "undo · poured mineral"
-            5 -> "undo · the sunlight"
-            6 -> "undo · moved the sun"
-            7 -> "undo · added a sun"
-            8 -> "undo · removed a sun"
-            9 -> "undo · the sun's setting"
-            10 -> "undo · built a wall"
-            11 -> "undo · removed a wall"
-            12 -> "undo · the wall's setting"
-            else -> "undo"
-        }
+        val t = undoLabels.getOrElse(kind) { undoLabels[0] }
+        return if (kind in 1..3) t.format(if (sp >= 0) Native.traitText(sp, 0) else "") else t
     }
 
     private fun button(label: String, onTap: () -> Unit) = Chrome.button(this, label, onTap)
@@ -1032,8 +1018,8 @@ class MainActivity : Activity() {
                 // Top level: back goes to the front door, with the sandbox saved first. The
                 // experiment list stays one back-press away for the whole session.
                 if (running == null) world.save { bytes -> writeAtomic(autosaveFile(), bytes) }
-                showStart(if (running != null) "your pond is waiting behind the experiment"
-                          else "your pond, as it stands")
+                showStart(getString(if (running != null) R.string.start_sub_behind_experiment
+                                    else R.string.start_sub_as_stands))
             }
         }
     }

@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Die deutsche Oberfläche (DE.2). Du-Form durchgehend, Alltagssprache nach dem Geist von
+     docs/phase8-language-style.md. Regel 6 gilt auch hier: Wirkungskarten sagen „Seitdem",
+     nie „weil" — die Karte berichtet Gleichzeitigkeit, keine bewiesene Ursache.
+     Artnamen (Solara, Drifta …) sind Eigennamen und bleiben. -->
+<resources>
+
+    <!-- die Eingangstür -->
+    <string name="app_tagline">ein kleiner Teich, ganz deiner</string>
+    <string name="choice_sandbox">Sandbox</string>
+    <string name="sub_sandbox_resume">dein Teich, wie du ihn verlassen hast</string>
+    <string name="sub_sandbox_fresh">ein frischer Teich</string>
+    <string name="choice_experiments">Experimente</string>
+    <string name="sub_experiments">Fragen, mit Teich dran</string>
+    <string name="experiments_title">Experimente</string>
+    <string name="start_sub_behind_experiment">dein Teich wartet hinter dem Experiment</string>
+    <string name="start_sub_as_stands">dein Teich, wie er gerade ist</string>
+
+    <!-- gemeinsame Knöpfe -->
+    <string name="btn_back">zurück</string>
+    <string name="btn_close">schließen</string>
+    <string name="btn_cancel">abbrechen</string>
+    <string name="btn_none">keine</string>
+    <string name="btn_begin">los</string>
+    <string name="btn_skip">überspringen</string>
+    <string name="btn_undo">rückgängig</string>
+    <string name="btn_experiments">Experimente</string>
+    <string name="btn_reset_sure">sicher?</string>
+
+    <!-- die Gesichter des Chrome-Inventars -->
+    <string name="pace_pause">Pause</string>
+    <string name="tool_feed">füttern</string>
+    <string name="tool_kill">töten</string>
+    <string name="tool_seed">aussetzen</string>
+    <string name="tool_wall">Wand</string>
+    <string name="sun_dimmer">dunkler</string>
+    <string name="sun_brighter">heller</string>
+    <string name="sun_release">loslassen</string>
+    <string name="page_pops">Arten</string>
+    <string name="page_chem">Chemie</string>
+    <string name="page_metab">Umsatz</string>
+    <string name="page_health">Vitalwerte</string>
+    <string name="page_events">Ereignisse</string>
+    <string name="util_reset">Reset</string>
+    <string name="util_save">Speichern</string>
+    <string name="util_data">Daten</string>
+
+    <!-- das Menü -->
+    <string name="section_pace">Tempo</string>
+    <string name="section_species">Arten · Tippen blendet aus</string>
+
+    <!-- die Hinweise der Hand und die Sonne -->
+    <string name="hint_wall_drag">übers Wasser ziehen</string>
+    <string name="hint_seed_press">Wasser lange drücken</string>
+    <string name="label_sun">Sonne</string>
+    <string name="badge_tap_restores">Tippen stellt zurück</string>
+    <string name="sun_badge_moved">verschoben</string>
+    <string name="sun_badge_just">gerade geändert</string>
+    <string name="sun_badge_standing">steht seit %1$d min</string>
+
+    <!-- die Lebewesen-Karte -->
+    <string name="specimen_dormant">ruht</string>
+    <string name="specimen_sub">Alter %1$d min · Größe %2$.1f · Mineral %3$.2f</string>
+    <string name="label_energy">Energie</string>
+
+    <!-- Speichern und Laden -->
+    <string name="dlg_saved_world">Gespeicherte Welt</string>
+    <string name="item_save_world">die Welt speichern</string>
+    <string name="item_load_world">die gespeicherte Welt laden</string>
+    <string name="toast_saved">Gespeichert — %1$d KB</string>
+    <string name="toast_save_failed">Speichern hat nicht geklappt</string>
+    <string name="toast_load_unreadable">Die gespeicherte Welt ließ sich nicht lesen</string>
+    <string name="toast_loaded">Geladen</string>
+    <string name="toast_not_world">Diese Datei ist keine Microcosm-Welt</string>
+
+    <!-- Aussetzen -->
+    <string name="dlg_seed_title">Welche Art aussetzen? Danach das Wasser lange drücken.</string>
+
+    <!-- Experimente -->
+    <string name="goal_prefix">Ziel: %1$s</string>
+    <string name="verdict_predicted">Deine Vorhersage: %1$s</string>
+    <string name="verdict_dismiss">(Tippen schließt · Reset startet neu)</string>
+    <string name="pours_left">Güsse übrig %1$d</string>
+
+    <!-- Wirkungskarten. Regel 6: „Seitdem", nie „weil". -->
+    <string name="impact_rolled">die Geschichte ist darüber hinweggezogen</string>
+    <string name="impact_watching">Wirkung wird beobachtet… %1$d%%</string>
+    <string name="impact_none">keine klare Verschiebung über das normale Schwanken hinaus — die Welt hat es geschluckt</string>
+    <string name="impact_since">"Seitdem: "</string>
+    <string name="impact_natural_swing">" (könnte eine natürliche Schwankung sein)"</string>
+    <string name="impact_relaxed">nach %1$d s wieder entspannt</string>
+    <string name="impact_settling">pendelt sich auf einen neuen Zustand ein</string>
+    <string name="impact_developing">entwickelt sich noch</string>
+    <string name="impact_mixed">vermischt mit anderen Eingriffen</string>
+    <string name="impact_sun_regime">unter veränderter Sonne — Zuordnung schwach</string>
+
+    <!-- die Vitalwerte-Seite -->
+    <string name="health_gathering">Geschichte wird gesammelt…</string>
+    <string name="axis_now">jetzt</string>
+    <string name="health_variety">VIELFALT %1$.2f    P/R %2$.2f</string>
+    <string name="health_recycling">RECYCLING %1$s    GEBUNDEN %2$d%%</string>
+    <string name="health_every">alle %1$d s</string>
+    <string name="health_adapt">ANPASSUNG %1$.2f</string>
+    <string name="health_vitals_header">VITALWERTE DER ARTEN</string>
+    <string name="vital_critical">kritisch</string>
+    <string name="vital_tense">angespannt</string>
+    <string name="vital_calm">ruhig</string>
+    <string name="health_row">%1$-9s Reserve %2$3d%% %3$s  Zahl x%4$.2f   %5$s</string>
+    <string name="health_venator">%1$-9s Reserve %2$3d%%    Beuteverluste %3$.1f/s</string>
+    <string name="health_reference">Referenzbereiche gemessen an sechs gesunden archivierten Welten.</string>
+    <string name="events_none">noch nichts zu berichten.</string>
+
+    <!-- was die Ereignis-Seite jeden Eingriff nennt -->
+    <string-array name="iv_labels">
+        <item>Du hast Mineral gegossen</item>
+        <item>Du hast ein Lebewesen getötet</item>
+        <item>Du hast ein Lebewesen gefüttert</item>
+        <item>Du hast Lebewesen ausgesetzt</item>
+        <item>Du hast den letzten Eingriff zurückgenommen</item>
+        <item>Du hast eine Energiequelle verschoben</item>
+        <item>Du hast das Sonnenlicht geändert</item>
+        <item>Du hast eine Energiequelle hinzugefügt</item>
+        <item>Du hast eine Energiequelle entfernt</item>
+        <item>Du hast eine Energiequelle geändert</item>
+        <item>Du hast die Anordnung der Quellen geändert</item>
+        <item>Du hast Mutation umgeschaltet</item>
+        <item>Du hast eine Evolutions-Einstellung geändert</item>
+        <item>Du hast eine Evolutions-Vorlage angewendet</item>
+        <item>Du hast eine Wand gebaut</item>
+        <item>Du hast eine Wand entfernt</item>
+        <item>Du hast eine Wand geändert</item>
+    </string-array>
+
+    <!-- der Rückgängig-Chip, nach Art des Eingriffs; 1–3 tragen den Artnamen -->
+    <string-array name="undo_labels">
+        <item>rückgängig</item>
+        <item>rückgängig · %1$s gefüttert</item>
+        <item>rückgängig · %1$s getötet</item>
+        <item>rückgängig · %1$s ausgesetzt</item>
+        <item>rückgängig · Mineral gegossen</item>
+        <item>rückgängig · das Sonnenlicht</item>
+        <item>rückgängig · Sonne verschoben</item>
+        <item>rückgängig · Sonne hinzugefügt</item>
+        <item>rückgängig · Sonne entfernt</item>
+        <item>rückgängig · die Sonnen-Einstellung</item>
+        <item>rückgängig · Wand gebaut</item>
+        <item>rückgängig · Wand entfernt</item>
+        <item>rückgängig · die Wand-Einstellung</item>
+    </string-array>
+
+    <!-- die Titel der Daten-Seiten -->
+    <string-array name="page_titles">
+        <item>Kopfzahlen — jede Linie eine Art, auf einer Log-Achse</item>
+        <item>Chemie — wo jede Einheit Mineral steckt; die Oberkante ist das Ganze der Welt</item>
+        <item>Umsatz — was die Welt erzeugt und verbrennt</item>
+        <item>Vitalwerte — gemessen gegen gesunde Referenzbereiche</item>
+        <item>Ereignisse — die Geschichte der Welt, Neuestes zuerst; seit ist nicht weil</item>
+    </string-array>
+
+</resources>

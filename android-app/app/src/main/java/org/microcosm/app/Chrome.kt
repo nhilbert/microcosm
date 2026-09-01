@@ -52,6 +52,35 @@ object Chrome {
     const val TEXT_SP = 14f
 
     /**
+     * The face a key wears on screen (DE.1). The lists above stay English keys — the gates and
+     * the baseline key on them, and CI measures under the English locale — while the player sees
+     * the locale's word from res/values*. A key with no resource shows itself ("1×" needs none).
+     */
+    fun label(ctx: Context, key: String): String {
+        val id = when (key) {
+            "pause" -> R.string.pace_pause
+            "feed" -> R.string.tool_feed
+            "kill" -> R.string.tool_kill
+            "seed" -> R.string.tool_seed
+            "wall" -> R.string.tool_wall
+            "dimmer" -> R.string.sun_dimmer
+            "brighter" -> R.string.sun_brighter
+            "release" -> R.string.sun_release
+            "pops" -> R.string.page_pops
+            "chem" -> R.string.page_chem
+            "metab" -> R.string.page_metab
+            "health" -> R.string.page_health
+            "events" -> R.string.page_events
+            "reset" -> R.string.util_reset
+            "save" -> R.string.util_save
+            "data" -> R.string.util_data
+            "bench" -> R.string.util_bench
+            else -> 0
+        }
+        return if (id == 0) key else ctx.getString(id)
+    }
+
+    /**
      * Every button in the shell is born here (U2.S): the quiet voice of the approved canvas —
      * Space Grotesk, slate on a hairline, radius 12, 44 dp minimum — instead of the framework's
      * gray default. Because this is the single birthplace, a taste change is an edit in Style,
@@ -78,11 +107,11 @@ object Chrome {
     /** One horizontal row of buttons, 8 dp apart. `onTap` receives the index into `labels`. */
     fun row(ctx: Context, labels: List<String>, onTap: (Int) -> Unit = {}): LinearLayout {
         val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        for ((k, label) in labels.withIndex()) {
+        for ((k, key) in labels.withIndex()) {
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             if (k > 0) lp.marginStart = Style.dp(ctx, 8f)
-            row.addView(button(ctx, label) { onTap(k) }, lp)
+            row.addView(button(ctx, label(ctx, key)) { onTap(k) }, lp)
         }
         return row
     }
@@ -129,8 +158,8 @@ object Chrome {
             orientation = LinearLayout.HORIZONTAL
             background = Style.quiet(ctx)
         }
-        for ((k, label) in PACE.withIndex()) box.addView(TextView(ctx).apply {
-            text = label
+        for ((k, key) in PACE.withIndex()) box.addView(TextView(ctx).apply {
+            text = label(ctx, key)
             textSize = 13f
             typeface = Style.mono(ctx)
             setTextColor(Style.DIM)
@@ -193,13 +222,14 @@ object Chrome {
             orientation = LinearLayout.VERTICAL
             gravity = android.view.Gravity.END
         }
-        for ((k, label) in TOOLS.withIndex()) {
+        for ((k, key) in TOOLS.withIndex()) {
             val row = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
+                tag = k // the tool's index — dialRowState must not key on display text (DE.1)
             }
             row.addView(TextView(ctx).apply {
-                text = label
+                text = label(ctx, key)
                 textSize = 13f
                 typeface = Style.word(ctx)
                 setTextColor(Style.TEXT)
@@ -226,17 +256,17 @@ object Chrome {
         val mini = row.getChildAt(1) as android.widget.ImageButton
         label.setTextColor(if (armed) Style.AMBER else Style.TEXT)
         label.background = if (armed) Style.pill(ctx, amber = true) else Style.pill(ctx)
-        fabState(ctx, mini, armed, TOOL_ICONS[ROWS.getValue("tools").indexOf(label.text.toString())], 48f)
+        fabState(ctx, mini, armed, TOOL_ICONS[row.tag as Int], 48f)
         row.alpha = if (enabled) 1f else 0.4f
     }
 
     /** A row of buttons sharing the width equally — the sheet's utility row. */
     fun weightedRow(ctx: Context, labels: List<String>, onTap: (Int) -> Unit = {}): LinearLayout {
         val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        for ((k, label) in labels.withIndex()) {
+        for ((k, key) in labels.withIndex()) {
             val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             if (k > 0) lp.marginStart = Style.dp(ctx, 8f)
-            row.addView(button(ctx, label) { onTap(k) }, lp)
+            row.addView(button(ctx, label(ctx, key)) { onTap(k) }, lp)
         }
         return row
     }

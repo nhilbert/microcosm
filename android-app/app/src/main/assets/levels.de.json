@@ -1,0 +1,187 @@
+{
+  "_comment": "Die deutsche Fassung der Experiment-Texte (DE.3). Nur Anzeige: die Urteile fallen im zertifizierten Kern über die englische Tabelle (levels.json im Kern-Hash); diese Datei wird in Levels.kt darübergelegt, wenn die Sprache Deutsch ist. 'whys' übersetzt die Fehlschlag-Begründungen per exakter Übereinstimmung. Der Prose-Gate (harness/prose-app.js) prüft Vollständigkeit gegen src/observatory/levels.json.",
+  "light": {
+    "title": "Erstes Licht",
+    "science": "Photosynthese · Tragfähigkeit",
+    "question": "Warum wächst in einem trüben Teich nichts?",
+    "briefing": "Zwanzig Gründer von Solara treiben unter einer schwachen Sonne auf einen Siedlungsgrund. Sich selbst überlassen, verhungert die Matte bei jeder Größe — Licht ist das einzige Einkommen dieser Welt. Dein Instrument ist der ☀-Hebel im Eingreifen-Modus.",
+    "goalText": "Etabliere die Matte — 400 Solara, gehalten",
+    "predict": {
+      "prompt": "Zwanzig Gründer unter schwacher Sonne. Was passiert, wenn du nur zuschaust?",
+      "options": [
+        "Die Matte wächst langsam, aber sie schafft es",
+        "Sie verhungert bei jeder Größe — Licht ist das Einkommen",
+        "Sie wächst, bis das Mineral im Wasser ausgeht"
+      ],
+      "reflect": [
+        "Geduld heilt diesen Teich nicht. Unter einem gewissen Licht verliert die Matte bei jeder Größe Energie — Warten macht sie nur kleiner.",
+        "Genau das zeigten die Energiebalken. Unter dieser Sonne verbrennt jede Solara mehr, als sie verdient.",
+        "Das Wasser kam nie an die Reihe. Die Energie ging zuerst aus — Licht ist hier das Einkommen."
+      ]
+    },
+    "debrief": {
+      "pass": "Licht ist das einzige Einkommen des Teichs. Unter einer trüben Sonne gibt die Matte mehr aus, als sie verdient, also schrumpft sie bei jeder Größe. Mit genug Licht wächst sie schnell und flacht dann ab — die Matte beschattet sich selbst, und der Grund wird knapp. Diese Decke ist die Tragfähigkeit: keine Quote, nur Einkommen trifft Kosten.",
+      "fail": "Die Matte brauchte mehr Einkommen, und nur Licht ist hier Einkommen. Tippe eine Solara an und schau auf ihre Karte: der Energiebalken füllt sich nie. Der ☀-Hebel hebt, was der ganze Teich verdient — alles andere schiebt es nur herum."
+    },
+    "meter": [{ "label": "Solara", "unit": "" }],
+    "whys": {
+      "The last Solara died — the mat never caught the light.": "Die letzte Solara ist gestorben — die Matte hat das Licht nie gefangen."
+    }
+  },
+  "mineral": {
+    "title": "Das hungrige Wasser",
+    "science": "Liebigs Gesetz vom Minimum",
+    "question": "Die Sonne steht schon auf Anschlag — warum stockt die Matte trotzdem?",
+    "briefing": "Der ☀-Hebel startet auf Maximum — aber das Wasser ist arm. Die Matte steigt, dann stockt sie; mehr Licht hat nichts mehr zu geben. Du trägst zehn Dosen Mineral: tippe offenes Wasser an, um eine zu gießen, und wähle die Stelle mit Bedacht.",
+    "goalText": "Bring die Matte mit zehn Güssen über 600",
+    "predict": {
+      "prompt": "Die Sonne ist am Anschlag. Was werden zehn Dosen Mineral bewirken?",
+      "options": [
+        "Die Stelle ist egal — die Mischung verteilt sie sowieso",
+        "Sie helfen nur dort, wo die Matte zuerst trinkt",
+        "Nichts — das Licht muss trotzdem das Problem sein"
+      ],
+      "reflect": [
+        "Die Mischung verteilt sie — aber viel zu langsam. Dosen am dunklen Ufer kamen zu spät, und die Uhr lief ab.",
+        "Richtig: Mineral bewegt sich langsam, und die Matte trinkt, was neben ihr landet.",
+        "Der Hebel stand die ganze Zeit an seiner Decke. Die knappste Zutat bestimmte — und das war nicht das Licht."
+      ]
+    },
+    "debrief": {
+      "pass": "Die knappste Zutat setzt die Decke — nicht die großzügigste. Die Sonne hatte nichts mehr zu geben; Mineral war die Grenze. Und es half nur dort, wo die Matte es trinken konnte, bevor die langsame Mischung es verdünnte. Schau auf den M-Balken: alles, was du gegossen hast, ist noch irgendwo. In Körpern, im Wasser oder im Toten — Materie geht nie verloren, sie zieht nur um.",
+      "fail": "Die Karten erzählten es: mineralbegrenzt, unter einer Sonne am Anschlag. Güsse am dunklen Rand füttern meist leeres Wasser — die Mischung ist langsam. Gieß früh, und gieß dorthin, wo die Matte lebt."
+    },
+    "meter": [{ "label": "Solara", "unit": "" }],
+    "whys": {
+      "The mat has died out.": "Die Matte ist ausgestorben."
+    }
+  },
+  "cycle": {
+    "title": "Alles fließt",
+    "science": "Zersetzung · der Mineralkreislauf",
+    "question": "Der Matte geht es prächtig — warum leert sich trotzdem das Wasser?",
+    "briefing": "Derselbe Teich wie in deinem ersten Experiment, unter voller Sonne. Die Matte blüht — und trotzdem versickert das freie Mineral. Alles, was stirbt, nimmt sein Mineral mit in den Schlamm, und nichts bringt es zurück. Drücke offenes Wasser lange, um eine Art auszusetzen — und wähle gut.",
+    "goalText": "Schließ den Schlamm auf — Recycler rein, Matte 1.000",
+    "predict": {
+      "prompt": "Der Matte geht es prächtig. Wohin verschwindet das freie Mineral?",
+      "options": [
+        "Nirgendwohin — ein gesunder Teich kreist von selbst",
+        "In die Toten — und dort bleibt es",
+        "Die lebende Matte hortet alles"
+      ],
+      "reflect": [
+        "Kreisen ist Arbeit, und niemand in dieser Welt hat sie gemacht — Materie floss bergab in den Schlamm und blieb liegen.",
+        "Die Chemie-Seite stimmt zu: der gebundene Anteil stieg, Tick um Tick, bis etwas die Toten fraß.",
+        "Körper hielten einen Teil — aber der Schlamm hielt mehr, und der Schlamm gibt von allein nichts zurück."
+      ]
+    },
+    "debrief": {
+      "pass": "Bacillus frisst die Toten und gibt ihr Mineral ans Wasser zurück. Lebewesen mit diesem Job heißen Zersetzer — sie schließen den Kreis. Dieselbe Materie geht jetzt im Kreis, statt sich im Schlamm zu stapeln. Das ist die tiefste Regel dieser Welt: Materie zieht im Kreis, Energie fließt durch wie ein Fluss. Ein Teich ohne seine Recycler erstickt langsam an den eigenen Toten.",
+      "fail": "Nur ein Zersetzer gibt gebundenes Mineral ans Wasser zurück. Fresser und Jäger schieben Materie nur zwischen Körpern hin und her — und alles, was sie töten, bindet mehr im Schlamm. Setz Bacillus nahe der Matte aus, dort, wo die Toten sind."
+    },
+    "meter": [
+      { "label": "gebunden", "unit": "%" },
+      { "label": "Bacillus", "unit": "" }
+    ],
+    "whys": {
+      "The producers are gone — without the mat, nothing eats and nothing returns.": "Die Erzeuger sind fort — ohne die Matte frisst nichts und nichts kehrt zurück."
+    }
+  },
+  "garden": {
+    "title": "Der Gärtner",
+    "science": "Konkurrenz · der Schlüsselfresser",
+    "question": "Das Wasser ist arm und die Blüte besitzt es. Ist die Wiese zu retten?",
+    "briefing": "Armes Wasser, und das schnelle Plankton besitzt es: Drifta trinkt schneller, und die Wiese verhungert unter heller Sonne. Du trägst acht Dosen Mineral, und die Aussetzbank ist offen. Wähle dein Instrument.",
+    "goalText": "Rette die Matte — 250 Solara, gehalten",
+    "predict": {
+      "prompt": "Was könnte die Matte retten?",
+      "options": [
+        "Mineral gießen — die Matte direkt füttern",
+        "Einen Fresser aussetzen — Feind der Blüte, Freund der Wiese",
+        "Nichts — die Schnellen gewinnen immer"
+      ],
+      "reflect": [
+        "Die Blüte trinkt schneller als die Matte, also fütterten deine Güsse zuerst die Blüte. Acht Dosen: die Matte blieb unter 70.",
+        "Die Schlüssel-Wette: Druck auf den Gewinner ist der einzige Hebel, der dem Verlierer Platz macht.",
+        "Das Wasser gewinnen sie — bis etwas sie frisst. Konkurrenz hat mehr als einen Schiedsrichter."
+      ]
+    },
+    "debrief": {
+      "pass": "Cilio fraß die Blüte, und die Matte nahm sich das Licht und Mineral, das frei wurde. Ein Fresser hielt die Tür für eine ganze Wiese auf — so einen nennt man Schlüsselfresser. Und jetzt schau weiter zu. In so armem Wasser frisst sich der Gärtner selbst arbeitslos: Cilio verhungert, und die Blüte kriecht zurück. Schlüsselfresser ist ein Job, und Jobs brauchen Lohn.",
+      "fail": "Die Blüte behielt das Wasser. Den Verlierer füttern klappt hier nicht — das Plankton trinkt schneller, also fütterte jeder Guss zuerst die Blüte. Versuch die andere Richtung: setz den Fresser der Blüte aus, und lass Druck von oben unten Platz schaffen."
+    },
+    "meter": [
+      { "label": "Solara", "unit": "" },
+      { "label": "Drifta", "unit": "" }
+    ],
+    "whys": {
+      "The last Solara died — the meadow is gone.": "Die letzte Solara ist gestorben — die Wiese ist fort.",
+      "The bloom is gone — exterminated, not gardened. That is not the rescue this pond needed.": "Die Blüte ist fort — ausgerottet, nicht gegärtnert. Das war nicht die Rettung, die dieser Teich brauchte."
+    }
+  },
+  "richer": {
+    "title": "Der reichere Teich",
+    "science": "Struktur von oben · Nachschub von unten",
+    "question": "Dieser Teich ist stabil und voller Plankton. Kannst du ihn reicher machen?",
+    "briefing": "Eine Blüte, eine Matte, Zersetzer — und niemand frisst irgendwen. Mineral ist diesmal unbegrenzt, und die Aussetzbank ist offen. Das Ziel ist ein reicherer Teich: eine Wiese über 1.300, alle Arten am Leben. Entscheide, was diesem Teich wirklich fehlt.",
+    "goalText": "Ein reicherer Teich — 1.300 Solara, alle am Leben",
+    "predict": {
+      "prompt": "Was braucht ein Teich, um reicher zu werden?",
+      "options": [
+        "Mehr Nachschub — Mineral ins Wasser gießen",
+        "Einen fehlenden Fresser — umbauen, wer wen frisst",
+        "Beides — Nachschub und Struktur zusammen"
+      ],
+      "reflect": [
+        "Dreißig Dosen versanken in der Blüte, und die Wiese blieb bei rund 900. Die Decke eines Teichs setzt seine Struktur, nicht seine Suppe.",
+        "Die Struktur-Wette: gib dem Teich einen Fresser, und die Wiese verdoppelt sich beinahe.",
+        "Beides geht — aber das Experiment zeigt, welche Hälfte nötig war: Güsse allein scheiterten, der Fresser allein gelang."
+      ]
+    },
+    "debrief": {
+      "pass": "Du hast einen Fresser eingesetzt, und der ganze Teich wurde reicher. Die Wiese hat sich fast verdoppelt; die Blüte fiel auf ein Viertel — und hielt. Und darum: Fressen hält Mineral in Bewegung. Gefressen, ans Wasser zurückgegeben, wieder aufgenommen. All dein Gießen konnte das nicht. Dieser Teich war nie hungrig. Er war unfertig.",
+      "fail": "Mehr Suppe machte keinen reicheren Teich. Die Blüte trank jeden Guss und stand einfach da. Was diesem Teich fehlt, hat ein Maul. Setz den Fresser aus, und sieh, was ein Fresser kann, was Gießen nicht kann."
+    },
+    "meter": [
+      { "label": "Solara", "unit": "" },
+      { "label": "Cilio", "unit": "" },
+      { "label": "Drifta", "unit": "" }
+    ],
+    "whys": {
+      "The meadow is gone — richer was the goal, and everything died at the bottom.": "Die Wiese ist fort — reicher war das Ziel, und unten ist alles gestorben.",
+      "The plankton is gone — grazed to nothing. A structure with a hole in it feeds no one.": "Das Plankton ist fort — leergefressen. Eine Struktur mit einem Loch darin füttert niemanden."
+    }
+  },
+  "hunters": {
+    "title": "Ein Kopf voller Jäger",
+    "science": "Die Energiepyramide · Spitzenjäger",
+    "question": "Der Teich ist reich. Wie viele Jäger kann er füttern?",
+    "briefing": "Ein voller Teich: Wiese, Blüte, Fresser, Recycler — und noch kein Jäger. Venator wartet auf deiner Aussetzbank. Gründe ein Rudel, das bleibt.",
+    "goalText": "Ein Rudel, das hält — 4+ Jäger, lange gehalten",
+    "predict": {
+      "prompt": "Du setzt einen Spitzenjäger ein. Wie viele Rudel lässt du frei?",
+      "options": [
+        "Zwei Rudel — doppelt so sicher",
+        "Ein Rudel — mehr gibt dieser Teich nicht her",
+        "Hier kann gar keins leben"
+      ],
+      "reflect": [
+        "Doppelt so viele Jäger hieß doppelt so viel Hunger. Rudel im selben Wasser plündern es gemeinsam — und verhungern gemeinsam.",
+        "Richtig. Jäger leben von dem, was der Teich entbehren kann, und selbst ein reicher Teich entbehrt wenig.",
+        "Ein Rudel kann hier leben. Aber nur ein kleines, gefüttert vom ganzen Teich darunter."
+      ]
+    },
+    "debrief": {
+      "pass": "Dein Rudel hält — ein paar Jäger auf einer Welle aus Fressern, auf einer Welle aus Plankton. Zähl die Schichten: Hunderte Plankton füttern hundert Fresser füttern eine Handvoll Jäger. Jede Mahlzeit verliert unterwegs das meiste ihrer Energie. Das ist der Preis der Nahrungskette. Darum ist die Spitze immer klein — und immer eine schlechte Saison vom Ende entfernt.",
+      "fail": "Jägern geht nicht der Mut aus — ihnen geht die Beute aus. Der Teich macht nur so viele Fresser, und jedes zusätzliche Maul verkleinert den Anteil jedes Jägers. Versuch ein Rudel, früh ausgesetzt, und gib ihm Raum."
+    },
+    "meter": [
+      { "label": "Venator", "unit": "" },
+      { "label": "Cilio", "unit": "" }
+    ],
+    "whys": {
+      "The pack is gone. It ate through what the pond could spare — the top of a pond is a narrow ledge.": "Das Rudel ist fort. Es hat aufgefressen, was der Teich entbehren konnte — die Spitze eines Teichs ist ein schmaler Sims.",
+      "The grazers are gone. Nothing now stands between the hunters and starving.": "Die Fresser sind fort. Nichts steht jetzt noch zwischen den Jägern und dem Hungern."
+    }
+  }
+}

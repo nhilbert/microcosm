@@ -1,5 +1,6 @@
 package org.microcosm.app
 
+import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -10,6 +11,12 @@ import org.json.JSONObject
  * built core, generated into `levels_gen.rs`, and handed over here verbatim. The predicates are
  * evaluated by the core (`levels.rs`), whose verdicts the honesty gate proves identical on both
  * cores; what the shell reads out of the JSON is the player text and the meter labels.
+ *
+ * German (DE.3): when the display language is German, `assets/levels.de.json` is laid over the
+ * player-text fields of each level — DISPLAY ONLY. The core keeps judging over its own English
+ * table (it is inside the certified hash), so verdicts are identical in every language; the
+ * overlay also registers the fail-reason translations with [L10n]. A level the overlay does not
+ * carry stays English — untranslated is honest, invented is not.
  */
 class Level(private val o: JSONObject) {
     val key: String = o.optString("key")
@@ -43,9 +50,38 @@ class Level(private val o: JSONObject) {
     }
 
     companion object {
-        fun all(): List<Level> {
+        fun all(ctx: Context): List<Level> {
             val a = JSONArray(Native.levelsJson())
-            return (0 until a.length()).map { Level(a.getJSONObject(it)) }
+            val overlay = if (L10n.de) loadOverlay(ctx) else null
+            return (0 until a.length()).map { i ->
+                val o = a.getJSONObject(i)
+                overlay?.optJSONObject(o.optString("key"))?.let { merge(o, it) }
+                Level(o)
+            }
+        }
+
+        /** Lay the translated player text over one level row; verdicts never read these fields. */
+        private fun merge(o: JSONObject, de: JSONObject) {
+            for (f in arrayOf("title", "science", "question", "briefing", "goalText"))
+                de.optString(f).takeIf { it.isNotEmpty() }?.let { o.put(f, it) }
+            de.optJSONObject("predict")?.let { o.put("predict", it) }
+            de.optJSONObject("debrief")?.let { o.put("debrief", it) }
+            de.optJSONArray("meter")?.let { m ->
+                // keep the EN meter row count authoritative: extra overlay rows are ignored
+                val base = o.optJSONArray("meter")
+                if (base != null && m.length() == base.length()) o.put("meter", m)
+            }
+            de.optJSONObject("whys")?.let { w ->
+                val map = HashMap<String, String>()
+                for (k in w.keys()) map[k] = w.getString(k)
+                L10n.addWhys(map)
+            }
+        }
+
+        private fun loadOverlay(ctx: Context): JSONObject? = try {
+            JSONObject(ctx.assets.open("levels.de.json").readBytes().decodeToString())
+        } catch (e: Exception) {
+            null // a missing or broken overlay costs the translation, never the level
         }
     }
 }
