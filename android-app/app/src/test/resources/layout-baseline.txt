@@ -1,13 +1,62 @@
 # Layout gate baseline — what is wrong with the app's chrome TODAY.
 #
-# Every line here is a violation the gate found and that we have chosen not to fix yet. They are
-# not excuses: they are docs/app-ux-review.md §1, written down where CI can count them. The file
-# may only shrink, and the test fails if a line stops occurring without being deleted — so a
-# repair cannot land silently and a regression cannot hide behind an old entry.
+# Every line is a violation the gate found and that we have chosen not to fix yet. They are not
+# excuses: they are docs/app-ux-review.md §1, written down where CI can count them. The file may
+# only shrink, and the test fails if a line stops occurring without being deleted — so a repair
+# cannot land silently and a regression cannot hide behind an old entry.
 #
 # Format: one violation key per line, "KIND subject @ profile". Comments after '#'.
 #
-# Nothing is listed yet. The first CI run of this gate prints exactly what belongs here; that
-# output is transcribed into this file in the commit that follows, so the initial contents are
-# measured rather than guessed. Until then the gate reports every violation as new, which is the
-# honest starting state — the screen has never been measured before.
+# MEASURED 2026-09-01 by the gate's own first correct run (CI run 14). 35 violations across four
+# device profiles. Two things in the numbers are worth keeping:
+#
+#   * The bar wants 88 dp per button — Material's minimum width — so nine of them need 792 dp.
+#     The review estimated 576 dp from a 64 dp guess, so the real overflow is worse than reported.
+#   * The TABLET PROFILE IS CLEAN. Not one violation at 800 dp. That is the proof this is a width
+#     problem and nothing deeper: the rows are structurally fine and simply have nowhere to go.
+#
+# The Fairphone 5 lines are the owner's screenshot, reproduced from source: save, exp, data and
+# bench laid out at 0 px each, having asked for 264 px.
+
+# --- small phone 320x568 xhdpi: the bar loses five controls, and Data loses its last page
+SQUEEZED bar/16x @ small phone   320x568 xhdpi
+SQUEEZED bar/mode @ small phone   320x568 xhdpi
+TINY bar/mode @ small phone   320x568 xhdpi
+SQUEEZED bar/save @ small phone   320x568 xhdpi
+TINY bar/save @ small phone   320x568 xhdpi
+SQUEEZED bar/exp @ small phone   320x568 xhdpi
+TINY bar/exp @ small phone   320x568 xhdpi
+SQUEEZED bar/data @ small phone   320x568 xhdpi
+TINY bar/data @ small phone   320x568 xhdpi
+SQUEEZED bar/bench @ small phone   320x568 xhdpi
+TINY bar/bench @ small phone   320x568 xhdpi
+SQUEEZED tools/wall @ small phone   320x568 xhdpi
+SQUEEZED pages/health @ small phone   320x568 xhdpi
+SQUEEZED pages/events @ small phone   320x568 xhdpi
+TINY pages/events @ small phone   320x568 xhdpi
+
+# --- Fairphone 5 408x900 xxhdpi: the owner's phone. Four controls at zero width.
+SQUEEZED bar/mode @ Fairphone 5   408x900 xxhdpi
+SQUEEZED bar/save @ Fairphone 5   408x900 xxhdpi
+TINY bar/save @ Fairphone 5   408x900 xxhdpi
+SQUEEZED bar/exp @ Fairphone 5   408x900 xxhdpi
+TINY bar/exp @ Fairphone 5   408x900 xxhdpi
+SQUEEZED bar/data @ Fairphone 5   408x900 xxhdpi
+TINY bar/data @ Fairphone 5   408x900 xxhdpi
+SQUEEZED bar/bench @ Fairphone 5   408x900 xxhdpi
+TINY bar/bench @ Fairphone 5   408x900 xxhdpi
+SQUEEZED pages/events @ Fairphone 5   408x900 xxhdpi
+
+# --- large phone 411x891 420dpi: three more dp of width buys nothing
+SQUEEZED bar/mode @ large phone   411x891 420dpi
+SQUEEZED bar/save @ large phone   411x891 420dpi
+TINY bar/save @ large phone   411x891 420dpi
+SQUEEZED bar/exp @ large phone   411x891 420dpi
+TINY bar/exp @ large phone   411x891 420dpi
+SQUEEZED bar/data @ large phone   411x891 420dpi
+TINY bar/data @ large phone   411x891 420dpi
+SQUEEZED bar/bench @ large phone   411x891 420dpi
+TINY bar/bench @ large phone   411x891 420dpi
+SQUEEZED pages/events @ large phone   411x891 420dpi
+
+# --- tablet 800x1280 xhdpi: clean. Nothing to record.
