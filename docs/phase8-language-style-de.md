@@ -202,6 +202,22 @@ darüber hinweggezogen".
 6. „weil" außerhalb des Leveltexts, „um zu" auf einer Kreatur? Raus.
 7. Imperativ in der Langform (außer gib/sieh)?
 
+## 9. Das Nachschlage-Register (Owner-Entscheidung, 2026-09-02)
+
+Die Verbotsliste hält Fachsprache aus Text heraus, den niemand angefordert hat. Die Hilfeseite
+ist der eine Ort, an dem doch jemand gefragt hat: Sie wird bewusst geöffnet, von der Startseite
+aus, von jemandem, der es genauer wissen will. Dort zu verbieten, worum es geht, hieße der Seite
+ihren Gegenstand zu nehmen.
+
+Deshalb gelten für `help_*`-Schlüssel — und nur für die — andere Regeln: Die Fachwörter sind
+erlaubt. Die Klammer bleibt, wo sie zählt: Der 18-Wörter-Deckel je Teilsatz gilt unverändert,
+die Lesbarkeit wird auf Stufe 12 statt 8 gehalten und nicht etwa aufgehoben.
+
+Das ist die Form, auf die es ankommt. Gelockert wird der **Wortschatz**, den ein Leser
+nachschlagen kann. Nicht gelockert wird die **Satzlänge**, gegen die kein Leser etwas tun kann.
+Das Gate hat den ersten Entwurf dieser Seite elfmal wegen zu langer Sätze abgewiesen, und jede
+dieser Abweisungen war berechtigt.
+
 ## Offene Punkte (Owner-Veto ausstehend)
 
 - **„schaue"**: Die Langform-Regel macht aus „schau zu" ein „schaue zu" — das klingt

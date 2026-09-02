@@ -41,6 +41,13 @@ import java.time.Duration
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class BootTest {
 
+    /** The drawn diagram, found by type — a picture that is missing is a page that lost it. */
+    private fun countCycles(v: android.view.View): Int = when (v) {
+        is Help.CycleView -> 1
+        is android.view.ViewGroup -> (0 until v.childCount).sumOf { countCycles(v.getChildAt(it)) }
+        else -> 0
+    }
+
     /** The camera's discipline (ChromeScreenshotTest): pictures are evidence, never a grade. */
     private fun photograph(v: android.view.View, name: String) {
         if (v.width == 0) { // a panel that was GONE at layout time has no size yet
@@ -417,6 +424,31 @@ class BootTest {
         assertTrue("the experiment menu should show at least one gameplay thumbnail",
             thumbs(activity.expPanel) > 0)
         activity.expPanel.visibility = android.view.View.GONE
+        // The help page (2026-09-02): it is the one screen a beginner meets before anything else,
+        // and it reads the CORE for its species names, colours and portraits — so an empty card
+        // means the page lost the world, not merely a string. Photographed for the same reason
+        // the front door is: no one in this container can look at it otherwise.
+        activity.startPanel.getChildAt(5).performClick() // help
+        assertTrue("the help page should open from the front door",
+            activity.helpPanel.visibility == android.view.View.VISIBLE)
+        fun texts(v: android.view.View): List<String> = when (v) {
+            is android.widget.TextView -> listOf(v.text.toString())
+            is android.view.ViewGroup -> (0 until v.childCount).flatMap { texts(v.getChildAt(it)) }
+            else -> emptyList()
+        }
+        val help = texts(activity.helpPanel)
+        for (sp in listOf("Solara", "Drifta", "Cilio", "Bacillus", "Venator"))
+            assertTrue("the help page should profile $sp", help.any { it == sp })
+        assertTrue("every species card should carry its real-world model",
+            help.count { it.contains("Modelled on") || it.contains("Vorbild") } == 5)
+        assertTrue("the mineral diagram should be drawn, not described",
+            texts(activity.helpPanel).isNotEmpty() &&
+                countCycles(activity.helpPanel) == 1)
+        photograph(activity.helpPanel, "help@boot")
+        activity.onBackPressed()
+        assertTrue("back should close the help page",
+            activity.helpPanel.visibility != android.view.View.VISIBLE)
+
         // GR.7: the optic switch. It is a view, so the test's whole claim is that a tap flips the
         // state both switches read, that the world hears it, and that the label follows — whether
         // the light field LOOKS right is WorldCameraTest's photograph and the owner's device.

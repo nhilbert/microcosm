@@ -41,6 +41,15 @@ const MAX_SENT_WORDS = 20;      // English: full sentences
 const MAX_CLAUSE_DE = 18;       // German: clauses — em-dash and colon count as boundaries
 const FK_MAX = 8;
 const WSTF_MAX = 8;             // Wiener Sachtextformel grade, German bodies of 25+ words
+// The reference register (owner decision, 2026-09-02). The help page is written for a player who
+// wants to go DEEPER, and the banned list exists to keep science out of text a player did not ask
+// for — which is the opposite of this page. So `help_*` keys may name the science, and pay for it
+// with the two rules that actually decide whether a sentence can be read: the clause caps stay
+// exactly as they are, and readability is held to a reference grade rather than waived. A named,
+// key-scoped exemption, never a global hole — the gate's whole value is that it has no holes.
+const FK_MAX_REF = 12;
+const WSTF_MAX_REF = 12;
+const REFERENCE = /^help_/;
 const FK_MIN_WORDS = 25;
 // The EN §4 budgets, applied to the German level overlay too (owner decision 2026-09-01).
 const BUDGET_DE = { briefing: 50, question: 14, prompt: 12, chip: 9, reflect: 28,
@@ -113,21 +122,24 @@ function check(text, where, lang, opts = {}){
   const wc = words(plain).length;
   if (opts.budget && wc > opts.budget)
     bad.push(`${where}  ${wc} words (budget ${opts.budget})`);
+  const wstfMax = opts.reference ? WSTF_MAX_REF : WSTF_MAX;
+  const fkMax = opts.reference ? FK_MAX_REF : FK_MAX;
   if (lang === "de"){
     for (const s of clauses(plain))
       if (words(s).length > MAX_CLAUSE_DE)
         bad.push(`${where}  ${words(s).length}-word clause (max ${MAX_CLAUSE_DE}): "${s.slice(0, 60)}…"`);
-    if (wc >= FK_MIN_WORDS && wstf(plain) > WSTF_MAX)
-      bad.push(`${where}  reads at grade ${wstf(plain).toFixed(1)} (WSTF max ${WSTF_MAX}): "${plain.slice(0, 60)}…"`);
+    if (wc >= FK_MIN_WORDS && wstf(plain) > wstfMax)
+      bad.push(`${where}  reads at grade ${wstf(plain).toFixed(1)} (WSTF max ${wstfMax}): "${plain.slice(0, 60)}…"`);
   } else {
     for (const s of sentences(plain))
       if (words(s).length > MAX_SENT_WORDS)
         bad.push(`${where}  ${words(s).length}-word sentence: "${s.slice(0, 60)}…"`);
-    if (wc >= FK_MIN_WORDS && fk(plain) > FK_MAX)
-      bad.push(`${where}  reads at grade ${fk(plain).toFixed(1)} (max ${FK_MAX}): "${plain.slice(0, 60)}…"`);
+    if (wc >= FK_MIN_WORDS && fk(plain) > fkMax)
+      bad.push(`${where}  reads at grade ${fk(plain).toFixed(1)} (max ${fkMax}): "${plain.slice(0, 60)}…"`);
   }
   const lower = plain.toLowerCase();
-  for (const b of (lang === "de" ? BANNED_DE : BANNED_EN)){
+  // the reference register names its subject; every other string still may not
+  for (const b of (opts.reference ? [] : lang === "de" ? BANNED_DE : BANNED_EN)){
     const causal = b === "weil" || b === "because";
     if (causal && opts.level) continue;     // measured lessons have earned their causality
     const re = causal ? new RegExp(`(^|\\P{L})${b}(\\P{L}|$)`, "u") : new RegExp(`(^|\\P{L})${b}`, "u");
@@ -191,8 +203,9 @@ function checkRes(file, defaultLang){
   for (const r of rows){
     if (r.skip) continue; // machine patterns (regexes, vocabulary keys)
     const lang = r.name.endsWith("_de") ? "de" : defaultLang;
+    const opts = REFERENCE.test(r.name) ? { reference: true } : {};
     for (const [k, t] of r.texts.entries())
-      check(t, `${path.relative(APP, file)}:${r.name}${r.array ? `[${k}]` : ""}`, lang);
+      check(t, `${path.relative(APP, file)}:${r.name}${r.array ? `[${k}]` : ""}`, lang, opts);
   }
   return rows;
 }

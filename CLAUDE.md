@@ -73,7 +73,16 @@ streams — the gate convicted raw-stream pins twice, and that is now the standi
 rule. Experiments save (snapshot v2 carries the level runtime). Player text
 obeys `docs/phase8-language-style.md` and, in German,
 `docs/phase8-language-style-de.md`; both are enforced by `harness/prose.js` and
-`harness/prose-app.js` in `npm test` and in CI.
+`harness/prose-app.js` in `npm test` and in CI. The one exception is the help
+page: `help_*` keys run in the **reference register** — the science may be
+named, the clause caps still hold (style guide §11 / de §9).
+
+**The help page** (`Help.kt`, reached from the front door) is the app's one
+piece of teaching text: a beginner's overview, a drawn diagram of the mineral's
+round, and a card per creature putting what it does here beside what its real
+model does out there — *Cladophora*, *Chlamydomonas*, *Paramecium*,
+*B. subtilis*, *Didinium*, each fact chosen to land on a mechanic the sim
+already has. `HelpPageTest` photographs the whole page in both languages.
 
 **Next (owner order)** is unchanged from the log's last entry: playthrough paths
 for L8/L11/L12 (wall drawing, feed cadence and σ sliders need gesture
