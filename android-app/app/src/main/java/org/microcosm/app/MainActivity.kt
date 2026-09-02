@@ -77,18 +77,22 @@ class MainActivity : Activity() {
     private lateinit var specimenSub: TextView
     private lateinit var specimenEnergyText: TextView
     private lateinit var specimenEnergyBar: LinearLayout
-    private lateinit var specimenTiles: LinearLayout
+    internal lateinit var specimenTiles: LinearLayout
     private val specimenTileViews = ArrayList<LinearLayout>()
     // ---- the species profile (Steckbrief) inside the specimen sheet ----
     internal lateinit var specimenProfile: LinearLayout // internal: the boot gate asserts it opens
     internal lateinit var profilePortrait: PortraitView
     private lateinit var specimenChevron: TextView
+    /** The disclosure row for the trait tiles; internal, the boot gate taps it. */
+    internal lateinit var specimenDetails: LinearLayout
+    /** The sheet's own dismiss; internal, the boot gate needs the second way to close. */
+    internal lateinit var specimenClose: android.widget.ImageButton
     private lateinit var profileRole: TextView
     private lateinit var profileEats: TextView
     private lateinit var profileEaten: TextView
     internal lateinit var profileAbout: TextView // internal: the boot gate reads its words
-    /** Whether the Steckbrief is unfolded; remembered across selections, never across launches. */
-    private var profileOpen = false
+    /** Whether the trait tiles are unfolded; remembered across selections, never across launches. */
+    private var detailsOpen = false
     /** Which species' static card content (portrait, words, tile labels) is populated. */
     private var specimenShownSp = -1
     private val specimenDot by lazy {
@@ -381,32 +385,33 @@ class MainActivity : Activity() {
             textSize = 17f
             typeface = Style.wordMedium(this@MainActivity)
         }
-        specimenChevron = TextView(this).apply {
-            setTextColor(Style.DIM)
-            textSize = 13f
-            text = "▾"
-            setPadding(Style.dp(this@MainActivity, 8f), 0, Style.dp(this@MainActivity, 8f), 0)
-        }
         specHeader.addView(specimenDot, LinearLayout.LayoutParams(
             Style.dp(this, 12f), Style.dp(this, 12f)).apply { marginEnd = Style.dp(this@MainActivity, 9f) })
-        specHeader.addView(specimenName, LinearLayout.LayoutParams(WRAP, WRAP))
-        specHeader.addView(specimenChevron, LinearLayout.LayoutParams(0, WRAP, 1f))
-        specHeader.addView(button(Chrome.label(this, "feed")) { world.feedSelected() },
-            LinearLayout.LayoutParams(WRAP, WRAP).apply { marginEnd = Style.dp(this@MainActivity, 8f) })
-        specHeader.addView(button(Chrome.label(this, "kill")) { world.killSelected() })
-        // Tapping the header unfolds the Steckbrief; feed and kill are clickable children and
-        // keep their own taps. The whole row is the target — 12sp of chevron alone would fail
-        // every touch guideline this project measures by.
-        specHeader.minimumHeight = Style.dp(this, 44f)
-        specHeader.setOnClickListener { setProfileOpen(!profileOpen) }
+        specHeader.addView(specimenName, LinearLayout.LayoutParams(0, WRAP, 1f))
+        // Icons, not words (owner, 2026-09-02) — feed and kill on THIS creature, and the dismiss
+        // the sheet never had a control for (back still closes it; this is the visible second
+        // way). Built through Chrome so the layout gate measures the row that ships, and each
+        // icon carries the word it replaced as contentDescription and tooltip: an icon is never
+        // the whole label, and these two are exactly the kind a player can read wrong.
+        val specActions = Chrome.build(this, "specimen") { k ->
+            when (k) {
+                0 -> world.feedSelected()
+                1 -> world.killSelected()
+                else -> world.deselect()
+            }
+        } as LinearLayout
+        specimenClose = specActions.getChildAt(2) as android.widget.ImageButton
+        specHeader.addView(specActions, LinearLayout.LayoutParams(WRAP, WRAP))
+        specHeader.minimumHeight = Style.dp(this, 48f)
         specimenSheet.addView(specHeader)
 
         // The Steckbrief (docs/species-profiles.md): portrait beside the food-web facts, the
-        // description below. Folded by default — the sheet floats over the pond, and the pond
-        // stays the point. Every slot hides when a species has no art or no words for it.
+        // description below. Shown at first glance since 2026-09-02 (owner) — it used to sit
+        // folded behind the header, so the picture and the words, the two things that say what
+        // this creature IS, arrived only on a second tap, after the numbers. Every slot still
+        // hides when a species has no art or no words for it.
         specimenProfile = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = ViewGroup.GONE
         }
         val profileRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -484,11 +489,40 @@ class MainActivity : Activity() {
         specimenSheet.addView(specimenEnergyBar, LinearLayout.LayoutParams(MATCH, Style.dp(this, 5f)).apply {
             topMargin = Style.dp(this@MainActivity, 6f); bottomMargin = Style.dp(this@MainActivity, 12f)
         })
+        // The disclosure the header used to be. What is behind it changed with the reordering:
+        // the tiles are the DETAILS now, the Steckbrief is the first glance. A labelled row, not
+        // a bare chevron — a glyph alone never says what it would open.
+        specimenDetails = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = Style.dp(this@MainActivity, 48f)
+            background = Style.touchable(this@MainActivity,
+                android.graphics.drawable.GradientDrawable().apply {
+                    setColor(Color.TRANSPARENT)
+                    cornerRadius = Style.dp(this@MainActivity, 12f).toFloat()
+                })
+            setOnClickListener { setDetailsOpen(!detailsOpen) }
+        }
+        specimenDetails.addView(TextView(this).apply {
+            text = getString(R.string.specimen_details)
+            setTextColor(Style.DIM); textSize = 12f; typeface = Style.word(this@MainActivity)
+        }, LinearLayout.LayoutParams(0, WRAP, 1f))
+        specimenChevron = TextView(this).apply {
+            setTextColor(Style.DIM)
+            textSize = 13f
+            text = "▾"
+        }
+        specimenDetails.addView(specimenChevron)
+        specimenSheet.addView(specimenDetails, LinearLayout.LayoutParams(MATCH, WRAP))
+
         // The trait tiles, two a row, populated per selection; species without a locus hide them.
         // Each tile: label and value up top, then the pole-to-pole track (TraitMeter — marker at
         // this creature, tick at the founding stock), the pole words at the rails, and one line
         // on what the dial trades. Child indices are read back in tickHud — keep them in step.
-        specimenTiles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        specimenTiles = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = ViewGroup.GONE
+        }
         repeat(2) { r ->
             val rowOfTiles = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             repeat(2) { c ->
@@ -1442,10 +1476,10 @@ class MainActivity : Activity() {
 
     private fun button(label: String, onTap: () -> Unit) = Chrome.button(this, label, onTap)
 
-    /** Fold or unfold the Steckbrief — immediately, not on the next 250 ms tick. */
-    internal fun setProfileOpen(open: Boolean) {
-        profileOpen = open
-        specimenProfile.visibility = if (open) ViewGroup.VISIBLE else ViewGroup.GONE
+    /** Fold or unfold the trait tiles — immediately, not on the next 250 ms tick. */
+    internal fun setDetailsOpen(open: Boolean) {
+        detailsOpen = open
+        specimenTiles.visibility = if (open) ViewGroup.VISIBLE else ViewGroup.GONE
         specimenChevron.text = if (open) "▴" else "▾"
     }
 
@@ -1466,10 +1500,13 @@ class MainActivity : Activity() {
         put(profileEats, Profiles.eats(name)) { getString(R.string.spec_eats, it) }
         put(profileEaten, Profiles.eatenBy(name)) { getString(R.string.spec_eaten, it) }
         put(profileAbout, Profiles.about(name))
-        // no art and no words: nothing to unfold, so the header offers nothing
+        // No art and no words: the Steckbrief block takes no space at all rather than showing
+        // an empty frame. The disclosure now governs the TILES, so it hides when there are none.
         val hasProfile = art != null || Profiles.role(name) != 0 || Profiles.about(name) != 0
-        specimenChevron.visibility = if (hasProfile) ViewGroup.VISIBLE else ViewGroup.GONE
-        if (!hasProfile) setProfileOpen(false) else setProfileOpen(profileOpen)
+        specimenProfile.visibility = if (hasProfile) ViewGroup.VISIBLE else ViewGroup.GONE
+        val hasTraits = snap.loci.isNotEmpty()
+        specimenDetails.visibility = if (hasTraits) ViewGroup.VISIBLE else ViewGroup.GONE
+        setDetailsOpen(hasTraits && detailsOpen)
         for ((k, tile) in specimenTileViews.withIndex()) {
             val locus = snap.loci.getOrNull(k)
             tile.visibility = if (locus != null) ViewGroup.VISIBLE else ViewGroup.INVISIBLE
