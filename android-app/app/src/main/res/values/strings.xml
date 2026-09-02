@@ -40,6 +40,7 @@
         <item>death runs through energy alone</item>
         <item>mineral is a valve</item>
         <item>protein is for the young</item>
+        <item>size scales the rest</item>
         <item>the cycle</item>
         <item>Bacillus closes the circle</item>
         <item>amber is your hand</item>
@@ -49,12 +50,13 @@
 
     <string-array name="help_bodies">
         <item>A pond where life runs on its own. Five species eat, grow and die. You watch, and you step in.</item>
-        <item>Nothing is made, nothing is lost. A speck of mineral only moves on: into a body, into a corpse, back into the water.</item>
-        <item>Solara is the mat on the floor. Drifta floats in the water. Both live on light. Cilio hunts Drifta. Venator hunts Cilio. Bacillus breaks down what is left.</item>
+        <item>Two rules, not one. Energy comes in with the light, passes on with the food, and leaves as warmth. Mineral only changes address: into a body, into a corpse, back into the water. It never leaves the pond.</item>
+        <item>Solara is the mat on the floor. Drifta floats in the water. Both live on light. Cilio hunts Drifta. Venator hunts Cilio. Bacillus breaks down what is left. The web is kept simple on purpose: one prey each.</item>
         <item>Every creature keeps four accounts: energy, mineral, protein and size. Energy is the fuel. The other three are never burned.</item>
         <item>Simply existing costs energy, every moment. When that account hits zero, the creature dies. No other shortage kills outright.</item>
         <item>Mineral is never spent, only parked. It sets how well a plant uses the light. With none in store, nothing comes in, and the creature starves.</item>
         <item>Protein is never burned. It is the ticket to dividing. Plants build it from spare energy. Hunters take it from their prey.</item>
+        <item>Size scales almost everything else. A bigger creature holds more energy, drinks more mineral and pays more to move. It also needs more protein before it can divide.</item>
         <item>A plant draws mineral from the water. A hunter eats the plant. The dead fall apart into detritus. Bacillus eats that and frees the mineral again.</item>
         <item>Switch Bacillus off, and the mineral stays locked in the remains. The pond slowly chokes on its own waste.</item>
         <item>Anything amber was done by you. The world itself never wears that colour. So what came from you stays visible.</item>
@@ -66,18 +68,18 @@
     <string name="help_h_cycle">Where the mineral goes</string>
     <string name="help_cycle_caption">One unit of mineral, on its round. Nothing leaves the circle.</string>
     <string name="help_h_species">The five, and their real models</string>
-    <string name="help_species_lede">Every creature here is built on a real one. What follows is what the real one does, and which part of it the simulation kept.</string>
+    <string name="help_species_lede">Every creature here is built on a real one. In the pond says what it does here. In reality says what its model does out there. Where the two part company, the pond is the simpler one.</string>
     <string name="help_label_pond">In the pond</string>
     <string name="help_label_real">In reality</string>
     <string name="help_h_sources">Sources</string>
     <string name="help_sources_note">The living-model notes are written from the articles below and are not quoted from them. Source: the English Wikipedia, en.wikipedia.org. Its text is licensed CC BY-SA 4.0. Retrieved 2 September 2026.</string>
 
     <string-array name="help_real">
-        <item>Modelled on the algal mats that coat a lit pond floor. The familiar mat-former is &lt;i&gt;Cladophora&lt;/i&gt;, a branching filamentous green alga. Real mats grow so dense that light, oxygen and mineral fall away within a few centimetres. What lies beneath them is shaded out. Solara inherits exactly that. A thicker mat is painted darker, and it swallows the light its own floor no longer gets.</item>
-        <item>Modelled on drifting single-celled green algae such as &lt;i&gt;Chlamydomonas reinhardtii&lt;/i&gt;. It is about ten micrometres across and swims on two flagella. It carries an eyespot, a light-sensing organelle. That steers it toward dim light and away from glare. Drifta keeps the useful half. It climbs the local light gradient, and only when light is short.</item>
-        <item>Modelled on &lt;i&gt;Paramecium&lt;/i&gt;, the textbook ciliate. It is 170 to 330 micrometres long and swims on a coat of cilia. A deep oral groove, lined with beating cilia, sweeps in bacteria, algae and yeasts. They are packed into food vacuoles. Meeting something it dislikes, it shows the avoiding reaction. It backs up, turns, and swims off in a new direction. Cilio\'s flight from alarm scent is that reaction. The glowing vacuole in its body is its last meal.</item>
+        <item>Modelled on the algal mats that coat a lit pond floor. The familiar mat-former is &lt;i&gt;Cladophora&lt;/i&gt;, a branching filamentous green alga. It grows worldwide, in fresh, brackish and salt water. Where dissolved mineral is plentiful, some species build heavy mats. Solara keeps that habit. The self-shading is the pond\'s own rule. A thicker mat is painted darker, and it takes the light from the floor below.</item>
+        <item>Modelled on drifting single-celled green algae such as &lt;i&gt;Chlamydomonas reinhardtii&lt;/i&gt;. It is about ten micrometres across and swims on two flagella. It carries an eyespot, a light-sensing organelle. That steers it toward dim light and away from glare. Starved of nitrogen it mates instead, and the pair becomes a tough resting zygote. Drifta keeps a plainer pair of those. It climbs the local light gradient when light is short, and it cysts when it starves.</item>
+        <item>Modelled on &lt;i&gt;Paramecium&lt;/i&gt;, the textbook ciliate. It is 170 to 330 micrometres long and swims on a coat of cilia. A deep oral groove, lined with beating cilia, sweeps in bacteria, algae and yeasts. They are packed into food vacuoles. Meeting something it dislikes, it shows the avoiding reaction. It backs up, turns, and swims off in a new direction. Two things here belong to the pond. Cilio lives on Drifta, where the real one lives mostly on bacteria. And its flight from alarm scent is a rule of this game.</item>
         <item>Modelled on &lt;i&gt;Bacillus subtilis&lt;/i&gt;, the rod-shaped soil bacterium. It hunts food by run-and-tumble: a straight run, then a random re-aim. Short of food it secretes enzymes, and breaks down what is left around it. If that fails, it forms a tough endospore and waits. All three are in the simulation. The tumbling walk, the recycling, and the cyst that waits for detritus.</item>
-        <item>Modelled on &lt;i&gt;Didinium nasutum&lt;/i&gt;, the classic ciliate hunter. It is a barrel, 80 to 200 micrometres long. Two girdles of cilia drive its fast swimming. It charges its prey head-on. Pexicysts hold the victim, toxicysts kill it. Then it swallows the prey whole, through a mouth that stretches open. Its prey in nature is &lt;i&gt;Paramecium&lt;/i&gt;. The two are the textbook predator-prey pair. That is why Venator hunts Cilio and nothing else.</item>
+        <item>Modelled on &lt;i&gt;Didinium nasutum&lt;/i&gt;, the classic ciliate hunter. It is a barrel, 80 to 200 micrometres long. Two girdles of cilia drive its fast swimming. It charges its prey head-on. Pexicysts hold the victim and toxicysts subdue it. Then it swallows the prey whole, through a mouth that stretches open. Its prey in nature is &lt;i&gt;Paramecium&lt;/i&gt;. The two are the textbook predator-prey pair. That is why Venator hunts Cilio and nothing else.</item>
     </string-array>
 
     <string-array name="help_sources">

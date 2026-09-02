@@ -40,6 +40,13 @@ object Help {
     /** The species the page profiles, in food-web order rather than table order. */
     private val ORDER = listOf("solara", "drifta", "cilio", "bacillus", "venator")
 
+    /**
+     * The seam in `help_titles`: chapters before it explain the metabolism and run above the
+     * species cards, chapters from it on are the player's own hand and run below them. A chapter
+     * added to the array lands in the metabolism half unless this index moves with it.
+     */
+    private const val AFTER_SPECIES = 10
+
     fun page(ctx: Context, onClose: () -> Unit): LinearLayout {
         val panel = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -89,8 +96,8 @@ object Help {
             setPadding(0, Style.dp(ctx, 8f), 0, Style.dp(ctx, 4f))
         })
 
-        // ---- chapters 4..9: the four accounts through to what closes the circle ----
-        for (k in 3 until min(9, n)) body.addView(chapter(ctx, titles[k], bodies[k]))
+        // ---- chapters 4..10: the four accounts through to what closes the circle ----
+        for (k in 3 until min(AFTER_SPECIES, n)) body.addView(chapter(ctx, titles[k], bodies[k]))
 
         // ---- the five, and the real creatures they are built on ----
         body.addView(heading(ctx, ctx.getString(R.string.help_h_species)))
@@ -108,8 +115,8 @@ object Help {
             body.addView(speciesCard(ctx, key, reals.getOrNull(k), sources.getOrNull(k)))
         }
 
-        // ---- chapters 10..: your hand, the levers, the experiments ----
-        for (k in 9 until n) body.addView(chapter(ctx, titles[k], bodies[k]))
+        // ---- chapters 11..: your hand, the levers, the experiments ----
+        for (k in AFTER_SPECIES until n) body.addView(chapter(ctx, titles[k], bodies[k]))
 
         // ---- where the living-model notes come from ----
         body.addView(heading(ctx, ctx.getString(R.string.help_h_sources)))
