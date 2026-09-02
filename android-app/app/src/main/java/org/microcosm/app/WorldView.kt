@@ -25,6 +25,12 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
 
     companion object {
         const val TICK_MS = 100.0
+        /**
+         * How long a touched sun wears the standing-change badge. Twice the undo chip's 45 s: the
+         * notice outlives the offer to put the world back, which is the whole point of U2.3, and
+         * then it stops taking up the top of the screen.
+         */
+        const val SUN_BADGE_SHOW_NS = 90_000_000_000L
         // The core's KINDS table (impact.rs), by index. A press changes the regime; a pulse pokes it.
         const val IV_POUR = 0
         const val IV_KILL = 1
@@ -131,12 +137,25 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         private set
     private var baseSun = DoubleArray(0) // x,y,i,a,sigma at founding; render thread only
     private var sunChangeTick = -1L
+    /**
+     * The badge is a notice, not a monument (owner round 4 — the undo chip's finding, one round
+     * later: "move the sun and the bar stays up forever"). It wears the standing change for
+     * SUN_BADGE_SHOW_NS of real time after the sun was last touched, and every further touch of
+     * the sun re-arms it. What stands, stands whether or not the chrome says so; this is about
+     * how long the notice is news. Render thread only; the window is a field so the gate can
+     * shorten it.
+     */
+    private var lastSun = DoubleArray(0)
+    private var sunBadgeUntil = 0L
+    @Volatile var sunBadgeShowNs = SUN_BADGE_SHOW_NS
 
     /** Remember the sun as this world was founded; the badge measures departure from here. */
     private fun captureSunBaseline() {
         baseSun = if (Native.sourceCount() > 0) DoubleArray(5) { Native.sourceNum(0, it) }
                   else DoubleArray(0)
         sunChangeTick = -1L
+        lastSun = DoubleArray(0) // a founded sky is not a change: the next frame only re-reads it
+        sunBadgeUntil = 0L
     }
 
     /** Put the sun back as founded — the badge's tap, logged as the presses it is. */
@@ -669,6 +688,14 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             card = renderer.cardText(selI, selGen)
             clock = "t %d".format(Native.tick())
             // The standing-change badge (U2.3): does the sun differ from this world's founding?
+            // Freshness first (round 4): any change to the sun re-arms the notice; nothing else
+            // does, so an unrelated pour leaves it alone.
+            if (Native.sourceCount() > 0) {
+                val cur = DoubleArray(5) { Native.sourceNum(0, it) }
+                if (lastSun.size == 5 && !cur.contentEquals(lastSun))
+                    sunBadgeUntil = System.nanoTime() + sunBadgeShowNs
+                lastSun = cur
+            }
             if (baseSun.size == 5 && Native.sourceCount() > 0) {
                 val di = Native.sourceNum(0, 2) - baseSun[2]
                 val moved = hypot(wrapDelta(Native.sourceNum(0, 0) - baseSun[0]),
@@ -682,7 +709,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                     if (moved) what.append(" · ").append(s(R.string.sun_badge_moved))
                     what.append(" · ").append(
                         if (mins < 1) s(R.string.sun_badge_just) else s(R.string.sun_badge_standing, mins))
-                    sunBadge = what.toString()
+                    sunBadge = if (System.nanoTime() < sunBadgeUntil) what.toString() else ""
                 } else { sunChangeTick = -1L; sunBadge = "" }
             } else sunBadge = ""
             // Where the gripped sun is on screen this frame, for the drag-start test (U0.4).

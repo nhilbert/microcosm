@@ -152,6 +152,36 @@ class BootTest {
             assertTrue("putting the sun back must clear the badge", world.sunBadge.isEmpty())
             println("BOOT GATE: the standing-change badge appears on a moved sun and clears on restore")
 
+            // Round 4: the badge is a notice, not a monument. It leaves by itself while the
+            // change still stands, and any further touch of the sun brings it back. The window
+            // is shortened here; the shipped one is WorldView.SUN_BADGE_SHOW_NS.
+            world.sunBadgeShowNs = 1_500_000_000L
+            fun nudgeSun() {
+                val done = java.util.concurrent.CountDownLatch(1)
+                world.post {
+                    Native.ivPush(WorldView.IV_SOURCE)
+                    Native.evSource(0, Native.sourceNum(0, 0) + 128.0, Native.sourceNum(0, 1))
+                    done.countDown()
+                }
+                assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            }
+            fun awaitBadge(want: Boolean): Boolean {
+                val stop = System.currentTimeMillis() + 8000
+                while (world.sunBadge.isNotEmpty() != want && System.currentTimeMillis() < stop)
+                    Thread.sleep(10)
+                return world.sunBadge.isNotEmpty() == want
+            }
+            nudgeSun()
+            assertTrue("a moved sun must wear the badge", awaitBadge(true))
+            assertTrue("the badge must leave by itself while the change still stands",
+                awaitBadge(false))
+            nudgeSun()
+            assertTrue("touching the sun again must bring the badge back", awaitBadge(true))
+            world.sunBadgeShowNs = WorldView.SUN_BADGE_SHOW_NS
+            world.putSunBack()
+            assertTrue(awaitBadge(false))
+            println("BOOT GATE: the badge leaves on its own and a further sun change re-arms it")
+
             // And the gate the grip sits behind, made explicit: in Observe the same tap does
             // nothing — levers are Intervene's, and always were. Documented here because the
             // owner's "I never get to grip it" is exactly what Observe mode looks like.
