@@ -30,7 +30,12 @@ use crate::Sim;
 
 const MAGIC: &[u8; 4] = b"MCSM";
 /// Bump on any format change. Loading refuses versions it does not know.
-const VERSION: u32 = 1;
+///
+/// Version history:
+/// * 1 — the M3 format: world, settings, locus table, event log.
+/// * 2 — appends the running experiment (owner report 2026-09-02: "world state is saved but the
+///   fact that I run an experiment is not"). Version-1 files still load, with no level.
+const VERSION: u32 = 2;
 
 // ---------- little-endian writer / reader ----------
 
@@ -212,6 +217,18 @@ impl<'a> Rd<'a> {
         let mut v = Vec::with_capacity(n);
         for _ in 0..n {
             v.push(self.u32()? as usize);
+        }
+        Ok(v)
+    }
+    fn bytes_vec(&mut self) -> R<Vec<u8>> {
+        let n = self.u32()? as usize;
+        Ok(self.take(n)?.to_vec())
+    }
+    fn f64s_vec(&mut self) -> R<Vec<f64>> {
+        let n = self.u32()? as usize;
+        let mut v = Vec::with_capacity(n);
+        for _ in 0..n {
+            v.push(self.f64()?);
         }
         Ok(v)
     }
@@ -501,6 +518,45 @@ impl Sim {
             w.i64(e.t);
             write_event(&mut w, &e.ev);
         }
+
+        // version 2: the running experiment. The level definition is the shipped table's; only the
+        // RUN is state — keyed by the level's name, not its index, so a reordered table cannot
+        // silently swap one experiment for another. `rg_def` is derived from the definition
+        // (levels::collect_regions), so only the census ring itself is stored.
+        let l = &self.lvl;
+        match l.def() {
+            Some(def) if l.state != crate::levels::LvlState::Idle => {
+                w.u8(1);
+                w.u8s(def.key.as_bytes());
+                w.u8(match l.state {
+                    crate::levels::LvlState::Idle => 0,
+                    crate::levels::LvlState::Running => 1,
+                    crate::levels::LvlState::Passed => 2,
+                    crate::levels::LvlState::Failed => 3,
+                });
+                w.i32(l.run);
+                w.i64(l.seen_s);
+                w.i32(l.predicted);
+                w.i32(l.pour_left);
+                for b in l.mem {
+                    w.u8(b);
+                }
+                w.u32(l.fired as u32);
+                w.u32(l.src0 as u32);
+                // fail_why as a reference into the definition: -1 none, -2 timeout, else the
+                // fail_now rule that fired — the strings themselves stay in the shipped table
+                w.i32(if l.fail_why.is_empty() {
+                    -1
+                } else if l.fail_why == def.timeout_why {
+                    -2
+                } else {
+                    def.fail_now.iter().position(|r| r.why == l.fail_why).map_or(-2, |k| k as i32)
+                });
+                w.i64(l.rg_s);
+                w.f64s(&l.rg);
+            }
+            _ => w.u8(0),
+        }
         w.v
     }
 
@@ -512,9 +568,9 @@ impl Sim {
             return Err(LoadError("not a Microcosm snapshot (bad magic)".into()));
         }
         let ver = r.u32()?;
-        if ver != VERSION {
+        if ver < 1 || ver > VERSION {
             return Err(LoadError(format!(
-                "format version {}, this build reads {}",
+                "format version {}, this build reads 1..={}",
                 ver, VERSION
             )));
         }
@@ -689,6 +745,64 @@ impl Sim {
                 s.event_log.push(LoggedEvent { t, ev });
             }
             s.events.clear();
+        }
+
+        // The running experiment (version 2). Whatever level THIS session was in ends here: its
+        // verdicts would judge the loaded world against a run it never had. A version-1 file, or
+        // one saved outside a level, therefore loads into the sandbox.
+        self.lvl = crate::levels::Lvl::default();
+        if ver >= 2 && r.u8()? != 0 {
+            use crate::levels::{collect_regions, Lvl, LvlState, MAX_LATCH};
+            let key = String::from_utf8_lossy(&r.bytes_vec()?).into_owned();
+            let state = match r.u8()? {
+                1 => LvlState::Running,
+                2 => LvlState::Passed,
+                3 => LvlState::Failed,
+                t => return Err(LoadError(format!("level: unknown state {}", t))),
+            };
+            let run = r.i32()?;
+            let seen_s = r.i64()?;
+            let predicted = r.i32()?;
+            let pour_left = r.i32()?;
+            let mut mem = [0u8; MAX_LATCH];
+            for b in mem.iter_mut() {
+                *b = r.u8()?;
+            }
+            let fired = r.u32()? as usize;
+            let src0 = r.u32()? as usize;
+            let fail_code = r.i32()?;
+            let rg_s = r.i64()?;
+            let rg = r.f64s_vec()?;
+            // Resolve against the shipped table. A key this build does not carry, or a census
+            // ring whose shape no longer matches the definition, means the level itself has
+            // changed since the save: the world is still whole and loads; the experiment cannot
+            // honestly continue and is dropped rather than misjudged.
+            let idx = crate::levels_gen::LEVELS.iter().position(|d| d.key == key);
+            if let Some(idx) = idx {
+                let def = &crate::levels_gen::LEVELS[idx];
+                let rg_def = collect_regions(def);
+                if rg.len() == crate::params::REC_N * rg_def.len() && fired <= def.script.len() {
+                    self.lvl = Lvl {
+                        def: idx as i32,
+                        state,
+                        run,
+                        seen_s,
+                        fail_why: match fail_code {
+                            -1 => "",
+                            -2 => def.timeout_why,
+                            k => def.fail_now.get(k as usize).map_or(def.timeout_why, |f| f.why),
+                        },
+                        predicted,
+                        pour_left,
+                        mem,
+                        fired,
+                        src0,
+                        rg_def,
+                        rg,
+                        rg_s,
+                    };
+                }
+            }
         }
 
         // Derived state, rebuilt exactly as init_world builds it.

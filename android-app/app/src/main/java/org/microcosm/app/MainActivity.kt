@@ -116,6 +116,8 @@ class MainActivity : Activity() {
     private lateinit var sunBadgeView: TextView
     private lateinit var verdict: TextView
     internal lateinit var startPanel: LinearLayout // internal: the boot gate walks the front door
+    /** The front door's continue-the-experiment row — added after the fixed rows the boot gate walks. */
+    internal lateinit var continueRow: LinearLayout
     internal lateinit var expPanel: LinearLayout
     private val levels by lazy { Level.all(this) }
     private var running: Level? = null
@@ -269,9 +271,15 @@ class MainActivity : Activity() {
         val root = FrameLayout(this)
         world = WorldView(this)
         // The autosaved pond, restored before the render thread founds anything (U0.6). One pond
-        // you keep: backgrounding the app no longer costs the world.
-        world.bootWorld = try { autosaveFile().readFully() } catch (e: Exception) { null }
+        // you keep: backgrounding the app no longer costs the world. A running experiment
+        // autosaves to its own file (owner report 2026-09-02) and outranks the sandbox at boot —
+        // the player left mid-experiment, so mid-experiment is where the app comes back.
+        world.bootWorld = try { experimentFile().readFully() } catch (e: Exception) { null }
+            ?: try { autosaveFile().readFully() } catch (e: Exception) { null }
         root.addView(world, FrameLayout.LayoutParams(MATCH, MATCH))
+        // Once the render thread has consumed bootWorld, ask the core whether an experiment rode
+        // in the snapshot — this also re-adopts a live experiment after an activity recreation.
+        adoptCoreLevel()
 
         val top = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         // Developer telemetry, dev-mode only (U0.7); since U2.2 the whole TextView hides with it.
@@ -841,15 +849,32 @@ class MainActivity : Activity() {
         val hasAutosave = autosaveFile().baseFile.exists()
         startPanel.addView(startChoice(getString(R.string.choice_sandbox),
             getString(if (hasAutosave) R.string.sub_sandbox_resume else R.string.sub_sandbox_fresh)) {
-            world.stopLevel()
+            // Choosing the sandbox while an experiment is live is leaving the experiment: the
+            // pond that comes back is the one the subtitle promises — the kept sandbox from its
+            // own autosave file — never the experiment's world wearing sandbox clothes.
+            if (running != null) {
+                world.stopLevel()
+                experimentFile().delete()
+                val pond = try { autosaveFile().readFully() } catch (e: Exception) { null }
+                if (pond != null) world.load(pond) {} else world.resetWorld(kotlin.random.Random.nextInt(1, 100000))
+            }
             running = null
             lastVerdict = 0
+            refreshContinueRow(0)
             startPanel.visibility = ViewGroup.GONE
             world.speed = 1.0
         })
         startPanel.addView(startChoice(getString(R.string.choice_experiments), getString(R.string.sub_experiments)) {
             expPanel.visibility = ViewGroup.VISIBLE
         })
+        // The continue row (2026-09-02): a saved or paused experiment resumes from the door. It
+        // sits AFTER the two fixed rows, so the boot gate's child indices stay put.
+        continueRow = startChoice(getString(R.string.choice_continue_exp), "") {
+            startPanel.visibility = ViewGroup.GONE
+            world.speed = 1.0
+        }
+        continueRow.visibility = ViewGroup.GONE
+        startPanel.addView(continueRow)
         root.addView(startPanel, FrameLayout.LayoutParams(MATCH, MATCH))
 
         // The ladder, as a screen: every experiment open, none gated behind another.
@@ -868,7 +893,7 @@ class MainActivity : Activity() {
                 Style.dp(this@MainActivity, 24f), Style.dp(this@MainActivity, 12f))
         })
         val expList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        for (l in levels) expList.addView(startChoice("E${l.n}  ${l.title}", l.science) {
+        for (l in levels) expList.addView(expChoice(l) {
             expPanel.visibility = ViewGroup.GONE
             briefing(l)
         })
@@ -930,6 +955,55 @@ class MainActivity : Activity() {
     /** The autosave's own file (U0.6) — never the manual slot, which belongs to the player. */
     private fun autosaveFile() = android.util.AtomicFile(java.io.File(filesDir, "autosave.mcsm"))
 
+    /**
+     * A running experiment's autosave (2026-09-02). Its own file, so pausing mid-experiment can
+     * never clobber the kept sandbox pond — the two worlds coexist on disk, and the front door
+     * offers both. Deleted when the player leaves the experiment for the sandbox, or when a
+     * sandbox pause writes a fresher world.
+     */
+    private fun experimentFile() = android.util.AtomicFile(java.io.File(filesDir, "experiment.mcsm"))
+
+    /**
+     * After a load, the core says whether an experiment rode in the snapshot (format v2) — the
+     * shell adopts it: running level, meter labels, deadline, the front door's continue row. A
+     * level-free world clears any experiment the shell thought it was in, so its verdicts can
+     * never judge a foreign world. Read on the render thread, applied on the UI thread.
+     */
+    internal fun adoptCoreLevel() {
+        world.post {
+            val st = Native.levelNum(0).toInt()
+            val idx = Native.levelNum(1).toInt()
+            runOnUiThread {
+                if (st != 0 && idx >= 0 && idx < levels.size) {
+                    val l = levels[idx]
+                    running = l
+                    lastVerdict = 0
+                    verdict.visibility = ViewGroup.GONE
+                    world.meterLabels = l.meterLabels
+                    world.meterUnits = l.meterUnits
+                    world.levelDeadline = l.deadline
+                } else if (running != null) {
+                    running = null
+                    lastVerdict = 0
+                    verdict.visibility = ViewGroup.GONE
+                }
+                refreshContinueRow(st)
+            }
+        }
+    }
+
+    /** The front door's third row: visible only while an experiment is live to continue. */
+    private fun refreshContinueRow(st: Int = world.levelState) {
+        val l = running
+        if (l != null && st != 0) {
+            (continueRow.getChildAt(1) as TextView).text =
+                getString(R.string.sub_continue_exp, l.n, l.title)
+            continueRow.visibility = ViewGroup.VISIBLE
+        } else {
+            continueRow.visibility = ViewGroup.GONE
+        }
+    }
+
     private fun writeAtomic(f: android.util.AtomicFile, bytes: ByteArray): Boolean {
         var out: java.io.FileOutputStream? = null
         return try {
@@ -959,6 +1033,8 @@ class MainActivity : Activity() {
                     if (bytes == null) toast(getString(R.string.toast_load_unreadable))
                     else world.load(bytes) { ok ->
                         toast(getString(if (ok) R.string.toast_loaded else R.string.toast_not_world))
+                        // the loaded snapshot may carry an experiment — or end the current one
+                        if (ok) adoptCoreLevel()
                     }
                 }
             }
@@ -997,10 +1073,54 @@ class MainActivity : Activity() {
             })
         }
 
+    /**
+     * An experiment row: the level's captured moment beside its words. The picture comes from
+     * assets/levels/<key>.jpg (photographed from real gameplay by tools/level-thumbs.js); a
+     * level without one gets the words alone — the portraits' missing-art contract.
+     */
+    private fun expChoice(l: Level, onTap: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Style.touchable(this@MainActivity, Style.card(this@MainActivity))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                leftMargin = Style.dp(this@MainActivity, 24f)
+                rightMargin = Style.dp(this@MainActivity, 24f)
+                bottomMargin = Style.dp(this@MainActivity, 14f)
+            }
+            setPadding(Style.dp(this@MainActivity, 16f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f))
+            setOnClickListener { onTap() }
+            Profiles.levelThumb(this@MainActivity, l.key)?.let { bm ->
+                addView(PortraitView(this@MainActivity).apply { show(bm) },
+                    LinearLayout.LayoutParams(Style.dp(this@MainActivity, 56f),
+                        Style.dp(this@MainActivity, 56f)).apply {
+                        rightMargin = Style.dp(this@MainActivity, 14f)
+                    })
+            }
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(this@MainActivity).apply {
+                    text = "E${l.n}  ${l.title}"
+                    setTextColor(Style.BRIGHT)
+                    textSize = 17f
+                    typeface = Style.wordMedium(this@MainActivity)
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = l.science
+                    setTextColor(Style.DIM)
+                    textSize = 13f
+                    typeface = Style.word(this@MainActivity)
+                    setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+
     /** Show the front door mid-session: the pond pauses, saved, and the subtitle tells the truth. */
     private fun showStart(sub: String) {
         world.speed = 0.0
         (startPanel.getChildAt(2) as LinearLayout).let { (it.getChildAt(1) as TextView).text = sub }
+        refreshContinueRow()
         startPanel.visibility = ViewGroup.VISIBLE
     }
 
@@ -1394,9 +1514,10 @@ class MainActivity : Activity() {
             world.wallArmed -> world.wallArmed = false
             world.intervene -> world.intervene = false
             else -> {
-                // Top level: back goes to the front door, with the sandbox saved first. The
-                // experiment list stays one back-press away for the whole session.
-                if (running == null) world.save { bytes -> writeAtomic(autosaveFile(), bytes) }
+                // Top level: back goes to the front door, with the pond saved first — to its own
+                // file per world (sandbox or experiment, see autosave()). The experiment list
+                // stays one back-press away for the whole session.
+                autosave()
                 showStart(getString(if (running != null) R.string.start_sub_behind_experiment
                                     else R.string.start_sub_as_stands))
             }
@@ -1411,13 +1532,35 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         ui.removeCallbacks(tickHud)
-        // U0.6: the sandbox autosaves when the app goes to the background — before this, losing
-        // the process lost the world with a working save slot a few lines away. Levels are not
-        // autosaved: the snapshot carries the world and not the level runtime, and a restored
-        // half-experiment would be a lie. Best effort by nature: the save is queued to the render
-        // thread, which normally turns it around within a frame, but a process killed faster
-        // keeps the previous autosave — atomically, never a torn file.
-        if (running == null) world.save { bytes -> writeAtomic(autosaveFile(), bytes) }
+        autosave()
+    }
+
+    /**
+     * U0.6: the pond autosaves when the app goes to the background — before this, losing the
+     * process lost the world with a working save slot a few lines away. Since 2026-09-02 the
+     * snapshot carries the level runtime (format v2), so an experiment autosaves too — the
+     * earlier "levels are never autosaved" decision existed only because a restored
+     * half-experiment would have been a lie, and the owner's report overturned it the day the
+     * snapshot could tell the truth. Each world keeps its own file, so an experiment can never
+     * clobber the kept sandbox pond. Best effort by nature: the save is queued to the render
+     * thread, which normally turns it around within a frame, but a process killed faster keeps
+     * the previous autosave — atomically, never a torn file.
+     */
+    private fun autosave() {
+        // The core is the authority on whether an experiment is live — the shell's `running`
+        // can lag it for a frame around boot, and misrouting once would clobber the sandbox.
+        world.post {
+            val live = Native.levelNum(0).toInt() != 0
+            val bytes = Native.save()
+            ui.post {
+                if (live) {
+                    writeAtomic(experimentFile(), bytes)
+                } else {
+                    writeAtomic(autosaveFile(), bytes)
+                    experimentFile().delete() // a sandbox pause means no experiment is live any more
+                }
+            }
+        }
     }
 
     private companion object {

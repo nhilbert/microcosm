@@ -40,6 +40,7 @@ UI_PARTS = [
     "src/ui-data.jsx",    # Data mode: the Observatory's screen
     "src/ui-reset.jsx",   # reset control
     "src/ui.jsx",         # the Microcosm component
+    "src/ui-thumbs.js",   # GENERATED level thumbnails (tools/level-thumbs.js)
     "src/ui-levels.jsx",  # start screen, level HUD, the app shell (default export)
 ]
 
