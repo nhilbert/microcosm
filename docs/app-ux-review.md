@@ -120,6 +120,28 @@ Not complained about, found while looking:
 None of this is surprising for a shell built in six increments in one night, and the plan records it
 rather than smoothing it over (rule 6).
 
+### 2.1 A browser finding, turned up while reworking the specimen panel (2026-09-02)
+
+The owner asked for three things on the specimen page: icons instead of the words *Feed* and
+*Kill*, a close icon beside the drag gesture, and identity before instrumentation — the photo, the
+name, what the species does and its reserves in the peek, with the measurements, the genome and the
+profile behind the second detent instead of the other way round. All three shipped in
+`src/ui.jsx`; the peek is 212 px, measured against its own content (176 px) rather than guessed.
+
+Measuring the new close icon turned up a defect the *shipped* gesture had too. Closing the sheet
+only cleared `ui.card`, and the 500 ms UI loop rebuilds the card from the live selection — so the
+sheet reopened by itself within half a second. Verified in a browser rather than reasoned about:
+gone right after the drag, back 1.2 s later. Letting go of a specimen is now one action
+(`deselect`, which clears the selection as well), used by the gesture, both close icons and Esc.
+The reset control also rode on a hard-coded offset tuned for the old 178 px peek; it follows the
+same stack as the speed control now and steps aside with it when the sheet is more than a peek.
+
+Two consequences for the app. The Kotlin specimen card is a `TextView` with no photo, no profile
+and no close control, so it inherits none of this yet — the reorder is a design decision the app
+should copy, not a repair. And the reopening close is a *class* of bug worth hunting wherever the
+app mirrors state the core owns: a control that appears to do something the render loop undoes on
+the next frame.
+
 ---
 
 ## 3. Three positions worth arguing against ourselves

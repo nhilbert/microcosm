@@ -15,6 +15,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
   const dragRef = useRef(null);
   const [hidden, setHidden] = useState([false,false,false,false,false,false,false,false,false,false]); // per-species show/hide (view only); 7 = debris, 8 = light layer, 9 = heat layer
   const hiddenRef = useRef(hidden); hiddenRef.current = hidden;
+  const pickRef = useRef(null); pickRef.current = ui.spawnPick;   // Esc reads it from outside its effect
 
   useEffect(() => {
     initWorld();
@@ -182,6 +183,9 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
           pushUndo(`Killed ${nm} · Undo`, () => { logIv("undo"); queueEvent({ type:"revive", snap }); });
         }});
       },
+      // Letting go of a specimen. ui.card alone is not enough -- the UI loop rebuilds the card from
+      // sel every 500 ms, so a close that leaves sel standing reopens itself.
+      deselect: () => { sel.i = -1; follow = false; setUi(u => ({ ...u, card: null, chips: null })); },
       setMode: m => { mode = m; if (m === "intervene") follow = false;
         else { if (srcSel >= 0) actionsRef.current.selectSource(-1);
                if (wallSel >= 0) actionsRef.current.selectWall(-1);
@@ -533,7 +537,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
     return () => ro.disconnect();
   }, []);
   const sheetUp = !desktop && (!!ui.card || srcOpen || wallOpen);        // a bottom sheet is up: lift the controls
-  const sheetPad = wallOpen ? 312 : srcOpen ? 262 : 194;
+  const sheetPad = wallOpen ? 312 : srcOpen ? 262 : CARD_PEEK + 16;
   const srcLog = (type, label, undoFn) => { W.evLog.push({ tick: W.tick, type });
     actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt(label + " · Undo", undoFn); };
 
@@ -566,7 +570,8 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
         actionsRef.current.disarmWall && actionsRef.current.disarmWall();
         actionsRef.current.selectWall && actionsRef.current.selectWall(-1);
         actionsRef.current.selectSource && actionsRef.current.selectSource(-1);
-        setUi(u => u.spawnPick ? { ...u, spawnPick: null } : { ...u, card: null });
+        if (pickRef.current) setUi(u => ({ ...u, spawnPick: null }));
+        else actionsRef.current.deselect && actionsRef.current.deselect();
         setUiMode(m => { if (m === "data"){ actionsRef.current.setMode && actionsRef.current.setMode("observe"); return "observe"; } return m; });
       }
     };
@@ -715,7 +720,10 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       </div>
       )}
       {uiMode === "data" && !desktop && <DataMode topH={topH} />}
-      <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()} card={sheetUp} />
+      {(srcOpen || wallOpen || !ui.card || detent === 0 || desktop) && (
+        <ResetButton onReset={() => actionsRef.current.reset && actionsRef.current.reset()}
+          lift={sheetUp ? sheetPad + 64 : 0} />
+      )}
       {/* Phase 8: the experiment verdict card (src/ui-levels.jsx). The objective
           chip and the home control ride in the top stack above. */}
       <LevelVerdict onExit={onExit} onLevel={onLevel}
@@ -775,7 +783,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       {undoChip && (
         <button onClick={() => actionsRef.current.undo && actionsRef.current.undo()}
           style={{ position:"absolute", left:"50%", transform:"translateX(-50%)",
-            bottom: sheetUp ? ((srcOpen || wallOpen) ? sheetPad + 64 : detent===0 ? 194 + 64 : detent===1 ? "48vh" : "82vh")
+            bottom: sheetUp ? ((srcOpen || wallOpen) ? sheetPad + 64 : detent===0 ? CARD_PEEK + 16 + 64 : detent===1 ? "48vh" : "82vh")
                             : "calc(env(safe-area-inset-bottom, 0px) + 88px)",
             padding:"10px 18px", borderRadius:20, cursor:"pointer",
             border:"1px solid rgba(242,178,74,0.7)", background:"rgba(21,34,51,0.95)",
@@ -787,7 +795,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       {/* specimen card — bottom sheet on mobile, docked panel on desktop */}
       {ui.card && !desktop && !srcOpen && !wallOpen && (
         <div style={{ position:"absolute", left:0, right:0, bottom:0,
-          height: detent===0 ? 178 : detent===1 ? "46vh" : "80vh",
+          height: detent===0 ? CARD_PEEK : detent===1 ? "46vh" : "80vh",
           background:"rgba(21,34,51,0.92)", backdropFilter:"blur(10px)",
           borderTop:"1px solid rgba(94,115,134,0.35)", borderRadius:"16px 16px 0 0",
           color:COL.plankTxt, transition:"height 0.18s ease-out",
@@ -798,11 +806,19 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
               const d = dragRef.current; dragRef.current = null; if (!d) return;
               const dy = e.clientY - d.y;
               if (dy < -40) setDetent(v => Math.min(2, v+1));
-              else if (dy > 40) setDetent(v => { if (v === 0){ setUi(u => ({ ...u, card: null })); return 0; } return v-1; });
+              else if (dy > 40) setDetent(v => { if (v === 0){ actionsRef.current.deselect(); return 0; } return v-1; });
             }}
-            style={{ padding:"16px 0 14px", cursor:"grab", touchAction:"none", flexShrink:0 }}>
+            style={{ padding:"16px 0 16px", cursor:"grab", touchAction:"none", flexShrink:0 }}>
             <div style={{ width:40, height:4, borderRadius:2, background:"rgba(94,115,134,0.7)", margin:"0 auto" }} />
           </div>
+          {/* the drag down still closes the sheet; this is the same exit for a thumb that does not
+              know the gesture yet. Grey, not amber -- closing a panel is not a hand in the world. */}
+          <button className="mc-hit" onClick={() => actionsRef.current.deselect()}
+            title="Close" aria-label="Close the specimen panel"
+            style={{ position:"absolute", right:10, top:1, zIndex:2, width:34, height:34, borderRadius:10,
+              display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer",
+              border:"1px solid rgba(94,115,134,0.3)", background:"rgba(11,19,30,0.45)",
+              color:COL.silt, fontSize:13, lineHeight:1 }}>✕</button>
           <div className="mc-scroll" style={{ padding:"0 18px calc(env(safe-area-inset-bottom, 0px) + 14px)",
             overflowY: detent>=1 ? "auto" : "hidden", flex:1 }}>
             <SpecimenBody card={ui.card} tick={ui.tick} detail={detent}
@@ -915,7 +931,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
             <>
               <div style={{ display:"flex", alignItems:"center", padding:"14px 16px 10px", flexShrink:0 }}>
                 <span style={{ fontSize:11, letterSpacing:1.4, color:COL.silt, fontFamily:mono }}>SPECIMEN</span>
-                <button className="mc-hit" onClick={() => setUi(u => ({ ...u, card: null }))}
+                <button className="mc-hit" onClick={() => actionsRef.current.deselect()}
                   title="Close (Esc)"
                   style={{ marginLeft:"auto", width:28, height:28, borderRadius:8, cursor:"pointer",
                     border:"1px solid rgba(94,115,134,0.3)", background:"transparent",
@@ -1045,41 +1061,69 @@ function EvolutionPanel({ desktop, mono, onLog }){
     </div>
   );
 }
+// The peek detent of the specimen sheet: tall enough for the photo, who it is, and the reserves.
+const CARD_PEEK = 212;
+// Action icons for the specimen. Drawn rather than written: the two buttons sit side by side in a
+// sheet that is mostly world, and the words crowded it. An icon is never the whole label, so both
+// carry title + aria-label. Amber marks the hand either way (rule 7).
+function IcoFeed(){
+  return (
+    <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.7"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d="M12 3.2c3.7 4.3 5.6 7.2 5.6 9.6a5.6 5.6 0 0 1-11.2 0c0-2.4 1.9-5.3 5.6-9.6Z" />
+      <path d="M12 10.6v4.4M9.8 12.8h4.4" />
+    </svg>
+  );
+}
+function IcoKill(){
+  return (
+    <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.7"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d="M5.2 11.4a6.8 6.8 0 0 1 13.6 0v2.9c0 .78-.5 1.47-1.24 1.71l-1.16.38v1.8c0 .66-.54 1.2-1.2 1.2H8.8c-.66 0-1.2-.54-1.2-1.2v-1.8l-1.16-.38A1.8 1.8 0 0 1 5.2 14.3Z" />
+      <circle cx="9.4" cy="11.7" r="1.75" fill="currentColor" stroke="none" />
+      <circle cx="14.6" cy="11.7" r="1.75" fill="currentColor" stroke="none" />
+      <path d="M12 14.7v1.7" />
+    </svg>
+  );
+}
 // Specimen detail. One implementation for both layouts: the mobile sheet passes
 // its detent, the desktop dock passes 2 (everything visible, nothing to drag).
+// Identity before instrumentation: the photo, the name, what the species does and its reserves
+// are all in the peek, because that is what the player asked the world by tapping. The
+// measurements, the genome and the profile are what the second detent is for.
 function SpecimenBody({ card, tick, detail, onFeed, onKill }){
   const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
   if (!card) return null;
+  const pf = SPECIES_PROFILE[card.sp];
+  const rgb = `rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})`;
+  const thumb = detail >= 1 ? 128 : 84;   // the photo breathes with the detent; it never leaves
   return (
     <>
-      <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
-        <span style={{ width:10, height:10, borderRadius:5, flexShrink:0, alignSelf:"center",
-          background:`rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})`,
-          boxShadow:`0 0 8px rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})` }} />
-        <span style={{ fontSize:17, fontWeight:600 }}>{card.name}</span>
-        <span style={{ fontSize:12, color:COL.silt }}>{card.role}</span>
-        <span style={{ marginLeft:"auto", fontSize:11, color:COL.silt, fontFamily:mono }}>#{card.id}</span>
-      </div>
-      <div style={{ display:"flex", gap:16, marginTop:8, fontSize:13, alignItems:"center", flexWrap:"wrap" }}>
-        <span>{card.state}</span>
-        <span style={{ color:COL.silt }}>age {Math.floor(card.age/60)}:{String(card.age%60).padStart(2,"0")}</span>
-        <span style={{ marginLeft:"auto", fontSize:11, fontWeight:600, padding:"3px 9px", borderRadius:9,
-          background: card.badge==="Ready to divide" ? "rgba(70,214,140,0.15)" : "rgba(94,115,134,0.22)",
-          color: card.badge==="Ready to divide" ? "rgb(70,214,140)" : COL.plankTxt }}>
-          {card.badge}</span>
-      </div>
-      {detail >= 1 && SPECIES_PROFILE[card.sp] && (
-        <img src={`assets/species/${SPECIES_PROFILE[card.sp].key}.jpg`} alt="" onError={e => { e.currentTarget.style.display = "none"; }}
-          style={{ display:"block", width:"100%", maxHeight:200, objectFit:"cover", borderRadius:12, marginTop:12,
-            border:"1px solid rgba(94,115,134,0.3)" }} />
-      )}
-      {detail >= 1 && SPECIES_PROFILE[card.sp] && (
-        <div style={{ marginTop:10, fontSize:12.5, lineHeight:1.55 }}>
-          {SPECIES_PROFILE[card.sp].intro}
+      <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+        {pf && (
+          <img src={`assets/species/${pf.key}.jpg`} alt="" onError={e => { e.currentTarget.style.display = "none"; }}
+            style={{ width:thumb, height:thumb, flexShrink:0, objectFit:"cover", borderRadius:12,
+              border:"1px solid rgba(94,115,134,0.3)", transition:"width 0.18s ease-out, height 0.18s ease-out" }} />
+        )}
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
+            <span style={{ width:10, height:10, borderRadius:5, flexShrink:0, alignSelf:"center",
+              background:rgb, boxShadow:`0 0 8px ${rgb}` }} />
+            <span style={{ fontSize:17, fontWeight:600 }}>{card.name}</span>
+            <span style={{ marginLeft:"auto", fontSize:11, color:COL.silt, fontFamily:mono }}>#{card.id}</span>
+          </div>
+          <div style={{ fontSize:12, color:COL.silt, marginTop:3 }}>{card.role}</div>
+          {pf && (
+            <div style={{ marginTop:6, fontSize:12.5, lineHeight:1.5,
+              ...(detail >= 1 ? {} : { display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical",
+                                       overflow:"hidden" }) }}>
+              {pf.intro}
+            </div>
+          )}
         </div>
-      )}
-      <div style={{ marginTop:10, display:"grid", gap:5 }}>
-        {[["E", card.en, card.cap, `rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})`],
+      </div>
+      <div style={{ marginTop:12, display:"grid", gap:5 }}>
+        {[["E", card.en, card.cap, rgb],
           ["P", card.pr, card.pQ, "rgb(226,170,150)"],
           ["M", card.mn, card.mQ, "rgb(91,200,232)"]].map(([lb, v, mx, col]) => (
           <div key={lb} style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -1093,7 +1137,31 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
         ))}
       </div>
       {detail >= 1 && (
-        <div style={{ marginTop:16, fontSize:13, display:"grid",
+        <div style={{ display:"flex", gap:10, marginTop:16 }}>
+          <button className="mc-hit mc-hit-amber" onClick={onFeed} title="Feed" aria-label="Feed this specimen"
+            style={{ flex:1, height:46, borderRadius:10, cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              border:"1px solid rgba(242,178,74,0.6)", background:"rgba(242,178,74,0.12)",
+              color:"#F2B24A" }}><IcoFeed /></button>
+          <button className="mc-hit-solid" onClick={onKill} title="Kill" aria-label="Kill this specimen"
+            style={{ flex:1, height:46, borderRadius:10, cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              border:"1px solid rgba(242,178,74,0.9)", background:"rgba(242,178,74,0.85)",
+              color:"#0B131E" }}><IcoKill /></button>
+        </div>
+      )}
+      {detail >= 1 && (
+        <div style={{ display:"flex", gap:16, marginTop:16, fontSize:13, alignItems:"center", flexWrap:"wrap" }}>
+          <span>{card.state}</span>
+          <span style={{ color:COL.silt }}>age {Math.floor(card.age/60)}:{String(card.age%60).padStart(2,"0")}</span>
+          <span style={{ marginLeft:"auto", fontSize:11, fontWeight:600, padding:"3px 9px", borderRadius:9,
+            background: card.badge==="Ready to divide" ? "rgba(70,214,140,0.15)" : "rgba(94,115,134,0.22)",
+            color: card.badge==="Ready to divide" ? "rgb(70,214,140)" : COL.plankTxt }}>
+            {card.badge}</span>
+        </div>
+      )}
+      {detail >= 1 && (
+        <div style={{ marginTop:14, fontSize:13, display:"grid",
           gridTemplateColumns:"repeat(auto-fit, minmax(128px, 1fr))", gap:"10px 16px" }}>
           <div><div style={{fontSize:11,color:COL.silt}}>SIZE</div>{card.size.toFixed(1)}</div>
           <div><div style={{fontSize:11,color:COL.silt}}>ENERGY</div>{card.en.toFixed(1)} / {card.cap.toFixed(0)}</div>
@@ -1118,7 +1186,7 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
             <div style={{ flex:1, height:4, borderRadius:2, background:"rgba(11,19,30,0.8)", position:"relative" }}>
               <div style={{ position:"absolute", left:`${h.g0*100}%`, top:-3, width:1, height:10, background:"rgba(201,215,227,0.45)" }} />
               <div style={{ position:"absolute", left:`calc(${h.g*100}% - 3px)`, top:-1, width:6, height:6, borderRadius:3,
-                background:`rgb(${card.rgb[0]},${card.rgb[1]},${card.rgb[2]})` }} />
+                background:rgb }} />
             </div>
           </div>
           <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:COL.silt, marginTop:2 }}>
@@ -1131,19 +1199,7 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
           </div>
         </div>
       ))}
-      {detail >= 1 && (
-        <div style={{ display:"flex", gap:10, marginTop:18 }}>
-          <button className="mc-hit mc-hit-amber" onClick={onFeed}
-            style={{ flex:1, height:44, borderRadius:10, cursor:"pointer",
-              border:"1px solid rgba(242,178,74,0.6)", background:"rgba(242,178,74,0.12)",
-              color:"#F2B24A", fontSize:14, fontWeight:600 }}>Feed</button>
-          <button className="mc-hit-solid" onClick={onKill}
-            style={{ flex:1, height:44, borderRadius:10, cursor:"pointer",
-              border:"1px solid rgba(242,178,74,0.9)", background:"rgba(242,178,74,0.85)",
-              color:"#0B131E", fontSize:14, fontWeight:600 }}>Kill</button>
-        </div>
-      )}
-      {detail >= 1 && SPECIES_PROFILE[card.sp] && (() => { const pf = SPECIES_PROFILE[card.sp]; return (
+      {detail >= 1 && pf && (
         <div style={{ marginTop:18, fontSize:12, lineHeight:1.5 }}>
           <div style={{ fontSize:11, color:COL.silt, letterSpacing:1.2 }}>PROFILE</div>
           <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"5px 12px", marginTop:8 }}>
@@ -1154,7 +1210,8 @@ function SpecimenBody({ card, tick, detail, onFeed, onKill }){
                 <span>{v}</span>
               </React.Fragment>))}
           </div>
-        </div> ); })()}
+        </div>
+      )}
       {detail >= 1 && (
         <div style={{ marginTop:18, fontSize:12, color:COL.silt, lineHeight:1.5 }}>
           Amber marks your hand: everything you do to the world, as opposed to what
