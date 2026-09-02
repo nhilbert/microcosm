@@ -193,7 +193,7 @@ class Renderer(private val density: Double = 1.0) {
         if (layers.hasWalls) paintLayer(c, layers.walls, cam, vw, vh)
 
         paintOrganisms(c)
-        paintCorpses(c)
+        paintCorpses(c, cam, vw, vh)
         // The selection ring is an affordance, above the world and never additive. Slate, not
         // amber: amber is the player's hand on the world, and looking is not touching.
         if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0) {
@@ -373,7 +373,20 @@ class Renderer(private val density: Double = 1.0) {
      * shape as it rots — every visible change is driven by the simulation, never by a UI clock.
      * A starved body starts lean and its husk starts already sunken: honest by construction.
      */
-    private fun paintCorpses(c: Canvas) {
+    /**
+     * The one UI-clock moment in the corpse story: a husk that was not on screen last frame
+     * settles in over ~0.4 s (fade + a slight deflate), so the living body's disappearance and
+     * the husk's arrival overlap perceptually instead of cutting. Same category as the amber
+     * pour ring — a one-shot event transition, not idle ornament; after it, every change is the
+     * sim's own decay clock again. Corpses never move, so world position identifies them; the
+     * map is primitive-keyed (no boxing) and swept when it grows past its high-water mark.
+     */
+    private val corpseSeen = HashMap<Long, Long>()
+    private var corpseSweep = 0
+
+    private fun paintCorpses(c: Canvas, cam: Camera, vw: Float, vh: Float) {
+        val now = System.nanoTime()
+        if (++corpseSweep >= 600 && corpseSeen.size > 2048) { corpseSweep = 0; corpseSeen.clear() }
         for (q in 0 until corpseN) {
             val b = q * corpseStride
             val sx = corpseBuf.get(b).toFloat()
@@ -382,15 +395,24 @@ class Renderer(private val density: Double = 1.0) {
             val a = corpseBuf.get(b + 3)
             val sp = corpseBuf.get(b + 4).toInt().coerceIn(0, 6)
             val fresh = (corpseBuf.get(b + 5) / 8.0).coerceIn(0.0, 1.0).toFloat()
+            // arrival transition: keyed by quantized world position (corpses never move)
+            val wx = cam.x + (sx - vw / 2.0) / cam.z
+            val wy = cam.y + (sy - vh / 2.0) / cam.z
+            val key = (Math.round(((wx % 1024.0 + 1024.0) % 1024.0) * 4.0) shl 13) or
+                Math.round(((wy % 1024.0 + 1024.0) % 1024.0) * 4.0)
+            var seen = corpseSeen[key] ?: 0L
+            if (seen == 0L) { seen = now; corpseSeen[key] = seen }
+            val arrive = ((now - seen) / 4e8).coerceIn(0.0, 1.0).toFloat()
+            val aa = a * arrive
             val col = speciesRGB[sp]
             val t = fresh * 0.45f // colour ghost strength: fresh tinted, decayed grey
             val cr = (CORPSE_GRAY[0] + (col[0] - CORPSE_GRAY[0]) * t).toInt()
             val cg = (CORPSE_GRAY[1] + (col[1] - CORPSE_GRAY[1]) * t).toInt()
             val cb = (CORPSE_GRAY[2] + (col[2] - CORPSE_GRAY[2]) * t).toInt()
-            val rr = r * (0.7f + 0.3f * fresh) // deflates as the mass leaves
+            val rr = r * (0.7f + 0.3f * fresh) * (1.1f - 0.1f * arrive) // deflates as the mass leaves; settles on arrival
             if (rr < 8f * dp) { // far tier: the old simple husk
                 flat.style = Paint.Style.FILL
-                flat.color = Color.argb((a * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
+                flat.color = Color.argb((aa * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
                 c.drawCircle(sx, sy, rr, flat)
                 continue
             }
@@ -406,14 +428,14 @@ class Renderer(private val density: Double = 1.0) {
             }
             rayPath.close()
             flat.style = Paint.Style.FILL
-            flat.color = Color.argb((a * 0.6 * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
+            flat.color = Color.argb((aa * 0.6 * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
             c.drawPath(rayPath, flat)
             flat.style = Paint.Style.STROKE
             flat.strokeWidth = 1f * dp
-            flat.color = Color.argb((a * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
+            flat.color = Color.argb((aa * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
             c.drawPath(rayPath, flat)
             flat.style = Paint.Style.FILL // the inner fold — the collapsed contents
-            flat.color = Color.argb((a * 0.7 * 255).roundToInt().coerceIn(0, 255),
+            flat.color = Color.argb((aa * 0.7 * 255).roundToInt().coerceIn(0, 255),
                 cr * 8 / 10, cg * 8 / 10, cb * 8 / 10)
             c.drawCircle(sx + rr * 0.2f, sy - rr * 0.15f, rr * 0.3f, flat)
         }
