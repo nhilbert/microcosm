@@ -893,7 +893,7 @@ class MainActivity : Activity() {
                 Style.dp(this@MainActivity, 24f), Style.dp(this@MainActivity, 12f))
         })
         val expList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        for (l in levels) expList.addView(startChoice("E${l.n}  ${l.title}", l.science) {
+        for (l in levels) expList.addView(expChoice(l) {
             expPanel.visibility = ViewGroup.GONE
             briefing(l)
         })
@@ -1071,6 +1071,49 @@ class MainActivity : Activity() {
                 typeface = Style.word(this@MainActivity)
                 setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
             })
+        }
+
+    /**
+     * An experiment row: the level's captured moment beside its words. The picture comes from
+     * assets/levels/<key>.jpg (photographed from real gameplay by tools/level-thumbs.js); a
+     * level without one gets the words alone — the portraits' missing-art contract.
+     */
+    private fun expChoice(l: Level, onTap: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Style.touchable(this@MainActivity, Style.card(this@MainActivity))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                leftMargin = Style.dp(this@MainActivity, 24f)
+                rightMargin = Style.dp(this@MainActivity, 24f)
+                bottomMargin = Style.dp(this@MainActivity, 14f)
+            }
+            setPadding(Style.dp(this@MainActivity, 16f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f))
+            setOnClickListener { onTap() }
+            Profiles.levelThumb(this@MainActivity, l.key)?.let { bm ->
+                addView(PortraitView(this@MainActivity).apply { show(bm) },
+                    LinearLayout.LayoutParams(Style.dp(this@MainActivity, 56f),
+                        Style.dp(this@MainActivity, 56f)).apply {
+                        rightMargin = Style.dp(this@MainActivity, 14f)
+                    })
+            }
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(this@MainActivity).apply {
+                    text = "E${l.n}  ${l.title}"
+                    setTextColor(Style.BRIGHT)
+                    textSize = 17f
+                    typeface = Style.wordMedium(this@MainActivity)
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = l.science
+                    setTextColor(Style.DIM)
+                    textSize = 13f
+                    typeface = Style.word(this@MainActivity)
+                    setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
 
     /** Show the front door mid-session: the pond pauses, saved, and the subtitle tells the truth. */

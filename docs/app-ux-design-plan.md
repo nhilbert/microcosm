@@ -367,3 +367,35 @@ experiment's narration and Data pages start fresh — verdicts are unaffected be
 samples travel as state (seenS, run, latches); the census strip in the level HUD resumes within
 a sample (20 ticks). Levels are still never autosaved DURING a run below onPause granularity;
 a hard kill between pauses loses since-pause progress, as the sandbox always has.
+
+## 12. TH — experiment-menu thumbnails from gameplay (owner request, 2026-09-02)
+
+One small picture per experiment, on both menus (browser start screen, app experiments list),
+and a tool that makes them: `tools/level-thumbs.js` (`npm run thumbs`).
+
+- **Captured from gameplay, not drawn**: the tool plays each level in the real browser UI
+  (the playthrough instrument's approach — dev server, headless Chromium, genuine gestures)
+  and photographs a 160px square of the world canvas. The camera work is all player-reachable
+  input: observe-mode drags to pan, wheel notches to zoom, a pause so the framing and the
+  frame agree. The owner's requirement — main actors and concept IN the picture — is met by a
+  per-level shot spec: a tick, a world point, a zoom, and where the level's actor is absent
+  from the null run, a scripted act (L5 seeds the grazer pack, L6 the Venator pack, which
+  founds as cysts and needs ~1,200 ticks to hatch into the frame).
+- **The core finds its own actors**: an untouched level run is deterministic (pinned seed,
+  draw-free founding), so for `actor:` specs the tool pauses, reads the tick the pause landed
+  on, replays the level headlessly to exactly that tick (the levels-gate drive loop:
+  levelStart + levelScript + step) and centres the camera on that species' densest cluster.
+  The first guessed-coordinate captures were empty water — L1's founders scatter over the
+  whole torus; the exact replay is what made the actors findable.
+- **One committed home, two consumers**: `assets/levels/<key>.jpg` rides into the APK beside
+  the species portraits (`Profiles.levelThumb`, PortraitView row in the experiments list) and
+  is inlined as data URIs into the single-file artifact (generated `src/ui-thumbs.js`, in
+  build.py's UI parts; artifact +67 KB). Missing file = no picture, never a placeholder.
+- **Gates**: `npm test` green with conformance bit-identical (UI-only — dist/core.js does not
+  carry the module); the boot gate lays out the experiments panel and requires at least one
+  thumbnail measured at real size (SP's VISIBLE-but-never-measured lesson); layout gate
+  unchanged at zero violations.
+- Recorded honestly: captures ride the live render loop, so the jpgs are not bit-reproducible
+  between runs (±a few ticks) — a curation tool, not a gate. Regeneration is deliberate.
+  L7's picture is the lonely risen sun on dark water by design: the level's concept is that
+  nothing is there until something is carried there.
