@@ -32,7 +32,6 @@
     "play": "npm run build && node harness/playthrough.js",
     "thumbs": "npm run build && node tools/level-thumbs.js",
     "walls:all": "npm run build && node harness/walls.js --open --seal --hideout --shade",
-    "apk:assets": "node tools/build-app.js",
     "wasm": "cd rust/microcosm-core && cargo build --release --target wasm32-unknown-unknown --lib",
     "port:fingerprint": "npm run build && node harness/fingerprint-raw.js 3000 && node harness/fingerprint-events.js",
     "conform:core": "node harness/conform-core.js",

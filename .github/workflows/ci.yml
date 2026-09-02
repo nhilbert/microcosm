@@ -49,6 +49,11 @@ jobs:
       - name: Player-language gate
         run: node harness/prose.js
 
+      # The app's own strings (Kotlin, strings.xml, the German overlay). Shipped with U2.6 inside
+      # `npm test`, which CI does not call — so until now it ran nowhere here.
+      - name: Player-language gate (the app's strings, EN + DE)
+        run: node harness/prose-app.js
+
       - name: Render smoke (the painting path runs)
         run: node harness/render-smoke.js
 
@@ -120,6 +125,15 @@ jobs:
         run: |
           node dev/xcheck/gen.js "$RUNNER_TEMP/trace.txt"
           npm run --silent port:math -- "$RUNNER_TEMP/trace.txt"
+
+      # Inherited from the retired android-native workflow. The probe APK is gone; the check it
+      # carried is not. It keeps the fingerprints embedded in microcosm_core::probe honest, so a
+      # future device build can be wired to these constants instead of new ones.
+      - name: Host self-check (keeps the embedded constants honest)
+        run: |
+          node dev/xcheck/gen-bin.js "$RUNNER_TEMP/trace.bin" 10000
+          cd rust/microcosm-core
+          cargo run --release --quiet --bin selfcheck -- "$RUNNER_TEMP/trace.bin"
 
       # The certifying harness for the core after the M4 handover: the fingerprint, the hash of
       # the Rust sources that binds it, and native-vs-WASM identity (two targets disagreeing means

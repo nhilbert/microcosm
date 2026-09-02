@@ -27,10 +27,3 @@ assets/species/full/
 # dev/assets is copied from assets/ by the dev server (no symlink: Windows)
 dev/assets/
 
-# Android wrapper: generated web assets + gradle output (tools/build-app.js
-# regenerates assets/ from dist/ for every APK build)
-android/app/src/main/assets/
-android/.gradle/
-android/build/
-android/app/build/
-android/local.properties

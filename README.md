@@ -11,10 +11,12 @@ living system and find out what happens.
 ## What's in the world
 
 Seven species are defined; five are alive in the shipped world. Four of them
-carry a heritable trait and evolve — Solara's light adaptation, Drifta's defense
-against grazing, Cilio's pursuit of it, and Bacillus's rate-versus-yield
-metabolism — and you can set the mutation rate, the shape of each trade-off and
-the prices yourself, as interventions the Observatory then reports on:
+evolve, carrying eleven heritable loci between them — Solara's light adaptation,
+Drifta's defense, warmth preference, restlessness and thermal tolerance, Cilio's
+pursuit, hunting style and warmth preference, Bacillus's rate-versus-yield
+metabolism, search style and thermal tolerance. You can set the mutation rate,
+the shape of each trade-off and the prices yourself, as interventions the
+Observatory then reports on:
 
 | Species | Role |
 | --- | --- |
@@ -25,10 +27,12 @@ the prices yourself, as interventions the Observatory then reports on:
 | **Venator** | apex predator, hunts in packs, founds colonies |
 | *Mycora, Necro* | defined but not seeded in the current world |
 
-Underneath them: a 64×64 resource grid on a torus, a single movable sun,
-turbulent mineral mixing, an energy/protein/mineral/structure chemistry,
-corpses that decay into detritus, and a scent field that doubles as the
-organisms' only means of navigation.
+Underneath them: a 64×64 resource grid on a torus, one to four movable energy
+sources that carry light and warmth (or cold), a temperature field the organisms
+read and steer by, thin walls you can draw that block light, flow and passage
+independently, turbulent mineral mixing, an energy/protein/mineral/structure
+chemistry, corpses that decay into detritus, and a scent field that doubles as
+the organisms' only means of navigation.
 
 ## The instruments
 
@@ -54,9 +58,11 @@ throughout the UI; every other colour belongs to the world.
 
 ## Running it
 
-`dist/microcosm.jsx` is the deliverable: one file, React only, no localStorage,
-sized for a phone screen. Drop it into any React host, or paste it into a Claude
-artifact. It is committed, so you can grab it without building anything.
+`dist/microcosm.jsx` is the browser build: one file, React only, no
+localStorage, sized for a phone screen. Drop it into any React host, or paste it
+into a Claude artifact. It is committed, so you can grab it without building
+anything. It runs the frozen JavaScript oracle rather than the Rust core, so it
+is a reference and a place to play, not the product — the app is.
 
 To run it locally in a browser:
 
@@ -81,20 +87,20 @@ Nothing in `dev/` ships. It exists so a browser has something to load; the
 artifact is unaffected by it.
 
 To run it **on an Android phone**: the Releases page carries a rolling
-**Microcosm APK (latest)** (tag `apk-latest`), rebuilt by CI from the current
-artifact on every relevant push. Download `microcosm.apk` on the phone and
-install it. The wrapper in `android/` is a dependency-free WebView shell —
-the sim still runs as JS; `docs/android-wrapper.md` has the details and the
-decisions (offline, no permissions, no localStorage, committed identity-only
-keystore).
+**Microcosm app** (tag `app-latest`), built by CI from `android-app/`. Download
+the APK on the phone and install it. This is the native app — the Rust core
+running on the device, painting the frame builder's display list on a
+SurfaceView. It is the product; the browser build above is the reference the
+renderer is proved against. Background: `docs/android-app-plan.md`.
 
-A second, separate APK — **Microcosm native probe** (tag `probe-latest`, built
-from `android-native/`) — runs the *Rust* core natively through JNI and prints
-what it measures: whether the certified world reproduces bit-for-bit on ARM64,
-whether the math matches V8's own results, whether a saved world resumes
-identically, and how fast the core ticks on that device. It is a diagnostics
-screen, not the game, and it installs alongside the sandbox app without touching
-it. Background: `docs/android-port-plan.md` §8.
+Two earlier APKs have retired. The WebView wrapper (`apk-latest`) existed
+because the simulation was JavaScript, which it no longer is; the M5.0
+diagnostics probe (`probe-latest`) existed to answer whether the arithmetic is
+bit-exact on ARM64 and how fast the core ticks on real hardware, and it
+answered both — a Fairphone 5 reproduced the four certified fingerprints
+bit-for-bit and ticked at 0.400 ms. The measurements are recorded in
+`docs/android-port-plan.md` §8, and the host-side half of that check still runs
+in CI on every push.
 
 ## The harnesses
 
@@ -122,23 +128,20 @@ sees it coming and says so without being asked.
 ## Repo layout
 
 ```
-src/sim/            the simulation — pure, deterministic, translated exactly by a port
-  params.js           PRNG, tunable constants, body tags
-  traits.js           species-as-data: the TRAITS table
-  world.js            world state W (structure-of-arrays), spawn/kill
-  events.js           interventions: the only legal outside mutation
-  fields.js           mineral diffusion, light, spatial hash, neighbours
-  step.js             the RNG-order contract and the tick
-  init.js             world setup, Node exports
-src/observatory/    the instruments — zero PRNG draws, free to reimplement
-  recorder.js         ring buffer + event detectors
-  analysis.js         reference bands, strain, indicators
-  impact.js           before/after intervention analysis
-src/ui-*            the render layer — explicitly disposable, rewritten per platform
-tools/build.py      assembles the layers into dist/
-dist/microcosm.jsx  the artifact — generated, committed, checked by CI
-dist/core.js        the sim exported for Node — what the harnesses drive
-harness/            conform.js, tune2.js, k6gate.js and the certified baseline
+rust/microcosm-core/  THE SIMULATION — sim, observatory, its own V8-matched math
+  step.rs             the RNG-order contract and the tick
+  observatory.rs      recorder, detectors, indicators
+  frame.rs            the visual grammar every platform's renderer paints from
+  snapshot.rs         save/load; wasm.rs the C ABI
+rust/microcosm-android/  the JNI adapter — exists only to keep `jni` out of the core
+android-app/        the app: the Rust core on the phone, Kotlin + SurfaceView
+src/sim/            the FROZEN historical oracle — what the Rust core was proved
+src/observatory/    against. Read it; do not extend it (CLAUDE.md rule 11).
+src/ui-*            the render layer — still JavaScript, and the frame gate's reference
+tools/build.py      assembles the JS layers into dist/
+dist/microcosm.jsx  the browser artifact — generated, committed, checked by CI
+dist/core.js        the oracle exported for Node — MC_CORE points harnesses elsewhere
+harness/            conform.js, tune2.js, k6gate.js and the certified baselines
 docs/               concept, phase plans, design notes, porting.md
 CONTRIBUTING.md     the rules that keep the recorded results meaningful
 CLAUDE.md           working rules and current status
@@ -158,18 +161,33 @@ confident theory that lost an argument with the data.
 
 ## Status
 
-Phases 1–5 are closed. A Kotlin port is the eventual target — `src/sim/` plus
-the harnesses are its conformance spec (`docs/porting.md`).
+Phases 1–7 are closed and Phase 8 (the learning levels) is in progress. The port
+is **done**: `rust/microcosm-core` is the simulation, and `src/sim/` plus
+`src/observatory/` are the frozen oracle it was proved against
+(`docs/porting.md`). The native Android app is the product; the browser build is
+the reference the renderer is proved against.
 
-Measured on this tree, 2026-08-29:
+Measured on this tree, 2026-09-02:
 
-- **`conform.js` — PASS**, bit-identical on both fingerprints: the *silent*
-  genome (the Phase 4 reference world) and the *evolving* world that ships.
-- **`tune2.js` — 8 of 8 seeds pass** the acceptance criterion. Venator, the apex
-  predator, holds on five seeds and is lost on three (11, 66, 88) between
-  t=5,100 and t=7,200 — but every world runs the full 18,000 ticks with all four
-  core species alive and the mineral audit flat to within 0.009%. Losing the
-  apex restructures the world; it does not break it.
+- **`conform.js` — PASS**, bit-identical on both fingerprints, no stale-hash
+  NOTE: the *silent* genome (the Phase 4 reference world) and the *evolving*
+  world that ships.
+- **`conform:core` — PASS**: the Rust core reproduces the same four
+  fingerprints, and its native and WASM builds agree with each other.
+- **`port:check` — PASS**, bit-identical on all six surfaces: world state,
+  events and scenario founding, the level API, the visual grammar, undo, and
+  impact cards. This check is expected to retire at the first declared ecology
+  change in Rust; it has not happened yet.
+- **`selfcheck` — PASS**: 0 mismatches against the V8 math trace on all seven
+  functions; 0.451 ms/tick on the CI-class host.
+
+The ecology numbers below are from the last full acceptance run, 2026-08-31:
+
+- **`tune2.js` — 8 of 8 seeds pass** the acceptance criterion, with Venator, the
+  apex predator, holding on six of the eight. Every world runs the full 18,000
+  ticks with all four core species alive and the mineral audit flat. The apex
+  hold rate has moved between three and six across the phases and is reported
+  rather than required — see the criterion note below.
 - **`k6gate.js` — PASS**, all five criteria, on the reference world: strain
   warning 712 s before the grazer's death, extinctions in ecological order,
   control silent (2/78 flags). Under evolution the grazer survives the same
@@ -177,8 +195,12 @@ Measured on this tree, 2026-08-29:
 - **`gate5.js` — the Observatory narrates the evolution unprompted**: a sweep
   event on 8/8 evolving seeds, each grounded in the locus-mean channel; the
   silent control emits nothing and its variance channel reads exactly 0.
-- **`corridor.js` — CERTIFIED**: both loci may evolve anywhere in [0,1]; all
-  four rail corners pass the ecosystem criterion on 8/8 seeds.
+- **`corridor.js` — CERTIFIED 200/200**: every one of the eleven loci may
+  evolve anywhere in its corridor without breaking the ecosystem, rails and
+  evolution-as-fuzzer alike.
+- **`levels.js` — 21 of 21 cases pass** the honesty gate, on both cores: every
+  shipped level fails untouched, passes on its lesson, and fails on a plausible
+  wrong lever.
 
 **On the acceptance criterion.** Venator was originally certified to establish on
 all eight seeds. After an undeclared RNG drift in Phase 4 (recorded in
