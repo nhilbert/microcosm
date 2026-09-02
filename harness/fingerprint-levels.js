@@ -30,18 +30,21 @@ for (const def of LEVELS) {
   C.levelStart(def, 1);
   console.log(`\nL${def.n} ${def.key}  seed ${def.world.seed} deadline ${def.deadline} sustain ${def.sustain}`);
   console.log(`  founded: pops ${pops().join(",")}  M ${h(auditM())}  predicted ${C.LVL.predicted}`);
-  console.log(`  allows ${APPARATUS.map(a => `${a}=${C.levelAllows(a)}`).join(" ")} pourLeft ${C.LVL.pourLeft}`);
+  console.log(`  allows ${APPARATUS.map(a => `${a}=${C.levelAllows(a)}`).join(" ")} pourLeft ${C.LVL.pourLeft}` +
+    ` src ${[0, 1].map(k => `${k}=${C.levelAllowsSource(k)}`).join(" ")}`);
   // the pour budget, spent the way the UI spends it
   let spent = 0;
   while (C.levelPourOk() && spent < 12 && C.LVL.pourLeft !== Infinity) { C.levelNotePour(1); spent++; }
   console.log(`  pours spent ${spent} -> pourLeft ${C.LVL.pourLeft} pourOk ${C.levelPourOk()}`);
 
   for (let t = 0; t < TICKS; t++) {
+    C.levelScript(); // F4/F5: the per-tick hook every driver shares
     C.step();
     if (C.levelCheck() !== "running") break;
   }
   const ev = C.levelNarration();
-  console.log(`  t ${W.tick} state ${C.levelCheck()} run ${C.LVL.run} seenS ${C.LVL.seenS}`);
+  console.log(`  t ${W.tick} state ${C.levelCheck()} run ${C.LVL.run} seenS ${C.LVL.seenS}` +
+    ` sources ${W.sources.length} src ${[0, 1].map(k => `${k}=${C.levelAllowsSource(k)}`).join(" ")}`);
   console.log(`  meter ${meterLine()}`);
   console.log(`  narration ${ev ? `${ev.type}@${ev.tick} sp${ev.sp} ${ev.text}` : "(none)"}`);
   console.log(`  failWhy ${JSON.stringify(C.LVL.failWhy)}`);

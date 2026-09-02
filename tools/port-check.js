@@ -66,7 +66,9 @@ compare(`world fingerprint`, "fingerprint-raw.js", [TICKS, SEEDS]);
 compare(`events + scenario founding`, "fingerprint-events.js", []);
 // The level API's surface beyond the verdict: apparatus gates, pour budget, meters, narration,
 // restart. `harness/levels.js` proves the verdicts; nothing else exercises these headlessly.
-compare(`the level API's surface`, "fingerprint-levels.js", ["600"]);
+// 2200 ticks so L7's scripted sun (t=2000) rises inside the window: the drive then covers the
+// timeline hook, the region census and the per-source lock flip on both cores.
+compare(`the level API's surface`, "fingerprint-levels.js", ["2200"]);
 // The visual grammar (M5.1 A.0): the display list, the sprite bucket table, the pixel fields and
 // the world-tile vector lists. Against dist/core.js the harness reads the grammar out of the
 // render layer, which is what the core's frame builder was transliterated from.

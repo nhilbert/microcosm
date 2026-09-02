@@ -226,5 +226,169 @@
       "The grazers are gone. Nothing now stands between the hunters and starving.": "Die Planktonfresser sind fort. Nichts steht jetzt noch zwischen den Jägern und dem Verhungern.",
       "No lasting pack took hold. A hunter eats a lot and breeds slowly — seed early, and seed small.": "Kein Rudel hat dauerhaft Fuß gefasst. Ein Jäger frisst viel und vermehrt sich langsam. Siedle früh an, und siedle wenige an."
     }
+  },
+  "outpost": {
+    "title": "Die zweite Sonne",
+    "science": "Ausbreitungsgrenzen · Kolonisation",
+    "question": "Über dunklem Wasser geht eine zweite Sonne auf. Was wächst dort?",
+    "briefing": "Ein lebendiger Teich unter einer Sonne — und bald geht eine zweite auf, weit über dunklem Wasser. Hell, warm, leer. Du kannst Arten aussetzen und gießen. Die alte Sonne gehört zum Versuch: Sie bleibt gesperrt.",
+    "goalText": "Besiedle die neue Sonne — Matte und Plankton",
+    "predict": {
+      "prompt": "Eine helle neue Sonne über leerem Wasser. Was passiert?",
+      "options": [
+        "Leben treibt hinüber und siedelt sich an",
+        "Es bleibt leer, bis etwas hingetragen wird",
+        "Die neue Sonne zehrt die alte aus"
+      ],
+      "reflect": [
+        "Treiben ist langsam. Das Plankton hat das dunkle Wasser nie überquert — und die Matte kroch viel zu spät heran.",
+        "Richtig. Licht hat nie gefehlt. Ein Reisender hat gefehlt.",
+        "Die alte Sonne behielt ihren ganzen Teich. Eine zweite Sonne ist nur eine zweite Bühne — und die stand leer."
+      ]
+    },
+    "debrief": {
+      "pass": "Du hast Leben über das Dunkel getragen, und die neue Sonne hält jetzt einen lebendigen Teich. Diese Reise war das ganze Geheimnis. Das Wasser brauchte nie bessere Bedingungen — es brauchte einen Reisenden. Das Plankton kann dunkles Wasser nicht überqueren; die Matte kriecht, aber viel zu langsam. Dass Leben so an neue Orte kommt, nennt man Besiedlung. Und jetzt beobachte deinen Außenposten: Die Blüte bedrängt schon die junge Matte.",
+      "fail": "Die neue Sonne war nie das Problem — der Weg dorthin war es. Gießen füttert Wasser, nicht Entfernung, und nichts, was treibt, überlebt die dunkle Strecke. Setz die Matte und das Plankton unter der neuen Sonne aus. Beides: Die Matte allein ernährt niemanden, und die Blüte allein sperrt die Matte aus."
+    },
+    "meter": [
+      { "label": "Solara · Sonne 2", "unit": "" },
+      { "label": "Drifta · Sonne 2", "unit": "" }
+    ],
+    "whys": {
+      "The last Solara died. Nothing is left to carry to the new sun.": "Die letzte Solara ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
+      "The last Drifta died. Nothing is left to carry to the new sun.": "Die letzte Drifta ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
+      "The new sun still has no working pond. Life had to be carried there — the mat and its plankton both.": "Die neue Sonne hat noch immer keinen lebendigen Teich. Leben musste dorthin getragen werden — die Matte und ihr Plankton."
+    }
+  },
+  "warmyear": {
+    "title": "Das warme Jahr",
+    "science": "Wärmeleistung · Energiehaushalte",
+    "question": "Das Wasser wird wärmer. Niemand verkocht — warum stirbt die Spitze zuerst?",
+    "briefing": "Im Lauf des Vormittags wird die Sonne fünf Grad wärmer. Jeder Körper verbrennt schneller, als er frisst. Die Jäger verhungern zuerst: Ihre Rechnung steigt am schnellsten. Füttere sie durch die Klemme — aber behutsam. Ein stark gefüttertes Rudel plündert die geschwächten Planktonfresser darunter.",
+    "goalText": "Bring Jäger und Planktonfresser durch die Hitze",
+    "predict": {
+      "prompt": "Das Wasser wird wärmer. Wer scheitert zuerst?",
+      "options": [
+        "Die Kleinsten verkochen zuerst",
+        "Der größte Hunger scheitert zuerst",
+        "Alle gehen gemeinsam zurück"
+      ],
+      "reflect": [
+        "Verkocht ist niemand. Wärme tötet über die Rechnung, nicht über die Glut — und kleine Körper haben kleine Haushalte.",
+        "Richtig. Wärme treibt den Unterhalt schneller als den Fang, und die Spitze lebt am dichtesten an ihrer Grenze.",
+        "Der Boden hat kaum etwas gemerkt. Matte und Schlamm wurden fetter, während die Spitze hungerte. Wärme spaltet die Pyramide."
+      ]
+    },
+    "debrief": {
+      "pass": "Verkocht ist nichts, und die Spitze wäre trotzdem fast verhungert. Wärme treibt das Ausgeben schneller als das Fangen, und die Spitze lebt am dichtesten an ihrer Grenze. Dein behutsames Füttern trug die Jäger über die Klemme. Und weil es behutsam blieb, überlebten die Planktonfresser die zusätzlichen Zähne. In einem wärmer werdenden Teich drückt jede helfende Hand woanders hin. Hilfe misst sich daran, was sie zwei Schichten tiefer anrichtet.",
+      "fail": "Halbe Maßnahmen scheitern hier auf die eine Art, starke auf die andere. Ungefüttert verhungern die Jäger zuerst: Die Wärme stellt der Spitze die Rechnung. Hart gefüttert werden sie zu Zähnen gegen die Planktonfresser. Füttere das Rudel behutsam — kleine Portionen, lange Pausen — und beide Linien bleiben."
+    },
+    "meter": [
+      { "label": "Venator", "unit": "" },
+      { "label": "Cilio", "unit": "" }
+    ],
+    "whys": {
+      "The hunters starved. Warming raised their bill fastest, and nothing was left over to pay it.": "Die Jäger sind verhungert. Die Wärme trieb ihre Rechnung am schnellsten, und nichts blieb übrig, sie zu bezahlen.",
+      "The grazers are gone — eaten out by a well-fed pack in a warming pond.": "Die Planktonfresser sind fort — leergefressen von einem wohlgenährten Rudel in einem wärmer werdenden Teich.",
+      "The pyramid never steadied. The hunters need feeding through the squeeze, and a heavily fed pack eats the grazers out. Feed lightly, and hold.": "Die Pyramide kam nie zur Ruhe. Die Jäger brauchen Futter durch die Klemme, und ein stark gefüttertes Rudel frisst die Planktonfresser leer. Füttere behutsam, und halte durch."
+    }
+  },
+  "sorting": {
+    "title": "Das große Sortieren",
+    "science": "Natürliche Auslese · erbliche Vielfalt",
+    "question": "Zwei Drifta-Linien teilen sich das Wasser. Was entscheidet, welche gewinnt?",
+    "briefing": "Der volle Teich, und nichts steht still: Junge Drifta können sich von ihren Eltern unterscheiden. Zähe weichen Planktonfressern aus; schnelle vermehren sich stärker. Der Teich behält beide, weil Panzer teuer ist. Öffne das Evolutions-Panel und mache Panzer billiger: Ziehe bei Driftas Verteidigungs-Preisen kp deutlich unter die Balance-Marke.",
+    "goalText": "Die zähe Drifta-Linie gewinnt",
+    "predict": {
+      "prompt": "Panzer wird billig. Was ändert sich an Drifta?",
+      "options": [
+        "Jede Drifta baut sich zäheren Panzer",
+        "Zähe Linien verdrängen die schnellen Linien",
+        "Nichts Erbliches ändert sich"
+      ],
+      "reflect": [
+        "Tippe eine Drifta an und schaue auf ihre Karte: Sie selbst ändert sich nie. Nur die Mischung der Linien ändert sich. Körper lernen nicht, Geburten zählen.",
+        "Richtig. Billiger Panzer kippt die Rechnung, und Geburten erledigen den Rest. Kein Tier hat sich verändert, nur die Zählung.",
+        "Die Änderung war erblich, und genau das zählte. Schalte die Mutation aus, und derselbe billige Panzer sortiert nichts."
+      ]
+    },
+    "debrief": {
+      "pass": "Keine einzelne Drifta hat sich verändert. Ganze Linien haben es. Du hast Panzer billig gemacht, und die zähe Linie hat die schnelle verdrängt, Geburt um Geburt. Die Vielfalt war längst da; dein Preis hat das Sortieren nur gekippt. Dieses Sortieren heißt natürliche Auslese. Sie plant nichts und verbessert nichts. Sie zählt Geburten. Und beim vollen Preis war das Gleichgewicht selbst schon Auslese.",
+      "fail": "Nichts wurde in deine Richtung sortiert. Prüfe den einen Schalter, der alles entscheidet: Ohne Mutation frieren die Linien ein. Nichts variiert, also kann nichts gewinnen. Auslese wirkt nur, wo das Erbe sich unterscheidet. Öffne das Evolutions-Panel, lass die Mutation an, senke Driftas kp-Preis, und lass den Teich Geburten zählen."
+    },
+    "meter": [
+      { "label": "zähe Linie", "unit": "%" },
+      { "label": "Drifta", "unit": "" }
+    ],
+    "whys": {
+      "The plankton is gone — grazed to nothing. Nothing is left to sort.": "Das Plankton ist fort, restlos abgeweidet. Zum Sortieren ist nichts mehr übrig.",
+      "The tough line never took over in time. At full price, armor spreads too slowly — if at all. The price is the lever that tips it.": "Die zähe Linie hat nicht rechtzeitig übernommen. Beim vollen Preis breitet Panzer sich zu langsam aus, wenn überhaupt. Der Preis ist der Hebel, der das kippt."
+    }
+  },
+  "refuge": {
+    "title": "Die Zuflucht",
+    "science": "Räumliche Zufluchten · Randeffekte",
+    "question": "Kann Architektur die Gejagten retten?",
+    "briefing": "Überall Planktonfresser, und das Plankton braucht Schutz. An der Flanke der Sonne steht ein dreiseitiger Pferch aus feinen Maschen: Plankton treibt hindurch, Planktonfresser nicht. Schließe die vierte Seite, das Wand-Werkzeug gehört dir. Aber schau hinein, bevor du schließt. Ein Schutz ist nur Schutz, wenn nichts Hungriges darin sitzt.",
+    "goalText": "Eine stehende Zuflucht, nichts Hungriges darin",
+    "predict": {
+      "prompt": "Ein Maschen-Pferch, eine Seite offen. Was macht ihn zur Zuflucht?",
+      "options": [
+        "Zumachen — die Wand erledigt es",
+        "Leer zumachen — erst hineinschauen",
+        "Nichts — Wände ändern hier nichts"
+      ],
+      "reflect": [
+        "Halb richtig. Die Maschen halten Planktonfresser draußen — und drinnen. Um einen herum geschlossen, wird der Pferch zur Farm für dein Plankton.",
+        "Richtig. Ein leerer Pferch füllt sich mit treibendem Plankton und bleibt sicher. Die Maschen lassen die Kleinen durch und die Hungrigen nicht.",
+        "Wände haben alles geändert, in beide Richtungen. Leer geschlossen: eine Zuflucht. Um einen Planktonfresser geschlossen: eine Mastanlage."
+      ]
+    },
+    "debrief": {
+      "pass": "Der Pferch steht voll: Plankton treibt durch die Maschen herein, und nichts Hungriges folgt. Einen Ort, den die Gejagten erreichen und der Jagende nicht, nennt man Zuflucht. Beachte, was ihn dazu gemacht hat — nicht die Wand, sondern die Leere darin beim Schließen. Derselbe Pferch, um einen einzigen Planktonfresser geschlossen, wird zur Farm für genau das, was er schützen sollte.",
+      "fail": "Wände sind ehrlich: Sie sperren aus, und sie sperren ein. Ein Pferch, um Planktonfresser geschlossen, ist eine Mastanlage. Dein Plankton treibt durch die Maschen herein, und die Eingesperrten fressen es für immer. Räume den Pferch mit dem Radier-Werkzeug, und schließe die vierte Seite, solange er leer ist."
+    },
+    "meter": [
+      { "label": "Plankton im Pferch", "unit": "" },
+      { "label": "Planktonfresser drin", "unit": "" }
+    ],
+    "whys": {
+      "The refuge emptied. Something hungry was inside the walls.": "Die Zuflucht hat sich geleert. Etwas Hungriges saß innerhalb der Wände.",
+      "The plankton is gone everywhere. No pen shelters an empty pond.": "Das Plankton ist überall fort. Kein Pferch schützt einen leeren Teich.",
+      "No refuge stood. A pen is shelter only when it closes empty: clear the grazers inside first, then seal the fourth side.": "Keine Zuflucht hat gestanden. Ein Pferch schützt nur, wenn er leer schließt: Räume erst die Planktonfresser hinaus, dann versiegle die vierte Seite."
+    }
+  },
+  "outrun": {
+    "title": "Wettlauf mit der Sonne",
+    "science": "Evolutionäre Rettung · Mutationsnachschub",
+    "question": "Die Sonne wird tödlich. Kommt die Evolution rechtzeitig an?",
+    "briefing": "Am Vormittag wird die Sonne grell, und das Wasser um sie herum wird sechs Grad wärmer. Die Planktonfresser folgen ihrem alten Wärmesinn in die Hitze. Erhöhe im Evolutions-Panel die Mutationsrate von Cilios Wärmevorliebe — bevor die Hitze kommt. Die Antwort muss schon geboren werden, wenn die Frage eintrifft.",
+    "goalText": "Bring die Planktonfresser durch die Hitze",
+    "predict": {
+      "prompt": "Am Vormittag wird die Sonne tödlich. Was rettet die Planktonfresser?",
+      "options": [
+        "Kühle Linien setzen sich rechtzeitig durch",
+        "Nichts — die Hitze gewinnt das Rennen",
+        "Nur Variation, die vor der Krise da ist"
+      ],
+      "reflect": [
+        "Hier ja. Die kühl-suchende Linie war schon am Brüten, als die Hitze kam. Dieser Vorsprung war alles.",
+        "Bei der eigenen Mutationsrate des Teichs: ja. Die Falle schließt in Minuten, die Antwort kommt zu spät. Du kannst diese Rate ändern.",
+        "Richtig. Rettung wird im Voraus gekauft oder gar nicht. Wenn die Not sichtbar wird, musste die Antwort längst in den Genen stehen."
+      ]
+    },
+    "debrief": {
+      "pass": "Die kühl-suchende Linie war schon da, als die Hitze kam — selten, bereit, und sie breitete sich aus, während die Wärme-Folger starben. Das nennt man evolutionäre Rettung, und sie ist nie ein Versprechen. Auf vielen Teichen verliert derselbe Zug trotzdem; du hast ein Los gekauft, keine Garantie. Der Preis des Loses war Variation, im Voraus bezahlt. Nur im Voraus lässt er sich zahlen.",
+      "fail": "Die Evolution hatte die Antwort — kühl-suchende Linien —, aber eine Antwort muss schon geboren werden, wenn die Frage eintrifft. Zu spät erhöht, füttert Variation nur einen Friedhof. Stelle die Mutationsrate von Cilios Wärmevorliebe hoch, solange das Wasser noch kühl ist. Und selbst dann: Halte den Atem an."
+    },
+    "meter": [
+      { "label": "Cilio", "unit": "" },
+      { "label": "Drifta", "unit": "" }
+    ],
+    "whys": {
+      "The grazers are gone. Their old warmth sense led them into the heat, and the cool-seeking line was still too rare to carry them.": "Die Planktonfresser sind fort. Ihr alter Wärmesinn führte sie in die Hitze. Die kühl-suchende Linie war noch zu selten, um sie zu tragen.",
+      "The plankton is gone — the pond lost its middle.": "Das Plankton ist fort. Der Teich hat seine Mitte verloren.",
+      "The grazers never held through the heat. Rescue is bought before the crisis: raise the variation while the water is still cool.": "Die Planktonfresser haben die Hitze nie überstanden. Rettung wird vor der Krise gekauft: Erhöhe die Variation, solange das Wasser noch kühl ist."
+    }
   }
 }

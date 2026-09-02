@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     internal lateinit var sunSheet: LinearLayout // internal: the boot gate asserts it opens
     private lateinit var sunTitle: TextView
     private lateinit var sunRemoveBtn: Button
+    private lateinit var sunLayoutsRow: android.view.View // hidden while the founded sky is locked (L7)
     private val sunSliders = HashMap<String, android.widget.SeekBar>()
     private val sunValues = HashMap<String, TextView>()
     private var sunGripShown = -1
@@ -185,6 +186,7 @@ class MainActivity : Activity() {
                 val last = si[3] <= 1.0
                 sunRemoveBtn.isEnabled = !last
                 sunRemoveBtn.alpha = if (last) 0.4f else 1f
+                sunLayoutsRow.visibility = if (world.homeSunLocked) ViewGroup.GONE else ViewGroup.VISIBLE
                 if (world.sunSel != sunGripShown) { // a fresh grip: sliders take the sun's values
                     sunGripShown = world.sunSel
                     sunSliders["i"]?.progress = Math.round(si[0] / 0.05).toInt()
@@ -558,7 +560,8 @@ class MainActivity : Activity() {
             (if (v > 0) "+" else "") + "%.1f°".format(v) })
         sunSheet.addView(sunSliderRow("sigma", getString(R.string.sun_spread), 90.0, 300.0, 10.0) { v ->
             "%.0f".format(v) })
-        sunSheet.addView(Chrome.build(this, "layouts") { k -> applyLayout(k) },
+        sunLayoutsRow = Chrome.build(this, "layouts") { k -> applyLayout(k) }
+        sunSheet.addView(sunLayoutsRow,
             LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = Style.dp(this@MainActivity, 10f) })
         val sunActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sunActions.addView(button(getString(R.string.sun_add)) { world.placeSource = 1 },
@@ -568,7 +571,7 @@ class MainActivity : Activity() {
         sunRemoveBtn = button(getString(R.string.sun_remove)) {
             val k = world.sunSel
             if (k >= 0) world.post {
-                if (Native.sourceCount() > 1) { // the world keeps at least one source
+                if (Native.sourceCount() > 1 && Native.levelAllowsSource(k) != 0) { // keep one source; a locked sky stays (L7)
                     Native.ivPush(WorldView.IV_SOURCE_REMOVE)
                     Native.evSourceRemove(k)
                 }
@@ -1276,6 +1279,7 @@ class MainActivity : Activity() {
         val a = -8.0 + (sunSliders["a"]?.progress ?: 0) * 0.5
         val sg = 90.0 + (sunSliders["sigma"]?.progress ?: 0) * 10.0
         world.post {
+            if (Native.levelAllowsSource(k) == 0) return@post // L7: the founded sky is locked
             Native.ivPush(WorldView.IV_SOURCE_SET)
             Native.evSourceSet(k, i, a, sg)
         }
@@ -1284,8 +1288,10 @@ class MainActivity : Activity() {
     /** A layout is ONE intervention (7.L): the shipped sun keeps its place; the rest is rebuilt.
      *  Internal: the boot gate applies real layouts. */
     internal fun applyLayout(which: Int) {
+        if (world.homeSunLocked) return // layouts rewrite the whole sky, the founded sun included (L7)
         val layout = sourceLayouts[which]
         world.post {
+            if (Native.levelAllowsSource(0) == 0) return@post
             Native.ivPush(WorldView.IV_SOURCE_LAYOUT)
             for (q in Native.sourceCount() - 1 downTo 1) Native.evSourceRemove(q)
             Native.evSourceSet(0, layout[0].i, layout[0].a, layout[0].sigma)

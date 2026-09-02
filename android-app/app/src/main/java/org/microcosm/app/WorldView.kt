@@ -136,7 +136,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     /** Put the sun back as founded — the badge's tap, logged as the presses it is. */
     fun putSunBack() = post {
         if (baseSun.size < 5 || Native.sourceCount() == 0) return@post
-        if (Native.levelAllows(2) == 0) return@post
+        if (Native.levelAllows(2) == 0 || Native.levelAllowsSource(0) == 0) return@post
         Native.ivPush(IV_SOURCE_SET)
         Native.evSourceSet(0, baseSun[2], baseSun[3], baseSun[4])
         Native.ivPush(IV_SOURCE)
@@ -170,6 +170,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var sunSel = -1
     /** The armed source-placement tool (EV sun card): 0 none, 1 a sun, 2 a heater — next tap places it. */
     @Volatile var placeSource = 0
+    /** L7: the founded sun is part of the experiment — published per frame for the UI's gating. */
+    @Volatile var homeSunLocked = false
     /** The gripped sun's live numbers for the card: [i, a, sigma, count], or null. Per frame. */
     @Volatile var sunInfo: DoubleArray? = null
         private set
@@ -453,7 +455,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 // presses longer and harder — and a long press used to do nothing at all unless
                 // a seed species was armed, which read as "I never get to grip it".
                 val k = nearestSun(lp[0], lp[1])
-                if (k >= 0) sunSel = k
+                if (k >= 0 && Native.levelAllowsSource(k) != 0) sunSel = k // a locked sun (L7) takes no grip
             }
         }
 
@@ -486,7 +488,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             // mineral is budgeted. `levelAllows` is open outside a level.
             if (Native.levelAllows(2) != 0) {
                 val k = nearestSun(sx, sy)
-                if (k >= 0) { sunSel = k; return }
+                // a locked sun (L7's founded sky) takes no grip — and swallows the tap, as the browser does
+                if (k >= 0) { if (Native.levelAllowsSource(k) != 0) sunSel = k; return }
             }
             if (Native.pick(wx, wy, Native.pickRadius(cam.z / density, 0)) == 0) {
                 if (Native.levelAllows(0) != 0 && Native.levelPourOk() != 0) {
@@ -626,6 +629,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             var steps = 0
             while (acc >= TICK_MS && steps < maxSteps) {
                 Native.markPrev()
+                Native.levelScript() // F4/F5: per tick, inside the loop — a scripted sun rises on its tick at any pace
                 Native.step()
                 acc -= TICK_MS
                 steps++
@@ -677,6 +681,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             }
             mutationOn = Native.scalar(50) != 0.0
             evolutionAllowed = Native.levelAllows(4) != 0
+            homeSunLocked = Native.levelAllowsSource(0) == 0
             selSpecies = if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0)
                 Native.org(selI, 1).toInt() else -1
             specimen = if (selSpecies >= 0) {

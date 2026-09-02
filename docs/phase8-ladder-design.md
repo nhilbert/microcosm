@@ -262,6 +262,17 @@ same-seed A/B (F6) has actually run.
   (*calibrate* against the movement-genome core — restlessness changed dispersal).
 
 ### L8 · The Warm Year — energy budgets in a warming pond
+
+> **Redesigned at calibration (2026-09-01)** — the spec's press and rescue both failed
+> measurement on the current core. The tempAmb-style press order (apex first) predates
+> MV.4: a ramped warm sun now bills the APEX first while the grazers hold (the "middle
+> dies first" phrasing below became "the top"); and the cold-refuge rescue is
+> measurably dead — a far cold source saves nothing the null loses, and every
+> C-death in the calibration table traces to the FED apex, not the heat. The level
+> shipped as a husbandry-dosage lesson: light feeding (every 900, frac 0.2) bridges
+> the hunters and both layers hold; hard feeding (every 300, frac 0.3) turns help
+> into teeth and the grazers die; cold-alone and pours fail as measured wrong levers.
+> Record in phase8-levels-plan.md §3. This spec stands as the design history.
 - **Science subtitle**: Thermal performance · Q10 economics.
 - **Question**: The water warms. Nobody is boiled — so why does the top die first?
 - **Misconception targeted**: heat kills by exceeding tolerance; warming hurts
@@ -333,6 +344,17 @@ same-seed A/B (F6) has actually run.
   wide).
 
 ### L10 · The Two Ponds — one species, two answers
+
+> **Folded at calibration (2026-09-01), per this document's own cut line (§7).** On the
+> movement-genome core the premise does not reproduce: with a grazer-free twin-sun
+> founding (S/D/B both patches, colonisation kit), asymmetric grazing separates the
+> plankton's defense locus only transiently (spread wobbles 0.01–0.15, never sustained
+> at 0.10 over 16k on seeds 11/44), and SYMMETRIC grazing spikes as high (0.057–0.066)
+> — the pressure's shape is not what the spread follows. The 7.L separation (7/8) was
+> measured before MV.2 shipped restlessness; dispersal now beats patch selection at
+> this geometry. Content folds into a future L9 twist (F3); re-entry condition: a
+> geometry that measurably cuts plankton crossing — a wall between the shores (L11's
+> machinery) or a greater dark-water gap. The spec below stands as the design record.
 - **Science subtitle**: Local adaptation · gene flow and its barriers.
 - **Question**: The same species lives under both suns. Why is it becoming two?
 - **Misconception targeted**: a species has one right answer; evolution converges on

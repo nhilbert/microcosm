@@ -2198,6 +2198,640 @@ const LEVEL_ROWS = [
       "pass": "Your pack holds — a few hunters riding a wave of grazers, riding a wave of plankton. Count the layers: hundreds of plankton feed a hundred grazers feed a handful of hunters. Every meal loses most of its energy on the way up. That is the food chain's price, and why the top is always small — and always one bad season from gone.",
       "fail": "Hunters don't run out of courage — they run out of prey. The pond only makes so many grazers, and every extra mouth shrinks each hunter's share. Try one pack, seeded early, and give it room."
     }
+  },
+  {
+    "key": "outpost",
+    "n": 7,
+    "title": "The Second Sun",
+    "science": "Dispersal limitation · colonization",
+    "question": "A second sun will rise over dark water. What grows there?",
+    "briefing": "A living pond under one sun — and soon a second sun rises, far across dark water. Bright, warm, empty. The seeding bench is open, and you can pour. The old sun is part of the experiment: it stays locked.",
+    "goalText": "Settle the new sun — mat and plankton",
+    "predict": {
+      "prompt": "A bright new sun over empty water. What happens?",
+      "options": [
+        "Life drifts over and settles it",
+        "It stays empty until something is carried there",
+        "The new sun drains the old one"
+      ],
+      "reflect": [
+        "Drifting is slow. The plankton never crossed the dark water, and the mat's creep came far too late.",
+        "Right. Light was never the missing thing. A traveler was.",
+        "The old sun kept its whole pond. A second sun adds a second stage — but an empty one."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "found": {
+        "0": 120,
+        "1": 500,
+        "2": 12,
+        "3": 60,
+        "6": 0
+      }
+    },
+    "script": [
+      {
+        "t": 2000,
+        "event": {
+          "type": "sourceAdd",
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": "added",
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 12000,
+    "sustain": 10,
+    "narrate": [
+      "estab",
+      "extinct",
+      "crashev",
+      "bloom"
+    ],
+    "pass": [
+      {
+        "m": "near",
+        "sp": 0,
+        "src": 1,
+        "r": 200,
+        "op": ">=",
+        "v": 100
+      },
+      {
+        "m": "near",
+        "sp": 1,
+        "src": 1,
+        "r": 200,
+        "op": ">=",
+        "v": 150
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 0,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The last Solara died. Nothing is left to carry to the new sun."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The last Drifta died. Nothing is left to carry to the new sun."
+      }
+    ],
+    "timeoutWhy": "The new sun still has no working pond. Life had to be carried there — the mat and its plankton both.",
+    "meter": [
+      {
+        "label": "Solara · sun 2",
+        "m": "near",
+        "sp": 0,
+        "src": 1,
+        "r": 200,
+        "goal": 100
+      },
+      {
+        "label": "Drifta · sun 2",
+        "m": "near",
+        "sp": 1,
+        "src": 1,
+        "r": 200,
+        "goal": 150
+      }
+    ],
+    "debrief": {
+      "pass": "You carried life across the dark, and the new sun keeps a working pond. That trip was the whole secret. The water never needed better conditions — it needed a traveler. The plankton cannot cross dark water; the mat can creep, but far too slowly. Settling a new place is called colonization. Now keep watching your outpost: the bloom is already crowding the young meadow.",
+      "fail": "The new sun was never the problem — the trip was. Pours feed water, not distance, and no drifter survives the dark crossing. Seed the mat and the plankton under the new sun. Both: alone, the mat feeds no one, and the bloom locks the meadow out."
+    }
+  },
+  {
+    "key": "warmyear",
+    "n": 8,
+    "title": "The Warm Year",
+    "science": "Thermal performance · energy budgets",
+    "question": "The water warms. Nobody boils — so why does the top die first?",
+    "briefing": "Through the morning the sun's warmth climbs by five, and every body starts burning faster than it eats. The hunters starve first: their bill rises fastest. Feed them through the squeeze — but gently. A strongly fed pack strips the struggling grazers below it.",
+    "goalText": "Hold hunters and grazers through the heat",
+    "predict": {
+      "prompt": "The water is warming. Who fails first?",
+      "options": [
+        "The smallest cook first",
+        "The biggest hunger fails first",
+        "Everything declines together"
+      ],
+      "reflect": [
+        "Nobody cooked at all. Warmth kills by the bill, not the burn — and small bodies balance small budgets.",
+        "Right. Warmth raises upkeep faster than it raises the catch, and the top lives closest to its limit.",
+        "The bottom barely noticed. The mat and the mud fattened while the top starved — warming splits the pyramid."
+      ]
+    },
+    "world": {
+      "seed": 11
+    },
+    "script": [
+      {
+        "t": 3000,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 1
+        }
+      },
+      {
+        "t": 3400,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 2
+        }
+      },
+      {
+        "t": 3800,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 3
+        }
+      },
+      {
+        "t": 4200,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 4
+        }
+      },
+      {
+        "t": 4600,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 5
+        }
+      }
+    ],
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": "added",
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 16000,
+    "sustain": 350,
+    "narrate": [
+      "wake",
+      "extinct",
+      "crashev",
+      "estab"
+    ],
+    "latch": [
+      {
+        "id": "hot",
+        "when": [
+          {
+            "m": "ch",
+            "c": 59,
+            "op": ">=",
+            "v": 2
+          }
+        ]
+      }
+    ],
+    "pass": [
+      {
+        "latched": "hot"
+      },
+      {
+        "m": "pop",
+        "sp": 2,
+        "op": ">=",
+        "v": 5
+      },
+      {
+        "m": "pop",
+        "sp": 6,
+        "op": ">=",
+        "v": 4
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 6,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The hunters starved. Warming raised their bill fastest, and nothing was left over to pay it."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 2,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The grazers are gone — eaten out by a well-fed pack in a warming pond."
+      }
+    ],
+    "timeoutWhy": "The pyramid never steadied. The hunters need feeding through the squeeze, and a heavily fed pack eats the grazers out. Feed lightly, and hold.",
+    "meter": [
+      {
+        "label": "Venator",
+        "m": "pop",
+        "sp": 6,
+        "goal": 4
+      },
+      {
+        "label": "Cilio",
+        "m": "pop",
+        "sp": 2,
+        "goal": 5
+      }
+    ],
+    "debrief": {
+      "pass": "Nothing boiled, and the top nearly starved anyway. Warmth raises spending faster than catching, and the top lives closest to its limit. Your light feeding carried the hunters across the squeeze. And because it stayed light, the grazers below survived the extra teeth. In a warming pond, every helping hand pushes somewhere else. The measure of help is what it does two layers down.",
+      "fail": "Half measures fail one way here, strong measures another. Unfed, the hunters starve first — warming bills the top. Fed hard, they turn your help into teeth, and the grazers vanish. Feed the pack lightly — small portions, long pauses — and watch both lines hold."
+    }
+  },
+  {
+    "key": "sorting",
+    "n": 9,
+    "title": "The Sorting",
+    "science": "Natural selection · heritable variation",
+    "question": "Two Drifta lines share the water. What decides which one wins?",
+    "briefing": "The full pond, and nothing is frozen: young Drifta can differ from their parents. Tough ones dodge grazers; fast ones out-breed them. The pond keeps both, because armor is expensive. Open the Evolution panel and make armor cheaper: under Drifta's defense prices, pull kp well below its balance mark.",
+    "goalText": "Make the tough Drifta line win",
+    "predict": {
+      "prompt": "Armor gets cheap. What changes in Drifta?",
+      "options": [
+        "Each Drifta grows itself tougher armor",
+        "Tough lines out-breed the fast lines",
+        "Nothing heritable changes at all"
+      ],
+      "reflect": [
+        "Tap any Drifta and watch its card: it never changed. Only the mix of lines changed. Bodies don't learn — births count.",
+        "Right. Cheap armor tips the ledger, and births do the rest — no creature changed, the count did.",
+        "The change was heritable, and that was the point. Turn mutation off and the same cheap armor sorts nothing."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "mutation": true
+    },
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": true
+    },
+    "deadline": 18000,
+    "sustain": 10,
+    "narrate": [
+      "sweep",
+      "diverse",
+      "uniform",
+      "rail",
+      "estab",
+      "extinct"
+    ],
+    "pass": [
+      {
+        "m": "ch",
+        "c": 43,
+        "op": ">=",
+        "v": 0.6
+      },
+      {
+        "m": "share",
+        "sp": 1,
+        "plane": 0,
+        "side": 1,
+        "op": ">=",
+        "v": 0.6
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The plankton is gone — grazed to nothing. Nothing is left to sort."
+      }
+    ],
+    "timeoutWhy": "The tough line never took over in time. At full price, armor spreads too slowly — if at all. The price is the lever that tips it.",
+    "meter": [
+      {
+        "label": "tough line",
+        "m": "share",
+        "sp": 1,
+        "plane": 0,
+        "side": 1,
+        "pct": true,
+        "goal": 60,
+        "unit": "%"
+      },
+      {
+        "label": "Drifta",
+        "m": "pop",
+        "sp": 1
+      }
+    ],
+    "debrief": {
+      "pass": "No single Drifta changed — whole lines did. You made armor cheap, and the tough line out-bred the fast one, birth by birth. The variation was there all along; your price change only tilted the sorting. That sorting is natural selection. It plans nothing and improves nothing — it counts births. And at full price, keeping both lines was selection too.",
+      "fail": "Nothing was sorted your way. Check the one switch that decides it all: with mutation off, the lines freeze. Nothing varies, so nothing can win. Sorting works only where the young can differ. Open the panel, keep mutation on, lower Drifta's kp price, and let the pond count births."
+    }
+  },
+  {
+    "key": "refuge",
+    "n": 11,
+    "title": "The Refuge",
+    "science": "Spatial refuges · edge effects",
+    "question": "Can architecture save the hunted?",
+    "briefing": "Grazers everywhere, and the plankton needs shelter. On the sun's flank stands a three-sided pen of fine mesh: plankton drifts through, grazers cannot. Close the fourth side — the wall tool is yours. But look inside before you close. A shelter is only shelter if no hunter is in it.",
+    "goalText": "A standing refuge, no grazers inside",
+    "predict": {
+      "prompt": "A mesh pen, one side open. What makes it a refuge?",
+      "options": [
+        "Closing it — walls do the work",
+        "Closing it empty — check inside first",
+        "Nothing — walls change nothing here"
+      ],
+      "reflect": [
+        "Half right. The mesh keeps grazers out — and in. Closed around a grazer, the pen farms your plankton instead of sheltering it.",
+        "Right. An empty pen fills with drifting plankton and stays safe. The mesh admits the small and refuses the hungry.",
+        "Walls changed everything, in both directions. Closed empty: a refuge. Closed around a grazer: a feedlot."
+      ]
+    },
+    "world": {
+      "seed": 44,
+      "found": {
+        "2": 24
+      }
+    },
+    "script": [
+      {
+        "t": 600,
+        "event": {
+          "type": "wallAdd",
+          "x0": 352,
+          "y0": 544,
+          "dx": 128,
+          "dy": 0,
+          "lt": 0.9,
+          "ht": 0.9,
+          "fl": 0.7,
+          "pass": 11
+        }
+      },
+      {
+        "t": 600,
+        "event": {
+          "type": "wallAdd",
+          "x0": 480,
+          "y0": 544,
+          "dx": 0,
+          "dy": 128,
+          "lt": 0.9,
+          "ht": 0.9,
+          "fl": 0.7,
+          "pass": 11
+        }
+      },
+      {
+        "t": 600,
+        "event": {
+          "type": "wallAdd",
+          "x0": 480,
+          "y0": 672,
+          "dx": -128,
+          "dy": 0,
+          "lt": 0.9,
+          "ht": 0.9,
+          "fl": 0.7,
+          "pass": 11
+        }
+      }
+    ],
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": true,
+      "evolution": false
+    },
+    "deadline": 14000,
+    "sustain": 150,
+    "narrate": [
+      "estab",
+      "extinct",
+      "crashev",
+      "bloom"
+    ],
+    "pass": [
+      {
+        "m": "at",
+        "sp": 1,
+        "x": 416,
+        "y": 608,
+        "r": 64,
+        "op": ">=",
+        "v": 40
+      },
+      {
+        "m": "at",
+        "sp": 2,
+        "x": 416,
+        "y": 608,
+        "r": 64,
+        "op": "==",
+        "v": 0
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The plankton is gone everywhere. No pen shelters an empty pond."
+      }
+    ],
+    "timeoutWhy": "No refuge stood. A pen is shelter only when it closes empty: clear the grazers inside first, then seal the fourth side.",
+    "meter": [
+      {
+        "label": "penned Drifta",
+        "m": "at",
+        "sp": 1,
+        "x": 416,
+        "y": 608,
+        "r": 64,
+        "goal": 40
+      },
+      {
+        "label": "grazers inside",
+        "m": "at",
+        "sp": 2,
+        "x": 416,
+        "y": 608,
+        "r": 64,
+        "goal": 0,
+        "dir": -1
+      }
+    ],
+    "debrief": {
+      "pass": "The pen stands full: plankton drifts in through the mesh, and nothing hungry follows. A place the hunted can reach and the hunter cannot is called a refuge. Notice what made it one — not the wall, but the emptiness inside when it closed. The same pen shut around one grazer becomes a farm for the thing it was built to save.",
+      "fail": "Walls are honest: they keep out, and they keep in. A pen closed around grazers is a feedlot. Your plankton drifts in through the mesh, and the trapped eat it forever. Clear the pen with the erase tool, then close the fourth side while it is empty."
+    }
+  },
+  {
+    "key": "outrun",
+    "n": 12,
+    "title": "Outrun the Sun",
+    "science": "Evolutionary rescue · mutation supply",
+    "question": "The sun is turning lethal. Can evolution arrive in time?",
+    "briefing": "At mid-morning the sun turns fierce, and the water around it warms by six. The grazers will follow their old warmth sense into the heat. In the Evolution panel, raise the mutation rate of Cilio's warmth preference — before the heat. The answer must already be breeding when the question comes.",
+    "goalText": "Keep the grazers through the heat",
+    "predict": {
+      "prompt": "The sun will turn lethal at mid-morning. What saves the grazers?",
+      "options": [
+        "They evolve away from the heat in time",
+        "Nothing — the heat wins before evolution moves",
+        "Only variation fed in before the crisis"
+      ],
+      "reflect": [
+        "Some did — on this pond. The cool-seeking line was already breeding when the heat came. That head start was everything.",
+        "At the pond's own mutation rate, yes: the trap closes in minutes and the answer arrives late. You can change that rate.",
+        "Right. Rescue is bought in advance or not at all. By the time the trouble is visible, the answer had to be in the genes."
+      ]
+    },
+    "world": {
+      "seed": 11,
+      "mutation": true
+    },
+    "script": [
+      {
+        "t": 3000,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 6
+        }
+      }
+    ],
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": true
+    },
+    "deadline": 15000,
+    "sustain": 350,
+    "narrate": [
+      "heatTrap",
+      "sweep",
+      "extinct",
+      "crashev"
+    ],
+    "latch": [
+      {
+        "id": "hot",
+        "when": [
+          {
+            "m": "ch",
+            "c": 60,
+            "op": ">=",
+            "v": 2
+          }
+        ]
+      }
+    ],
+    "pass": [
+      {
+        "latched": "hot"
+      },
+      {
+        "m": "pop",
+        "sp": 2,
+        "op": ">=",
+        "v": 20
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 2,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The grazers are gone. Their old warmth sense led them into the heat, and the cool-seeking line was still too rare to carry them."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The plankton is gone — the pond lost its middle."
+      }
+    ],
+    "timeoutWhy": "The grazers never held through the heat. Rescue is bought before the crisis: raise the variation while the water is still cool.",
+    "meter": [
+      {
+        "label": "Cilio",
+        "m": "pop",
+        "sp": 2,
+        "goal": 20
+      },
+      {
+        "label": "Drifta",
+        "m": "pop",
+        "sp": 1
+      }
+    ],
+    "debrief": {
+      "pass": "The cool-seeking line was already there when the heat came — rare, ready, and spreading as the heat-followers died. That is called evolutionary rescue, and it is never a promise. On many ponds the same move still loses; you bought a ticket, not a guarantee. The ticket's price was variation, and it was paid in advance. That is the only time it can be paid.",
+      "fail": "Evolution had the answer — cool-seekers — but an answer must already be breeding when the question arrives. Raised too late, variation feeds a graveyard. Set the mutation rate of Cilio's warmth preference high while the water is still cool. And even then: hold your breath."
+    }
   }
 ];
 // ============================================================
@@ -2224,18 +2858,24 @@ const LEVEL_ROWS = [
 //     world is its own world, like a moved sun — no conformance claim.
 // ============================================================
 const LVL = { def: null, state: "idle", run: 0, seenS: 0, pourLeft: 0, failWhy: "", predicted: -1,
-  mem: {} }; // per-run scratch for stateful predicates (e.g. "extinct AFTER being present"); sample-driven, so deterministic
+  mem: {},      // per-run scratch for stateful predicates (e.g. "extinct AFTER being present"); sample-driven, so deterministic
+  fired: 0,     // F4: how many script entries have fired
+  src0: 0,      // sources present at founding; the "added" apparatus locks exactly these
+  rgDef: [], rg: null, rgS: 0 }; // F5: the level's region census — specs, ring (REC.N rows), captured-sample watermark
 
 // one recorder sample, `back` samples before the latest (pure ring-buffer reads)
 function lvlSample(back){
   const r = ((W.recHead - 1 - back + REC.N) % REC.N) * REC.CH, B = W.rec;
   const total = B[r+14] + B[r+15] + B[r+16] + B[r+17];
   return { pop: sp => B[r+sp], free: B[r+14],
-    lockShare: (B[r+16] + B[r+17]) / Math.max(1, total) };
+    lockShare: (B[r+16] + B[r+17]) / Math.max(1, total),
+    raw: c => B[r + c] }; // any recorder channel — the "ch" metric (L9 reads locus means)
 }
 
 function levelStart(def, predicted){
-  P.mutation = false;   // experiments run on the certified silent world; the sandbox restores true
+  // Experiments run on the certified silent world unless the level DECLARES the evolving one
+  // (L9+: world.mutation true). The sandbox restores true on its own entry either way.
+  P.mutation = def.world.mutation === true;
   P.lightMul = 1.0;
   resetWorld();
   initWorld(def.world.seed, { found: def.world.found, M0: def.world.M0 });
@@ -2244,6 +2884,78 @@ function levelStart(def, predicted){
   LVL.pourLeft = def.apparatus.pours === true ? Infinity : (def.apparatus.pours | 0);
   LVL.predicted = predicted === undefined ? -1 : predicted; // F1: committed before the run; contrast, never grade
   LVL.mem = {};
+  LVL.fired = 0; LVL.src0 = W.sources.length;
+  // F5: collect the level's census reads (deduplicated) from every predicate and meter row —
+  // "near" region counts (L7) and "share" locus shares (L9), one ring column each
+  const rgDef = [];
+  const need = c => {
+    if (c.m === "near" && !rgDef.some(d => d.k === "near" && d.sp === c.sp && d.src === c.src && d.r === c.r))
+      rgDef.push({ k: "near", sp: c.sp, src: c.src, r: c.r });
+    if (c.m === "at" && !rgDef.some(d => d.k === "at" && d.sp === c.sp && d.x === c.x && d.y === c.y && d.r === c.r))
+      rgDef.push({ k: "at", sp: c.sp, x: c.x, y: c.y, r: c.r }); // L11: a fixed-point region (the pen site)
+    if (c.m === "share" && !rgDef.some(d => d.k === "share" && d.sp === c.sp && d.plane === c.plane && d.side === c.side))
+      rgDef.push({ k: "share", sp: c.sp, plane: c.plane, side: c.side });
+  };
+  for (const c of def.pass) need(c);
+  if (def.latch) for (const l of def.latch) for (const c of l.when) need(c);
+  for (const f of def.failNow) for (const c of f.when) need(c);
+  for (const m of def.meter) need(m);
+  LVL.rgDef = rgDef; LVL.rg = rgDef.length ? new Float64Array(REC.N * rgDef.length) : null; LVL.rgS = 0;
+}
+
+// F5b (L9): the live share of a species' locus plane beyond the detector's own ±0.05 band
+// around g0 — the recorder's sweep-share definition, captured on the sample clock like a region.
+function lvlShare(g){
+  const L = TRAITS[g.sp].loci[g.plane]; if (!L) return 0;
+  const off = g.plane * MAXN; let n = 0, m = 0;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i] || W.sp[i] !== g.sp) continue;
+    n++;
+    const v = W.g[off + i];
+    if (g.side > 0 ? v > L.g0 + 0.05 : v < L.g0 - 0.05) m++;
+  }
+  return n ? m / n : 0;
+}
+
+// F5: one region census — live members of a species within toroidal radius r of a source
+// ("near") or of a fixed point ("at", L11's pen site). Pure read; squared distance only
+// (*, +), so the ported core computes it bit-identically.
+function lvlNear(g){
+  const s = g.k === "at" ? g : W.sources[g.src]; if (!s) return 0;
+  const HW = P.WORLD / 2; let n = 0;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i] || W.sp[i] !== g.sp) continue;
+    let dx = Math.abs(W.x[i] - s.x); if (dx > HW) dx = P.WORLD - dx;
+    let dy = Math.abs(W.y[i] - s.y); if (dy > HW) dy = P.WORLD - dy;
+    if (dx * dx + dy * dy <= g.r * g.r) n++;
+  }
+  return n;
+}
+
+// F4+F5: the level's per-tick hook. Call it before EVERY step() while a level runs — the UI's
+// tick loop, the harness, and the app all share this call site. It does two things, both
+// tick-anchored so no caller cadence can move a verdict:
+//   - fires scripted events at their declared tick (before the step that produces tick t —
+//     the harness's own action convention), composing applyEvent exactly like levelStart;
+//   - takes the region census one tick before each recorder sample lands (state at tick 20s-1
+//     for sample s), so by the time levelCheck consumes a sample its region row exists.
+// Idempotent within a tick: extra calls fire nothing twice and capture nothing twice.
+function levelScript(){
+  const def = LVL.def; if (!def || LVL.state !== "running") return;
+  if (def.script) while (LVL.fired < def.script.length && def.script[LVL.fired].t <= W.tick + 1)
+    applyEvent({ ...def.script[LVL.fired++].event });
+  const nr = LVL.rgDef.length;
+  if (nr && (W.tick + 1) % REC.STRIDE === 0){
+    const s = (W.tick + 1) / REC.STRIDE;
+    if (s > LVL.rgS){
+      const row = (s % REC.N) * nr;
+      for (let j = 0; j < nr; j++){
+        const d = LVL.rgDef[j];
+        LVL.rg[row + j] = d.k === "share" ? lvlShare(d) : lvlNear(d);
+      }
+      LVL.rgS = s;
+    }
+  }
 }
 function levelRestart(){ const d = LVL.def, p = LVL.predicted; if (d) levelStart(d, p); }
 // F2: the freshest Observatory event of a type this level narrates (pure read; null outside a level)
@@ -2261,12 +2973,33 @@ function levelAllows(what){
   if (what === "seed") return a.seed === "all";
   return !!a[what];
 }
+// Per-source lock (L7): sources === "added" opens only sources that appeared after founding —
+// the script's or the player's own. The founded sky stays part of the experiment.
+function levelAllowsSource(k){
+  if (!LVL.def) return true;
+  const a = LVL.def.apparatus.sources;
+  return a === true ? true : a === "added" ? k >= LVL.src0 : false;
+}
 function levelPourOk(){ return !LVL.def || LVL.pourLeft > 0; }
 function levelNotePour(d){ if (LVL.def && LVL.pourLeft !== Infinity) LVL.pourLeft = Math.max(0, LVL.pourLeft - d); }
 
 // ---- the predicate evaluator. Schema:
 //   condition  { m: "pop", sp } | { m: "lockShare" } | { m: "free" }, with op one of
-//              >= <= > < ==, and v the right-hand side; or { latched: id } for a set latch.
+//              >= <= > < ==, and v the right-hand side; or { latched: id } for a set latch;
+//              or { m: "near", sp, src, r } (F5) — the census of a species within toroidal
+//              radius r of source src, captured by levelScript on the sample clock;
+//              or { m: "at", sp, x, y, r } (L11) — the same census around a fixed point
+//              (a marked site rather than a source);
+//              or { m: "share", sp, plane, side } (L9) — the live share of that species'
+//              locus plane beyond g0±0.05 (side 1 = hi, -1 = lo; the sweep detector's own
+//              definition), captured like a region; or { m: "ch", c } — a raw recorder
+//              channel (L9 reads the locus mean at 42+sp).
+//   world.mutation  true runs the EVOLVING world (L9+); absent/false runs the certified
+//              silent world, as every earlier level does.
+//   script     [{ t, event }] (F4) — events the LEVEL fires at fixed ticks (before the step
+//              that produces tick t), through levelScript's per-tick call site.
+//   apparatus.sources  false | true | "added" — "added" locks the founded sky and opens only
+//              sources that appear after founding (levelAllowsSource).
 //   pass       AND of conditions.
 //   latch      [{ id, when }] — set once its conditions hold, evaluated before failNow, so a
 //              level can say "extinct AFTER being present". Per-run scratch (LVL.mem), sample-
@@ -2275,6 +3008,18 @@ function levelNotePour(d){ if (LVL.def && LVL.pourLeft !== Infinity) LVL.pourLef
 //   meter      [{ label, m, sp?, pct?, goal?, dir?, unit? }] — pct reads the share as a rounded
 //              percentage. A row with no goal is information, not an objective.
 function lvlMetric(S, r){
+  if (r.m === "near" || r.m === "at" || r.m === "share"){ // F5: the census the levelScript ring holds for this sample (S.s absolute)
+    const D = LVL.rgDef;
+    for (let j = 0; j < D.length; j++){
+      const d = D[j];
+      const hit = r.m === "near" ? d.k === "near" && d.sp === r.sp && d.src === r.src && d.r === r.r
+        : r.m === "at" ? d.k === "at" && d.sp === r.sp && d.x === r.x && d.y === r.y && d.r === r.r
+        : d.k === "share" && d.sp === r.sp && d.plane === r.plane && d.side === r.side;
+      if (hit) return LVL.rg[(S.s % REC.N) * D.length + j];
+    }
+    return 0;
+  }
+  if (r.m === "ch") return S.raw(r.c); // any recorder channel (L9: locus mean 42+sp)
   return r.m === "lockShare" ? S.lockShare : r.m === "free" ? S.free : S.pop(r.sp);
 }
 function lvlCond(S, M, c){
@@ -2296,7 +3041,8 @@ function lvlAll(S, M, list){
 // the HUD's meter rows for the latest sample; [] outside a level or before the first sample
 function levelMeter(){
   const def = LVL.def; if (!def || !W.recCount) return [];
-  const S = lvlSample(0);
+  const sNow = Math.floor(W.tick / REC.STRIDE);
+  const S = lvlSample(0); S.s = LVL.rgDef.length ? Math.min(sNow, LVL.rgS) : sNow;
   return def.meter.map(m => {
     const o = { label: m.label, v: m.pct ? Math.round(lvlMetric(S, m) * 100) : lvlMetric(S, m) };
     if (m.goal !== undefined) o.goal = m.goal;
@@ -2312,12 +3058,15 @@ function levelCheck(){
   const L = LVL, def = L.def;
   if (!def || L.state !== "running") return L.state;
   const sNow = Math.floor(W.tick / REC.STRIDE);
-  let news = sNow - L.seenS;
+  // F5: a sample is judged only once its region row exists (levelScript's watermark); with the
+  // per-tick call site in place the watermark equals sNow, so non-region levels are untouched.
+  const sEval = L.rgDef.length ? Math.min(sNow, L.rgS) : sNow;
+  let news = sEval - L.seenS;
   if (news > 0){
     if (news > W.recCount) news = W.recCount;
     if (news > REC.N) news = REC.N;
     for (let k = news - 1; k >= 0 && L.state === "running"; k--){
-      const S = lvlSample(k);
+      const S = lvlSample(sNow - sEval + k); S.s = sEval - k;
       if (def.latch) for (const l of def.latch) if (lvlAll(S, L.mem, l.when)) L.mem[l.id] = 1;
       let why = "";
       for (const f of def.failNow) if (lvlAll(S, L.mem, f.when)){ why = f.why; break; }
@@ -2325,7 +3074,7 @@ function levelCheck(){
       L.run = lvlAll(S, L.mem, def.pass) ? L.run + 1 : 0;
       if (L.run >= (def.sustain || 10)) L.state = "passed";
     }
-    L.seenS = sNow;
+    L.seenS = sEval;
   }
   if (L.state === "running" && W.tick >= def.deadline){
     L.state = "failed"; L.failWhy = def.timeoutWhy || "Time ran out.";
@@ -2722,8 +3471,12 @@ function step(){
   if (W.tick % REC.STRIDE === 0) record();
 }
 
-// the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul)
-const LOCUS_SHIPPED = TRAITS.map(T => T.loci.map(L => ({ sigma: L.sigma, curve: L.curve })));
+// the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul).
+// ALL locus fields, not only sigma/curve: the Phase 6 price sliders edit slopes through the same
+// locus event, and a partial restore leaked an edited price across every reset — sandbox, level
+// entry and harness case alike (caught 2026-09-01 when L9's kp case poisoned the gate cases after
+// it). Restoring values that are already shipped is a no-op, so certified runs are untouched.
+const LOCUS_SHIPPED = TRAITS.map(T => T.loci.map(L => ({ ...L })));
 function resetWorld(){
   W.initialized = false; W.n = 0; W.freeList.length = 0; W.alive.fill(0);
   W.tick = 0; W.events.length = 0; W.eventLog.length = 0;
@@ -2736,7 +3489,7 @@ function initWorld(seed, sc){
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
   // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
-  TRAITS.forEach((T, sp) => T.loci.forEach((L, k) => { L.sigma = LOCUS_SHIPPED[sp][k].sigma; L.curve = LOCUS_SHIPPED[sp][k].curve; }));
+  TRAITS.forEach((T, sp) => T.loci.forEach((L, k) => Object.assign(L, LOCUS_SHIPPED[sp][k])));
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
   det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0); det.adapt.fill(0); det.adaptRun.fill(0);
   det.heatRetreat.fill(0); det.heatPile=false; det.heatPileRun=0; det.heatStarve=false; det.heatStarveRun=0;
@@ -2776,5 +3529,5 @@ if (typeof module !== "undefined" && module.exports !== undefined){
     cellLight, neighbors, step, initWorld, resetWorld, applyEvent, drainEvents,
     queueEvent, mulberry32, CELL, MAXN, MAXLOCI,
     makeWall, compileWalls, marchMul, pathBlocked,
-    LEVELS, LEVEL_ROWS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter, levelAllows, levelPourOk, levelNotePour, levelNarration };
+    LEVELS, LEVEL_ROWS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter, levelAllows, levelAllowsSource, levelPourOk, levelNotePour, levelNarration, levelScript };
 }

@@ -664,6 +664,23 @@ pub extern "system" fn Java_org_microcosm_app_Native_levelAllows(
     abi::mc_level_allows(what)
 }
 
+/// F4+F5: the level's per-tick hook (scripted events + region census). Call before every step
+/// while a level runs; idempotent within a tick.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelScript(_env: JNIEnv, _this: JObject) {
+    abi::mc_level_script();
+}
+
+/// Per-source lock (L7): 1 when source `k` may be selected, edited, moved or removed.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_levelAllowsSource(
+    _env: JNIEnv,
+    _this: JObject,
+    k: jint,
+) -> jint {
+    abi::mc_level_allows_source(k)
+}
+
 #[no_mangle]
 pub extern "system" fn Java_org_microcosm_app_Native_levelPourOk(_env: JNIEnv, _this: JObject) -> jint {
     abi::mc_level_pour_ok()

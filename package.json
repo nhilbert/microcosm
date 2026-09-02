@@ -29,6 +29,7 @@
     "walls": "npm run build && node harness/walls.js",
     "levels": "npm run build && node harness/levels.js",
     "prose": "npm run build && node harness/prose.js",
+    "play": "npm run build && node harness/playthrough.js",
     "walls:all": "npm run build && node harness/walls.js --open --seal --hideout --shade",
     "apk:assets": "node tools/build-app.js",
     "wasm": "cd rust/microcosm-core && cargo build --release --target wasm32-unknown-unknown --lib",

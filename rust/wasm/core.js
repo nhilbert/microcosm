@@ -320,6 +320,10 @@ function levelAllows(what){
 }
 function levelPourOk(){ return !!X.mc_level_pour_ok(); }
 function levelNotePour(d){ X.mc_level_note_pour(d | 0); }
+// F4+F5: the level's per-tick hook (scripted events + region census); call before every step.
+function levelScript(){ X.mc_level_script(); sync(); }
+// Per-source lock (L7): may source k be selected, edited, moved or removed?
+function levelAllowsSource(k){ return !!X.mc_level_allows_source(k | 0); }
 function levelNarration(){
   const i = X.mc_level_narration();
   return i < 0 ? null : W.sysEvents[i];
@@ -462,7 +466,7 @@ module.exports = {
   wrap, wd, cellOf, mulberry32,
   indicators, impact, ivPush, ivCount, ivClear, IV_KINDS,
   LEVELS, LEVEL_ROWS: LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter,
-  levelAllows, levelPourOk, levelNotePour, levelNarration,
+  levelAllows, levelAllowsSource, levelPourOk, levelNotePour, levelNarration, levelScript,
   markPrev, makeGrammar, bucketSpec, frameOf, TINT_BINS: 7, LOD_Z, pickRadius, pickCandidates,
   undo, undoKind, undoSpecies, undoClear,
   fieldCarpet, fieldMineral, fieldCorpsePall, fieldShade,

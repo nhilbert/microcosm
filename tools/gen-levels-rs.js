@@ -34,7 +34,56 @@ function metric(c, what) {
     if (!Number.isInteger(c.sp) || c.sp < 0 || c.sp > 6) throw new Error(`bad species in ${what}: ${c.sp}`);
     return `Metric::Pop(${c.sp})`;
   }
+  if (c.m === "near") { // F5: region census — species sp within radius r of source src
+    if (!Number.isInteger(c.sp) || c.sp < 0 || c.sp > 6) throw new Error(`bad species in ${what}: ${c.sp}`);
+    if (!Number.isInteger(c.src) || c.src < 0) throw new Error(`bad source index in ${what}: ${c.src}`);
+    return `Metric::Near { sp: ${c.sp}, src: ${c.src}, r: ${f(c.r, what + ".r")} }`;
+  }
+  if (c.m === "at") { // L11: the census around a fixed point (a marked site)
+    if (!Number.isInteger(c.sp) || c.sp < 0 || c.sp > 6) throw new Error(`bad species in ${what}: ${c.sp}`);
+    return `Metric::At { sp: ${c.sp}, x: ${f(c.x, what + ".x")}, y: ${f(c.y, what + ".y")}, r: ${f(c.r, what + ".r")} }`;
+  }
+  if (c.m === "share") { // L9: locus-plane share beyond g0±0.05, side 1 = hi / -1 = lo
+    if (!Number.isInteger(c.sp) || c.sp < 0 || c.sp > 6) throw new Error(`bad species in ${what}: ${c.sp}`);
+    if (!Number.isInteger(c.plane) || c.plane < 0 || c.plane > 3) throw new Error(`bad plane in ${what}: ${c.plane}`);
+    if (c.side !== 1 && c.side !== -1) throw new Error(`bad side in ${what}: ${c.side}`);
+    return `Metric::Share { sp: ${c.sp}, plane: ${c.plane}, side: ${c.side} }`;
+  }
+  if (c.m === "ch") { // a raw recorder channel
+    if (!Number.isInteger(c.c) || c.c < 0 || c.c > 140) throw new Error(`bad channel in ${what}: ${c.c}`);
+    return `Metric::Ch(${c.c})`;
+  }
   throw new Error(`unknown metric in ${what}: ${JSON.stringify(c.m)}`);
+}
+
+// F4: a level's timeline entry. Only event types a shipped level actually uses are legal here —
+// extending the set means extending ScriptEvent in levels.rs first.
+function scriptStep(e, what) {
+  if (!Number.isInteger(e.t) || e.t < 0) throw new Error(`${what}: bad script tick ${e.t}`);
+  const ev = e.event;
+  const opt = k => ev[k] === undefined ? "None" : `Some(${f(ev[k], `${what}.${k}`)})`;
+  if (ev.type === "sourceAdd") {
+    return `ScriptStep { t: ${e.t}, event: ScriptEvent::SourceAdd { x: ${f(ev.x, what + ".x")}, ` +
+      `y: ${f(ev.y, what + ".y")}, i: ${opt("i")}, a: ${opt("a")}, sigma: ${opt("sigma")} } }`;
+  }
+  if (ev.type === "sourceSet") {
+    if (!Number.isInteger(ev.k) || ev.k < 0) throw new Error(`${what}: bad source index ${ev.k}`);
+    return `ScriptStep { t: ${e.t}, event: ScriptEvent::SourceSet { k: ${ev.k}, ` +
+      `i: ${opt("i")}, a: ${opt("a")}, sigma: ${opt("sigma")} } }`;
+  }
+  if (ev.type === "wallAdd") { // L11: scripted pen sides — every field explicit, no defaults
+    for (const k of ["x0", "y0", "dx", "dy", "lt", "ht", "fl"]) f(ev[k], `${what}.${k}`);
+    if (!Number.isInteger(ev.pass)) throw new Error(`${what}: bad wall pass mask ${ev.pass}`);
+    return `ScriptStep { t: ${e.t}, event: ScriptEvent::WallAdd { x0: ${f(ev.x0, what)}, y0: ${f(ev.y0, what)}, ` +
+      `dx: ${f(ev.dx, what)}, dy: ${f(ev.dy, what)}, lt: ${f(ev.lt, what)}, ht: ${f(ev.ht, what)}, ` +
+      `fl: ${f(ev.fl, what)}, pass: ${ev.pass} } }`;
+  }
+  if (ev.type === "spawnPack") { // L10: the timeline founds a colony
+    if (!Number.isInteger(ev.sp) || ev.sp < 0 || ev.sp > 6) throw new Error(`${what}: bad species ${ev.sp}`);
+    return `ScriptStep { t: ${e.t}, event: ScriptEvent::SpawnPack { sp: ${ev.sp}, ` +
+      `x: ${f(ev.x, what + ".x")}, y: ${f(ev.y, what + ".y")} } }`;
+  }
+  throw new Error(`${what}: unknown script event ${JSON.stringify(ev.type)}`);
 }
 
 // Latch ids are strings in the table (readable) and slots in Rust (no allocation at check time).
@@ -60,7 +109,7 @@ out.push("// carries the player text an app shell needs) and the typed table the
 out.push("// walks. CI re-runs the generator and fails on a diff, so the two cores cannot drift.");
 out.push("#![allow(clippy::all)]");
 out.push("");
-out.push("use crate::levels::{Cond, FailRule, Latch, LevelDef, MeterRow, Metric, Op};");
+out.push("use crate::levels::{Cond, FailRule, Latch, LevelDef, MeterRow, Metric, Op, ScriptEvent, ScriptStep, SourcesGate};");
 out.push("");
 out.push("/// The level definitions exactly as `src/observatory/levels.json` carries them.");
 out.push("pub const LEVELS_JSON: &str = r##\"" + JSON.stringify(ROWS) + "\"##;");
@@ -85,15 +134,23 @@ for (const L of ROWS) {
   const ap = L.apparatus;
   const pours = ap.pours === true ? "-1" : String(ap.pours | 0);
   if (ap.seed !== false && ap.seed !== "all") throw new Error(`${what}: unknown seed apparatus ${JSON.stringify(ap.seed)}`);
+  const sources = ap.sources === true ? "SourcesGate::All" : ap.sources === "added" ? "SourcesGate::Added"
+    : ap.sources === false ? "SourcesGate::None"
+    : (() => { throw new Error(`${what}: unknown sources apparatus ${JSON.stringify(ap.sources)}`); })();
+  const script = (L.script || []).map((e, i) => scriptStep(e, `${what}.script[${i}]`));
+  for (let i = 1; i < (L.script || []).length; i++)
+    if (L.script[i].t < L.script[i - 1].t) throw new Error(`${what}: script not sorted by tick`);
 
   out.push("    LevelDef {");
   out.push(`        key: ${s(L.key)}, n: ${L.n | 0},`);
   out.push(`        seed: ${L.world.seed | 0},`);
   out.push(`        found: [${found.join(", ")}],`);
   out.push(`        m0: ${L.world.M0 === undefined ? "0.0" : f(L.world.M0, what + ".M0")}, has_m0: ${b(L.world.M0 !== undefined)},`);
+  out.push(`        mutation: ${b(L.world.mutation === true)},`);
   out.push(`        light_mul: ${L.world.lightMul === undefined ? "0.0" : f(L.world.lightMul, what + ".lightMul")}, has_light_mul: ${b(L.world.lightMul !== undefined)},`);
   out.push(`        pours: ${pours}, seed_all: ${b(ap.seed === "all")},`);
-  out.push(`        sources: ${b(ap.sources)}, walls: ${b(ap.walls)}, evolution: ${b(ap.evolution)},`);
+  out.push(`        sources: ${sources}, walls: ${b(ap.walls)}, evolution: ${b(ap.evolution)},`);
+  out.push(`        script: &[${script.join(", ")}],`);
   out.push(`        deadline: ${L.deadline | 0}, sustain: ${L.sustain | 0},`);
   out.push(`        narrate: &[${(L.narrate || []).map(s).join(", ")}],`);
   out.push(`        pass: ${condList(L.pass, latchIds, what + ".pass")},`);

@@ -819,6 +819,22 @@ pub extern "C" fn mc_level_allows(what: i32) -> i32 {
     s().level_allows(a) as i32
 }
 
+/// F4+F5: the level's per-tick hook — scripted events plus the region census. Call before
+/// every `mc_step` while a level runs; idempotent within a tick.
+#[no_mangle]
+pub extern "C" fn mc_level_script() {
+    s().level_script();
+}
+
+/// Per-source lock (L7): 1 when source `k` may be selected, edited, moved or removed.
+#[no_mangle]
+pub extern "C" fn mc_level_allows_source(k: i32) -> i32 {
+    if k < 0 {
+        return 0;
+    }
+    s().level_allows_source(k as usize) as i32
+}
+
 #[no_mangle]
 pub extern "C" fn mc_level_pour_ok() -> i32 {
     s().level_pour_ok() as i32
