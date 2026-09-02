@@ -399,3 +399,32 @@ and a tool that makes them: `tools/level-thumbs.js` (`npm run thumbs`).
   between runs (±a few ticks) — a curation tool, not a gate. Regeneration is deliberate.
   L7's picture is the lonely risen sun on dark water by design: the level's concept is that
   nothing is there until something is carried there.
+
+## 13. The standing-sun badge stops being a monument (owner report, 2026-09-02)
+
+"Move the sun and an undo bar sits at the top forever; it should leave by itself after a
+short while." Reproduced by reading the code: U2.3 shipped the badge as *persistent* — it wore
+amber until the sun was put back, and a moved sun never returns to its founding by itself, so
+the bar was permanent by construction. This is the round-3 undo-chip finding ("it is an offer,
+not a monument") arriving one round later at the badge.
+
+Fix (`WorldView`, the badge block): the badge is now a **notice with a freshness window**. Any
+change to source 0's tuple (x, y, i, a, sigma) re-arms it for `SUN_BADGE_SHOW_NS` = 90 s of real
+time — twice the undo chip's 45 s, so the notice still outlives the offer to put the world back,
+which was U2.3's whole reason for existing — and then it goes. Nothing else re-arms it: an
+unrelated pour leaves it alone (the chip's `ivCount` freshness would not have). Founding a
+world, restarting a level and loading a save re-baseline the sky, so a restored change is
+history and wears no badge, exactly as restored interventions get no chip.
+
+What this costs, recorded rather than smoothed over: `putSunBack` — the one path back to the
+*founding* sun — hangs off the badge's tap, so after 90 s that path is gone and the player is
+left with the sun card's sliders and the undo slot. And the outrun study's conviction (a sun
+press left standing five minutes outruns its undo) is now answered only while the notice is up;
+past that the world carries a standing change the chrome no longer mentions. Both are the
+owner's call, taken with the report; if the restore path is wanted permanently it belongs on the
+sun card as its own row, not on a bar that never leaves.
+
+Gate: the boot gate's badge block now walks the whole life — appears on a moved sun, clears on
+restore (as before), then, with the window shortened through `world.sunBadgeShowNs`, leaves by
+itself **while the change still stands**, and comes back when the sun is touched again. App
+suite green, `npm test` green, conformance bit-identical (the core is untouched).
