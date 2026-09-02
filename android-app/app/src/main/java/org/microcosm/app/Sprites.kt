@@ -82,14 +82,23 @@ object Sprites {
 
         if (shape == SQUARE) {
             // Bacillus: a rod colony in a shared capsule — still the dimmest body by design.
-            // The feeding dial rounds the rod corners; the rods never change size with it.
+            // The rods form a loose CHAIN along +x (streptobacillus-style), because the painter
+            // rotates this bake by the record's own heading: the owner's report (2026-09-02) was
+            // that a fixed unrotated triangle constellation read as "Formationsflug/Raumschiff" —
+            // a chain gives the colony an axis, so it swims lengthwise and visibly slews at
+            // every tumble. Relative rod motion inside the colony would be clock animation,
+            // which the owner rejected; the dynamics come from the sim's heading instead.
+            g.save()
+            g.translate(C, C)
+            g.scale(1.5f, 0.65f) // the shared capsule follows the chain
             p.shader = RadialGradient(
-                C, C, C,
+                0f, 0f, C,
                 intArrayOf(argb(0.45, r, gg, b), argb(0.45, r, gg, b), argb(0.15, r, gg, b), argb(0.0, r, gg, b)),
                 floatArrayOf(0f, stop(0f), stop(0.45f), stop(1f)),
                 Shader.TileMode.CLAMP,
             )
-            g.drawRect(0f, 0f, S.toFloat(), S.toFloat(), p)
+            g.drawRect(-C, -C, C, C, p)
+            g.restore()
             p.shader = null
             p.style = Paint.Style.FILL
             p.color = argb(0.85, min(255, r + 45), min(255, gg + 45), min(255, b + 40))
@@ -100,9 +109,8 @@ object Sprites {
             val hh = (1.9 + round * 0.6).toFloat()
             val corner = (1.0 + round * 2.4).toFloat()
             val rod = RectF(-hw, -hh, hw, hh)
-            // spread far enough apart to read as a colony of rods, not one blob (its first
-            // photograph merged them); each rod wears a dark seam so overlaps stay separable
-            val place = floatArrayOf(-4.5f, -5f, 8f, 4f, 1.2f, 28f, -2.5f, 6f, -14f)
+            // end-to-end with organic jitter; each rod wears a dark seam so overlaps separate
+            val place = floatArrayOf(-7.4f, -0.9f, -9f, 0.2f, 0.7f, 5f, 7.6f, -0.5f, -4f)
             val seam = argb(0.6, (r * 0.35).roundToInt(), (gg * 0.35).roundToInt(), (b * 0.35).roundToInt())
             val body = p.color
             for (i in 0 until 3) {

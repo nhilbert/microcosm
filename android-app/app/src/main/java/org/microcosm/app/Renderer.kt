@@ -337,6 +337,17 @@ class Renderer(private val density: Double = 1.0) {
                         c.drawBitmap(bmp, null, dst, screen)
                         if (fade > 0f && specShape[sp] == Sprites.TRI) vecTri(c, r, sp, bk, fade)
                         c.restore()
+                    } else if (specShape[sp] == Sprites.SQUARE) {
+                        // Bacillus turns with its own heading — hd is written into every record
+                        // (frame.rs:569), so this is representation, not a new decision: the
+                        // chain bake swims lengthwise and slews at each tumble instead of
+                        // gliding as a fixed constellation (owner report, 2026-09-02)
+                        c.save()
+                        c.translate(sx, sy)
+                        c.rotate(Math.toDegrees(orgBuf.get(b + 6)).toFloat())
+                        dst.set(-r, -r, r, r)
+                        c.drawBitmap(bmp, null, dst, screen)
+                        c.restore()
                     } else {
                         dst.set(sx - r, sy - r, sx + r, sy + r)
                         c.drawBitmap(bmp, null, dst, screen)
