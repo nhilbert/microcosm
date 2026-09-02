@@ -157,6 +157,14 @@ conform:core bit-identical ×4 (hash rebound under this declaration), port:check
 bit-identical, android gates green (`--rerun-tasks`), npm test green. Owner verdict on
 the device pending.
 
+**GR.6b (same day)** — owner asked for a transition between body and husk. The swap was
+one tick; a true sim-side death age would need a corpse birth-tick written inside the
+tick of both cores (the JS core is frozen — rule 11), so the painter does it instead: a
+husk not seen before, recognized by its quantized world position (corpses never move),
+settles in over ~0.4 s — fade plus a slight deflate. A one-shot UI-clock event
+transition in the amber pour ring's category, explicitly not idle ornament; after
+arrival, the sim's decay clock is the only driver again.
+
 Portrait prompt already updated (GR.1); the owner regenerates `assets/species/venator.jpg`
 when convenient (the card hides the slot meanwhile if removed). CLAUDE.md status line,
 plan record sections filled with measured numbers, probe retired or kept as bench toy —
