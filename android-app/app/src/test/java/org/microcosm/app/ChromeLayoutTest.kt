@@ -66,8 +66,15 @@ class ChromeLayoutTest {
             // A drawer row is measured at the drawer's inner width, not the screen's — that is
             // the width it actually gets, and where "Speichern" really overflowed.
             for ((name, row) in rows(c)) {
-                val w = if (name in Chrome.IN_DRAWER) Chrome.DRAWER_DP - 2 * Chrome.DRAWER_PAD_DP
-                        else prof.wDp
+                val w = when (name) {
+                    in Chrome.IN_DRAWER -> Chrome.DRAWER_DP - 2 * Chrome.DRAWER_PAD_DP
+                    // The specimen actions live in the sheet, inside its padding, and share
+                    // that width with the creature's name. Measuring the cluster alone at the
+                    // sheet's inner width is the honest floor and no more: it proves the three
+                    // targets fit and stay 48 dp, not that the name beside them still does.
+                    "specimen" -> prof.wDp - 2 * Chrome.SHEET_PAD_DP
+                    else -> prof.wDp
+                }
                 for (v in LayoutGate.check(name, row, prof, w)) found[v.key] = v
             }
         }

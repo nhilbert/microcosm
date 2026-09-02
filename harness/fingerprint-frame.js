@@ -102,7 +102,7 @@ function report(label){
       console.log(`  view${v} ${hlabel.padEnd(15)} org ${String(fr.orgN).padStart(5)}` +
         ` corpse ${String(fr.corpseN).padStart(4)} pops ${fr.pops.join(",")}` +
         ` mn ${h(fr.mnBound)} orgHash ${shaD(fr.org, fr.orgN * 8)}` +
-        ` corpseHash ${shaD(fr.corpse, fr.corpseN * 4)}`);
+        ` corpseHash ${shaD(fr.corpse, fr.corpseN * 6)}`);
       if (hlabel === "nothing hidden"){ // the first record of each kind in full, so a diff names the path
         const seen = new Set();
         for (let q = 0; q < fr.orgN; q++){
@@ -113,7 +113,7 @@ function report(label){
             ` r ${h(fr.org[b+3])} sp ${fr.org[b+4]} bucket ${fr.org[b+5]} hd ${h(fr.org[b+6])} flags ${fr.org[b+7]}`);
         }
         if (fr.corpseN) console.log(`    corpse[0] sx ${h(fr.corpse[0])} sy ${h(fr.corpse[1])}` +
-          ` r ${h(fr.corpse[2])} a ${h(fr.corpse[3])}`);
+          ` r ${h(fr.corpse[2])} a ${h(fr.corpse[3])} sp ${h(fr.corpse[4])} fresh ${h(fr.corpse[5])}`);
       }
     }
   }
@@ -123,11 +123,20 @@ function report(label){
 // same bucket, which would let a mistranslated bin table pass unnoticed.
 P.mutation = true;
 C.resetWorld(); C.initWorld(11);
-W.px.set(W.x); W.py.set(W.y);
+// The GR.5 spline reads two segments back: shift ppx<-px<-x exactly as the shells do. On the
+// wasm core W.ppx is a memory view over the Rust field; on the JS core it is attached here —
+// either way both frame builders see the identical anchor pipeline, so the curve arithmetic
+// itself is inside the fingerprint.
+const mark = () => {
+  if (!W.ppx){ W.ppx = new Float32Array(W.px.length); W.ppy = new Float32Array(W.py.length); }
+  W.ppx.set(W.px); W.ppy.set(W.py);
+  W.px.set(W.x); W.py.set(W.y);
+};
+mark();
 report("founding");
-for (let t = 0; t < 600; t++){ W.px.set(W.x); W.py.set(W.y); C.step(); }
+for (let t = 0; t < 600; t++){ mark(); C.step(); }
 report("t=600");
-for (let t = 0; t < 2400; t++){ W.px.set(W.x); W.py.set(W.y); C.step(); }
+for (let t = 0; t < 2400; t++){ mark(); C.step(); }
 report("t=3000");
 
 // A world with the apparatus in it: a second sun, a cold one, and two walls — the glow, shade and
@@ -136,6 +145,6 @@ C.applyEvent({ type: "sourceAdd", x: 300, y: 700, i: 0.7, a: 6, sigma: 150 });
 C.applyEvent({ type: "sourceAdd", x: 880, y: 120, i: 0, a: -8, sigma: 120 });
 C.applyEvent({ type: "wallAdd", x0: 200, y0: 200, dx: 300, dy: 40, lt: 0.5, ht: 0.2, fl: 0.1, pass: 0 });
 C.applyEvent({ type: "wallAdd", x0: 700, y0: 900, dx: -60, dy: 220, lt: 0, ht: 0, fl: 1, pass: 4 });
-for (let t = 0; t < 200; t++){ W.px.set(W.x); W.py.set(W.y); C.step(); }
+for (let t = 0; t < 200; t++){ mark(); C.step(); }
 report("suns + walls, t=3200");
 P.mutation = false;

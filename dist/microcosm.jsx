@@ -1753,7 +1753,7 @@ const LEVEL_ROWS = [
       "reflect": [
         "Mixing does spread them — but far too slowly. Doses poured at the dark shore arrived late, and the clock ran out.",
         "Right: mineral moves slowly, and the mat drinks what lands beside it.",
-        "The lever was pinned at its ceiling the whole time. The scarcest ingredient ruled, and it was not light."
+        "The lever was pinned at its ceiling the whole time. The scarcest ingredient ruled — and it wasn't light."
       ]
     },
     "world": {
@@ -2110,7 +2110,7 @@ const LEVEL_ROWS = [
     ],
     "debrief": {
       "pass": "You added an eater, and the whole pond got richer. The meadow nearly doubled; the bloom fell to a quarter — and held. Here is why: grazing keeps mineral moving. Eaten, returned to the water, taken up again. All your pouring couldn't do that. This pond was never hungry. It was unfinished.",
-      "fail": "More soup did not make a richer pond. The bloom drank every pour and just stood there. What this pond is missing has a mouth: seed the grazer, and watch what an eater does that pouring can't."
+      "fail": "More soup did not make a richer pond. The bloom drank every pour and just stood there. What this pond is missing has a mouth: seed the grazer, and watch an eater do what pouring can't."
     }
   },
   {
@@ -2119,7 +2119,7 @@ const LEVEL_ROWS = [
     "title": "A Head Full of Hunters",
     "science": "Energy pyramid · apex predators",
     "question": "The pond is rich. How many hunters can it feed?",
-    "briefing": "A full pond: meadow, bloom, grazers, recyclers — and no hunter yet. Venator waits on your seeding bench. Found a pack that lasts.",
+    "briefing": "A full pond: meadow, bloom, grazers, recyclers — and no hunter yet. Venator waits on your seeding bench. Seed a pack that lasts.",
     "goalText": "A lasting pack — 4+ hunters, held long",
     "predict": {
       "prompt": "You're adding a top hunter. How many packs would you release?",
@@ -2225,6 +2225,640 @@ const LEVEL_ROWS = [
       "pass": "Your pack holds — a few hunters riding a wave of grazers, riding a wave of plankton. Count the layers: hundreds of plankton feed a hundred grazers feed a handful of hunters. Every meal loses most of its energy on the way up. That is the food chain's price, and why the top is always small — and always one bad season from gone.",
       "fail": "Hunters don't run out of courage — they run out of prey. The pond only makes so many grazers, and every extra mouth shrinks each hunter's share. Try one pack, seeded early, and give it room."
     }
+  },
+  {
+    "key": "outpost",
+    "n": 7,
+    "title": "The Second Sun",
+    "science": "Dispersal limitation · colonization",
+    "question": "A second sun will rise over dark water. What grows there?",
+    "briefing": "A living pond under one sun — and soon a second sun rises, far across dark water. Bright, warm, empty. The seeding bench is open, and you can pour. The old sun is part of the experiment: it stays locked.",
+    "goalText": "Settle the new sun — mat and plankton",
+    "predict": {
+      "prompt": "A bright new sun over empty water. What happens?",
+      "options": [
+        "Life drifts over and settles it",
+        "It stays empty until something is carried there",
+        "The new sun drains the old one"
+      ],
+      "reflect": [
+        "Drifting is slow. The plankton never crossed the dark water, and the mat's creep came far too late.",
+        "Right. Light was never the missing thing. A traveler was.",
+        "The old sun kept its whole pond. A second sun adds a second stage — but an empty one."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "found": {
+        "0": 120,
+        "1": 500,
+        "2": 12,
+        "3": 60,
+        "6": 0
+      }
+    },
+    "script": [
+      {
+        "t": 2000,
+        "event": {
+          "type": "sourceAdd",
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": "added",
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 12000,
+    "sustain": 10,
+    "narrate": [
+      "estab",
+      "extinct",
+      "crashev",
+      "bloom"
+    ],
+    "pass": [
+      {
+        "m": "near",
+        "sp": 0,
+        "src": 1,
+        "r": 200,
+        "op": ">=",
+        "v": 100
+      },
+      {
+        "m": "near",
+        "sp": 1,
+        "src": 1,
+        "r": 200,
+        "op": ">=",
+        "v": 150
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 0,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The last Solara died. Nothing is left to carry to the new sun."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The last Drifta died. Nothing is left to carry to the new sun."
+      }
+    ],
+    "timeoutWhy": "The new sun still has no working pond. Life had to be carried there — the mat and its plankton both.",
+    "meter": [
+      {
+        "label": "Solara · sun 2",
+        "m": "near",
+        "sp": 0,
+        "src": 1,
+        "r": 200,
+        "goal": 100
+      },
+      {
+        "label": "Drifta · sun 2",
+        "m": "near",
+        "sp": 1,
+        "src": 1,
+        "r": 200,
+        "goal": 150
+      }
+    ],
+    "debrief": {
+      "pass": "You carried life across the dark, and the new sun keeps a working pond. That trip was the whole secret. The water never needed better conditions — it needed a traveler. The plankton cannot cross dark water; the mat can creep, but far too slowly. Settling a new place is called colonization. Now keep watching your outpost: the bloom is already crowding the young meadow.",
+      "fail": "The new sun was never the problem — the trip was. Pours feed water, not distance, and no drifter survives the dark crossing. Seed the mat and the plankton under the new sun. Both: alone, the mat feeds no one, and the bloom locks the meadow out."
+    }
+  },
+  {
+    "key": "warmyear",
+    "n": 8,
+    "title": "The Warm Year",
+    "science": "Thermal performance · energy budgets",
+    "question": "The water warms. Nobody boils — so why does the top die first?",
+    "briefing": "Through the morning the sun's warmth climbs by five, and every body starts burning faster than it eats. The hunters starve first: their bill rises fastest. Feed them through the squeeze — but gently. A strongly fed pack strips the struggling grazers below it.",
+    "goalText": "Hold hunters and grazers through the heat",
+    "predict": {
+      "prompt": "The water is warming. Who fails first?",
+      "options": [
+        "The smallest cook first",
+        "The biggest hunger fails first",
+        "Everything declines together"
+      ],
+      "reflect": [
+        "Nobody cooked at all. Warmth kills by the bill, not the burn — and small bodies balance small budgets.",
+        "Right. Warmth raises upkeep faster than it raises the catch, and the top lives closest to its limit.",
+        "The bottom barely noticed. The mat and the mud fattened while the top starved — warming splits the pyramid."
+      ]
+    },
+    "world": {
+      "seed": 11
+    },
+    "script": [
+      {
+        "t": 3000,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 1
+        }
+      },
+      {
+        "t": 3400,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 2
+        }
+      },
+      {
+        "t": 3800,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 3
+        }
+      },
+      {
+        "t": 4200,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 4
+        }
+      },
+      {
+        "t": 4600,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 5
+        }
+      }
+    ],
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": "added",
+      "walls": false,
+      "evolution": false
+    },
+    "deadline": 16000,
+    "sustain": 350,
+    "narrate": [
+      "wake",
+      "extinct",
+      "crashev",
+      "estab"
+    ],
+    "latch": [
+      {
+        "id": "hot",
+        "when": [
+          {
+            "m": "ch",
+            "c": 59,
+            "op": ">=",
+            "v": 2
+          }
+        ]
+      }
+    ],
+    "pass": [
+      {
+        "latched": "hot"
+      },
+      {
+        "m": "pop",
+        "sp": 2,
+        "op": ">=",
+        "v": 5
+      },
+      {
+        "m": "pop",
+        "sp": 6,
+        "op": ">=",
+        "v": 4
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 6,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The hunters starved. Warming raised their bill fastest, and nothing was left over to pay it."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 2,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The grazers are gone — eaten out by a well-fed pack in a warming pond."
+      }
+    ],
+    "timeoutWhy": "The pyramid never steadied. The hunters need feeding through the squeeze, and a heavily fed pack eats the grazers out. Feed lightly, and hold.",
+    "meter": [
+      {
+        "label": "Venator",
+        "m": "pop",
+        "sp": 6,
+        "goal": 4
+      },
+      {
+        "label": "Cilio",
+        "m": "pop",
+        "sp": 2,
+        "goal": 5
+      }
+    ],
+    "debrief": {
+      "pass": "Nothing boiled, and the top nearly starved anyway. Warmth raises spending faster than catching, and the top lives closest to its limit. Your light feeding carried the hunters across the squeeze. And because it stayed light, the grazers below survived the extra teeth. In a warming pond, every helping hand pushes somewhere else. The measure of help is what it does two layers down.",
+      "fail": "Half measures fail one way here, strong measures another. Unfed, the hunters starve first — warming bills the top. Fed hard, they turn your help into teeth, and the grazers vanish. Feed the pack lightly — small portions, long pauses — and watch both lines hold."
+    }
+  },
+  {
+    "key": "sorting",
+    "n": 9,
+    "title": "The Sorting",
+    "science": "Natural selection · heritable variation",
+    "question": "Two Drifta lines share the water. What decides which one wins?",
+    "briefing": "The full pond, and nothing is frozen: young Drifta can differ from their parents. Tough ones dodge grazers; fast ones out-breed them. The pond keeps both, because armor is expensive. Open the Evolution panel and make armor cheaper: under Drifta's defense prices, pull kp well below its balance mark.",
+    "goalText": "Make the tough Drifta line win",
+    "predict": {
+      "prompt": "Armor gets cheap. What changes in Drifta?",
+      "options": [
+        "Each Drifta grows itself tougher armor",
+        "Tough lines out-breed the fast lines",
+        "Nothing heritable changes at all"
+      ],
+      "reflect": [
+        "Tap any Drifta and watch its card: it never changed. Only the mix of lines changed. Bodies don't learn — births count.",
+        "Right. Cheap armor tips the ledger, and births do the rest — no creature changed, the count did.",
+        "The change was heritable, and that was the point. Turn mutation off and the same cheap armor sorts nothing."
+      ]
+    },
+    "world": {
+      "seed": 101,
+      "mutation": true
+    },
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": true
+    },
+    "deadline": 18000,
+    "sustain": 10,
+    "narrate": [
+      "sweep",
+      "diverse",
+      "uniform",
+      "rail",
+      "estab",
+      "extinct"
+    ],
+    "pass": [
+      {
+        "m": "ch",
+        "c": 43,
+        "op": ">=",
+        "v": 0.6
+      },
+      {
+        "m": "share",
+        "sp": 1,
+        "plane": 0,
+        "side": 1,
+        "op": ">=",
+        "v": 0.6
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The plankton is gone — grazed to nothing. Nothing is left to sort."
+      }
+    ],
+    "timeoutWhy": "The tough line never took over in time. At full price, armor spreads too slowly — if at all. The price is the lever that tips it.",
+    "meter": [
+      {
+        "label": "tough line",
+        "m": "share",
+        "sp": 1,
+        "plane": 0,
+        "side": 1,
+        "pct": true,
+        "goal": 60,
+        "unit": "%"
+      },
+      {
+        "label": "Drifta",
+        "m": "pop",
+        "sp": 1
+      }
+    ],
+    "debrief": {
+      "pass": "No single Drifta changed — whole lines did. You made armor cheap, and the tough line out-bred the fast one, birth by birth. The variation was there all along; your price change only tilted the sorting. That sorting is natural selection. It plans nothing and improves nothing — it counts births. And at full price, keeping both lines was selection too.",
+      "fail": "Nothing was sorted your way. Check the one switch that decides it all: with mutation off, the lines freeze. Nothing varies, so nothing can win. Sorting works only where the young can differ. Open the panel, keep mutation on, lower Drifta's kp price, and let the pond count births."
+    }
+  },
+  {
+    "key": "refuge",
+    "n": 11,
+    "title": "The Refuge",
+    "science": "Spatial refuges · edge effects",
+    "question": "Can architecture save the hunted?",
+    "briefing": "Grazers everywhere, and the plankton needs shelter. On the sun's flank stands a three-sided pen of fine mesh: plankton drifts through, grazers cannot. Close the fourth side — the wall tool is yours. But look inside before you close. A shelter is only shelter if no hunter is in it.",
+    "goalText": "A standing refuge, no grazers inside",
+    "predict": {
+      "prompt": "A mesh pen, one side open. What makes it a refuge?",
+      "options": [
+        "Closing it — walls do the work",
+        "Closing it empty — check inside first",
+        "Nothing — walls change nothing here"
+      ],
+      "reflect": [
+        "Half right. The mesh keeps grazers out — and in. Closed around a grazer, the pen farms your plankton instead of sheltering it.",
+        "Right. An empty pen fills with drifting plankton and stays safe. The mesh admits the small and refuses the hungry.",
+        "Walls changed everything, in both directions. Closed empty: a refuge. Closed around a grazer: a feedlot."
+      ]
+    },
+    "world": {
+      "seed": 44,
+      "found": {
+        "2": 24
+      }
+    },
+    "script": [
+      {
+        "t": 600,
+        "event": {
+          "type": "wallAdd",
+          "x0": 352,
+          "y0": 544,
+          "dx": 128,
+          "dy": 0,
+          "lt": 0.9,
+          "ht": 0.9,
+          "fl": 0.7,
+          "pass": 11
+        }
+      },
+      {
+        "t": 600,
+        "event": {
+          "type": "wallAdd",
+          "x0": 480,
+          "y0": 544,
+          "dx": 0,
+          "dy": 128,
+          "lt": 0.9,
+          "ht": 0.9,
+          "fl": 0.7,
+          "pass": 11
+        }
+      },
+      {
+        "t": 600,
+        "event": {
+          "type": "wallAdd",
+          "x0": 480,
+          "y0": 672,
+          "dx": -128,
+          "dy": 0,
+          "lt": 0.9,
+          "ht": 0.9,
+          "fl": 0.7,
+          "pass": 11
+        }
+      }
+    ],
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": true,
+      "evolution": false
+    },
+    "deadline": 14000,
+    "sustain": 150,
+    "narrate": [
+      "estab",
+      "extinct",
+      "crashev",
+      "bloom"
+    ],
+    "pass": [
+      {
+        "m": "at",
+        "sp": 1,
+        "x": 416,
+        "y": 608,
+        "r": 64,
+        "op": ">=",
+        "v": 40
+      },
+      {
+        "m": "at",
+        "sp": 2,
+        "x": 416,
+        "y": 608,
+        "r": 64,
+        "op": "==",
+        "v": 0
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The plankton is gone everywhere. No pen shelters an empty pond."
+      }
+    ],
+    "timeoutWhy": "No refuge stood. A pen is shelter only when it closes empty: clear the grazers inside first, then seal the fourth side.",
+    "meter": [
+      {
+        "label": "penned Drifta",
+        "m": "at",
+        "sp": 1,
+        "x": 416,
+        "y": 608,
+        "r": 64,
+        "goal": 40
+      },
+      {
+        "label": "grazers inside",
+        "m": "at",
+        "sp": 2,
+        "x": 416,
+        "y": 608,
+        "r": 64,
+        "goal": 0,
+        "dir": -1
+      }
+    ],
+    "debrief": {
+      "pass": "The pen stands full: plankton drifts in through the mesh, and nothing hungry follows. A place the hunted can reach and the hunter cannot is called a refuge. Notice what made it one — not the wall, but the emptiness inside when it closed. The same pen shut around one grazer becomes a farm for the thing it was built to save.",
+      "fail": "Walls are honest: they keep out, and they keep in. A pen closed around grazers is a feedlot. Your plankton drifts in through the mesh, and the trapped eat it forever. Clear the pen with the erase tool, then close the fourth side while it is empty."
+    }
+  },
+  {
+    "key": "outrun",
+    "n": 12,
+    "title": "Outrun the Sun",
+    "science": "Evolutionary rescue · mutation supply",
+    "question": "The sun is turning lethal. Can evolution arrive in time?",
+    "briefing": "At mid-morning the sun turns fierce, and the water around it warms by six. The grazers will follow their old warmth sense into the heat. In the Evolution panel, raise the mutation rate of Cilio's warmth preference — before the heat. The answer must already be breeding when the question comes.",
+    "goalText": "Keep the grazers through the heat",
+    "predict": {
+      "prompt": "The sun will turn lethal at mid-morning. What saves the grazers?",
+      "options": [
+        "They evolve away from the heat in time",
+        "Nothing — the heat wins before evolution moves",
+        "Only variation fed in before the crisis"
+      ],
+      "reflect": [
+        "Some did — on this pond. The cool-seeking line was already breeding when the heat came. That head start was everything.",
+        "At the pond's own mutation rate, yes: the trap closes in minutes and the answer arrives late. You can change that rate.",
+        "Right. Rescue is bought in advance or not at all. By the time the trouble is visible, the answer had to be in the genes."
+      ]
+    },
+    "world": {
+      "seed": 11,
+      "mutation": true
+    },
+    "script": [
+      {
+        "t": 3000,
+        "event": {
+          "type": "sourceSet",
+          "k": 0,
+          "a": 6
+        }
+      }
+    ],
+    "apparatus": {
+      "pours": true,
+      "seed": "all",
+      "sources": false,
+      "walls": false,
+      "evolution": true
+    },
+    "deadline": 15000,
+    "sustain": 350,
+    "narrate": [
+      "heatTrap",
+      "sweep",
+      "extinct",
+      "crashev"
+    ],
+    "latch": [
+      {
+        "id": "hot",
+        "when": [
+          {
+            "m": "ch",
+            "c": 60,
+            "op": ">=",
+            "v": 2
+          }
+        ]
+      }
+    ],
+    "pass": [
+      {
+        "latched": "hot"
+      },
+      {
+        "m": "pop",
+        "sp": 2,
+        "op": ">=",
+        "v": 20
+      }
+    ],
+    "failNow": [
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 2,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The grazers are gone. Their old warmth sense led them into the heat, and the cool-seeking line was still too rare to carry them."
+      },
+      {
+        "when": [
+          {
+            "m": "pop",
+            "sp": 1,
+            "op": "==",
+            "v": 0
+          }
+        ],
+        "why": "The plankton is gone — the pond lost its middle."
+      }
+    ],
+    "timeoutWhy": "The grazers never held through the heat. Rescue is bought before the crisis: raise the variation while the water is still cool.",
+    "meter": [
+      {
+        "label": "Cilio",
+        "m": "pop",
+        "sp": 2,
+        "goal": 20
+      },
+      {
+        "label": "Drifta",
+        "m": "pop",
+        "sp": 1
+      }
+    ],
+    "debrief": {
+      "pass": "The cool-seeking line was already there when the heat came — rare, ready, and spreading as the heat-followers died. That is called evolutionary rescue, and it is never a promise. On many ponds the same move still loses; you bought a ticket, not a guarantee. The ticket's price was variation, and it was paid in advance. That is the only time it can be paid.",
+      "fail": "Evolution had the answer — cool-seekers — but an answer must already be breeding when the question arrives. Raised too late, variation feeds a graveyard. Set the mutation rate of Cilio's warmth preference high while the water is still cool. And even then: hold your breath."
+    }
   }
 ];
 // ============================================================
@@ -2251,18 +2885,24 @@ const LEVEL_ROWS = [
 //     world is its own world, like a moved sun — no conformance claim.
 // ============================================================
 const LVL = { def: null, state: "idle", run: 0, seenS: 0, pourLeft: 0, failWhy: "", predicted: -1,
-  mem: {} }; // per-run scratch for stateful predicates (e.g. "extinct AFTER being present"); sample-driven, so deterministic
+  mem: {},      // per-run scratch for stateful predicates (e.g. "extinct AFTER being present"); sample-driven, so deterministic
+  fired: 0,     // F4: how many script entries have fired
+  src0: 0,      // sources present at founding; the "added" apparatus locks exactly these
+  rgDef: [], rg: null, rgS: 0 }; // F5: the level's region census — specs, ring (REC.N rows), captured-sample watermark
 
 // one recorder sample, `back` samples before the latest (pure ring-buffer reads)
 function lvlSample(back){
   const r = ((W.recHead - 1 - back + REC.N) % REC.N) * REC.CH, B = W.rec;
   const total = B[r+14] + B[r+15] + B[r+16] + B[r+17];
   return { pop: sp => B[r+sp], free: B[r+14],
-    lockShare: (B[r+16] + B[r+17]) / Math.max(1, total) };
+    lockShare: (B[r+16] + B[r+17]) / Math.max(1, total),
+    raw: c => B[r + c] }; // any recorder channel — the "ch" metric (L9 reads locus means)
 }
 
 function levelStart(def, predicted){
-  P.mutation = false;   // experiments run on the certified silent world; the sandbox restores true
+  // Experiments run on the certified silent world unless the level DECLARES the evolving one
+  // (L9+: world.mutation true). The sandbox restores true on its own entry either way.
+  P.mutation = def.world.mutation === true;
   P.lightMul = 1.0;
   resetWorld();
   initWorld(def.world.seed, { found: def.world.found, M0: def.world.M0 });
@@ -2271,6 +2911,78 @@ function levelStart(def, predicted){
   LVL.pourLeft = def.apparatus.pours === true ? Infinity : (def.apparatus.pours | 0);
   LVL.predicted = predicted === undefined ? -1 : predicted; // F1: committed before the run; contrast, never grade
   LVL.mem = {};
+  LVL.fired = 0; LVL.src0 = W.sources.length;
+  // F5: collect the level's census reads (deduplicated) from every predicate and meter row —
+  // "near" region counts (L7) and "share" locus shares (L9), one ring column each
+  const rgDef = [];
+  const need = c => {
+    if (c.m === "near" && !rgDef.some(d => d.k === "near" && d.sp === c.sp && d.src === c.src && d.r === c.r))
+      rgDef.push({ k: "near", sp: c.sp, src: c.src, r: c.r });
+    if (c.m === "at" && !rgDef.some(d => d.k === "at" && d.sp === c.sp && d.x === c.x && d.y === c.y && d.r === c.r))
+      rgDef.push({ k: "at", sp: c.sp, x: c.x, y: c.y, r: c.r }); // L11: a fixed-point region (the pen site)
+    if (c.m === "share" && !rgDef.some(d => d.k === "share" && d.sp === c.sp && d.plane === c.plane && d.side === c.side))
+      rgDef.push({ k: "share", sp: c.sp, plane: c.plane, side: c.side });
+  };
+  for (const c of def.pass) need(c);
+  if (def.latch) for (const l of def.latch) for (const c of l.when) need(c);
+  for (const f of def.failNow) for (const c of f.when) need(c);
+  for (const m of def.meter) need(m);
+  LVL.rgDef = rgDef; LVL.rg = rgDef.length ? new Float64Array(REC.N * rgDef.length) : null; LVL.rgS = 0;
+}
+
+// F5b (L9): the live share of a species' locus plane beyond the detector's own ±0.05 band
+// around g0 — the recorder's sweep-share definition, captured on the sample clock like a region.
+function lvlShare(g){
+  const L = TRAITS[g.sp].loci[g.plane]; if (!L) return 0;
+  const off = g.plane * MAXN; let n = 0, m = 0;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i] || W.sp[i] !== g.sp) continue;
+    n++;
+    const v = W.g[off + i];
+    if (g.side > 0 ? v > L.g0 + 0.05 : v < L.g0 - 0.05) m++;
+  }
+  return n ? m / n : 0;
+}
+
+// F5: one region census — live members of a species within toroidal radius r of a source
+// ("near") or of a fixed point ("at", L11's pen site). Pure read; squared distance only
+// (*, +), so the ported core computes it bit-identically.
+function lvlNear(g){
+  const s = g.k === "at" ? g : W.sources[g.src]; if (!s) return 0;
+  const HW = P.WORLD / 2; let n = 0;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i] || W.sp[i] !== g.sp) continue;
+    let dx = Math.abs(W.x[i] - s.x); if (dx > HW) dx = P.WORLD - dx;
+    let dy = Math.abs(W.y[i] - s.y); if (dy > HW) dy = P.WORLD - dy;
+    if (dx * dx + dy * dy <= g.r * g.r) n++;
+  }
+  return n;
+}
+
+// F4+F5: the level's per-tick hook. Call it before EVERY step() while a level runs — the UI's
+// tick loop, the harness, and the app all share this call site. It does two things, both
+// tick-anchored so no caller cadence can move a verdict:
+//   - fires scripted events at their declared tick (before the step that produces tick t —
+//     the harness's own action convention), composing applyEvent exactly like levelStart;
+//   - takes the region census one tick before each recorder sample lands (state at tick 20s-1
+//     for sample s), so by the time levelCheck consumes a sample its region row exists.
+// Idempotent within a tick: extra calls fire nothing twice and capture nothing twice.
+function levelScript(){
+  const def = LVL.def; if (!def || LVL.state !== "running") return;
+  if (def.script) while (LVL.fired < def.script.length && def.script[LVL.fired].t <= W.tick + 1)
+    applyEvent({ ...def.script[LVL.fired++].event });
+  const nr = LVL.rgDef.length;
+  if (nr && (W.tick + 1) % REC.STRIDE === 0){
+    const s = (W.tick + 1) / REC.STRIDE;
+    if (s > LVL.rgS){
+      const row = (s % REC.N) * nr;
+      for (let j = 0; j < nr; j++){
+        const d = LVL.rgDef[j];
+        LVL.rg[row + j] = d.k === "share" ? lvlShare(d) : lvlNear(d);
+      }
+      LVL.rgS = s;
+    }
+  }
 }
 function levelRestart(){ const d = LVL.def, p = LVL.predicted; if (d) levelStart(d, p); }
 // F2: the freshest Observatory event of a type this level narrates (pure read; null outside a level)
@@ -2288,12 +3000,33 @@ function levelAllows(what){
   if (what === "seed") return a.seed === "all";
   return !!a[what];
 }
+// Per-source lock (L7): sources === "added" opens only sources that appeared after founding —
+// the script's or the player's own. The founded sky stays part of the experiment.
+function levelAllowsSource(k){
+  if (!LVL.def) return true;
+  const a = LVL.def.apparatus.sources;
+  return a === true ? true : a === "added" ? k >= LVL.src0 : false;
+}
 function levelPourOk(){ return !LVL.def || LVL.pourLeft > 0; }
 function levelNotePour(d){ if (LVL.def && LVL.pourLeft !== Infinity) LVL.pourLeft = Math.max(0, LVL.pourLeft - d); }
 
 // ---- the predicate evaluator. Schema:
 //   condition  { m: "pop", sp } | { m: "lockShare" } | { m: "free" }, with op one of
-//              >= <= > < ==, and v the right-hand side; or { latched: id } for a set latch.
+//              >= <= > < ==, and v the right-hand side; or { latched: id } for a set latch;
+//              or { m: "near", sp, src, r } (F5) — the census of a species within toroidal
+//              radius r of source src, captured by levelScript on the sample clock;
+//              or { m: "at", sp, x, y, r } (L11) — the same census around a fixed point
+//              (a marked site rather than a source);
+//              or { m: "share", sp, plane, side } (L9) — the live share of that species'
+//              locus plane beyond g0±0.05 (side 1 = hi, -1 = lo; the sweep detector's own
+//              definition), captured like a region; or { m: "ch", c } — a raw recorder
+//              channel (L9 reads the locus mean at 42+sp).
+//   world.mutation  true runs the EVOLVING world (L9+); absent/false runs the certified
+//              silent world, as every earlier level does.
+//   script     [{ t, event }] (F4) — events the LEVEL fires at fixed ticks (before the step
+//              that produces tick t), through levelScript's per-tick call site.
+//   apparatus.sources  false | true | "added" — "added" locks the founded sky and opens only
+//              sources that appear after founding (levelAllowsSource).
 //   pass       AND of conditions.
 //   latch      [{ id, when }] — set once its conditions hold, evaluated before failNow, so a
 //              level can say "extinct AFTER being present". Per-run scratch (LVL.mem), sample-
@@ -2302,6 +3035,18 @@ function levelNotePour(d){ if (LVL.def && LVL.pourLeft !== Infinity) LVL.pourLef
 //   meter      [{ label, m, sp?, pct?, goal?, dir?, unit? }] — pct reads the share as a rounded
 //              percentage. A row with no goal is information, not an objective.
 function lvlMetric(S, r){
+  if (r.m === "near" || r.m === "at" || r.m === "share"){ // F5: the census the levelScript ring holds for this sample (S.s absolute)
+    const D = LVL.rgDef;
+    for (let j = 0; j < D.length; j++){
+      const d = D[j];
+      const hit = r.m === "near" ? d.k === "near" && d.sp === r.sp && d.src === r.src && d.r === r.r
+        : r.m === "at" ? d.k === "at" && d.sp === r.sp && d.x === r.x && d.y === r.y && d.r === r.r
+        : d.k === "share" && d.sp === r.sp && d.plane === r.plane && d.side === r.side;
+      if (hit) return LVL.rg[(S.s % REC.N) * D.length + j];
+    }
+    return 0;
+  }
+  if (r.m === "ch") return S.raw(r.c); // any recorder channel (L9: locus mean 42+sp)
   return r.m === "lockShare" ? S.lockShare : r.m === "free" ? S.free : S.pop(r.sp);
 }
 function lvlCond(S, M, c){
@@ -2323,7 +3068,8 @@ function lvlAll(S, M, list){
 // the HUD's meter rows for the latest sample; [] outside a level or before the first sample
 function levelMeter(){
   const def = LVL.def; if (!def || !W.recCount) return [];
-  const S = lvlSample(0);
+  const sNow = Math.floor(W.tick / REC.STRIDE);
+  const S = lvlSample(0); S.s = LVL.rgDef.length ? Math.min(sNow, LVL.rgS) : sNow;
   return def.meter.map(m => {
     const o = { label: m.label, v: m.pct ? Math.round(lvlMetric(S, m) * 100) : lvlMetric(S, m) };
     if (m.goal !== undefined) o.goal = m.goal;
@@ -2339,12 +3085,15 @@ function levelCheck(){
   const L = LVL, def = L.def;
   if (!def || L.state !== "running") return L.state;
   const sNow = Math.floor(W.tick / REC.STRIDE);
-  let news = sNow - L.seenS;
+  // F5: a sample is judged only once its region row exists (levelScript's watermark); with the
+  // per-tick call site in place the watermark equals sNow, so non-region levels are untouched.
+  const sEval = L.rgDef.length ? Math.min(sNow, L.rgS) : sNow;
+  let news = sEval - L.seenS;
   if (news > 0){
     if (news > W.recCount) news = W.recCount;
     if (news > REC.N) news = REC.N;
     for (let k = news - 1; k >= 0 && L.state === "running"; k--){
-      const S = lvlSample(k);
+      const S = lvlSample(sNow - sEval + k); S.s = sEval - k;
       if (def.latch) for (const l of def.latch) if (lvlAll(S, L.mem, l.when)) L.mem[l.id] = 1;
       let why = "";
       for (const f of def.failNow) if (lvlAll(S, L.mem, f.when)){ why = f.why; break; }
@@ -2352,7 +3101,7 @@ function levelCheck(){
       L.run = lvlAll(S, L.mem, def.pass) ? L.run + 1 : 0;
       if (L.run >= (def.sustain || 10)) L.state = "passed";
     }
-    L.seenS = sNow;
+    L.seenS = sEval;
   }
   if (L.state === "running" && W.tick >= def.deadline){
     L.state = "failed"; L.failWhy = def.timeoutWhy || "Time ran out.";
@@ -2749,8 +3498,12 @@ function step(){
   if (W.tick % REC.STRIDE === 0) record();
 }
 
-// the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul)
-const LOCUS_SHIPPED = TRAITS.map(T => T.loci.map(L => ({ sigma: L.sigma, curve: L.curve })));
+// the shipped evolution settings, captured once at load; initWorld restores them (like P.lightMul).
+// ALL locus fields, not only sigma/curve: the Phase 6 price sliders edit slopes through the same
+// locus event, and a partial restore leaked an edited price across every reset — sandbox, level
+// entry and harness case alike (caught 2026-09-01 when L9's kp case poisoned the gate cases after
+// it). Restoring values that are already shipped is a no-op, so certified runs are untouched.
+const LOCUS_SHIPPED = TRAITS.map(T => T.loci.map(L => ({ ...L })));
 function resetWorld(){
   W.initialized = false; W.n = 0; W.freeList.length = 0; W.alive.fill(0);
   W.tick = 0; W.events.length = 0; W.eventLog.length = 0;
@@ -2763,7 +3516,7 @@ function initWorld(seed, sc){
   W.recHead=0; W.recCount=0; W.rec.fill(0); W.sysEvents.length=0;
   W.addedM=0; P.lightMul=1.0; W.evLog.length=0;
   // P.mutation is a harness-level switch (like spawnDecomposers) and is NOT reset here; the UI reset restores it
-  TRAITS.forEach((T, sp) => T.loci.forEach((L, k) => { L.sigma = LOCUS_SHIPPED[sp][k].sigma; L.curve = LOCUS_SHIPPED[sp][k].curve; }));
+  TRAITS.forEach((T, sp) => T.loci.forEach((L, k) => Object.assign(L, LOCUS_SHIPPED[sp][k])));
   det.estab.fill(0); det.run.fill(0); det.bloom.fill(0); det.crash.fill(0);
   det.packAwake=false; det.depleted=false; det.lockedWarn=false; det.sweep.fill(0); det.uniform.fill(0); det.diverse.fill(0); det.diverseRun.fill(0); det.rail.fill(0); det.railRun.fill(0); det.adapt.fill(0); det.adaptRun.fill(0);
   det.heatRetreat.fill(0); det.heatPile=false; det.heatPileRun=0; det.heatStarve=false; det.heatStarveRun=0;
@@ -3153,6 +3906,29 @@ function bucketSpec(G, sp, tb, mb){
 // Grammar too: the radius and the tie-breaking decide WHICH organism a thumb lands on, and the
 // platforms must not disagree about that. Raw positions, not interpolated ones — a tap picks what
 // is there, not what is being drawn on the way there. Ties keep slot order (sort is stable).
+// The display-path spline (GR.5, declared frame change 2026-09-02 — the Rust builder carries the
+// identical arithmetic in the identical order; harness/fingerprint-frame.js holds them bit-equal):
+// a quadratic B-spline through the midpoints of the last two tick segments. Velocity-continuous
+// across ticks, half a tick of display latency, never outside the hull; the guard straightens a
+// stale previous segment (fresh slot, fresh load) back to linear. ppx/ppy are render scratch —
+// created and shifted only by markPrev, never read by the sim.
+function ipos(W, i, alpha){
+  const ppx = W.ppx || W.px, ppy = W.ppy || W.py;
+  const px = W.px[i], py = W.py[i];
+  let d1x = wd(px - ppx[i]), d1y = wd(py - ppy[i]);
+  const d2x = wd(W.x[i] - px), d2y = wd(W.y[i] - py);
+  if (Math.max(Math.abs(d1x), Math.abs(d1y)) > 4*Math.max(Math.abs(d2x), Math.abs(d2y)) + 8){ d1x = d2x; d1y = d2y; }
+  const omt = 1 - alpha;
+  return [px - omt*omt*d1x*0.5 + alpha*alpha*d2x*0.5,
+          py - omt*omt*d1y*0.5 + alpha*alpha*d2y*0.5];
+}
+// The one legal way to advance the interpolation anchors. Works on the JS core (lazily attaching
+// the scratch arrays) and on the wasm wrapper's memory views alike.
+function markPrev(W){
+  if (!W.ppx){ W.ppx = new Float32Array(W.px.length); W.ppy = new Float32Array(W.py.length); }
+  W.ppx.set(W.px); W.ppy.set(W.py);
+  W.px.set(W.x); W.py.set(W.y);
+}
 function pickRadius(z, tight){ return tight ? Math.max(10/z, 7) : Math.max(24/z, 14); }
 function pickCandidates(wx, wy, rad){
   const cand = [], rr = rad*rad;
@@ -3170,11 +3946,13 @@ function pickCandidates(wx, wy, rad){
 //   kind 0 dormant cyst | 1 bacteria dot-LOD | 2 sprite | 3 sprite, heading-aligned | 4 ghost ray
 //   bucket = tintBin*mN + morphBin, or -1 for a species with no grammar
 //   flags  bit 0: striking (the ray's stretched form)
-// Corpse record (4 doubles): sx, sy, r, alpha.
+// Corpse record (6 doubles): sx, sy, r, alpha, sp, fresh. `fresh` = remaining mass over size —
+// the sim's own decay clock (GR.6, declared frame change 2026-09-02): a husk may wear a ghost of
+// its species colour and deflate as it rots, so a death reads as a collapse, not a pop.
 // Preallocated and reused: a frame allocates nothing, exactly like a tick.
 const FRAME = {
   org: new Float64Array(MAXN * 8), orgN: 0,
-  corpse: new Float64Array(1500 * 4), corpseN: 0,
+  corpse: new Float64Array(1500 * 6), corpseN: 0,
   pops: [0,0,0,0,0,0,0], mnBound: 0,
 };
 function frameOf(view, hidden, G){
@@ -3187,8 +3965,7 @@ function frameOf(view, hidden, G){
     pops[W.sp[i]]++;
     mnBound += W.mn[i];
     if (hidden[W.sp[i]]) continue; // hidden from view, still counted
-    const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
-    const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
+    const [ix, iy] = ipos(W, i, alpha);
     const sx = hw + wd(ix - camX)*z, sy = hh + wd(iy - camY)*z;
     if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
     const sp = W.sp[i], b = n*8;
@@ -3220,10 +3997,12 @@ function frameOf(view, hidden, G){
     if (!W.cAlive[k]) continue;
     const sx = hw + wd(W.cX[k] - camX)*z, sy = hh + wd(W.cY[k] - camY)*z;
     if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
-    const mass = W.cE[k] + W.cP[k] + W.cM[k], b = m*4;
+    const mass = W.cE[k] + W.cP[k] + W.cM[k], b = m*6;
     c[b] = sx; c[b+1] = sy;
     c[b+2] = Math.max(1.5, W.cSz[k]*1.0*z);
     c[b+3] = Math.min(0.55, 0.12 + 0.05*mass/W.cSz[k]);
+    c[b+4] = W.cSp[k];
+    c[b+5] = mass/W.cSz[k];
     m++;
   }
   F.corpseN = m;
@@ -3418,7 +4197,7 @@ function drawPours(ctx, pours, nowT){
 function paintCorpses(ctx, F){
   const c = F.corpse;
   for (let q = 0; q < F.corpseN; q++){
-    const b = q*4, sx = c[b], sy = c[b+1], r = c[b+2], a = c[b+3];
+    const b = q*6, sx = c[b], sy = c[b+1], r = c[b+2], a = c[b+3]; // look unchanged: frozen oracle
     ctx.fillStyle = `rgba(158,168,178,${a.toFixed(3)})`;
     ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill();
     ctx.strokeStyle = `rgba(110,120,130,${(a*0.8).toFixed(3)})`; ctx.lineWidth = 1;
@@ -3437,7 +4216,7 @@ function drawSunAffordance(ctx, view, selSun){
 }
 function drawSelectionRing(ctx, view, si){
   const { camX, camY, z, hw, hh, alpha } = view;
-  const ix = W.px[si] + wd(W.x[si]-W.px[si])*alpha, iy = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
+  const [ix, iy] = ipos(W, si, alpha);
   const sx = hw + wd(ix - camX)*z, sy = hh + wd(iy - camY)*z;
   const rr = Math.max(14, W.sz[si]*2.6*z);
   ctx.strokeStyle = "rgba(201,215,227,0.95)"; ctx.lineWidth = 1.5;
@@ -4217,7 +4996,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       undoTimer = setTimeout(() => { undoAction = null; setUndoChip(null); }, 5000);
     };
     actionsRef.current = {
-      stepOnce: () => { W.px.set(W.x); W.py.set(W.y); step(); },
+      stepOnce: () => { markPrev(W); levelScript(); step(); },
       feed: () => {
         if (!selValid()) return;
         const i = sel.i, g = W.gen[i], nm = SPECIES[W.sp[i]].name;
@@ -4249,7 +5028,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       },
       pushUndoExt: (label, fn) => pushUndo(label, fn),
       // 7.L suns: every change is an event (logged, undoable); a layout is one intervention
-      selectSource: k => { if (k >= 0 && !levelAllows("sources")) return; // an experiment's sky is not editable
+      selectSource: k => { if (k >= 0 && !levelAllowsSource(k)) return; // an experiment's founded sky is not editable (L7: only risen suns unlock)
         srcSel = k; if (k >= 0) wallSel = -1;
         setUi(u => ({ ...u, srcSel: k, wallSel: k >= 0 ? -1 : u.wallSel })); },
       // 7.W walls: select, arm the one-shot drawing tool, add from a drag, remove -- all events, all undoable
@@ -4301,6 +5080,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       },
       removeSelSource: () => { if (srcSel >= 0) actionsRef.current.removeSource(srcSel); },
       sourceLayout: (layout, label) => {
+        if (!levelAllowsSource(0)) return; // layouts rewrite the whole sky, the founded sun included
         const prev = W.sources.map(s => ({ ...s }));
         const apply = L => {
           for (let k = W.sources.length - 1; k >= 1; k--) queueEvent({ type:"sourceRemove", k });
@@ -4322,7 +5102,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
         undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
         cam.x = W.sources[0].x; cam.y = W.sources[0].y;
         W.lightDirty = true; // sources and walls are back to the founding state: repaint every derived layer
-        setUi(us => ({ ...us, card: null, chips: [], spawnPick: null, tick: 0,
+        setUi(us => ({ ...us, card: null, chips: null, spawnPick: null, tick: 0, // null, not []: the chips overlay renders {x,y,opts} behind a truthiness guard, and [] is truthy (reset crashed the tree — caught by L7's playthrough)
           mineral: { b:0, f:0, l:0, add:0 }, lightMul: 1, srcSel: -1, wallSel: -1, wallArm: false }));
       },
       seedAt: (sp, wx, wy, sx, sy) => {
@@ -4348,9 +5128,10 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
         if (wallArm){ // 7.W: the armed wall tool claims the drag -- it starts under the finger
           wallDrag = { x0: wrap(cam.x + (pp.sx - vw/2)/cam.z), y0: wrap(cam.y + (pp.sy - vh/2)/cam.z), dx: 0, dy: 0 };
         } else {
-          // the drag target: the selected sun, else the sun nearest the finger at touch-down
+          // the drag target: the selected sun, else the sun nearest the finger at touch-down;
+          // a locked sun (L7's founded sky) takes no grip at all
           const k = srcSel >= 0 && W.sources[srcSel] ? srcSel : nearestSource(pp.sx, pp.sy).k, s = W.sources[k];
-          srcDrag = { k, x: s.x, y: s.y, ox: s.x, oy: s.y };
+          srcDrag = levelAllowsSource(k) ? { k, x: s.x, y: s.y, ox: s.x, oy: s.y } : null;
         }
       }
       if (mode === "observe" && pointers.size === 1){
@@ -4462,7 +5243,8 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       const maxSteps = spd >= 16 ? 9 : spd >= 4 ? 5 : 3;
       let steps = 0;
       while (acc >= P.TICK_MS && steps < maxSteps){
-        W.px.set(W.x); W.py.set(W.y);
+        markPrev(W);
+        levelScript(); // F4/F5: per-tick, inside the loop — a scripted sun rises on its tick at any speed
         step(); acc -= P.TICK_MS; steps++;
       }
       if (steps === maxSteps) acc = 0; // shed backlog: slow-motion, never death-spiral
@@ -4473,7 +5255,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       // follow-cam: ease toward the selected organism
       if (follow && selValid()){
         const si = sel.i;
-        const tx = W.px[si] + wd(W.x[si]-W.px[si])*alpha, ty = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
+        const [tx, ty] = ipos(W, si, alpha); // the follow-cam rides the same spline the sprite is drawn on
         cam.x = wrap(cam.x + wd(tx - cam.x)*0.10); cam.y = wrap(cam.y + wd(ty - cam.y)*0.10);
       }
 
@@ -5327,7 +6109,7 @@ function SourceCard({ k, desktop, mono, actions, lightMul, onClose, onLog }){
       <div style={row}><span style={lab}>warmth</span>{slider("a", -8, 15, 0.5, "Changed a source's warmth")}<span style={val}>{(s.a > 0 ? "+" : "") + s.a.toFixed(1)}°</span></div>
       <div style={row}><span style={lab}>spread</span>{slider("sigma", 90, 300, 10, "Changed a source's spread")}<span style={val}>{Math.round(s.sigma)}</span></div>
       <div style={{ ...row, flexWrap:"wrap", gap:6 }}>
-        {SOURCE_LAYOUTS.map(L => (
+        {(levelAllowsSource(0) ? SOURCE_LAYOUTS : []).map(L => ( // layouts rewrite the founded sun too — hidden while it is locked (L7)
           <button key={L.key} className="mc-hit" style={btn}
             onClick={() => actions.current.sourceLayout(L.sources.map(q => ({ ...q })), "Layout: " + L.label)}>{L.label}</button>))}
         <button className="mc-hit" disabled={last} onClick={() => actions.current.removeSource(k)}
@@ -5425,6 +6207,26 @@ function WallCard({ k, desktop, mono, actions, onClose, onLog }){
     </div>
   );
 }
+// ============================================================
+// GENERATED by tools/level-thumbs.js — never hand-edit; regenerate with
+// `npm run thumbs`. Experiment-menu thumbnails captured from real gameplay
+// (assets/levels/*.jpg as data URIs — the artifact is a single file).
+// The start screen shows a level's picture only when its key is here;
+// a level without one simply has no picture, never a placeholder.
+// ============================================================
+const LEVEL_THUMBS = {
+  "light": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCACgAKADASIAAhEBAxEB/8QAGwABAAMBAQEBAAAAAAAAAAAAAAECAwQFBgf/xAAoEAEAAgICAgEEAQUBAAAAAAAAAQIDESExBGFRBQYSQXEigaHB0fD/xAAZAQEBAQEBAQAAAAAAAAAAAAAAAQMCBAX/xAAaEQEBAQEBAQEAAAAAAAAAAAAAAQIREiED/9oADAMBAAIRAxEAPwD8JAfbfHAAAAAAAAABAAUAAAE4ABwA0KBo0HQNGg6Bo0HQJgiA6C0VXih1OsjU/DeMS0YvSdT05tSN5xelZxnT0yF5orMKvUCEimkgJQBQAAAAWrCrTGlSr1r6aVpv9JxxuW9Ks7WeqpXH6axi4nhtjx+3RXH/AEzyzumV2862L0zvj9PRyY/bnyU1tZp1NOC1fTO8OvJVz5IaStJXPMcmlrdodtOgnSBQTokEBCdAgFtAq3xRwx1zHDowR1/KVzq/HRir6dWKnXDLDXl2YaxqGGq8+q0xY/Tqpi3WeDFSrsx0r+E8sNaebWnt/Svt36V5X2xm87P5P4eRG5jmeOf9e3xGWnfD1ssarasWmImeY3xLhzVjc8ri1Py7Le15uSuv05MsdvQzRHHLizRxPL0Zr2Yrjv2qvl7UbN4sjSRQRMJFEVheKlI5aUq4tS1SKLxj9Na09Na4/Tm1xdMIxbn9NsWPUNq44+GlaenN04ujHV0Y+NM4q0rwzrK/XVis6KZNVnmXBFtftpGSYieWVyyuWubJ7lx5r8zynLknXbnyX3vl3nLvOWeWXJlnttkt7c2Se22Y9GWGTtWVrdqy1bRIkUQJEF8cdcN6Vn4Z4o6dWKvDjVZ6q2Onp0Uxz8IxV56deOnpjrTDWlaY/X6JpPw7KYuOpVvTTP0y9fXHMaVmdNsldML8bdx3L1E20rOTUdsr3Y3y64dzLSZ62vkj5ZWvDG2RSb7dzLSZXvZjeS1lLS6kdyKz2A7jpICIAA6MXcOvDrXbixTzDrw24Z6Z6d+CIduGI5/483FeduzHefl59R5tx6VIrr+3wzvSb3ilIm1p4iIjmVKZZ121+nedXw/qWHyb1/OtJmZiP40y5WFln2Ob6h4vkeLMR5GG+Kbcx+Ua283NMbl9Z9+fcni/Wow08Xx644pzMxX8f/d/4h8dktzLb8+2fW349s7qMMtnJkvO2+W23Lft6Mx68w/KUbQO3aUa9gCEwaBQBeIAHBpj406McuaktaTDixzY7cdtOil9fpwUv7a0ye2dyy1l6VMnHTPJk56c8ZI+VL5PbiZZzC+S7nyT2Wv7Y3ttpMtc5VyS57dtbTDKe2kjWIAdcUAAAQBYdCosAisr1sppKcGsXXjI507lPKeXTGVFsm3P+Um5TynlrN1Zuz3IvF4mbKLaNQsiqiyJUQAAAC+jSdGgRo0nRoEaNJ0aBGjSdGgRo0nRoEaNJ0aBGjSdAKiyJBXRpbRoFdGltGgf/9k=",
+  "mineral": "data:image/jpeg;base64,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",
+  "cycle": "data:image/jpeg;base64,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",
+  "garden": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCACgAKADASIAAhEBAxEB/8QAHAAAAgMBAQEBAAAAAAAAAAAABQYCBAcDAAEI/8QAMxAAAQMDBAECBQMEAgMBAAAAAQIDBAAFEQYSITFBE1EUImFxgQeh8DKRscHR4RUjM1L/xAAZAQACAwEAAAAAAAAAAAAAAAACAwABBAX/xAAiEQADAAICAgMAAwAAAAAAAAAAAQIDERIhBDETIkEjMlH/2gAMAwEAAhEDEQA/AMXFfQaiK+10jCTBr6DUAaknJ4GahCVdWXlt9GuWxfsa+gEnAFQotGYsjHNcFKUo5Jr3pOY/pqODnBqFJJejo0hSzhIrv8G9jODRjT1vD6kjHdP0nRM2PakTlx1BpQyDj+f9Ucxsz5PJUPRn1shlSkoI5NM9y0pOh2xE55hSWXB8qj5/nn26NVZDQirCwMFJoneNZTZ9lZtryx6bIODzk/fmjSS9iau6aciJcmQgkjxVAKIOQav3N4LJAodSn7Nseuzt6zmMbqgSSck1CvVQRLNfc1CvVCyWa9Ua9UIcnYy2xnmuFO2rrIu0T3YbwG9HeDnsZH7GkySna6QKKp0KxZOa2fEjJAFFIETcBxzQxj/6CmixKbDqCvqpK2TLTS6ILtq0t7i2QPtUWrbyMJ5rVNTzNKuaaZRb2QmSAc8YPYxk/QZB+p890gtvtocCuMA0xykY4zVSIOaemogiWYjvoK6c2Hafz1S5cGPTOR4rYpOvIDmkmrWYbYdbQElYGVKxjz+APoKyO7OhRURQ0kNw1TfYY0tLQ3sOeRWzQNbwlaVXb5iC4sJwjnj+f475NfnKHKXHVlJOKKJvTmzG796k2Dm8bm9oN6lnJLiy2eCaVlzHDkCvkuYt8nk1V5oarbNGLHxnTJqWpRyTXzNRr2aEaTr1RzXqhZKvVGvVCEq9Ua9moQN3q6OS3VuvLKlkkkk0uPL3uE1Bbq19qPNfWG1OKwKtvYuIUI8CQQRRKFM2gc4r41AynquMmIpvkZFTTRG5roMJnKdARvOPvVhkLVwkE/al+3K/9uCa0v8ATZdkRPzec+jtOMAE58d8f3o5+xnzfxraFGYVIRjBBoDJcWpZCqetdKthujxtm74bPybhg9f85pDl/wD2OKqw8D2tkAa9UQakn+ofegNJfhRS5gkVfXbSG87Dj7Vb0+wFLQVdZrSNQNadOlWEw0q+NCRv48/fHPnOfPXFNmNoxZc7mtGMyo5bVwKnHhqWATmiU1hRdOU9UwaKtDV0ubMN11tkLON6zgDjPNCp2xtZeM7E92EpIyM1TUCk4PdaV+oFgj2Sb8OzIafSUhW5tW4c54z5rP32wZIFVU6Lw5ea2cW2XF8gVJcdxIzTNpyzvXKSiNHbK3FdJHZq5qjTsqzO+jMaU2sjOFDBxV8OinnXLiI/NfCa7TUBDnFcM0A9PZSolakgkZob0cGrMJ/01gE1F7KpbRr/AOnembbeYkpcqT6SmWtyQCAVHwOvP0pN1REZizXmWnEuIQopC09KAPYrhbLhIDe1pRANcbmiQtJWeTTm00YYipvbYAUv03yRROLcSlIwoihDwWHDvBBqFK3o2uVS7C8ufvH9RJoapRUok1zBqbSStYTVN7LUqT6kE9Amu0dBLoBBorb7eXcBKCTRSFZsTG/XQQjcN32olLF1mldBLRUBy4zGojWNyuiTgdZNNmpbE9ZXxFkKG/AOAc4zVFEL4ENvwwEOJIIKK4XW6SJDgckuFSk9Z8fT6U6fRz8m3fRQudkmBgTPQX6Pe7acYzj/ADQkSVRVbm1bVCnC465W/pgWUtp2gj5vsMDjHeBjus1usjJUUqxmhppehuJVXVF+53ZyTlTrhWo9knNAvX3SArxVdTildk1HNKdbNs41KHLTd5dtsluTHWUOI6IODV3VepJF6e9eUvcrGO88fc8n80itSFo6NSclOKGM0XPrQp4Fy5E5zgW5xVfNRJycmvZoDQloncY4bVkVXjNKedSkCrd2eCiQPNWLI0krQT70WtsXyanY16TsLslbbTYUpayAAByTTtfP09uVvtYmPxz6RH9XFX9IafltWFF8YUkIb+bIVgjbyfzxmil71rOmWY251SSjB55z1j39vFPU6RyLy1VdGEagt+xwhKeRQhMJwin65RkvKJKez7UYt+hfidLybuJDafRTu9PyRznzkdHx/wBLcbZtnyeMrZkTrSmzhQrpDIDwzRK8sJQpQ9qFR2lrUCmltaZrmuU7NC0Bc4Vtu8eVMa9VpCsqSOz9vrTpfp9uvdz+MiRvRbUANueSfJP+Px+KyCP6jaBkkUdst6DKUtrWElJ4ye6Yr0jHeHdbNvsUOBE02+/LtyXgRlJJIIH3/mO6xvVL2x1zYeM+KPSNbPC0mD8QFIIxtGOKQ7vcPiXSkHOaJ10BiwtXsH/EurJ2g1XdafcVyKYdP2h24Pojx2ytxXQFGLppqVaJHoTmFNOYzhXtQKWzS80y9CU3AURk5ri/GW3zWraS0a3eo8t34htkR2i4QRnIH5/zSZqOCmJJdYyklCiMg5HFRxpFR5CqtCrmvZqakKLhCRnmvKZcAzil6NW0QzXyvqW1qPCTX1TS09ioTZxmZ9Y5NXbVI2YHkVWCPiJB9gaPWmyrkDchCiB7VaFU1rTDcLVc9iEIaX1el/8AnNEbZNemOYUcAck0FasxbyvaQocDzTrpKC5cYPpRmlLcQn5kgc5/n+/amKmZqxQu2XdVOaeRZGDBQ6iVn5wsgjHPIx/v8UkTL/JZhORW5K0sr/qQFHB+48101AiS284y/kLQSkg+CKS7gh8uEBRxV1TSBw4pZ9uUr1VEA5Jq3Zo6VqSn3oEoKSr5u6K2uVsxzgilp99mup1OkaZP0LIi6UbvaiPSWARyOjjHnOefbwfpnOLoj0lHacEUwO6kmOQBEVIWWgOElXFK1zkBZODyaO2vwRgm0/sV/i3MYrzDpLwKjVavoNK2bNIeNKXt20TWpjCgHGzkZ+2D+1GNT6rk3+d8VK2b9oHypwOKzmG85vCfFMVvjPyyltpBUo8ACmzT9GPJilPkwixf5kIKEd9xoKGFbFEZH4oFcpvrrJUck1bulukxFFt5CkKHYUMEUuv7kPjJOM1VNh4ol9oM2yH66wAnk0cuWmpcJpC5LCkJV7j27H3+lCbFNEd1DoPKSDTpqbWsi9Q2IzyUJQ0kJASn2yAPsMn+/milLQrJVquvQrRrMuQ+lphsrWo4ASMkn2qdy09IikJfZUjIyMjGRRKwXk2+4tyW0pUUnojIIIwf2NNGo7wrUs9MlxsIJAHv/of4q1KYustyzJIkT0ldY5rUv07m2Zi2Otz0IKyklBIz83j+Hg0j6nbjw7m+iM4HGkrISrGNwzwcUKgTpSnlNxUlZ7I8UH9eh2nkWx6u02Kyt9SRhs5KU55HtXHS2s5FkfUuHjK+CFZx+xHuaQbvcJXqFh5JbUOSmqLUxxBFUq0xlYeU6Zp8OW1cLv68vYS5k5IGAT9OhVvX+kn4EVietkJS4nBISRk+B1z56z4+lINsuakqSrdjFN9w1TdL5BahypLjrTf9IUeuMZpiaZmqbh6XoRnYaVSDlOQOal6beNoQP7UfXbHyd7bZVnsAd0JuqDFyFMrSv2IxSqlo2Ysqa0BXnHEOqbCicHirLNucdGVLwo/SqCHD8Qla+Tuyf7032mOH0pKOQeqH2MpqVsWpFveZVhXPsfeq6kKSraRzWpXHR9w/8MLkY6vQAzu++P5jvHPVJD0RIdORyDRuGJnOqfRRt8ZRcBNPWjLiiy3JqY4yh5KO0L6UMYwfpXzSul3LmEBtaQtQyAeP3qrqSE5aJjkR3G5B7HR9jRStdictc3xYW1vemdQXD4lqKzHSE7QltOB2ef3pOl2/erIT+1TjStzu0ea1HTcDTT2lJDsxR+OCfkG7HP28+MY85zx0WuQt18CSRkTMVxteR0KJtsvONZSgmjEuE0latowM06fp+9phizym7swlchWfTKkbvHH759u/yKUkvP1vRm0VlxJypJzWiaS07In2Z64JWkBnAIJHZ6zzxnx++KByIqVOrU038ma4Juc6Mw5GYfcbbOcgKI7GD/ccUaXEVdPIuhCkyVy1qOSc11s2YTq1qaK0rHOOxRzTTkNEQtOYSsqznHdOVl0TGuOnn7p8Ww3jJCCRkckD/HPsOeeqVK5GzLkWHRk94Q7NmeshspSAEgVXTa5BTnFPMW2NLl+kAMZxT47+mdwbbZw2lRdAICTuxnzxVrELrzFJgqmn458/amfS6lOBIPdX9Z2Fy1zFRnkbXEnBBqrp5HovAJHNRTphXlVxs27TFpht6NflSYJUv+pDu3x5Gf8Anrv7ZHrxbDqtrY/ozk1oVt1HKRYV21Zw0fGSOD35rMNTlLk51DZyjPFHWjN46pdv0LEGCH1b3CQkngCnXTtuWpTaI29SiQAkckn6VUstoddjIVtCR0M+aPWm4JskpDzQSVpPIIz9Dmkz0zZlfKeg7ertdYlkFqklaWSMhKvI/gxn8dVl9zkBuQo+5p011ql6/wA1LziQCU4+pxS6zZnJq9wQVU2vt6M2FfGt0TsWpJdvSn0XACkcEgH/ADXGTKXeZyy86dxBUpXZNRuVncYQRtII+lLLj0qHJ3tuFChxmgptdGjHM29oJSmhb7ihIcKkLGRnsU6aRfYky2WH3djalAKJUBgZ9zwKzORKfkPB19wrUBgcY4o/bUTEREykjCdu4c8496qK0Fnxcl0aX+pMG1WhbSLfM+I3JyoFBSR1g8++f2pIj3FKCAFY596Ey7mt5ISpRUfAoctMnfvAGPbPNFV9icXjvjpmz6R1ZZIFklR5sNT7ro+UhWBjHR9+ff6/YqrfpyXirI2qVgUiIuJSkpJII8UQtl7CDsUTjOc+1R3si8bi9nrU8naNvJo8zcp7EJcZmQ6lpf8AWgLISr7jzUNKWND9zZjvL2JWcZx+33PVNeutOQrLNEeFJD6CkEKyDn8jg/8ARopnSF5csutCbFnuMv7lK+bOaarfrm4wyhxMpwFAwPmPXt+w/sKBStNznIfxqGl+mBncB49/tweaVbip5kFJPVRtyRY4yB3VeoHbtPVJkOb1qOVKPmuemp7DFzZefQHGkqBUgnG4Z5FLVqiuXJx0KeLaG8ZIGSSc/wDFfZRVbZZjqc3jAIVjGRS+fZp+DU6Rq/6h6ltFyjRxbYpZKG9qyTknrz/roeOzShaI5mSEFfRIpVcuO4AbqcNGOoU81vICcijVcmIeL4oNKd/8a3p1tqPDKJCEgbuwSOz+azfUCS05nhKlHrnut11DD09bdHtOJfbckODckjtXHY4668/94Tql4OyQtJAAVxVWutleNe3oq25pt9/LqVHHAycZrS/0+uEGyTvWejpcQpJHzDOPxnms6tLrbjwQgZPt5Bpm+HkKSlISQMcnqqjaG+TMUtDT+qqNOGG3ItjranXBuWlCsgE5z/bjwOz+MHve0uqI96er0XQgoVnb9azy8EplqR47FS62V4uJz+lVCSpQSPNNtsfkrhJioZBUEbArPjrqlaIlXrA7TitB/TyfAgXlh+4M+qwk/OjyRjxQwk32Oz25XRTsmnkOTsS0EgJJCScZNev1qbiyQlkbUlOSnPVP9xlWi86iQuOgRY61DPIBGfr+2fpk0N/VO0wLPIQ3CnF8lOVbk4I6wf3/AG+uAdY/0zY/Ke0mjKZMUrmKGOOKvx7GpSQonbnrirDCG/WTnByea1Bu0WQ6VTNEoGQRwj6/zjHfnqhUDrz6AeoITtrlOsnCVtKKT9waXzdlqdw4skg046nts12Gucobmz2rP+R3+frWfqhOqdJQCrmnU/8ADHjSa+w+Rdfus6UdsaGRtcBBVnjB9xjOfsR0OO853dGi8pS/erzbCm+HEkH600aL0c9qZT6GV4DSNx6z5x2QPHvVd10EnGL7GWtrl291bkde3d2MZBqpKkOyXi88vcs9mm7U9oXAmPRiAS2opJHWQcUnyUbHSCMUip0dDHk5ohRyx3UxiEqVjFAs14GqT0HUqlpj8/qZS4+xTxIx1mluZcXZUgJQtW3PvQfJPGaM2iKFlIA5NHydCVjnEtodP07YSme2862lYBB2no89VubkNnUYjNw4nphpAStRAH57/wB0haJsr1usCJ8qOG2lHO9QHIOMfjr+49xWjaH1BaYdvkrWspcydmMf0/n/AFzxTUujmZr3WzPv1N043ZV7FLStRGfl/n85rE7gx6twUojzwK2T9QLjIuTzz7iy4Tk5JrIHlL+PXuT0aG50afFummEbdYpMphTjDC1hCdyilJO0e5+lVpBXFVgghSaedD6zZsNukR1RGny6kgFXBSffPeRgY9ufwpTnES5C3MD5jUaWugpunT5Lo4Rru8ANuQRUpMmTJT85UaL2LS0uayqW2wotJzkge3J/sOT7Uy2HR7t0koisoG9Rxz1VqWwby45ZmPqOtufNkAVdReXkN7EvKA9s02660k9Y5Co8lACsZBHRHWR/Y1mktHpS9ueM0Fbkdjc5Vs//2Q==",
+  "richer": "data:image/jpeg;base64,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",
+  "hunters": "data:image/jpeg;base64,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",
+  "outpost": "data:image/jpeg;base64,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",
+  "warmyear": "data:image/jpeg;base64,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",
+  "sorting": "data:image/jpeg;base64,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",
+  "refuge": "data:image/jpeg;base64,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",
+  "outrun": "data:image/jpeg;base64,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",
+};
 // ============================================================
 // Phase 8 — the app shell: start screen, experiment HUD, verdicts.
 // The world component (src/ui.jsx) is unchanged in spirit: this layer only
@@ -5615,16 +6417,27 @@ function StartScreen({ badges, onSandbox, onLevel }){
         <div style={{ display:"grid", gap:10 }}>
           {LEVELS.map(def => (
             <button key={def.key} className="mc-hit" onClick={() => pick(def)} style={card}>
-              <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
-                <span style={{ fontSize:11, color:"#5E7386", fontFamily:mono }}>{def.n}</span>
-                <span style={{ fontSize:15, fontWeight:600 }}>{def.title}</span>
-                <span style={{ fontSize:11, color:"#8FA3B5" }}>{def.science}</span>
-                {badges[def.key] && <span style={{ marginLeft:"auto", color:"rgb(70,214,140)", fontSize:14 }}>✓</span>}
+              <div style={{ display:"flex", gap:12 }}>
+                {/* a captured moment of the level's world (generated src/ui-thumbs.js);
+                    a level without one simply has no picture */}
+                {LEVEL_THUMBS[def.key] && (
+                  <img src={LEVEL_THUMBS[def.key]} alt="" width={54} height={54}
+                    style={{ flex:"0 0 auto", borderRadius:10, marginTop:2,
+                      border:"1px solid rgba(94,115,134,0.35)" }} />
+                )}
+                <div style={{ flex:"1 1 auto", minWidth:0 }}>
+                  <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
+                    <span style={{ fontSize:11, color:"#5E7386", fontFamily:mono }}>{def.n}</span>
+                    <span style={{ fontSize:15, fontWeight:600 }}>{def.title}</span>
+                    <span style={{ fontSize:11, color:"#8FA3B5" }}>{def.science}</span>
+                    {badges[def.key] && <span style={{ marginLeft:"auto", color:"rgb(70,214,140)", fontSize:14 }}>✓</span>}
+                  </div>
+                  <div style={{ fontSize:12, color:"#8FA3B5", marginTop:5, lineHeight:1.5, fontStyle:"italic" }}>
+                    {def.question}</div>
+                  <div style={{ fontSize:12, color:"#C9D7E3", marginTop:6, lineHeight:1.55 }}>{def.briefing}</div>
+                  <div style={{ fontSize:11.5, color:"#8FA3B5", marginTop:6, fontFamily:mono }}>goal · {def.goalText}</div>
+                </div>
               </div>
-              <div style={{ fontSize:12, color:"#8FA3B5", marginTop:5, lineHeight:1.5, fontStyle:"italic" }}>
-                {def.question}</div>
-              <div style={{ fontSize:12, color:"#C9D7E3", marginTop:6, lineHeight:1.55 }}>{def.briefing}</div>
-              <div style={{ fontSize:11.5, color:"#8FA3B5", marginTop:6, fontFamily:mono }}>goal · {def.goalText}</div>
             </button>
           ))}
         </div>

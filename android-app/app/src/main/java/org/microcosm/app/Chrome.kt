@@ -63,6 +63,9 @@ object Chrome {
     /** The rows that live inside the drawer, and so at its inner width, not the screen's. */
     val IN_DRAWER = setOf("pace", "utility")
 
+    /** The specimen sheet's own padding, so its header row is measured at the width it gets. */
+    const val SHEET_PAD_DP = 20
+
     const val TEXT_SP = 14f
 
     /**
@@ -77,6 +80,7 @@ object Chrome {
             "kill" -> R.string.tool_kill
             "seed" -> R.string.tool_seed
             "wall" -> R.string.tool_wall
+            "close" -> R.string.specimen_close
             "pops" -> R.string.page_pops
             "traits" -> R.string.page_traits
             "chem" -> R.string.page_chem
@@ -126,6 +130,63 @@ object Chrome {
         setOnClickListener { onTap() }
     }
 
+    /**
+     * A square icon button in the same quiet voice as [button] — a glyph where a word would not
+     * fit, at the same 48 dp the layout gate holds every other control to.
+     *
+     * `desc` is load-bearing, not decoration: an icon is never the whole label. It becomes the
+     * contentDescription a screen reader speaks AND the long-press tooltip a sighted player uses
+     * to find out what the picture means, so it must be the word the icon replaced.
+     *
+     * `bordered = false` drops the hairline box and keeps only the ripple — for a control that
+     * shares a row with real actions without claiming to be one of them (the sheet's dismiss).
+     */
+    fun iconButton(
+        ctx: Context, iconRes: Int, desc: String,
+        tint: Int = Style.TEXT, bordered: Boolean = true, onTap: () -> Unit = {},
+    ): android.widget.ImageButton = android.widget.ImageButton(ctx).apply {
+        setImageResource(iconRes)
+        imageTintList = ColorStateList.valueOf(tint)
+        contentDescription = desc
+        tooltipText = desc
+        scaleType = android.widget.ImageView.ScaleType.CENTER
+        background = Style.touchable(ctx, if (bordered) Style.quiet(ctx)
+            else android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.TRANSPARENT); cornerRadius = Style.dp(ctx, 12f).toFloat()
+            })
+        stateListAnimator = null
+        layoutParams = LinearLayout.LayoutParams(Style.dp(ctx, 48f), Style.dp(ctx, 48f))
+        setOnClickListener { onTap() }
+    }
+
+    /**
+     * The specimen card's three actions, as icons (owner, 2026-09-02): feed and kill on THIS
+     * creature, then the sheet's own dismiss.
+     *
+     * The gap before the dismiss is not decoration. The kill glyph is a circled cross and the
+     * dismiss is a cross — they are neighbours, and one of them is irreversible in consequence
+     * (docs/app-ux-research.md: undo puts the LEVER back, never the world). So the dismiss is
+     * set apart, unboxed and dim, while feed and kill stay a boxed pair.
+     *
+     * It lives here rather than in `MainActivity` for the reason the whole file exists: the
+     * layout gate measures `Chrome.ROWS`, and a row built somewhere else is a row nothing checks.
+     */
+    fun specimenActions(ctx: Context, onTap: (Int) -> Unit = {}): LinearLayout {
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        fun add(iconRes: Int, key: String, gapDp: Float, tint: Int, bordered: Boolean, k: Int) {
+            row.addView(iconButton(ctx, iconRes, label(ctx, key), tint, bordered) { onTap(k) },
+                LinearLayout.LayoutParams(Style.dp(ctx, 48f), Style.dp(ctx, 48f))
+                    .apply { marginStart = Style.dp(ctx, gapDp) })
+        }
+        add(R.drawable.ic_feed, "feed", 0f, Style.TEXT, true, 0)
+        add(R.drawable.ic_kill, "kill", 8f, Style.TEXT, true, 1)
+        add(R.drawable.ic_close, "close", 14f, Style.DIM, false, 2)
+        return row
+    }
+
     /** One horizontal row of buttons, 8 dp apart. `onTap` receives the index into `labels`. */
     fun row(ctx: Context, labels: List<String>, onTap: (Int) -> Unit = {}): LinearLayout {
         val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
@@ -157,7 +218,11 @@ object Chrome {
     /** Row names to their label lists — the inventory [build] and the gate walk together.
      *  (The old "sun" row — dimmer/brighter/release — retired with the sun card's sliders, EV.) */
     val ROWS = mapOf("pace" to PACE, "tools" to TOOLS, "pages" to PAGES,
-        "utility" to UTILITY, "presets" to PRESETS, "layouts" to LAYOUTS)
+        "utility" to UTILITY, "presets" to PRESETS, "layouts" to LAYOUTS,
+        // The specimen card's action cluster — icons, so the list is what they SAY, not what
+        // they show. It shares the header with the creature's name, so it is measured at the
+        // width it actually competes for (Chrome.IN_SHEET).
+        "specimen" to listOf("feed", "kill", "close"))
 
     /**
      * The one place a row's shipped construct is decided. `MainActivity` builds through this and
@@ -166,6 +231,7 @@ object Chrome {
      */
     fun build(ctx: Context, name: String, onTap: (Int) -> Unit = {}): View = when (name) {
         "pace" -> pace(ctx, onTap)
+        "specimen" -> specimenActions(ctx, onTap)
         "tools" -> dial(ctx, onTap)
         // 2x2, not 1x4 (owner round 3): four buttons sharing the drawer's ~260 dp gave each 65,
         // which German ("Speichern") overflowed and even English only just survived. Two per row

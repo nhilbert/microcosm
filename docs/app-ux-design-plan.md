@@ -262,3 +262,140 @@ banned since 8.4) — the port is newer than the wording it ports.
 Recorded gaps: evolution/sun-slider changes are logged and impact-carded but the core's undo
 slot covers world levers only (codes 1–12) — the browser's UI-side evolution undo is not
 ported; Traits patch marks per sun; the light-budget line of the browser's card.
+
+## 10. SP — the species Steckbrief and trait tracks (2026-09-01)
+
+The specimen sheet knew a creature's numbers but not its species: four bare tiles (label,
+genotype, pole pair) and no answer to "what IS this thing?". docs/species-profiles.md had
+already designed the answer — a profile per species with a portrait slot — and the art existed
+in `assets/species/` without a single consumer. This increment wires both in.
+
+- **The portraits ride in from their one committed home**: `build.gradle` adds the repo's
+  `assets/` to the source set (no second copy to drift) and `ignoreAssetsPattern` keeps the
+  folder's README and the gitignored full-size originals out of the APK — verified by merging
+  with a probe file planted in `full/`: five jpgs and the level overlay ship, nothing else.
+- **The Steckbrief** (`Profiles.kt` + the sheet): tapping the specimen header unfolds a profile
+  block — rounded portrait (`PortraitView`, shader-clipped, dependency-free), role line,
+  "eats" / "eaten by", and a two-sentence description. Folded by default: the sheet floats over
+  the pond and the pond stays the point. Every slot hides when a species has no art or no words
+  (species-profiles.md's contract), so Mycora and Necro degrade to the identity dot, never a
+  crash. Keys are the CORE's English names (species name for art, locus label for trait text) —
+  a core rename surfaces as a missing profile, never a wrong one.
+- **The trait tiles grew a track** (`TraitMeter`): pole-to-pole rail, hollow tick at the
+  founding value (locusGet key 16), marker in the species' own colour at THIS creature's
+  genotype, pole words at the rails, and one line on what the dial trades — nine explanation
+  strings keyed by locus label, shared where the trade is shared (Thermal serves Drifta and
+  Bacillus, deliberately). The lines are teleology-proof per the style guide: lines out-grow
+  and out-breed; nothing adapts in order to.
+- **Words within the gates**: all strings EN+DE in the resource files, prose gate PASS (330
+  strings) — the profile texts are species-profiles.md rewritten into player language, since
+  the originals lean on half the banned-science list.
+
+Gates: the boot gate's selection block now unfolds the Steckbrief against the host core and
+requires the portrait to decode from the BUNDLED assets, the words to be non-blank, and — after
+its first run photographed a sheet whose VISIBLE profile had never been measured — the unfolded
+block to take real laid-out space before it is photographed (`specimen@profile.png`). Layout
+gate 0 violations across 4 profiles × EN/DE; German gate green; `npm test` green.
+
+Recorded gaps: the Steckbrief is per-species, not per-individual (age/size/energy stay the
+individual's rows above it); no portrait in the seed picker yet; the browser's specimen card
+keeps its text-only form — the app is the product, the browser the renderer's oracle.
+
+## 11. Owner round 4 — the seam and the lost experiment (2026-09-02)
+
+Two reports from the device, both reproduced before repair.
+
+**The world-boundary seam.** The screenshot showed a hard vertical edge where the torus wrap
+crossed the screen (t=69,035). Pixel analysis: a constant step, one side reading darker than the
+ABYSS ground, the other brighter — compositing, not content. Reproduced in a Robolectric NATIVE
+probe (the wrap column's neighbouring-pixel difference spiked 2.4x against its surroundings) and
+bisected by `hidden` bits: every layer carried it, the light tile loudest. Cause: the per-tile
+`drawBitmap` loop clamps bilinear filtering at each tile's edge, so no layer could interpolate
+across the wrap — and the 4x field prescale clamped the same way, flattening the edge texels on
+top of it. Fix: every world layer samples through a `BitmapShader` in REPEAT mode (a torus has
+no edge, so the filter must not either) — `Renderer.paintLayer` replaces the tile loop with one
+viewport rect per layer, `Layers.upPaint` wraps the prescale. Painting only; frame.rs and the
+display list untouched, the frame gate stands. New gate `WorldSeamTest`: sun parked on the wrap
+corner, both wrap lines rendered mid-screen at the phone's zoom, seam column/row must not spike
+1.8x over its neighbourhood — negative-tested (convicts the old renderer at 2.42x, passes the
+fix at 1.03x). The browser's canvas tiling has the same clamp seam; it stays as the renderer's
+frozen oracle and is recorded here rather than patched.
+
+**Experiments don't save.** "World state is saved but the fact that I run an experiment is not"
+— exact: the snapshot carried no level runtime, so a mid-experiment save (manual slot) restored
+as sandbox, and the pause-time autosave skipped levels entirely by the U0.6 decision. That
+decision existed only because a restored half-experiment would have been a lie; the owner's
+report overturned it the day the snapshot could tell the truth. Shipped:
+
+- **Snapshot format v2** (snapshot.rs): the running experiment rides at the end — keyed by the
+  level's NAME (a reordered table cannot swap experiments), state/run/seenS/prediction/pour
+  budget/latches/script watermark/fail reason (as a reference into the shipped table) and the
+  F5 census ring; `rg_def` is derived (`levels::collect_regions`, factored out of level_start),
+  so only state is stored. Loading always ends whatever level the session was in (verdicts must
+  never judge a foreign world); a version-1 file still loads, with no level — the owner's
+  existing saves survive. A key or ring shape this build cannot honour drops the experiment and
+  keeps the world.
+- **Proof** extended in `cargo run --bin snapshot` (inside `port:snapshot`): L7 saved mid-run
+  past its scripted sunrise, loaded into a fresh sim, driven across the deadline — level state,
+  fail reason and world all bit-identical to the uninterrupted run; level re-save
+  byte-identical; the synthesised v1 file loads sandbox. Fingerprints bit-identical ×4,
+  native == wasm, core baseline rebound (declared: snapshot format v2 + collect_regions
+  factoring, behavior-neutral), no NOTE.
+- **The shell adopts what it loads** (`adoptCoreLevel`): after any load — boot restore, manual
+  slot — the core says whether an experiment rode along; the shell adopts running level, meter
+  labels and deadline, or clears a stale one. This also re-adopts a live experiment after an
+  activity recreation, which silently lost the shell's experiment context before.
+- **The experiment autosaves to its own file** (`experiment.mcsm`): a mid-experiment pause can
+  never clobber the kept sandbox pond (`autosave.mcsm` untouched); a sandbox pause deletes the
+  stale experiment file. Boot prefers the experiment file — the player left mid-experiment, so
+  mid-experiment is where the app comes back. Routing reads the CORE's level state on the
+  render thread, not the shell's `running`, which can lag a frame around boot.
+- **The front door offers both**: a "continue the experiment" row (after the two fixed rows, so
+  the boot gate's child indices hold) appears whenever an experiment is live, named E{n} {title};
+  the Sandbox row now honours its own subtitle — choosing it mid-experiment stops the level,
+  deletes the experiment file and loads the kept pond back, instead of handing over the
+  experiment's world wearing sandbox clothes. Strings EN+DE, prose gate PASS (414).
+
+Gates: new boot-gate test `theExperimentSurvivesSaveAndLoad` (L7 saved mid-run through the real
+render thread, world walked away to a fresh sandbox, loaded back: core mid-experiment at the
+saved tick with the risen sun intact, shell adopts meters and shows the continue row). Full app
+suite 14/14, `npm test` green, `test:port` green (levels gate byte-identical on the ported
+core).
+
+Recorded gaps: the Observatory ring is not in the snapshot (never was), so a restored
+experiment's narration and Data pages start fresh — verdicts are unaffected because judged
+samples travel as state (seenS, run, latches); the census strip in the level HUD resumes within
+a sample (20 ticks). Levels are still never autosaved DURING a run below onPause granularity;
+a hard kill between pauses loses since-pause progress, as the sandbox always has.
+
+## 12. TH — experiment-menu thumbnails from gameplay (owner request, 2026-09-02)
+
+One small picture per experiment, on both menus (browser start screen, app experiments list),
+and a tool that makes them: `tools/level-thumbs.js` (`npm run thumbs`).
+
+- **Captured from gameplay, not drawn**: the tool plays each level in the real browser UI
+  (the playthrough instrument's approach — dev server, headless Chromium, genuine gestures)
+  and photographs a 160px square of the world canvas. The camera work is all player-reachable
+  input: observe-mode drags to pan, wheel notches to zoom, a pause so the framing and the
+  frame agree. The owner's requirement — main actors and concept IN the picture — is met by a
+  per-level shot spec: a tick, a world point, a zoom, and where the level's actor is absent
+  from the null run, a scripted act (L5 seeds the grazer pack, L6 the Venator pack, which
+  founds as cysts and needs ~1,200 ticks to hatch into the frame).
+- **The core finds its own actors**: an untouched level run is deterministic (pinned seed,
+  draw-free founding), so for `actor:` specs the tool pauses, reads the tick the pause landed
+  on, replays the level headlessly to exactly that tick (the levels-gate drive loop:
+  levelStart + levelScript + step) and centres the camera on that species' densest cluster.
+  The first guessed-coordinate captures were empty water — L1's founders scatter over the
+  whole torus; the exact replay is what made the actors findable.
+- **One committed home, two consumers**: `assets/levels/<key>.jpg` rides into the APK beside
+  the species portraits (`Profiles.levelThumb`, PortraitView row in the experiments list) and
+  is inlined as data URIs into the single-file artifact (generated `src/ui-thumbs.js`, in
+  build.py's UI parts; artifact +67 KB). Missing file = no picture, never a placeholder.
+- **Gates**: `npm test` green with conformance bit-identical (UI-only — dist/core.js does not
+  carry the module); the boot gate lays out the experiments panel and requires at least one
+  thumbnail measured at real size (SP's VISIBLE-but-never-measured lesson); layout gate
+  unchanged at zero violations.
+- Recorded honestly: captures ride the live render loop, so the jpgs are not bit-reproducible
+  between runs (±a few ticks) — a curation tool, not a gate. Regeneration is deliberate.
+  L7's picture is the lonely risen sun on dark water by design: the level's concept is that
+  nothing is there until something is carried there.

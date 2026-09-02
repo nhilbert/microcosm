@@ -22,18 +22,24 @@
 //     world is its own world, like a moved sun — no conformance claim.
 // ============================================================
 const LVL = { def: null, state: "idle", run: 0, seenS: 0, pourLeft: 0, failWhy: "", predicted: -1,
-  mem: {} }; // per-run scratch for stateful predicates (e.g. "extinct AFTER being present"); sample-driven, so deterministic
+  mem: {},      // per-run scratch for stateful predicates (e.g. "extinct AFTER being present"); sample-driven, so deterministic
+  fired: 0,     // F4: how many script entries have fired
+  src0: 0,      // sources present at founding; the "added" apparatus locks exactly these
+  rgDef: [], rg: null, rgS: 0 }; // F5: the level's region census — specs, ring (REC.N rows), captured-sample watermark
 
 // one recorder sample, `back` samples before the latest (pure ring-buffer reads)
 function lvlSample(back){
   const r = ((W.recHead - 1 - back + REC.N) % REC.N) * REC.CH, B = W.rec;
   const total = B[r+14] + B[r+15] + B[r+16] + B[r+17];
   return { pop: sp => B[r+sp], free: B[r+14],
-    lockShare: (B[r+16] + B[r+17]) / Math.max(1, total) };
+    lockShare: (B[r+16] + B[r+17]) / Math.max(1, total),
+    raw: c => B[r + c] }; // any recorder channel — the "ch" metric (L9 reads locus means)
 }
 
 function levelStart(def, predicted){
-  P.mutation = false;   // experiments run on the certified silent world; the sandbox restores true
+  // Experiments run on the certified silent world unless the level DECLARES the evolving one
+  // (L9+: world.mutation true). The sandbox restores true on its own entry either way.
+  P.mutation = def.world.mutation === true;
   P.lightMul = 1.0;
   resetWorld();
   initWorld(def.world.seed, { found: def.world.found, M0: def.world.M0 });
@@ -42,6 +48,78 @@ function levelStart(def, predicted){
   LVL.pourLeft = def.apparatus.pours === true ? Infinity : (def.apparatus.pours | 0);
   LVL.predicted = predicted === undefined ? -1 : predicted; // F1: committed before the run; contrast, never grade
   LVL.mem = {};
+  LVL.fired = 0; LVL.src0 = W.sources.length;
+  // F5: collect the level's census reads (deduplicated) from every predicate and meter row —
+  // "near" region counts (L7) and "share" locus shares (L9), one ring column each
+  const rgDef = [];
+  const need = c => {
+    if (c.m === "near" && !rgDef.some(d => d.k === "near" && d.sp === c.sp && d.src === c.src && d.r === c.r))
+      rgDef.push({ k: "near", sp: c.sp, src: c.src, r: c.r });
+    if (c.m === "at" && !rgDef.some(d => d.k === "at" && d.sp === c.sp && d.x === c.x && d.y === c.y && d.r === c.r))
+      rgDef.push({ k: "at", sp: c.sp, x: c.x, y: c.y, r: c.r }); // L11: a fixed-point region (the pen site)
+    if (c.m === "share" && !rgDef.some(d => d.k === "share" && d.sp === c.sp && d.plane === c.plane && d.side === c.side))
+      rgDef.push({ k: "share", sp: c.sp, plane: c.plane, side: c.side });
+  };
+  for (const c of def.pass) need(c);
+  if (def.latch) for (const l of def.latch) for (const c of l.when) need(c);
+  for (const f of def.failNow) for (const c of f.when) need(c);
+  for (const m of def.meter) need(m);
+  LVL.rgDef = rgDef; LVL.rg = rgDef.length ? new Float64Array(REC.N * rgDef.length) : null; LVL.rgS = 0;
+}
+
+// F5b (L9): the live share of a species' locus plane beyond the detector's own ±0.05 band
+// around g0 — the recorder's sweep-share definition, captured on the sample clock like a region.
+function lvlShare(g){
+  const L = TRAITS[g.sp].loci[g.plane]; if (!L) return 0;
+  const off = g.plane * MAXN; let n = 0, m = 0;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i] || W.sp[i] !== g.sp) continue;
+    n++;
+    const v = W.g[off + i];
+    if (g.side > 0 ? v > L.g0 + 0.05 : v < L.g0 - 0.05) m++;
+  }
+  return n ? m / n : 0;
+}
+
+// F5: one region census — live members of a species within toroidal radius r of a source
+// ("near") or of a fixed point ("at", L11's pen site). Pure read; squared distance only
+// (*, +), so the ported core computes it bit-identically.
+function lvlNear(g){
+  const s = g.k === "at" ? g : W.sources[g.src]; if (!s) return 0;
+  const HW = P.WORLD / 2; let n = 0;
+  for (let i = 0; i < W.n; i++){
+    if (!W.alive[i] || W.sp[i] !== g.sp) continue;
+    let dx = Math.abs(W.x[i] - s.x); if (dx > HW) dx = P.WORLD - dx;
+    let dy = Math.abs(W.y[i] - s.y); if (dy > HW) dy = P.WORLD - dy;
+    if (dx * dx + dy * dy <= g.r * g.r) n++;
+  }
+  return n;
+}
+
+// F4+F5: the level's per-tick hook. Call it before EVERY step() while a level runs — the UI's
+// tick loop, the harness, and the app all share this call site. It does two things, both
+// tick-anchored so no caller cadence can move a verdict:
+//   - fires scripted events at their declared tick (before the step that produces tick t —
+//     the harness's own action convention), composing applyEvent exactly like levelStart;
+//   - takes the region census one tick before each recorder sample lands (state at tick 20s-1
+//     for sample s), so by the time levelCheck consumes a sample its region row exists.
+// Idempotent within a tick: extra calls fire nothing twice and capture nothing twice.
+function levelScript(){
+  const def = LVL.def; if (!def || LVL.state !== "running") return;
+  if (def.script) while (LVL.fired < def.script.length && def.script[LVL.fired].t <= W.tick + 1)
+    applyEvent({ ...def.script[LVL.fired++].event });
+  const nr = LVL.rgDef.length;
+  if (nr && (W.tick + 1) % REC.STRIDE === 0){
+    const s = (W.tick + 1) / REC.STRIDE;
+    if (s > LVL.rgS){
+      const row = (s % REC.N) * nr;
+      for (let j = 0; j < nr; j++){
+        const d = LVL.rgDef[j];
+        LVL.rg[row + j] = d.k === "share" ? lvlShare(d) : lvlNear(d);
+      }
+      LVL.rgS = s;
+    }
+  }
 }
 function levelRestart(){ const d = LVL.def, p = LVL.predicted; if (d) levelStart(d, p); }
 // F2: the freshest Observatory event of a type this level narrates (pure read; null outside a level)
@@ -59,12 +137,33 @@ function levelAllows(what){
   if (what === "seed") return a.seed === "all";
   return !!a[what];
 }
+// Per-source lock (L7): sources === "added" opens only sources that appeared after founding —
+// the script's or the player's own. The founded sky stays part of the experiment.
+function levelAllowsSource(k){
+  if (!LVL.def) return true;
+  const a = LVL.def.apparatus.sources;
+  return a === true ? true : a === "added" ? k >= LVL.src0 : false;
+}
 function levelPourOk(){ return !LVL.def || LVL.pourLeft > 0; }
 function levelNotePour(d){ if (LVL.def && LVL.pourLeft !== Infinity) LVL.pourLeft = Math.max(0, LVL.pourLeft - d); }
 
 // ---- the predicate evaluator. Schema:
 //   condition  { m: "pop", sp } | { m: "lockShare" } | { m: "free" }, with op one of
-//              >= <= > < ==, and v the right-hand side; or { latched: id } for a set latch.
+//              >= <= > < ==, and v the right-hand side; or { latched: id } for a set latch;
+//              or { m: "near", sp, src, r } (F5) — the census of a species within toroidal
+//              radius r of source src, captured by levelScript on the sample clock;
+//              or { m: "at", sp, x, y, r } (L11) — the same census around a fixed point
+//              (a marked site rather than a source);
+//              or { m: "share", sp, plane, side } (L9) — the live share of that species'
+//              locus plane beyond g0±0.05 (side 1 = hi, -1 = lo; the sweep detector's own
+//              definition), captured like a region; or { m: "ch", c } — a raw recorder
+//              channel (L9 reads the locus mean at 42+sp).
+//   world.mutation  true runs the EVOLVING world (L9+); absent/false runs the certified
+//              silent world, as every earlier level does.
+//   script     [{ t, event }] (F4) — events the LEVEL fires at fixed ticks (before the step
+//              that produces tick t), through levelScript's per-tick call site.
+//   apparatus.sources  false | true | "added" — "added" locks the founded sky and opens only
+//              sources that appear after founding (levelAllowsSource).
 //   pass       AND of conditions.
 //   latch      [{ id, when }] — set once its conditions hold, evaluated before failNow, so a
 //              level can say "extinct AFTER being present". Per-run scratch (LVL.mem), sample-
@@ -73,6 +172,18 @@ function levelNotePour(d){ if (LVL.def && LVL.pourLeft !== Infinity) LVL.pourLef
 //   meter      [{ label, m, sp?, pct?, goal?, dir?, unit? }] — pct reads the share as a rounded
 //              percentage. A row with no goal is information, not an objective.
 function lvlMetric(S, r){
+  if (r.m === "near" || r.m === "at" || r.m === "share"){ // F5: the census the levelScript ring holds for this sample (S.s absolute)
+    const D = LVL.rgDef;
+    for (let j = 0; j < D.length; j++){
+      const d = D[j];
+      const hit = r.m === "near" ? d.k === "near" && d.sp === r.sp && d.src === r.src && d.r === r.r
+        : r.m === "at" ? d.k === "at" && d.sp === r.sp && d.x === r.x && d.y === r.y && d.r === r.r
+        : d.k === "share" && d.sp === r.sp && d.plane === r.plane && d.side === r.side;
+      if (hit) return LVL.rg[(S.s % REC.N) * D.length + j];
+    }
+    return 0;
+  }
+  if (r.m === "ch") return S.raw(r.c); // any recorder channel (L9: locus mean 42+sp)
   return r.m === "lockShare" ? S.lockShare : r.m === "free" ? S.free : S.pop(r.sp);
 }
 function lvlCond(S, M, c){
@@ -94,7 +205,8 @@ function lvlAll(S, M, list){
 // the HUD's meter rows for the latest sample; [] outside a level or before the first sample
 function levelMeter(){
   const def = LVL.def; if (!def || !W.recCount) return [];
-  const S = lvlSample(0);
+  const sNow = Math.floor(W.tick / REC.STRIDE);
+  const S = lvlSample(0); S.s = LVL.rgDef.length ? Math.min(sNow, LVL.rgS) : sNow;
   return def.meter.map(m => {
     const o = { label: m.label, v: m.pct ? Math.round(lvlMetric(S, m) * 100) : lvlMetric(S, m) };
     if (m.goal !== undefined) o.goal = m.goal;
@@ -110,12 +222,15 @@ function levelCheck(){
   const L = LVL, def = L.def;
   if (!def || L.state !== "running") return L.state;
   const sNow = Math.floor(W.tick / REC.STRIDE);
-  let news = sNow - L.seenS;
+  // F5: a sample is judged only once its region row exists (levelScript's watermark); with the
+  // per-tick call site in place the watermark equals sNow, so non-region levels are untouched.
+  const sEval = L.rgDef.length ? Math.min(sNow, L.rgS) : sNow;
+  let news = sEval - L.seenS;
   if (news > 0){
     if (news > W.recCount) news = W.recCount;
     if (news > REC.N) news = REC.N;
     for (let k = news - 1; k >= 0 && L.state === "running"; k--){
-      const S = lvlSample(k);
+      const S = lvlSample(sNow - sEval + k); S.s = sEval - k;
       if (def.latch) for (const l of def.latch) if (lvlAll(S, L.mem, l.when)) L.mem[l.id] = 1;
       let why = "";
       for (const f of def.failNow) if (lvlAll(S, L.mem, f.when)){ why = f.why; break; }
@@ -123,7 +238,7 @@ function levelCheck(){
       L.run = lvlAll(S, L.mem, def.pass) ? L.run + 1 : 0;
       if (L.run >= (def.sustain || 10)) L.state = "passed";
     }
-    L.seenS = sNow;
+    L.seenS = sEval;
   }
   if (L.state === "running" && W.tick >= def.deadline){
     L.state = "failed"; L.failWhy = def.timeoutWhy || "Time ran out.";

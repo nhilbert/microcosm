@@ -188,16 +188,27 @@ function StartScreen({ badges, onSandbox, onLevel }){
         <div style={{ display:"grid", gap:10 }}>
           {LEVELS.map(def => (
             <button key={def.key} className="mc-hit" onClick={() => pick(def)} style={card}>
-              <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
-                <span style={{ fontSize:11, color:"#5E7386", fontFamily:mono }}>{def.n}</span>
-                <span style={{ fontSize:15, fontWeight:600 }}>{def.title}</span>
-                <span style={{ fontSize:11, color:"#8FA3B5" }}>{def.science}</span>
-                {badges[def.key] && <span style={{ marginLeft:"auto", color:"rgb(70,214,140)", fontSize:14 }}>✓</span>}
+              <div style={{ display:"flex", gap:12 }}>
+                {/* a captured moment of the level's world (generated src/ui-thumbs.js);
+                    a level without one simply has no picture */}
+                {LEVEL_THUMBS[def.key] && (
+                  <img src={LEVEL_THUMBS[def.key]} alt="" width={54} height={54}
+                    style={{ flex:"0 0 auto", borderRadius:10, marginTop:2,
+                      border:"1px solid rgba(94,115,134,0.35)" }} />
+                )}
+                <div style={{ flex:"1 1 auto", minWidth:0 }}>
+                  <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
+                    <span style={{ fontSize:11, color:"#5E7386", fontFamily:mono }}>{def.n}</span>
+                    <span style={{ fontSize:15, fontWeight:600 }}>{def.title}</span>
+                    <span style={{ fontSize:11, color:"#8FA3B5" }}>{def.science}</span>
+                    {badges[def.key] && <span style={{ marginLeft:"auto", color:"rgb(70,214,140)", fontSize:14 }}>✓</span>}
+                  </div>
+                  <div style={{ fontSize:12, color:"#8FA3B5", marginTop:5, lineHeight:1.5, fontStyle:"italic" }}>
+                    {def.question}</div>
+                  <div style={{ fontSize:12, color:"#C9D7E3", marginTop:6, lineHeight:1.55 }}>{def.briefing}</div>
+                  <div style={{ fontSize:11.5, color:"#8FA3B5", marginTop:6, fontFamily:mono }}>goal · {def.goalText}</div>
+                </div>
               </div>
-              <div style={{ fontSize:12, color:"#8FA3B5", marginTop:5, lineHeight:1.5, fontStyle:"italic" }}>
-                {def.question}</div>
-              <div style={{ fontSize:12, color:"#C9D7E3", marginTop:6, lineHeight:1.55 }}>{def.briefing}</div>
-              <div style={{ fontSize:11.5, color:"#8FA3B5", marginTop:6, fontFamily:mono }}>goal · {def.goalText}</div>
             </button>
           ))}
         </div>

@@ -175,6 +175,10 @@ object Native {
 
     /** what: 0 pours, 1 seed, 2 sources, 3 walls, 4 evolution. */
     external fun levelAllows(what: Int): Int
+    /** F4+F5: the level's per-tick hook (scripted events + region census); call before every step. */
+    external fun levelScript()
+    /** Per-source lock (L7): 1 when source k may be selected, edited, moved or removed. */
+    external fun levelAllowsSource(k: Int): Int
     external fun levelPourOk(): Int
     external fun levelNotePour(d: Int)
     external fun levelNarration(): Int

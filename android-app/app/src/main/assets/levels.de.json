@@ -1,187 +1,394 @@
 {
-  "_comment": "Die deutsche Fassung der Experiment-Texte (DE.3). Nur Anzeige: die Urteile fallen im zertifizierten Kern über die englische Tabelle (levels.json im Kern-Hash); diese Datei wird in Levels.kt darübergelegt, wenn die Sprache Deutsch ist. 'whys' übersetzt die Fehlschlag-Begründungen per exakter Übereinstimmung. Der Prose-Gate (harness/prose-app.js) prüft Vollständigkeit gegen src/observatory/levels.json.",
+  "_comment": "Die deutsche Fassung der Experiment-Texte (DE.3, Sprachreview 2026-09-01). Nur Anzeige: die Urteile fallen im zertifizierten Kern über die englische Tabelle (levels.json im Kern-Hash); diese Datei wird in Levels.kt darübergelegt, wenn die Sprache Deutsch ist. 'whys' übersetzt die Fehlschlag-Begründungen per exakter Übereinstimmung — die timeoutWhy-Texte laufen über dieselbe Map. Der Prose-Gate (harness/prose-app.js) prüft Vollständigkeit gegen src/observatory/levels.json.",
   "light": {
     "title": "Erstes Licht",
     "science": "Photosynthese · Tragfähigkeit",
     "question": "Warum wächst in einem trüben Teich nichts?",
-    "briefing": "Zwanzig Gründer von Solara treiben unter einer schwachen Sonne auf einen Siedlungsgrund. Sich selbst überlassen, verhungert die Matte bei jeder Größe — Licht ist das einzige Einkommen dieser Welt. Dein Instrument ist der ☀-Hebel im Eingreifen-Modus.",
-    "goalText": "Etabliere die Matte — 400 Solara, gehalten",
+    "briefing": "Zwanzig Gründer von Solara treiben unter einer schwachen Sonne auf einen Siedlungsgrund. Lässt du sie allein, verhungert ihre Algenmatte, egal wie groß sie wird. Licht ist die einzige Energiequelle dieser Welt. Dein Instrument ist der ☀-Hebel im Eingreifen-Modus.",
+    "goalText": "Baue die Matte auf und halte 400 Solara",
     "predict": {
       "prompt": "Zwanzig Gründer unter schwacher Sonne. Was passiert, wenn du nur zuschaust?",
       "options": [
         "Die Matte wächst langsam, aber sie schafft es",
-        "Sie verhungert bei jeder Größe — Licht ist das Einkommen",
+        "Sie verhungert, denn Licht ist die einzige Energiequelle",
         "Sie wächst, bis das Mineral im Wasser ausgeht"
       ],
       "reflect": [
-        "Geduld heilt diesen Teich nicht. Unter einem gewissen Licht verliert die Matte bei jeder Größe Energie — Warten macht sie nur kleiner.",
-        "Genau das zeigten die Energiebalken. Unter dieser Sonne verbrennt jede Solara mehr, als sie verdient.",
-        "Das Wasser kam nie an die Reihe. Die Energie ging zuerst aus — Licht ist hier das Einkommen."
+        "Geduld hilft hier nicht. Ist das Licht zu schwach, verliert die Matte Energie, egal wie groß sie ist. Warten macht sie nur kleiner.",
+        "Genau das zeigten die Energiebalken. Jede Solara verbraucht hier mehr Energie, als das Licht ihr gibt.",
+        "Das Wasser war nie das Problem. Die Energie ging zuerst aus, und Energie kommt hier nur aus dem Licht."
       ]
     },
     "debrief": {
-      "pass": "Licht ist das einzige Einkommen des Teichs. Unter einer trüben Sonne gibt die Matte mehr aus, als sie verdient, also schrumpft sie bei jeder Größe. Mit genug Licht wächst sie schnell und flacht dann ab — die Matte beschattet sich selbst, und der Grund wird knapp. Diese Decke ist die Tragfähigkeit: keine Quote, nur Einkommen trifft Kosten.",
-      "fail": "Die Matte brauchte mehr Einkommen, und nur Licht ist hier Einkommen. Tippe eine Solara an und schau auf ihre Karte: der Energiebalken füllt sich nie. Der ☀-Hebel hebt, was der ganze Teich verdient — alles andere schiebt es nur herum."
+      "pass": "Licht ist die einzige Energiequelle dieses Teichs. Unter einer trüben Sonne verbraucht die Matte mehr Energie, als das Licht ihr gibt. Also schrumpft sie, egal wie groß sie ist. Mit genug Licht wächst sie schnell, dann flacht sie ab. Sie beschattet sich selbst, und der Grund wird knapp. Diese Grenze heißt Tragfähigkeit: der Punkt, an dem Zuwachs und Verbrauch sich treffen.",
+      "fail": "Die Matte brauchte mehr Energie, und Energie kommt hier nur aus dem Licht. Tippe eine Solara an und schaue auf ihre Karte: Der Energiebalken füllt sich nie. Der ☀-Hebel hebt, was der ganze Teich bekommt. Alles andere schiebt die Energie nur herum."
     },
-    "meter": [{ "label": "Solara", "unit": "" }],
+    "meter": [
+      {
+        "label": "Solara",
+        "unit": ""
+      }
+    ],
     "whys": {
-      "The last Solara died — the mat never caught the light.": "Die letzte Solara ist gestorben — die Matte hat das Licht nie gefangen."
+      "The last Solara died — the mat never caught the light.": "Die letzte Solara ist gestorben. Die Matte hat das Licht nie eingefangen.",
+      "The mat never took hold. Under this sun, every Solara spends more than it earns — at any number.": "Die Matte hat nie Fuß gefasst. Unter dieser Sonne verbraucht jede Solara mehr Energie, als das Licht ihr gibt. Das gilt bei jeder Zahl."
     }
   },
   "mineral": {
-    "title": "Das hungrige Wasser",
-    "science": "Liebigs Gesetz vom Minimum",
-    "question": "Die Sonne steht schon auf Anschlag — warum stockt die Matte trotzdem?",
-    "briefing": "Der ☀-Hebel startet auf Maximum — aber das Wasser ist arm. Die Matte steigt, dann stockt sie; mehr Licht hat nichts mehr zu geben. Du trägst zehn Dosen Mineral: tippe offenes Wasser an, um eine zu gießen, und wähle die Stelle mit Bedacht.",
-    "goalText": "Bring die Matte mit zehn Güssen über 600",
+    "title": "Das magere Wasser",
+    "science": "Liebigs Minimumgesetz",
+    "question": "Die Sonne steht schon am Anschlag. Warum stockt die Algenmatte trotzdem?",
+    "briefing": "Der ☀-Hebel startet auf Maximum, aber das Wasser ist mager. Die Matte wächst, dann stockt sie: Mehr Licht bringt nichts mehr. Du hast zehn Gaben Mineral dabei. Tippe offenes Wasser an, um eine zu gießen, und wähle die Stelle mit Bedacht.",
+    "goalText": "Bringe die Matte mit zehn Gaben über 600",
     "predict": {
-      "prompt": "Die Sonne ist am Anschlag. Was werden zehn Dosen Mineral bewirken?",
+      "prompt": "Die Sonne ist am Anschlag. Was bringen zehn Gaben Mineral?",
       "options": [
-        "Die Stelle ist egal — die Mischung verteilt sie sowieso",
+        "Die Stelle ist egal, die Durchmischung verteilt sie sowieso",
         "Sie helfen nur dort, wo die Matte zuerst trinkt",
-        "Nichts — das Licht muss trotzdem das Problem sein"
+        "Nichts, das Licht muss trotzdem das Problem sein"
       ],
       "reflect": [
-        "Die Mischung verteilt sie — aber viel zu langsam. Dosen am dunklen Ufer kamen zu spät, und die Uhr lief ab.",
-        "Richtig: Mineral bewegt sich langsam, und die Matte trinkt, was neben ihr landet.",
-        "Der Hebel stand die ganze Zeit an seiner Decke. Die knappste Zutat bestimmte — und das war nicht das Licht."
+        "Die Durchmischung verteilt sie, aber viel zu langsam. Gaben am dunklen Ufer kamen zu spät, und die Uhr lief ab.",
+        "Richtig: Mineral wandert langsam, und die Matte trinkt, was neben ihr landet.",
+        "Der Hebel stand die ganze Zeit am Anschlag. Die knappste Zutat gab den Ausschlag, und das war nicht das Licht."
       ]
     },
     "debrief": {
-      "pass": "Die knappste Zutat setzt die Decke — nicht die großzügigste. Die Sonne hatte nichts mehr zu geben; Mineral war die Grenze. Und es half nur dort, wo die Matte es trinken konnte, bevor die langsame Mischung es verdünnte. Schau auf den M-Balken: alles, was du gegossen hast, ist noch irgendwo. In Körpern, im Wasser oder im Toten — Materie geht nie verloren, sie zieht nur um.",
-      "fail": "Die Karten erzählten es: mineralbegrenzt, unter einer Sonne am Anschlag. Güsse am dunklen Rand füttern meist leeres Wasser — die Mischung ist langsam. Gieß früh, und gieß dorthin, wo die Matte lebt."
+      "pass": "Die knappste Zutat setzt den Deckel, nicht die reichlichste. Die Sonne hatte nichts mehr zu geben; die Grenze war das Mineral. Und es half nur dort, wo die Matte es trinken konnte, bevor die langsame Durchmischung es verdünnte. Schaue auf den M-Balken: Alles, was du gegossen hast, ist noch irgendwo. In Körpern, im Wasser oder in den Toten. Materie geht nie verloren, sie zieht nur um.",
+      "fail": "Die Karten haben es gezeigt: mineralbegrenzt, unter einer Sonne am Anschlag. Gaben am dunklen Rand füttern meist nur leeres Wasser, die Durchmischung ist langsam. Gieße früh, und gieße dorthin, wo die Matte lebt."
     },
-    "meter": [{ "label": "Solara", "unit": "" }],
+    "meter": [
+      {
+        "label": "Solara",
+        "unit": ""
+      }
+    ],
     "whys": {
-      "The mat has died out.": "Die Matte ist ausgestorben."
+      "The mat has died out.": "Die Matte ist ausgestorben.",
+      "The mat stalled below 600. Light was maxed out the whole time — the scarcest ingredient set the ceiling.": "Die Matte blieb unter 600 stecken. Das Licht war die ganze Zeit am Anschlag. Den Deckel setzte die knappste Zutat."
     }
   },
   "cycle": {
     "title": "Alles fließt",
     "science": "Zersetzung · der Mineralkreislauf",
-    "question": "Der Matte geht es prächtig — warum leert sich trotzdem das Wasser?",
-    "briefing": "Derselbe Teich wie in deinem ersten Experiment, unter voller Sonne. Die Matte blüht — und trotzdem versickert das freie Mineral. Alles, was stirbt, nimmt sein Mineral mit in den Schlamm, und nichts bringt es zurück. Drücke offenes Wasser lange, um eine Art auszusetzen — und wähle gut.",
-    "goalText": "Schließ den Schlamm auf — Recycler rein, Matte 1.000",
+    "question": "Der Algenmatte geht es prächtig. Warum leert sich trotzdem das Wasser?",
+    "briefing": "Derselbe Teich wie in deinem ersten Experiment, unter voller Sonne. Die Matte wuchert, und trotzdem versickert das freie Mineral. Alles, was stirbt, nimmt sein Mineral mit in den Schlamm, und nichts bringt es zurück. Drücke offenes Wasser lange, um eine Art anzusiedeln, und wähle gut.",
+    "goalText": "Hole das Mineral zurück: Recycler rein, Matte 1.000",
     "predict": {
       "prompt": "Der Matte geht es prächtig. Wohin verschwindet das freie Mineral?",
       "options": [
-        "Nirgendwohin — ein gesunder Teich kreist von selbst",
-        "In die Toten — und dort bleibt es",
+        "Nirgendwohin, in einem gesunden Teich läuft alles im Kreis",
+        "In die Toten, und dort bleibt es",
         "Die lebende Matte hortet alles"
       ],
       "reflect": [
-        "Kreisen ist Arbeit, und niemand in dieser Welt hat sie gemacht — Materie floss bergab in den Schlamm und blieb liegen.",
-        "Die Chemie-Seite stimmt zu: der gebundene Anteil stieg, Tick um Tick, bis etwas die Toten fraß.",
-        "Körper hielten einen Teil — aber der Schlamm hielt mehr, und der Schlamm gibt von allein nichts zurück."
+        "Der Kreislauf ist Arbeit, und niemand in dieser Welt hat sie erledigt. Materie floss bergab in den Schlamm und blieb liegen.",
+        "Die Chemie-Seite zeigt es: Der gebundene Anteil stieg, Tick um Tick, bis etwas die Toten fraß.",
+        "In Körpern steckte ein Teil, im Schlamm steckte mehr, und der Schlamm gibt von allein nichts zurück."
       ]
     },
     "debrief": {
-      "pass": "Bacillus frisst die Toten und gibt ihr Mineral ans Wasser zurück. Lebewesen mit diesem Job heißen Zersetzer — sie schließen den Kreis. Dieselbe Materie geht jetzt im Kreis, statt sich im Schlamm zu stapeln. Das ist die tiefste Regel dieser Welt: Materie zieht im Kreis, Energie fließt durch wie ein Fluss. Ein Teich ohne seine Recycler erstickt langsam an den eigenen Toten.",
-      "fail": "Nur ein Zersetzer gibt gebundenes Mineral ans Wasser zurück. Fresser und Jäger schieben Materie nur zwischen Körpern hin und her — und alles, was sie töten, bindet mehr im Schlamm. Setz Bacillus nahe der Matte aus, dort, wo die Toten sind."
+      "pass": "Bacillus frisst die Toten und gibt ihr Mineral ans Wasser zurück. Lebewesen mit diesem Job heißen Zersetzer: Sie schließen den Kreis. Dieselbe Materie wandert jetzt im Kreis, statt sich im Schlamm zu stapeln. Das ist die tiefste Regel dieser Welt: Materie läuft im Kreis, Energie fließt durch wie ein Fluss. Ein Teich ohne seine Recycler kippt langsam um.",
+      "fail": "Nur ein Zersetzer holt gebundenes Mineral zurück ins Wasser. Planktonfresser und Jäger bewegen Materie nur zwischen Körpern. Ihre Opfer binden zugleich noch mehr Mineral im Schlamm. Siedle Bacillus nahe der Matte an: Dort liegen die Toten."
     },
     "meter": [
-      { "label": "gebunden", "unit": "%" },
-      { "label": "Bacillus", "unit": "" }
+      {
+        "label": "gebunden",
+        "unit": "%"
+      },
+      {
+        "label": "Bacillus",
+        "unit": ""
+      }
     ],
     "whys": {
-      "The producers are gone — without the mat, nothing eats and nothing returns.": "Die Erzeuger sind fort — ohne die Matte frisst nichts und nichts kehrt zurück."
+      "The producers are gone — without the mat, nothing eats and nothing returns.": "Die Erzeuger sind fort. Ohne die Matte frisst nichts, und nichts kehrt zurück.",
+      "The dead kept their mineral. Over 40% of the world's matter ended up locked in corpses and mud, and the water kept emptying.": "Die Toten behielten ihr Mineral. Über 40 % der Materie steckten am Ende in toten Körpern und im Schlamm fest. Das Wasser leerte sich weiter."
     }
   },
   "garden": {
     "title": "Der Gärtner",
-    "science": "Konkurrenz · der Schlüsselfresser",
-    "question": "Das Wasser ist arm und die Blüte besitzt es. Ist die Wiese zu retten?",
-    "briefing": "Armes Wasser, und das schnelle Plankton besitzt es: Drifta trinkt schneller, und die Wiese verhungert unter heller Sonne. Du trägst acht Dosen Mineral, und die Aussetzbank ist offen. Wähle dein Instrument.",
-    "goalText": "Rette die Matte — 250 Solara, gehalten",
+    "science": "Konkurrenzausschluss · Schlüsselart",
+    "question": "Mageres Wasser, und die Blüte trinkt zuerst. Ist die Wiese zu retten?",
+    "briefing": "Mageres Wasser, und das meiste davon trinkt das schnelle Plankton. Drifta trinkt schneller als Solara, und die Wiese verhungert unter heller Sonne. Du hast acht Gaben Mineral dabei, und du kannst neue Arten ansiedeln. Wähle dein Instrument.",
+    "goalText": "Rette die Wiese und halte 250 Solara",
     "predict": {
-      "prompt": "Was könnte die Matte retten?",
+      "prompt": "Was könnte die Wiese retten?",
       "options": [
-        "Mineral gießen — die Matte direkt füttern",
-        "Einen Fresser aussetzen — Feind der Blüte, Freund der Wiese",
-        "Nichts — die Schnellen gewinnen immer"
+        "Mineral gießen und die Wiese direkt füttern",
+        "Einen Planktonfresser ansiedeln: Feind der Blüte, Freund der Wiese",
+        "Nichts, die Schnellen gewinnen immer"
       ],
       "reflect": [
-        "Die Blüte trinkt schneller als die Matte, also fütterten deine Güsse zuerst die Blüte. Acht Dosen: die Matte blieb unter 70.",
-        "Die Schlüssel-Wette: Druck auf den Gewinner ist der einzige Hebel, der dem Verlierer Platz macht.",
-        "Das Wasser gewinnen sie — bis etwas sie frisst. Konkurrenz hat mehr als einen Schiedsrichter."
+        "Die Blüte trinkt schneller als die Wiese, also haben deine Gaben zuerst die Blüte gefüttert. Acht davon, und die Wiese blieb unter 70.",
+        "Die Gärtner-Wette: Druck auf den Gewinner ist der einzige Hebel, der dem Verlierer Platz macht.",
+        "Das Wasser gewinnen sie, bis etwas sie frisst. Konkurrenz hat mehr als einen Schiedsrichter."
       ]
     },
     "debrief": {
-      "pass": "Cilio fraß die Blüte, und die Matte nahm sich das Licht und Mineral, das frei wurde. Ein Fresser hielt die Tür für eine ganze Wiese auf — so einen nennt man Schlüsselfresser. Und jetzt schau weiter zu. In so armem Wasser frisst sich der Gärtner selbst arbeitslos: Cilio verhungert, und die Blüte kriecht zurück. Schlüsselfresser ist ein Job, und Jobs brauchen Lohn.",
-      "fail": "Die Blüte behielt das Wasser. Den Verlierer füttern klappt hier nicht — das Plankton trinkt schneller, also fütterte jeder Guss zuerst die Blüte. Versuch die andere Richtung: setz den Fresser der Blüte aus, und lass Druck von oben unten Platz schaffen."
+      "pass": "Cilio fraß die Blüte, und die Wiese nahm sich das Licht und das Mineral, das frei wurde. Ein einziger Planktonfresser hielt der ganzen Wiese die Tür auf. So eine Art nennt man Schlüsselart. Und jetzt schaue weiter zu: In so magerem Wasser frisst sich der Gärtner selbst arbeitslos. Cilio verhungert, und die Blüte kriecht zurück. Schlüsselart ist ein Job, und Jobs brauchen Lohn.",
+      "fail": "Die Blüte behielt das Wasser. Den Verlierer zu füttern klappt hier nicht: Das Plankton trinkt schneller, also fütterte jede Gabe zuerst die Blüte. Versuche die andere Richtung und setze der Blüte ihren Planktonfresser vor die Nase. Druck von oben schafft Platz weiter unten."
     },
     "meter": [
-      { "label": "Solara", "unit": "" },
-      { "label": "Drifta", "unit": "" }
+      {
+        "label": "Solara",
+        "unit": ""
+      },
+      {
+        "label": "Drifta",
+        "unit": ""
+      }
     ],
     "whys": {
-      "The last Solara died — the meadow is gone.": "Die letzte Solara ist gestorben — die Wiese ist fort.",
-      "The bloom is gone — exterminated, not gardened. That is not the rescue this pond needed.": "Die Blüte ist fort — ausgerottet, nicht gegärtnert. Das war nicht die Rettung, die dieser Teich brauchte."
+      "The last Solara died — the meadow is gone.": "Die letzte Solara ist gestorben, die Wiese ist fort.",
+      "The bloom is gone — exterminated, not gardened. That is not the rescue this pond needed.": "Die Blüte ist fort: ausgerottet, nicht gegärtnert. Das war nicht die Rettung, die dieser Teich brauchte.",
+      "The mat never rose past 250 — the bloom held the water to the end. Minerals feed whoever drinks fastest; only pressure on the bloom itself opens space below it.": "Die Wiese kam nie über 250, die Blüte behielt das Wasser bis zum Schluss. Mineral füttert den, der am schnellsten trinkt; erst Druck auf die Blüte selbst schafft darunter Platz."
     }
   },
   "richer": {
-    "title": "Der reichere Teich",
+    "title": "Der vollere Teich",
     "science": "Struktur von oben · Nachschub von unten",
-    "question": "Dieser Teich ist stabil und voller Plankton. Kannst du ihn reicher machen?",
-    "briefing": "Eine Blüte, eine Matte, Zersetzer — und niemand frisst irgendwen. Mineral ist diesmal unbegrenzt, und die Aussetzbank ist offen. Das Ziel ist ein reicherer Teich: eine Wiese über 1.300, alle Arten am Leben. Entscheide, was diesem Teich wirklich fehlt.",
-    "goalText": "Ein reicherer Teich — 1.300 Solara, alle am Leben",
+    "question": "Dieser Teich ist stabil und voller Plankton. Passt noch mehr Leben hinein?",
+    "briefing": "Eine Blüte, eine Wiese, Zersetzer, und niemand frisst irgendwen. Mineral ist diesmal unbegrenzt, und du kannst neue Arten ansiedeln. Das Ziel: ein vollerer Teich, die Wiese über 1.300, alle Arten am Leben. Entscheide, was diesem Teich wirklich fehlt.",
+    "goalText": "Ein vollerer Teich: 1.300 Solara, alle am Leben",
     "predict": {
-      "prompt": "Was braucht ein Teich, um reicher zu werden?",
+      "prompt": "Was braucht ein Teich, um voller zu werden?",
       "options": [
-        "Mehr Nachschub — Mineral ins Wasser gießen",
-        "Einen fehlenden Fresser — umbauen, wer wen frisst",
-        "Beides — Nachschub und Struktur zusammen"
+        "Mehr Nachschub: Mineral ins Wasser gießen",
+        "Einen fehlenden Planktonfresser: ändern, wer wen frisst",
+        "Beides, Nachschub und Struktur zusammen"
       ],
       "reflect": [
-        "Dreißig Dosen versanken in der Blüte, und die Wiese blieb bei rund 900. Die Decke eines Teichs setzt seine Struktur, nicht seine Suppe.",
-        "Die Struktur-Wette: gib dem Teich einen Fresser, und die Wiese verdoppelt sich beinahe.",
-        "Beides geht — aber das Experiment zeigt, welche Hälfte nötig war: Güsse allein scheiterten, der Fresser allein gelang."
+        "Dreißig Gaben versanken in der Blüte, und die Wiese blieb bei rund 900. Wie voll ein Teich wird, bestimmt seine Struktur, nicht seine Suppe.",
+        "Die Struktur-Wette: Gib dem Teich einen Planktonfresser, und die Wiese verdoppelt sich beinahe.",
+        "Beides geht, aber das Experiment zeigt, welche Hälfte nötig war: Gaben allein scheiterten, der Planktonfresser allein hat es geschafft."
       ]
     },
     "debrief": {
-      "pass": "Du hast einen Fresser eingesetzt, und der ganze Teich wurde reicher. Die Wiese hat sich fast verdoppelt; die Blüte fiel auf ein Viertel — und hielt. Und darum: Fressen hält Mineral in Bewegung. Gefressen, ans Wasser zurückgegeben, wieder aufgenommen. All dein Gießen konnte das nicht. Dieser Teich war nie hungrig. Er war unfertig.",
-      "fail": "Mehr Suppe machte keinen reicheren Teich. Die Blüte trank jeden Guss und stand einfach da. Was diesem Teich fehlt, hat ein Maul. Setz den Fresser aus, und sieh, was ein Fresser kann, was Gießen nicht kann."
+      "pass": "Du hast einen Planktonfresser angesiedelt, und der ganze Teich wurde voller. Die Wiese hat sich fast verdoppelt; die Blüte fiel auf ein Viertel und blieb dort. Der Grund: Fressen hält das Mineral in Bewegung. Gefressen, ans Wasser zurückgegeben, wieder aufgenommen. All dein Gießen konnte das nicht. Diesem Teich fehlte nie Nachschub. Ihm fehlte ein Planktonfresser.",
+      "fail": "Mehr Suppe macht keinen volleren Teich. Die Blüte trank jede Gabe und stand einfach da. Was diesem Teich fehlt, hat ein Maul. Siedle den Planktonfresser an und schaue zu, was Fressen kann und Gießen nicht."
     },
     "meter": [
-      { "label": "Solara", "unit": "" },
-      { "label": "Cilio", "unit": "" },
-      { "label": "Drifta", "unit": "" }
+      {
+        "label": "Solara",
+        "unit": ""
+      },
+      {
+        "label": "Cilio",
+        "unit": ""
+      },
+      {
+        "label": "Drifta",
+        "unit": ""
+      }
     ],
     "whys": {
-      "The meadow is gone — richer was the goal, and everything died at the bottom.": "Die Wiese ist fort — reicher war das Ziel, und unten ist alles gestorben.",
-      "The plankton is gone — grazed to nothing. A structure with a hole in it feeds no one.": "Das Plankton ist fort — leergefressen. Eine Struktur mit einem Loch darin füttert niemanden."
+      "The meadow is gone — richer was the goal, and everything died at the bottom.": "Die Wiese ist fort. Voller war das Ziel, und unten ist alles gestorben.",
+      "The plankton is gone — grazed to nothing. A structure with a hole in it feeds no one.": "Das Plankton ist fort, leergefressen. Eine Struktur mit einem Loch ernährt niemanden.",
+      "The pond stayed poor. Everything you poured sank into the standing bloom — nothing turned it over. Richness needed an eater, not an input.": "Der Teich wurde nicht voller. Alles, was du gegossen hast, versank in der stehenden Blüte; nichts hat sie umgewälzt. Mehr Leben brauchte einen Planktonfresser, keinen Nachschub."
     }
   },
   "hunters": {
-    "title": "Ein Kopf voller Jäger",
-    "science": "Die Energiepyramide · Spitzenjäger",
-    "question": "Der Teich ist reich. Wie viele Jäger kann er füttern?",
-    "briefing": "Ein voller Teich: Wiese, Blüte, Fresser, Recycler — und noch kein Jäger. Venator wartet auf deiner Aussetzbank. Gründe ein Rudel, das bleibt.",
-    "goalText": "Ein Rudel, das hält — 4+ Jäger, lange gehalten",
+    "title": "Der schmale Grat",
+    "science": "Energiepyramide · Spitzenjäger",
+    "question": "Der Teich ist voll. Wie viele Jäger kann er ernähren?",
+    "briefing": "Ein voller Teich: Wiese, Blüte, Planktonfresser, Recycler. Nur ein Jäger fehlt noch. Du kannst Venator ansiedeln. Gründe ein Rudel, das bleibt.",
+    "goalText": "Halte ein Rudel: 4+ Jäger über lange Zeit",
     "predict": {
-      "prompt": "Du setzt einen Spitzenjäger ein. Wie viele Rudel lässt du frei?",
+      "prompt": "Du siedelst einen Spitzenjäger an. Wie viele Rudel lässt du frei?",
       "options": [
-        "Zwei Rudel — doppelt so sicher",
-        "Ein Rudel — mehr gibt dieser Teich nicht her",
+        "Zwei Rudel, doppelt so sicher",
+        "Ein Rudel, mehr gibt dieser Teich nicht her",
         "Hier kann gar keins leben"
       ],
       "reflect": [
-        "Doppelt so viele Jäger hieß doppelt so viel Hunger. Rudel im selben Wasser plündern es gemeinsam — und verhungern gemeinsam.",
-        "Richtig. Jäger leben von dem, was der Teich entbehren kann, und selbst ein reicher Teich entbehrt wenig.",
-        "Ein Rudel kann hier leben. Aber nur ein kleines, gefüttert vom ganzen Teich darunter."
+        "Doppelt so viele Jäger hieß doppelt so viel Hunger. Rudel im selben Wasser plündern es gemeinsam, und sie verhungern gemeinsam.",
+        "Richtig. Jäger leben von dem, was der Teich übrig hat, und selbst ein voller Teich hat wenig übrig.",
+        "Ein Rudel kann hier leben. Aber nur ein kleines, ernährt vom ganzen Teich darunter."
       ]
     },
     "debrief": {
-      "pass": "Dein Rudel hält — ein paar Jäger auf einer Welle aus Fressern, auf einer Welle aus Plankton. Zähl die Schichten: Hunderte Plankton füttern hundert Fresser füttern eine Handvoll Jäger. Jede Mahlzeit verliert unterwegs das meiste ihrer Energie. Das ist der Preis der Nahrungskette. Darum ist die Spitze immer klein — und immer eine schlechte Saison vom Ende entfernt.",
-      "fail": "Jägern geht nicht der Mut aus — ihnen geht die Beute aus. Der Teich macht nur so viele Fresser, und jedes zusätzliche Maul verkleinert den Anteil jedes Jägers. Versuch ein Rudel, früh ausgesetzt, und gib ihm Raum."
+      "pass": "Dein Rudel bleibt: ein paar Jäger auf einer Welle aus Planktonfressern, auf einer Welle aus Plankton. Zähle die Schichten: Hunderte Plankton ernähren hundert Planktonfresser, und die ernähren eine Handvoll Jäger. Jede Mahlzeit verliert auf dem Weg nach oben das meiste ihrer Energie. Das ist der Preis der Nahrungskette, darum ist die Spitze immer klein. Und immer nur eine schlechte Saison vom Ende entfernt.",
+      "fail": "Die Jäger verhungern, weil ihnen die Beute ausgeht. Der Teich bringt nur so viele Planktonfresser hervor, und jedes weitere Maul macht die Portionen kleiner. Versuche ein einziges Rudel, siedle es früh an, und gib ihm Raum."
+    },
+    "meter": [
+      {
+        "label": "Venator",
+        "unit": ""
+      },
+      {
+        "label": "Cilio",
+        "unit": ""
+      }
+    ],
+    "whys": {
+      "The pack is gone. It ate through what the pond could spare — the top of a pond is a narrow ledge.": "Das Rudel ist fort. Es hat aufgefressen, was der Teich übrig hatte. Die Spitze eines Teichs ist ein schmaler Grat.",
+      "The grazers are gone. Nothing now stands between the hunters and starving.": "Die Planktonfresser sind fort. Nichts steht jetzt noch zwischen den Jägern und dem Verhungern.",
+      "No lasting pack took hold. A hunter eats a lot and breeds slowly — seed early, and seed small.": "Kein Rudel hat dauerhaft Fuß gefasst. Ein Jäger frisst viel und vermehrt sich langsam. Siedle früh an, und siedle wenige an."
+    }
+  },
+  "outpost": {
+    "title": "Die zweite Sonne",
+    "science": "Ausbreitungsgrenzen · Kolonisation",
+    "question": "Über dunklem Wasser geht eine zweite Sonne auf. Was wächst dort?",
+    "briefing": "Ein lebendiger Teich unter einer Sonne — und bald geht eine zweite auf, weit über dunklem Wasser. Hell, warm, leer. Du kannst Arten aussetzen und gießen. Die alte Sonne gehört zum Versuch: Sie bleibt gesperrt.",
+    "goalText": "Besiedle die neue Sonne — Matte und Plankton",
+    "predict": {
+      "prompt": "Eine helle neue Sonne über leerem Wasser. Was passiert?",
+      "options": [
+        "Leben treibt hinüber und siedelt sich an",
+        "Es bleibt leer, bis etwas hingetragen wird",
+        "Die neue Sonne zehrt die alte aus"
+      ],
+      "reflect": [
+        "Treiben ist langsam. Das Plankton hat das dunkle Wasser nie überquert — und die Matte kroch viel zu spät heran.",
+        "Richtig. Licht hat nie gefehlt. Ein Reisender hat gefehlt.",
+        "Die alte Sonne behielt ihren ganzen Teich. Eine zweite Sonne ist nur eine zweite Bühne — und die stand leer."
+      ]
+    },
+    "debrief": {
+      "pass": "Du hast Leben über das Dunkel getragen, und die neue Sonne hält jetzt einen lebendigen Teich. Diese Reise war das ganze Geheimnis. Das Wasser brauchte nie bessere Bedingungen — es brauchte einen Reisenden. Das Plankton kann dunkles Wasser nicht überqueren; die Matte kriecht, aber viel zu langsam. Dass Leben so an neue Orte kommt, nennt man Besiedlung. Und jetzt beobachte deinen Außenposten: Die Blüte bedrängt schon die junge Matte.",
+      "fail": "Die neue Sonne war nie das Problem — der Weg dorthin war es. Gießen füttert Wasser, nicht Entfernung, und nichts, was treibt, überlebt die dunkle Strecke. Setz die Matte und das Plankton unter der neuen Sonne aus. Beides: Die Matte allein ernährt niemanden, und die Blüte allein sperrt die Matte aus."
+    },
+    "meter": [
+      { "label": "Solara · Sonne 2", "unit": "" },
+      { "label": "Drifta · Sonne 2", "unit": "" }
+    ],
+    "whys": {
+      "The last Solara died. Nothing is left to carry to the new sun.": "Die letzte Solara ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
+      "The last Drifta died. Nothing is left to carry to the new sun.": "Die letzte Drifta ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
+      "The new sun still has no working pond. Life had to be carried there — the mat and its plankton both.": "Die neue Sonne hat noch immer keinen lebendigen Teich. Leben musste dorthin getragen werden — die Matte und ihr Plankton."
+    }
+  },
+  "warmyear": {
+    "title": "Das warme Jahr",
+    "science": "Wärmeleistung · Energiehaushalte",
+    "question": "Das Wasser wird wärmer. Niemand verkocht — warum stirbt die Spitze zuerst?",
+    "briefing": "Im Lauf des Vormittags wird die Sonne fünf Grad wärmer. Jeder Körper verbrennt schneller, als er frisst. Die Jäger verhungern zuerst: Ihre Rechnung steigt am schnellsten. Füttere sie durch die Klemme — aber behutsam. Ein stark gefüttertes Rudel plündert die geschwächten Planktonfresser darunter.",
+    "goalText": "Bring Jäger und Planktonfresser durch die Hitze",
+    "predict": {
+      "prompt": "Das Wasser wird wärmer. Wer scheitert zuerst?",
+      "options": [
+        "Die Kleinsten verkochen zuerst",
+        "Der größte Hunger scheitert zuerst",
+        "Alle gehen gemeinsam zurück"
+      ],
+      "reflect": [
+        "Verkocht ist niemand. Wärme tötet über die Rechnung, nicht über die Glut — und kleine Körper haben kleine Haushalte.",
+        "Richtig. Wärme treibt den Unterhalt schneller als den Fang, und die Spitze lebt am dichtesten an ihrer Grenze.",
+        "Der Boden hat kaum etwas gemerkt. Matte und Schlamm wurden fetter, während die Spitze hungerte. Wärme spaltet die Pyramide."
+      ]
+    },
+    "debrief": {
+      "pass": "Verkocht ist nichts, und die Spitze wäre trotzdem fast verhungert. Wärme treibt das Ausgeben schneller als das Fangen, und die Spitze lebt am dichtesten an ihrer Grenze. Dein behutsames Füttern trug die Jäger über die Klemme. Und weil es behutsam blieb, überlebten die Planktonfresser die zusätzlichen Zähne. In einem wärmer werdenden Teich drückt jede helfende Hand woanders hin. Hilfe misst sich daran, was sie zwei Schichten tiefer anrichtet.",
+      "fail": "Halbe Maßnahmen scheitern hier auf die eine Art, starke auf die andere. Ungefüttert verhungern die Jäger zuerst: Die Wärme stellt der Spitze die Rechnung. Hart gefüttert werden sie zu Zähnen gegen die Planktonfresser. Füttere das Rudel behutsam — kleine Portionen, lange Pausen — und beide Linien bleiben."
     },
     "meter": [
       { "label": "Venator", "unit": "" },
       { "label": "Cilio", "unit": "" }
     ],
     "whys": {
-      "The pack is gone. It ate through what the pond could spare — the top of a pond is a narrow ledge.": "Das Rudel ist fort. Es hat aufgefressen, was der Teich entbehren konnte — die Spitze eines Teichs ist ein schmaler Sims.",
-      "The grazers are gone. Nothing now stands between the hunters and starving.": "Die Fresser sind fort. Nichts steht jetzt noch zwischen den Jägern und dem Hungern."
+      "The hunters starved. Warming raised their bill fastest, and nothing was left over to pay it.": "Die Jäger sind verhungert. Die Wärme trieb ihre Rechnung am schnellsten, und nichts blieb übrig, sie zu bezahlen.",
+      "The grazers are gone — eaten out by a well-fed pack in a warming pond.": "Die Planktonfresser sind fort — leergefressen von einem wohlgenährten Rudel in einem wärmer werdenden Teich.",
+      "The pyramid never steadied. The hunters need feeding through the squeeze, and a heavily fed pack eats the grazers out. Feed lightly, and hold.": "Die Pyramide kam nie zur Ruhe. Die Jäger brauchen Futter durch die Klemme, und ein stark gefüttertes Rudel frisst die Planktonfresser leer. Füttere behutsam, und halte durch."
+    }
+  },
+  "sorting": {
+    "title": "Das große Sortieren",
+    "science": "Natürliche Auslese · erbliche Vielfalt",
+    "question": "Zwei Drifta-Linien teilen sich das Wasser. Was entscheidet, welche gewinnt?",
+    "briefing": "Der volle Teich, und nichts steht still: Junge Drifta können sich von ihren Eltern unterscheiden. Zähe weichen Planktonfressern aus; schnelle vermehren sich stärker. Der Teich behält beide, weil Panzer teuer ist. Öffne das Evolutions-Panel und mache Panzer billiger: Ziehe bei Driftas Verteidigungs-Preisen kp deutlich unter die Balance-Marke.",
+    "goalText": "Die zähe Drifta-Linie gewinnt",
+    "predict": {
+      "prompt": "Panzer wird billig. Was ändert sich an Drifta?",
+      "options": [
+        "Jede Drifta baut sich zäheren Panzer",
+        "Zähe Linien verdrängen die schnellen Linien",
+        "Nichts Erbliches ändert sich"
+      ],
+      "reflect": [
+        "Tippe eine Drifta an und schaue auf ihre Karte: Sie selbst ändert sich nie. Nur die Mischung der Linien ändert sich. Körper lernen nicht, Geburten zählen.",
+        "Richtig. Billiger Panzer kippt die Rechnung, und Geburten erledigen den Rest. Kein Tier hat sich verändert, nur die Zählung.",
+        "Die Änderung war erblich, und genau das zählte. Schalte die Mutation aus, und derselbe billige Panzer sortiert nichts."
+      ]
+    },
+    "debrief": {
+      "pass": "Keine einzelne Drifta hat sich verändert. Ganze Linien haben es. Du hast Panzer billig gemacht, und die zähe Linie hat die schnelle verdrängt, Geburt um Geburt. Die Vielfalt war längst da; dein Preis hat das Sortieren nur gekippt. Dieses Sortieren heißt natürliche Auslese. Sie plant nichts und verbessert nichts. Sie zählt Geburten. Und beim vollen Preis war das Gleichgewicht selbst schon Auslese.",
+      "fail": "Nichts wurde in deine Richtung sortiert. Prüfe den einen Schalter, der alles entscheidet: Ohne Mutation frieren die Linien ein. Nichts variiert, also kann nichts gewinnen. Auslese wirkt nur, wo das Erbe sich unterscheidet. Öffne das Evolutions-Panel, lass die Mutation an, senke Driftas kp-Preis, und lass den Teich Geburten zählen."
+    },
+    "meter": [
+      { "label": "zähe Linie", "unit": "%" },
+      { "label": "Drifta", "unit": "" }
+    ],
+    "whys": {
+      "The plankton is gone — grazed to nothing. Nothing is left to sort.": "Das Plankton ist fort, restlos abgeweidet. Zum Sortieren ist nichts mehr übrig.",
+      "The tough line never took over in time. At full price, armor spreads too slowly — if at all. The price is the lever that tips it.": "Die zähe Linie hat nicht rechtzeitig übernommen. Beim vollen Preis breitet Panzer sich zu langsam aus, wenn überhaupt. Der Preis ist der Hebel, der das kippt."
+    }
+  },
+  "refuge": {
+    "title": "Die Zuflucht",
+    "science": "Räumliche Zufluchten · Randeffekte",
+    "question": "Kann Architektur die Gejagten retten?",
+    "briefing": "Überall Planktonfresser, und das Plankton braucht Schutz. An der Flanke der Sonne steht ein dreiseitiger Pferch aus feinen Maschen: Plankton treibt hindurch, Planktonfresser nicht. Schließe die vierte Seite, das Wand-Werkzeug gehört dir. Aber schau hinein, bevor du schließt. Ein Schutz ist nur Schutz, wenn nichts Hungriges darin sitzt.",
+    "goalText": "Eine stehende Zuflucht, nichts Hungriges darin",
+    "predict": {
+      "prompt": "Ein Maschen-Pferch, eine Seite offen. Was macht ihn zur Zuflucht?",
+      "options": [
+        "Zumachen — die Wand erledigt es",
+        "Leer zumachen — erst hineinschauen",
+        "Nichts — Wände ändern hier nichts"
+      ],
+      "reflect": [
+        "Halb richtig. Die Maschen halten Planktonfresser draußen — und drinnen. Um einen herum geschlossen, wird der Pferch zur Farm für dein Plankton.",
+        "Richtig. Ein leerer Pferch füllt sich mit treibendem Plankton und bleibt sicher. Die Maschen lassen die Kleinen durch und die Hungrigen nicht.",
+        "Wände haben alles geändert, in beide Richtungen. Leer geschlossen: eine Zuflucht. Um einen Planktonfresser geschlossen: eine Mastanlage."
+      ]
+    },
+    "debrief": {
+      "pass": "Der Pferch steht voll: Plankton treibt durch die Maschen herein, und nichts Hungriges folgt. Einen Ort, den die Gejagten erreichen und der Jagende nicht, nennt man Zuflucht. Beachte, was ihn dazu gemacht hat — nicht die Wand, sondern die Leere darin beim Schließen. Derselbe Pferch, um einen einzigen Planktonfresser geschlossen, wird zur Farm für genau das, was er schützen sollte.",
+      "fail": "Wände sind ehrlich: Sie sperren aus, und sie sperren ein. Ein Pferch, um Planktonfresser geschlossen, ist eine Mastanlage. Dein Plankton treibt durch die Maschen herein, und die Eingesperrten fressen es für immer. Räume den Pferch mit dem Radier-Werkzeug, und schließe die vierte Seite, solange er leer ist."
+    },
+    "meter": [
+      { "label": "Plankton im Pferch", "unit": "" },
+      { "label": "Planktonfresser drin", "unit": "" }
+    ],
+    "whys": {
+      "The refuge emptied. Something hungry was inside the walls.": "Die Zuflucht hat sich geleert. Etwas Hungriges saß innerhalb der Wände.",
+      "The plankton is gone everywhere. No pen shelters an empty pond.": "Das Plankton ist überall fort. Kein Pferch schützt einen leeren Teich.",
+      "No refuge stood. A pen is shelter only when it closes empty: clear the grazers inside first, then seal the fourth side.": "Keine Zuflucht hat gestanden. Ein Pferch schützt nur, wenn er leer schließt: Räume erst die Planktonfresser hinaus, dann versiegle die vierte Seite."
+    }
+  },
+  "outrun": {
+    "title": "Wettlauf mit der Sonne",
+    "science": "Evolutionäre Rettung · Mutationsnachschub",
+    "question": "Die Sonne wird tödlich. Kommt die Evolution rechtzeitig an?",
+    "briefing": "Am Vormittag wird die Sonne grell, und das Wasser um sie herum wird sechs Grad wärmer. Die Planktonfresser folgen ihrem alten Wärmesinn in die Hitze. Erhöhe im Evolutions-Panel die Mutationsrate von Cilios Wärmevorliebe — bevor die Hitze kommt. Die Antwort muss schon geboren werden, wenn die Frage eintrifft.",
+    "goalText": "Bring die Planktonfresser durch die Hitze",
+    "predict": {
+      "prompt": "Am Vormittag wird die Sonne tödlich. Was rettet die Planktonfresser?",
+      "options": [
+        "Kühle Linien setzen sich rechtzeitig durch",
+        "Nichts — die Hitze gewinnt das Rennen",
+        "Nur Variation, die vor der Krise da ist"
+      ],
+      "reflect": [
+        "Hier ja. Die kühl-suchende Linie war schon am Brüten, als die Hitze kam. Dieser Vorsprung war alles.",
+        "Bei der eigenen Mutationsrate des Teichs: ja. Die Falle schließt in Minuten, die Antwort kommt zu spät. Du kannst diese Rate ändern.",
+        "Richtig. Rettung wird im Voraus gekauft oder gar nicht. Wenn die Not sichtbar wird, musste die Antwort längst in den Genen stehen."
+      ]
+    },
+    "debrief": {
+      "pass": "Die kühl-suchende Linie war schon da, als die Hitze kam — selten, bereit, und sie breitete sich aus, während die Wärme-Folger starben. Das nennt man evolutionäre Rettung, und sie ist nie ein Versprechen. Auf vielen Teichen verliert derselbe Zug trotzdem; du hast ein Los gekauft, keine Garantie. Der Preis des Loses war Variation, im Voraus bezahlt. Nur im Voraus lässt er sich zahlen.",
+      "fail": "Die Evolution hatte die Antwort — kühl-suchende Linien —, aber eine Antwort muss schon geboren werden, wenn die Frage eintrifft. Zu spät erhöht, füttert Variation nur einen Friedhof. Stelle die Mutationsrate von Cilios Wärmevorliebe hoch, solange das Wasser noch kühl ist. Und selbst dann: Halte den Atem an."
+    },
+    "meter": [
+      { "label": "Cilio", "unit": "" },
+      { "label": "Drifta", "unit": "" }
+    ],
+    "whys": {
+      "The grazers are gone. Their old warmth sense led them into the heat, and the cool-seeking line was still too rare to carry them.": "Die Planktonfresser sind fort. Ihr alter Wärmesinn führte sie in die Hitze. Die kühl-suchende Linie war noch zu selten, um sie zu tragen.",
+      "The plankton is gone — the pond lost its middle.": "Das Plankton ist fort. Der Teich hat seine Mitte verloren.",
+      "The grazers never held through the heat. Rescue is bought before the crisis: raise the variation while the water is still cool.": "Die Planktonfresser haben die Hitze nie überstanden. Rettung wird vor der Krise gekauft: Erhöhe die Variation, solange das Wasser noch kühl ist."
     }
   }
 }

@@ -42,7 +42,19 @@ class Layers {
     val pall: Bitmap = Bitmap.createBitmap(FIELD, FIELD, Bitmap.Config.ARGB_8888)
     val shade: Bitmap = Bitmap.createBitmap(FIELD, FIELD, Bitmap.Config.ARGB_8888)
     private val cell: Bitmap = Bitmap.createBitmap(GRID, GRID, Bitmap.Config.ARGB_8888)
-    private val upPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { isFilterBitmap = true }
+    // The upscale samples the cell grid through a REPEAT shader: the world is a torus, so the
+    // filter must read the wrapped neighbour at the edges — a plain scaled drawBitmap clamps
+    // there, and that flat edge column became half of the visible world-boundary seam.
+    private val upPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
+        isFilterBitmap = true
+        shader = android.graphics.BitmapShader(
+            cell,
+            android.graphics.Shader.TileMode.REPEAT,
+            android.graphics.Shader.TileMode.REPEAT,
+        ).apply {
+            setLocalMatrix(android.graphics.Matrix().apply { setScale(UP.toFloat(), UP.toFloat()) })
+        }
+    }
     private val upDst = android.graphics.RectF(0f, 0f, FIELD.toFloat(), FIELD.toFloat())
 
     // world-tile paintings
@@ -54,7 +66,18 @@ class Layers {
     var hasWalls = false
         private set
 
+    /** Whether the heat layer holds anything — a heatless world skips a full-screen fill. */
+    var hasHeat = false
+        private set
+
     private val px = IntArray(GRID * GRID)
+    /**
+     * The carpet field's straight ARGB per cell, kept for the near-zoom cell painter (GR.3).
+     * The field already carries the mat's colour ramp AND the light-locus genotype turn (the
+     * recorded grammar exception), so the cells take their colour from the core's own pixels
+     * instead of a second ramp that could drift.
+     */
+    val carpetColor = IntArray(GRID * GRID)
     // The core's scratch field lives at a fixed address, so this is wrapped once, not per frame.
     private val fieldBuf: ByteBuffer = Native.fieldBuffer()
     private var fieldTick = -1L
@@ -73,10 +96,11 @@ class Layers {
                 ((fieldBuf.get(o + 1).toInt() and 0xFF) shl 8) or
                 (fieldBuf.get(o + 2).toInt() and 0xFF)
         }
+        if (which == 0) px.copyInto(carpetColor)
         cell.setPixels(px, 0, GRID, 0, 0, GRID, GRID)
         val g = Canvas(into)
         g.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-        g.drawBitmap(cell, null, upDst, upPaint)
+        g.drawRect(upDst, upPaint)
     }
 
     /** Force a refresh and report the nanoseconds it took — the benchmark's `fields` row. */
@@ -139,6 +163,7 @@ class Layers {
     private fun drawHeat() {
         val g = Canvas(heat)
         g.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+        hasHeat = Native.glowCount(1) > 0 || Native.glowCount(3) > 0
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         // warmth as an ember glow, cold as a blue one — never amber, which is the hand's colour
         for (k in 0 until Native.glowCount(1)) {

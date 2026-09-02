@@ -1,0 +1,655 @@
+<title>Microcosm Stilproben</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --abyss:#0B131E; --panel:#101A27; --panel2:#0D1622;
+    --ink:#E7EDF4; --dim:#8FA0B5; --faint:#5A6B80;
+    --line:#1D2A3A; --accent:#A8D6F4;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--abyss); color:var(--ink); margin:0;
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:20px 14px 48px}
+  header{margin:6px 2px 14px}
+  h1{font-size:22px; font-weight:700; letter-spacing:.01em; margin:0 0 6px; text-wrap:balance}
+  h1 .sub{color:var(--accent)}
+  .lede{color:var(--dim); font-size:14.5px; line-height:1.5; margin:0; max-width:56ch}
+  .stage{
+    position:relative; border-radius:10px; overflow:hidden;
+    border:1px solid var(--line); background:var(--abyss);
+    touch-action:manipulation;
+  }
+  canvas{display:block; width:100%; height:auto; cursor:crosshair}
+  .hud{
+    position:absolute; top:10px; left:12px; right:12px;
+    display:flex; justify-content:space-between; align-items:center;
+    pointer-events:none;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em;
+    color:rgba(231,237,244,.55); text-transform:uppercase;
+  }
+  .hud .tag{background:rgba(11,19,30,.55); padding:3px 8px; border-radius:4px}
+  .hud button{
+    pointer-events:auto; cursor:pointer;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em;
+    color:var(--ink); background:rgba(16,26,39,.75); border:1px solid var(--line);
+    border-radius:4px; padding:4px 10px; text-transform:uppercase;
+  }
+  .hud button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .zoomrow{
+    display:flex; align-items:center; gap:12px; margin:12px 2px 0;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em;
+    color:var(--faint); text-transform:uppercase;
+  }
+  .zoomrow input{flex:1; accent-color:var(--accent); min-height:28px}
+  .chips{
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:10px 2px 0;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em;
+    color:var(--faint); text-transform:uppercase;
+  }
+  .chips button{
+    cursor:pointer; font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    color:var(--dim); background:var(--panel2); border:1px solid var(--line);
+    border-radius:6px; padding:6px 10px; min-height:32px; letter-spacing:.03em;
+  }
+  .chips button[aria-pressed="true"]{color:var(--abyss); background:var(--accent); border-color:var(--accent); font-weight:500}
+  .chips button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .tabs{display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 0}
+  .tabs button{
+    cursor:pointer; font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:500;
+    color:var(--dim); background:var(--panel2); border:1px solid var(--line);
+    border-radius:999px; padding:9px 16px; min-height:40px;
+  }
+  .tabs button[aria-pressed="true"]{color:var(--abyss); background:var(--accent); border-color:var(--accent); font-weight:700}
+  .tabs button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .card{
+    margin-top:14px; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:14px 16px;
+  }
+  .card h2{font-size:15px; margin:0 0 6px; font-weight:700}
+  .card p{margin:0; color:var(--dim); font-size:14px; line-height:1.55; max-width:62ch}
+  .card .note{
+    margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
+    font-family:'IBM Plex Mono',monospace; font-size:12px; line-height:1.55; color:var(--faint);
+  }
+  footer{margin-top:22px; color:var(--faint); font-size:12.5px; line-height:1.6; max-width:62ch}
+  footer b{color:var(--dim); font-weight:500}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Microcosm <span class="sub">Stilproben</span></h1>
+    <p class="lede">Gleiche Szene, gleicher Seed — der Malstil und der Zoom wechseln.
+    Ziehe den Regler und tippe ins Bild, um den Ausschnitt zu wählen: die Darstellung
+    folgt dem Zoom, von Punkten bis zu Organellen.</p>
+  </header>
+
+  <div class="stage">
+    <canvas id="cv" width="640" height="640" aria-label="Stilprobe der Teichszene"></canvas>
+    <div class="hud">
+      <span class="tag" id="hudName">Texturen</span>
+      <span class="tag" id="hudZoom">Zoom 1.0×</span>
+      <button id="pauseBtn" aria-pressed="false">Pause</button>
+    </div>
+  </div>
+
+  <div class="zoomrow">
+    <span>Weit</span>
+    <input type="range" id="zoom" min="1" max="8" step="0.05" value="1" aria-label="Zoom">
+    <span>Nah</span>
+  </div>
+
+  <div class="chips" role="group" aria-label="Venator-Vorbild" id="venrow">
+    <span>Venator</span>
+  </div>
+
+  <div class="tabs" role="group" aria-label="Malstil wählen" id="tabs"></div>
+
+  <div class="card">
+    <h2 id="cardTitle"></h2>
+    <p id="cardBlurb"></p>
+    <div class="note" id="cardNote"></div>
+  </div>
+
+  <footer>
+    <b>Was das ist:</b> ein Wegwerf-Prototyp mit eigener Mini-Simulation, nicht der Renderer —
+    damit alle Stile exakt dieselbe Szene zeigen. Low Poly und die Animationsspielereien sind
+    nach deinem Urteil raus (2026-09-02); die Kreaturen treiben jetzt ruhig. Die Zoom-Leiter
+    (Punkte → Körper → Zellen → Organellen) ist reine Malschicht und verlängert den Punkt-LOD,
+    den der Renderer für Bacillus schon hat. Drifta trägt keine Geißel — es hat keinen Antrieb.
+    <br><br><b>Venator-Vorbilder:</b> Didinium nasutum ist der reale Zwilling — der berühmteste
+    Ciliatenjäger der Mikrobiologie, frontaler Schnellangriff, exakt Venators Jagdweise
+    (Tonnenkörper, Rüssel auf Stäbchen-Palisade, zwei Wimpernkränze nur fürs Schnellschwimmen,
+    Band-Makronukleus). Ghost-Ray ist die bisherige Kunstfigur, veredelt. Die Lanze borgt nur
+    die Silhouette von Lacrymaria olor — das echte Tier ist ein verankerter Lauerjäger mit
+    Teleskophals, seine Form würde über Venators Geradeausjagd lügen. „Folgen" heftet die
+    Kamera an einen Jäger.
+  </footer>
+</div>
+
+<script>
+"use strict";
+// ---------- deterministic scene ----------
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R = mulberry32(1122);
+const W = 640, TAU = Math.PI*2;
+const SUN = {x:210, y:190};
+const DET = {x:500, y:500, r:95};
+const COLS = {sol:[70,214,140], dri:[91,200,232], cil:[215,166,232], bac:[158,168,104], ven:[168,214,244]};
+const wrap = v => (v%W+W)%W;
+const wd = d => { d = ((d+W/2)%W+W)%W - W/2; return d; };
+function rgba(c,a){return `rgba(${c[0]},${c[1]},${c[2]},${a})`}
+function mix(a,b,t){return [a[0]+(b[0]-a[0])*t|0, a[1]+(b[1]-a[1])*t|0, a[2]+(b[2]-a[2])*t|0]}
+function shade(col,f){ return col.map(v=>Math.max(0,Math.min(255,v*f|0))); }
+
+const MATB = []; for(let i=0;i<7;i++){ MATB.push({x:SUN.x+(R()-0.5)*230, y:SUN.y+(R()-0.5)*230, s:45+R()*55}); }
+function matDens(x,y){ let d=0; for(const b of MATB){ const dx=wd(x-b.x), dy=wd(y-b.y); d+=Math.exp(-(dx*dx+dy*dy)/(2*b.s*b.s)); } return Math.min(1,d*0.85); }
+
+const orgs=[];
+function add(sp,n,f){ for(let i=0;i<n;i++){ const o={sp,x:R()*W,y:R()*W,hd:R()*TAU,ph:R()*TAU,seed:(R()*1e9)|0,r:0,ring:false,strike:0,run:0}; f&&f(o); orgs.push(o);} }
+add('dri',26,o=>{ o.r=7+R()*3; o.ring=R()<0.45; o.x=wrap(SUN.x+(R()-0.5)*420); o.y=wrap(SUN.y+(R()-0.5)*420); });
+add('cil',7, o=>{ o.r=12+R()*3; });
+add('bac',12,o=>{ o.r=6+R()*2; o.x=wrap(DET.x+(R()-0.5)*220); o.y=wrap(DET.y+(R()-0.5)*220); });
+add('ven',2, o=>{ o.r=17; });
+const cysts=[]; for(let i=0;i<3;i++) cysts.push({x:R()*W,y:R()*W,r:5+R()*2});
+const corpses=[]; for(let i=0;i<5;i++) corpses.push({x:wrap(DET.x+(R()-0.5)*180),y:wrap(DET.y+(R()-0.5)*180),r:6+R()*4,ph:R()*TAU});
+const solMarks=[]; for(let i=0;i<200;i++){ const x=R()*W,y=R()*W; if(matDens(x,y)>0.35&&R()<0.12) solMarks.push({x,y,ph:R()*TAU}); }
+
+const S = mulberry32(7788);
+function nearest(o,sp){ let best=null,bd=1e9; for(const q of orgs){ if(q.sp!==sp) continue; const dx=wd(q.x-o.x),dy=wd(q.y-o.y),d=dx*dx+dy*dy; if(d<bd){bd=d;best=q;} } return best; }
+function steer(o,tx,ty,rate){ const want=Math.atan2(wd(ty-o.y),wd(tx-o.x)); let d=want-o.hd; while(d>Math.PI)d-=TAU; while(d<-Math.PI)d+=TAU; o.hd+=Math.max(-rate,Math.min(rate,d)); }
+
+function tick(dt){                              // calm speeds — these are not rockets
+  for(const o of orgs){
+    let spd=0;
+    if(o.sp==='dri'){ o.hd+=(S()-0.5)*0.2; steer(o,SUN.x,SUN.y,0.005); spd=4.5; }
+    if(o.sp==='cil'){ const p=nearest(o,'dri'); if(p) steer(o,p.x,p.y,0.035); spd=12; }
+    if(o.sp==='bac'){ o.run-=dt; if(o.run<=0){ o.hd=S()*TAU; o.run=0.8+S()*1.8; } spd=8; }
+    if(o.sp==='ven'){ const p=nearest(o,'cil'); if(p) steer(o,p.x,p.y,0.018);
+      o.strike-=dt; if(o.strike<-7-S()*5) o.strike=0.6; spd=(o.strike>0)?36:15; }
+    o.x=wrap(o.x+Math.cos(o.hd)*spd*dt); o.y=wrap(o.y+Math.sin(o.hd)*spd*dt);
+  }
+}
+
+// ---------- camera / zoom ----------
+let Z=1, cam={x:W/2,y:W/2}, camT={x:W/2,y:W/2};
+function clampCam(p){ const h=W/(2*Z); p.x=Math.max(h,Math.min(W-h,p.x)); p.y=Math.max(h,Math.min(W-h,p.y)); return p; }
+
+// ---------- drawing helpers ----------
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+function blob(c,x,y,r,ph){                       // gently irregular membrane, static
+  c.beginPath();
+  for(let i=0;i<=30;i++){ const a=i/30*TAU;
+    const w=1+0.035*Math.sin(a*3+ph)+0.02*Math.sin(a*5-ph*1.3);
+    const rr=r*w; i?c.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr):c.moveTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr);
+  } c.closePath();
+}
+function teardrop(c,x,y,hd,r,e){
+  c.save(); c.translate(x,y); c.rotate(hd);
+  c.beginPath(); c.moveTo(r*e,0);
+  c.bezierCurveTo(r*e*0.55,r*0.86, -r*0.9,r*0.82, -r*0.95,0);
+  c.bezierCurveTo(-r*0.9,-r*0.82, r*e*0.55,-r*0.86, r*e,0);
+  c.closePath();
+}
+function spearhead(c,x,y,hd,r,striking){
+  c.save(); c.translate(x,y); c.rotate(hd); const st=striking?1.4:1;
+  c.beginPath(); c.moveTo(r*1.15*st,0); c.lineTo(-r*0.75,r*0.62); c.lineTo(-r*0.42,0); c.lineTo(-r*0.75,-r*0.62); c.closePath();
+}
+const lw = px => px/Z;                            // screen-constant stroke under the world transform
+
+// ---------- the carpet ----------
+// far: smooth surface. mid: tiled cells. near: cells with wall and nucleus.
+function carpetWash(c,bright){
+  for(const b of MATB){
+    const g=c.createRadialGradient(b.x,b.y,2,b.x,b.y,b.s*2.1);
+    if(bright){ g.addColorStop(0,'rgba(96,150,112,0.45)'); g.addColorStop(0.6,'rgba(120,170,132,0.25)'); g.addColorStop(1,'rgba(140,190,150,0)'); }
+    else{ g.addColorStop(0,rgba([30,110,70],0.85)); g.addColorStop(0.55,rgba([42,140,90],0.5)); g.addColorStop(1,rgba([96,205,150],0)); }
+    c.fillStyle=g; c.beginPath(); c.arc(b.x,b.y,b.s*2.1,0,TAU); c.fill();
+  }
+}
+function carpetCells(c,bright){
+  const h=W/(2*Z), x0=cam.x-h-10, x1=cam.x+h+10, y0=cam.y-h-10, y1=cam.y+h+10;
+  const detail = Z>3.2;                           // organelle tier
+  const pr=mulberry32(2026);
+  for(let gy=0;gy<W;gy+=7) for(let gx=0;gx<W;gx+=7){
+    const jx=pr()*7, jy=pr()*7, jn=pr(), js=pr();  // consume the stream unconditionally: stable layout
+    const x=gx+jx, y=gy+jy;
+    if(x<x0||x>x1||y<y0||y>y1) continue;
+    const d=matDens(x,y); if(d<0.16) continue;
+    const q=Math.sqrt(d), r=(2.4+q*3.6)*(0.8+js*0.5);
+    const body = bright ? mix([150,200,165],[74,132,94],q) : mix([96,205,150],[26,96,60],q);
+    c.fillStyle=rgba(body, bright?0.55:(0.4+0.45*q));
+    c.beginPath(); c.arc(x,y,r,0,TAU); c.fill();
+    c.strokeStyle = bright?'rgba(58,104,74,0.5)':'rgba(8,44,28,0.55)';
+    c.lineWidth=detail?lw(1.2):0.9; c.stroke();
+    c.strokeStyle = bright?'rgba(235,245,238,0.35)':'rgba(190,255,220,0.18)';
+    c.lineWidth=detail?lw(1):0.9;
+    c.beginPath(); c.arc(x-r*0.25,y-r*0.25,r*0.62,Math.PI*0.9,Math.PI*1.7); c.stroke();
+    if(detail){                                   // every cell shows its organelles up close
+      c.fillStyle = bright?'rgba(30,64,42,0.75)':'rgba(235,255,244,0.7)';
+      c.beginPath(); c.arc(x+(js-0.5)*r*0.7, y+(jn-0.5)*r*0.7, r*0.16, 0, TAU); c.fill();
+      c.fillStyle = bright?'rgba(74,132,94,0.35)':'rgba(20,80,52,0.45)';
+      c.beginPath(); c.arc(x-(jn-0.5)*r*0.8, y+(js-0.5)*r*0.5, r*0.12, 0, TAU); c.fill();
+    } else if(jn<0.07){
+      c.fillStyle = bright?'rgba(30,64,42,0.8)':'rgba(235,255,244,0.75)';
+      c.beginPath(); c.arc(x+(js-0.5)*r, y+(jn*8-0.3)*r*0.6, 1.0, 0, TAU); c.fill();
+    }
+  }
+  const fr=mulberry32(505);                       // margin filaments
+  c.lineWidth=lw(1.4);
+  for(let i=0;i<16;i++){ const b=MATB[(fr()*MATB.length)|0];
+    const a=fr()*TAU; let x=b.x+Math.cos(a)*b.s*1.1, y=b.y+Math.sin(a)*b.s*1.1, hd=a;
+    c.strokeStyle = bright?'rgba(74,132,94,0.45)':'rgba(96,205,150,0.35)';
+    c.beginPath(); c.moveTo(x,y);
+    for(let s=0;s<9;s++){ hd+=(fr()-0.5)*0.9; x+=Math.cos(hd)*6; y+=Math.sin(hd)*6; c.lineTo(x,y); }
+    c.stroke();
+  }
+}
+function paintCarpet(c,bright){
+  carpetWash(c,bright);
+  if(Z>=1.4) carpetCells(c,bright);
+  for(const m of solMarks){                       // thinning margin cells
+    const col = bright?[96,150,112]:COLS.sol;
+    c.fillStyle=rgba(col,0.5); c.beginPath(); c.arc(m.x,m.y,2.6,0,TAU); c.fill();
+    if(Z>=1.4){ c.strokeStyle = bright?'rgba(58,104,74,0.5)':'rgba(8,44,28,0.5)'; c.lineWidth=lw(1); c.stroke(); }
+    c.fillStyle = bright?'rgba(30,64,42,0.6)':'rgba(240,255,246,0.55)';
+    c.beginPath(); c.arc(m.x+0.8,m.y-0.8,0.9,0,TAU); c.fill();
+  }
+}
+
+// ---------- world ground ----------
+function paintWaterBase(c){ c.fillStyle='#0B131E'; c.fillRect(-20,-20,W+40,W+40);
+  const g=c.createRadialGradient(DET.x,DET.y,10,DET.x,DET.y,DET.r+50);
+  g.addColorStop(0,'rgba(64,138,205,0.10)'); g.addColorStop(1,'rgba(64,138,205,0)');
+  c.fillStyle=g; c.fillRect(0,0,W,W);
+  c.fillStyle='rgba(60,52,40,0.35)'; c.beginPath(); c.arc(DET.x,DET.y,DET.r,0,TAU); c.fill();
+}
+function paintSun(c){
+  const g=c.createRadialGradient(SUN.x,SUN.y,4,SUN.x,SUN.y,300);
+  g.addColorStop(0,'rgba(255,243,214,0.30)'); g.addColorStop(0.4,'rgba(255,243,214,0.10)'); g.addColorStop(1,'rgba(255,243,214,0)');
+  c.fillStyle=g; c.fillRect(0,0,W,W);
+}
+
+// ---------- the textured bodies, tiered by screen radius ----------
+// tiers: <6 px dot · 6–14 body · 14–32 cell · >32 organelles
+function drawBodies(c,bright){
+  if(!bright) c.globalCompositeOperation='screen';
+  for(const o of orgs){
+    const sr=o.r*Z;
+    const col=COLS[o.sp], faded=mix(col,[105,105,100],0.5);
+    const memb  = bright?rgba(shade(faded,0.55),0.9):rgba(col,0.95);
+    const inter = bright?rgba(faded,0.35):rgba(mix(col,[10,25,40],0.55),0.55);
+    const dark  = bright?'rgba(50,56,62,0.8)':'rgba(235,250,255,0.9)';       // nucleus ink
+    if(o.sp==='ven'){ drawVen(c,o,sr,bright); continue; }
+    if(sr<6){                                                                 // dot
+      if(bright){ c.fillStyle=rgba(shade(faded,0.7),0.75); c.beginPath(); c.arc(o.x,o.y,o.r*0.55,0,TAU); c.fill(); }
+      else{ const g=c.createRadialGradient(o.x,o.y,0.4,o.x,o.y,o.r*1.5);
+        g.addColorStop(0,rgba(col,0.6)); g.addColorStop(1,rgba(col,0));
+        c.fillStyle=g; c.beginPath(); c.arc(o.x,o.y,o.r*1.5,0,TAU); c.fill(); }
+      continue;
+    }
+    if(o.sp==='dri'){
+      if(bright){ c.strokeStyle='rgba(255,255,252,0.9)'; c.lineWidth=lw(2.6);
+        c.beginPath(); c.arc(o.x,o.y,o.r*1.12,0,TAU); c.stroke(); }
+      else if(sr>=14){ const g=c.createRadialGradient(o.x,o.y,o.r*0.6,o.x,o.y,o.r*2.0);
+        g.addColorStop(0,rgba(col,0.14)); g.addColorStop(1,rgba(col,0));
+        c.fillStyle=g; c.beginPath(); c.arc(o.x,o.y,o.r*2.0,0,TAU); c.fill(); }
+      blob(c,o.x,o.y,o.r,o.ph);
+      c.fillStyle=inter; c.fill(); c.strokeStyle=memb; c.lineWidth=lw(1.5); c.stroke();
+      if(sr>=32){ c.strokeStyle=bright?'rgba(120,140,130,0.4)':rgba(col,0.35);  // inner membrane
+        c.lineWidth=lw(1); blob(c,o.x,o.y,o.r*0.86,o.ph); c.stroke(); }
+      if(sr>=14){
+        c.fillStyle=dark; c.beginPath(); c.arc(o.x+o.r*0.28,o.y-o.r*0.2,o.r*0.22,0,TAU); c.fill();
+        c.fillStyle=bright?'rgba(255,255,255,0.45)':rgba(mix(col,[0,0,0],0.4),0.5);
+        c.beginPath(); c.arc(o.x-o.r*0.3,o.y+o.r*0.25,o.r*0.18,0,TAU); c.fill();
+      }
+      if(sr>=32){ const pr=mulberry32(o.seed);                                  // granules
+        c.fillStyle=bright?'rgba(90,110,100,0.4)':rgba(col,0.4);
+        for(let i=0;i<8;i++){ const a=pr()*TAU, rr=pr()*o.r*0.65;
+          c.beginPath(); c.arc(o.x+Math.cos(a)*rr,o.y+Math.sin(a)*rr,o.r*0.05+pr()*o.r*0.04,0,TAU); c.fill(); } }
+      if(o.ring&&sr>=10){ c.strokeStyle=bright?'rgba(55,60,66,0.7)':'rgba(235,246,255,0.85)'; c.lineWidth=lw(1.4);
+        for(let s=0;s<10;s++){ const a=s/10*TAU+o.ph; c.beginPath();
+          c.moveTo(o.x+Math.cos(a)*o.r*1.02,o.y+Math.sin(a)*o.r*1.02);
+          c.lineTo(o.x+Math.cos(a)*o.r*1.3,o.y+Math.sin(a)*o.r*1.3); c.stroke(); } }
+    }
+    if(o.sp==='cil'){
+      if(bright){ c.strokeStyle='rgba(255,255,252,0.85)'; c.lineWidth=lw(2.4);
+        teardrop(c,o.x,o.y,o.hd,o.r*1.07,1.25); c.stroke(); c.restore(); }
+      teardrop(c,o.x,o.y,o.hd,o.r,1.25);
+      c.fillStyle=inter; c.fill(); c.strokeStyle=memb; c.lineWidth=lw(1.6); c.stroke();
+      if(sr>=14){ // static cilia fringe — texture, not animation
+        c.strokeStyle=bright?rgba(shade(faded,0.45),0.6):rgba(col,0.55); c.lineWidth=lw(1);
+        const n=sr>=32?38:24;
+        for(let s=0;s<n;s++){ const a=s/n*TAU;
+          const bx=Math.cos(a)*o.r*1.02, by=Math.sin(a)*o.r*0.86;
+          c.beginPath(); c.moveTo(bx,by);
+          c.lineTo(bx+Math.cos(a+0.35)*o.r*0.24, by+Math.sin(a+0.35)*o.r*0.24); c.stroke(); }
+        c.strokeStyle=bright?'rgba(60,55,66,0.7)':'rgba(245,235,255,0.7)'; c.lineWidth=lw(1.2);
+        c.beginPath(); c.moveTo(o.r*1.05,0); c.quadraticCurveTo(o.r*0.5,o.r*0.28,o.r*0.1,o.r*0.12); c.stroke();
+        c.fillStyle=bright?rgba(mix(COLS.dri,[110,110,105],0.35),0.7):rgba(COLS.dri,0.65);
+        c.beginPath(); c.arc(-o.r*0.25,-o.r*0.18,o.r*0.16,0,TAU); c.fill();
+        c.beginPath(); c.arc(-o.r*0.5,o.r*0.15,o.r*0.12,0,TAU); c.fill();
+      }
+      if(sr>=32){ // macronucleus + granules up close
+        c.fillStyle=dark; c.save(); c.rotate(0.5);
+        c.beginPath(); c.ellipse(-o.r*0.1,o.r*0.05,o.r*0.30,o.r*0.14,0,0,TAU); c.fill(); c.restore();
+        const pr=mulberry32(o.seed);
+        c.fillStyle=bright?'rgba(100,90,110,0.4)':rgba(col,0.4);
+        for(let i=0;i<7;i++){ const a=pr()*TAU, rr=pr()*o.r*0.6;
+          c.beginPath(); c.arc(Math.cos(a)*rr,Math.sin(a)*rr,o.r*0.05,0,TAU); c.fill(); }
+      }
+      c.restore();
+    }
+    if(o.sp==='bac'){
+      c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
+      if(bright){ c.strokeStyle='rgba(255,255,252,0.8)'; c.lineWidth=lw(2.2);
+        c.beginPath(); c.arc(0,0,o.r*0.95,0,TAU); c.stroke(); }
+      else if(sr>=14){ const g=c.createRadialGradient(0,0,1,0,0,o.r*1.7);
+        g.addColorStop(0,rgba(col,0.16)); g.addColorStop(1,rgba(col,0));
+        c.fillStyle=g; c.beginPath(); c.arc(0,0,o.r*1.7,0,TAU); c.fill(); }
+      const rods = sr>=14 ? [[-2,-2.4,0],[1.5,0.6,0.4],[-1,3.2,-0.3]] : [[0,0,0]];
+      for(const[rx,ry,rr]of rods){
+        c.save(); c.translate(rx,ry); c.rotate(rr);
+        c.fillStyle=bright?rgba(faded,0.6):rgba(col,0.85); c.beginPath();
+        c.roundRect(-o.r*0.55,-o.r*0.2,o.r*1.1,o.r*0.4,o.r*0.2); c.fill();
+        if(bright||sr>=32){ c.strokeStyle=bright?'rgba(74,74,60,0.7)':rgba(shade(col,1.3),0.5); c.lineWidth=lw(0.9); c.stroke(); }
+        if(sr>=32){ c.strokeStyle=bright?'rgba(74,74,60,0.5)':rgba(shade(col,1.3),0.4); c.lineWidth=lw(0.8);
+          c.beginPath(); c.moveTo(-o.r*0.18,-o.r*0.2); c.lineTo(-o.r*0.18,o.r*0.2);   // septum
+          c.moveTo(o.r*0.18,-o.r*0.2); c.lineTo(o.r*0.18,o.r*0.2); c.stroke(); }
+        c.restore(); }
+      c.restore();
+    }
+  }
+  c.globalCompositeOperation='source-over';
+}
+// Venator variants — the model question. 0 Didinium · 1 Ghost-Ray · 2 Lanze (Lacrymaria-inspired)
+let VSTYLE=0;
+function venInk(bright,col,faded){ return {
+  memb:  bright?'rgba(60,68,76,0.85)':rgba(col,0.8),
+  fill:  bright?rgba(faded,0.28):rgba(col,0.13),
+  brightLine: bright?'rgba(50,58,66,0.9)':'rgba(235,248,255,0.95)',
+  soft:  bright?'rgba(60,68,76,0.5)':rgba(col,0.4),
+  halo:  'rgba(255,255,252,0.8)',
+};}
+function drawVen(c,o,sr,bright){
+  const col=COLS.ven, faded=mix(col,[105,108,112],0.5), ink=venInk(bright,col,faded);
+  const st=o.strike>0?1.18:1;
+  if(!bright) c.globalCompositeOperation='source-over';
+  c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
+  if(VSTYLE===0) venDidinium(c,o,sr,bright,ink,col,st);
+  else if(VSTYLE===1) venGhost(c,o,sr,bright,ink,col,st);
+  else venLance(c,o,sr,bright,ink,col,st);
+  c.restore();
+  if(!bright) c.globalCompositeOperation='screen';
+}
+// Didinium nasutum: barrel body, conical proboscis on a rod palisade, two
+// pectinelle girdles (fast-swim cilia rings), band macronucleus. Hits its prey head-on.
+function venDidinium(c,o,sr,bright,ink,col,st){
+  const L=o.r*1.4, wdt=o.r*0.72;                                   // a stretched barrel, ~2:1
+  const bodyY = x => wdt*Math.sqrt(Math.max(0,1-(x/L)*(x/L)));
+  if(bright){ c.strokeStyle=ink.halo; c.lineWidth=lw(2.6);
+    c.beginPath(); c.ellipse(0,0,L*1.07,wdt*1.09,0,0,TAU); c.stroke(); }
+  else{ const g=c.createRadialGradient(0,0,o.r*0.4,0,0,o.r*1.9);   // faint aura
+    g.addColorStop(0,rgba(col,0.12)); g.addColorStop(1,rgba(col,0));
+    c.fillStyle=g; c.beginPath(); c.arc(0,0,o.r*1.9,0,TAU); c.fill(); }
+  c.beginPath(); c.ellipse(0,0,L,wdt,0,0,TAU);                     // body — a real body, not a ghost
+  c.fillStyle = bright?rgba(mix(col,[105,108,112],0.5),0.4):rgba(mix(col,[12,26,40],0.5),0.5);
+  c.fill(); c.strokeStyle=bright?ink.memb:rgba(col,0.95); c.lineWidth=lw(1.7); c.stroke();
+  // proboscis: cone at the front, brighter — the seizing organ
+  const px=L*0.92, pl=o.r*0.55*st;
+  c.beginPath(); c.moveTo(px,-wdt*0.34); c.quadraticCurveTo(px+pl*1.15,0,px,wdt*0.34); c.closePath();
+  c.fillStyle = bright?'rgba(130,138,146,0.5)':rgba(mix(col,[255,255,255],0.4),0.45);
+  c.fill(); c.strokeStyle=ink.brightLine; c.lineWidth=lw(1.5); c.stroke();
+  if(sr>=12){                                                      // the two pectinelle girdles
+    for(const gx of [L*0.42,-L*0.18]){
+      const yh=bodyY(gx);
+      c.strokeStyle=ink.soft; c.lineWidth=lw(1);
+      c.beginPath(); c.ellipse(gx,0,o.r*0.13,yh,0,0,TAU); c.stroke();   // the hoop
+      c.strokeStyle=bright?'rgba(50,58,66,0.8)':'rgba(225,242,252,0.85)'; c.lineWidth=lw(1.3);
+      for(let s=-4;s<=4;s++){ if(s===0) continue;                        // fringe along the hoop, denser at the rim
+        const f=s/4.6, yy=yh*f, bx=gx+o.r*0.05;
+        const out=(Math.abs(s)>2?1:0.6)*o.r*0.34, ny=(yy>=0?1:-1);
+        c.beginPath(); c.moveTo(bx,yy);
+        c.lineTo(bx+o.r*0.09, yy+ny*out); c.stroke();
+      }
+    }
+  }
+  if(sr>=32){
+    c.strokeStyle=bright?'rgba(80,88,96,0.5)':rgba(col,0.35); c.lineWidth=lw(1);  // nematodesmata rods
+    for(let i=-2;i<=2;i++){ c.beginPath(); c.moveTo(px-o.r*0.15,i*wdt*0.12);
+      c.lineTo(px+pl*0.85,i*wdt*0.05); c.stroke(); }
+    c.strokeStyle=bright?'rgba(50,56,62,0.75)':'rgba(225,240,250,0.8)';           // band macronucleus
+    c.lineWidth=lw(3);
+    c.beginPath(); c.arc(-L*0.1,0,o.r*0.42,Math.PI*0.75,Math.PI*1.9); c.stroke();
+    const pr=mulberry32(o.seed);                                                   // toxicyst dots at the snout
+    c.fillStyle=bright?'rgba(60,68,76,0.7)':rgba(mix(col,[255,255,255],0.5),0.8);
+    for(let i=0;i<5;i++){ c.beginPath();
+      c.arc(px+pl*(0.5+pr()*0.45),(pr()-0.5)*wdt*0.3,lw(1.1),0,TAU); c.fill(); }
+  }
+}
+// The refined Ghost-Ray: today's spearhead identity with an interior worth looking at.
+function venGhost(c,o,sr,bright,ink,col,st){
+  const stx=o.strike>0?1.4:1;
+  if(bright){ c.strokeStyle=ink.halo; c.lineWidth=lw(2.6);
+    spearhead(c,0,0,0,o.r*1.1,o.strike>0); c.restore(); c.stroke(); }
+  spearhead(c,0,0,0,o.r,o.strike>0);
+  c.fillStyle=bright?ink.fill:rgba(col,0.2); c.fill();
+  c.strokeStyle=ink.soft; c.lineWidth=lw(1); c.stroke();
+  c.restore();                                                           // spearhead() saves; body frame continues
+  c.strokeStyle=ink.brightLine; c.lineWidth=lw(1.8);                     // luminous leading V
+  c.beginPath(); c.moveTo(-o.r*0.75,o.r*0.62); c.lineTo(o.r*1.15*stx,0); c.lineTo(-o.r*0.75,-o.r*0.62); c.stroke();
+  if(sr>=14){                                                            // curved mantle ribs
+    c.strokeStyle=ink.soft; c.lineWidth=lw(1);
+    for(const s of [1,-1]){ c.beginPath(); c.moveTo(o.r*1.05*stx,0);
+      c.quadraticCurveTo(o.r*0.1,s*o.r*0.18,-o.r*0.72,s*o.r*0.58); c.stroke(); }
+  }
+  if(sr>=32){                                                            // trailing veil + lens
+    c.strokeStyle=bright?'rgba(80,88,96,0.4)':rgba(col,0.25); c.lineWidth=lw(1);
+    for(const s of [1,-1]){ c.beginPath(); c.moveTo(-o.r*0.75,s*o.r*0.62);
+      c.quadraticCurveTo(-o.r*1.5,s*o.r*0.3,-o.r*1.85,s*o.r*0.05); c.stroke(); }
+    c.strokeStyle=ink.brightLine; c.lineWidth=lw(1);
+    c.beginPath(); c.arc(o.r*1.15*stx,0,o.r*0.1,0,TAU); c.stroke();
+  }
+  c.fillStyle=bright?'rgba(60,68,76,0.9)':rgba(col,1);
+  c.beginPath(); c.arc(o.r*1.15*stx,0,lw(1.8),0,TAU); c.fill();
+}
+// Lanze — Lacrymaria-inspired silhouette: teardrop body, stiff short neck, head knob.
+// Honest caveat: the real animal is an anchored ambusher; only the silhouette is borrowed.
+function venLance(c,o,sr,bright,ink,col,st){
+  const nl=o.r*1.35*st;
+  if(bright){ c.strokeStyle=ink.halo; c.lineWidth=lw(2.4);
+    c.beginPath(); c.ellipse(-o.r*0.35,0,o.r*0.95,o.r*0.62,0,0,TAU); c.stroke(); }
+  c.beginPath(); c.ellipse(-o.r*0.35,0,o.r*0.9,o.r*0.58,0,0,TAU);       // teardrop body
+  c.fillStyle=ink.fill; c.fill(); c.strokeStyle=ink.memb; c.lineWidth=lw(1.5); c.stroke();
+  c.strokeStyle=ink.brightLine; c.lineWidth=lw(1.6);                     // the neck, stiff
+  c.beginPath(); c.moveTo(o.r*0.5,0); c.lineTo(o.r*0.5+nl,0); c.stroke();
+  c.beginPath(); c.arc(o.r*0.5+nl,0,o.r*0.14,0,TAU);                     // head knob
+  c.fillStyle=bright?rgba(mix(col,[110,110,105],0.4),0.7):rgba(mix(col,[255,255,255],0.4),0.8); c.fill();
+  if(sr>=14){ c.strokeStyle=ink.soft; c.lineWidth=lw(1);                 // crown cilia on the knob
+    for(let s=-2;s<=2;s++){ const a=s*0.5;
+      c.beginPath(); c.moveTo(o.r*0.5+nl+Math.cos(a)*o.r*0.14,Math.sin(a)*o.r*0.14);
+      c.lineTo(o.r*0.5+nl+Math.cos(a)*o.r*0.3,Math.sin(a)*o.r*0.3); c.stroke(); } }
+  if(sr>=32){
+    c.fillStyle=bright?'rgba(50,56,62,0.8)':'rgba(235,250,255,0.85)';    // nucleus
+    c.beginPath(); c.ellipse(-o.r*0.5,0,o.r*0.24,o.r*0.14,0,0,TAU); c.fill();
+    c.fillStyle=bright?'rgba(60,68,76,0.6)':rgba(mix(col,[255,255,255],0.5),0.7);
+    for(let i=0;i<4;i++){ c.beginPath();                                  // toxicysts along the neck
+      c.arc(o.r*0.5+nl*(0.25+i*0.2),0,lw(1),0,TAU); c.fill(); }
+  }
+}
+function drawStills(c,bright){                    // cysts + corpses, tiered
+  for(const z of cysts){ const sr=z.r*Z;
+    c.fillStyle=bright?'rgba(110,115,120,0.4)':'rgba(96,110,124,0.45)';
+    c.beginPath(); c.arc(z.x,z.y,z.r,0,TAU); c.fill();
+    c.strokeStyle=bright?'rgba(80,85,90,0.7)':'rgba(150,164,178,0.6)'; c.lineWidth=lw(1.6);
+    c.beginPath(); c.arc(z.x,z.y,z.r,0,TAU); c.stroke();
+    if(sr>=14){ c.strokeStyle=bright?'rgba(80,85,90,0.5)':'rgba(150,164,178,0.4)'; c.lineWidth=lw(1);
+      c.beginPath(); c.arc(z.x,z.y,z.r*0.7,0,TAU); c.stroke(); }        // the double wall
+  }
+  for(const k of corpses){ const sr=k.r*Z;
+    if(sr<8){ c.fillStyle=bright?'rgba(90,90,88,0.25)':'rgba(158,168,178,0.3)';
+      c.beginPath(); c.arc(k.x,k.y,k.r,0,TAU); c.fill(); continue; }
+    blob(c,k.x,k.y,k.r,k.ph);
+    c.fillStyle=bright?'rgba(90,90,88,0.20)':'rgba(158,168,178,0.14)'; c.fill();
+    c.strokeStyle=bright?'rgba(70,70,68,0.5)':'rgba(158,168,178,0.5)'; c.lineWidth=lw(1); c.stroke();
+    c.fillStyle=bright?'rgba(70,70,68,0.3)':'rgba(158,168,178,0.3)';
+    c.beginPath(); c.arc(k.x+k.r*0.2,k.y-k.r*0.15,k.r*0.3,0,TAU); c.fill();
+  }
+}
+
+// ---------- painters ----------
+function withCamera(c,f){ c.save(); c.translate(W/2,W/2); c.scale(Z,Z); c.translate(-cam.x,-cam.y); f(); c.restore(); }
+
+// A — Heute: today's soft dots and the blocky 64-grid carpet, magnified as-is.
+function paintToday(c){
+  withCamera(c,()=>{
+    paintWaterBase(c);
+    const cell=16;
+    for(let gy=0;gy<W;gy+=cell) for(let gx=0;gx<W;gx+=cell){
+      const d=matDens(gx+8,gy+8); if(d<0.12) continue;
+      const q=Math.sqrt(d), col=mix([96,205,150],[34,123,78],q);
+      c.fillStyle=rgba(col,(70+150*q)/255); c.fillRect(gx,gy,cell,cell);
+    }
+    paintSun(c);
+    c.fillStyle='rgba(120,135,150,0.5)';
+    for(const z of cysts){ c.beginPath(); c.arc(z.x,z.y,z.r,0,TAU); c.fill(); }
+    for(const k of corpses){ c.fillStyle='rgba(158,168,178,0.4)'; c.beginPath(); c.arc(k.x,k.y,k.r,0,TAU); c.fill();
+      c.strokeStyle='rgba(158,168,178,0.5)'; c.lineWidth=lw(1); c.beginPath(); c.arc(k.x,k.y,k.r*0.55,0,TAU); c.stroke(); }
+    c.globalCompositeOperation='screen';
+    for(const m of solMarks){ c.fillStyle=rgba(COLS.sol,0.35); c.beginPath(); c.arc(m.x,m.y,2.2,0,TAU); c.fill(); }
+    for(const o of orgs){
+      const col=COLS[o.sp];
+      if(o.sp==='ven'){ c.globalCompositeOperation='source-over';
+        spearhead(c,o.x,o.y,o.hd,o.r,o.strike>0);
+        c.fillStyle=rgba(col,0.16); c.fill(); c.strokeStyle=rgba(col,0.9); c.lineWidth=lw(1.6); c.stroke();
+        c.beginPath(); c.arc(o.r*1.15*(o.strike>0?1.4:1),0,lw(1.6),0,TAU); c.fillStyle=rgba(col,1); c.fill();
+        c.restore(); c.globalCompositeOperation='screen'; continue; }
+      const g=c.createRadialGradient(o.x,o.y,0.5,o.x,o.y,o.r*1.6);
+      g.addColorStop(0,rgba(col,0.55)); g.addColorStop(0.55,rgba(col,0.18)); g.addColorStop(1,rgba(col,0));
+      c.fillStyle=g; c.beginPath(); c.arc(o.x,o.y,o.r*1.6,0,TAU); c.fill();
+      if(o.sp==='dri'){ c.fillStyle=rgba(col,0.95); c.beginPath(); c.arc(o.x,o.y,o.r*0.42,0,TAU); c.fill();
+        if(o.ring){ c.strokeStyle='rgba(235,246,255,0.7)'; c.lineWidth=lw(1.8); c.beginPath(); c.arc(o.x,o.y,o.r*0.85,0,TAU); c.stroke(); } }
+      if(o.sp==='cil'){ c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
+        c.beginPath(); c.moveTo(o.r*0.75,0); c.lineTo(-o.r*0.45,o.r*0.5); c.lineTo(-o.r*0.45,-o.r*0.5); c.closePath();
+        c.fillStyle=rgba(col,0.95); c.fill(); c.restore(); }
+      if(o.sp==='bac'){ c.fillStyle=rgba(col,0.9); c.fillRect(o.x-o.r*0.4,o.y-o.r*0.4,o.r*0.8,o.r*0.8); }
+    }
+    c.globalCompositeOperation='source-over';
+  });
+}
+
+// B — Texturen: the loved one. Dark micrograph, detail follows the zoom.
+function paintTex(c){
+  withCamera(c,()=>{
+    paintWaterBase(c);
+    paintCarpet(c,false);
+    paintSun(c);
+    drawStills(c,false);
+    drawBodies(c,false);
+  });
+}
+
+// C — Hellfeld: identical bodies and carpet, ground inverted, round field of view.
+function paintBright(c){
+  c.fillStyle='#05070B'; c.fillRect(0,0,W,W);
+  c.save(); c.beginPath(); c.arc(W/2,W/2,W*0.48,0,TAU); c.clip();
+  withCamera(c,()=>{
+    c.fillStyle='#ECE9DF'; c.fillRect(-20,-20,W+40,W+40);
+    const g0=c.createRadialGradient(SUN.x,SUN.y,10,SUN.x,SUN.y,320);
+    g0.addColorStop(0,'rgba(255,255,250,0.7)'); g0.addColorStop(1,'rgba(255,255,250,0)');
+    c.fillStyle=g0; c.fillRect(0,0,W,W);
+    c.fillStyle='rgba(120,105,80,0.25)'; c.beginPath(); c.arc(DET.x,DET.y,DET.r,0,TAU); c.fill();
+    paintCarpet(c,true);
+    drawStills(c,true);
+    drawBodies(c,true);
+  });
+  const vg=c.createRadialGradient(W/2,W/2,W*0.30,W/2,W/2,W*0.48);
+  vg.addColorStop(0,'rgba(30,32,30,0)'); vg.addColorStop(1,'rgba(30,32,30,0.45)');
+  c.fillStyle=vg; c.fillRect(0,0,W,W);
+  c.restore();
+  c.strokeStyle='rgba(150,160,175,0.35)'; c.lineWidth=2;
+  c.beginPath(); c.arc(W/2,W/2,W*0.48,0,TAU); c.stroke();
+}
+
+// ---------- styles, tabs, loop ----------
+const STYLES=[
+ {key:'tex', name:'Texturen', title:'Texturen — Mikrografie, dem Zoom folgend',
+  blurb:'Weit: Teppich als Fläche, Kreaturen als Leuchtpunkte. Mittel: Körper mit Membran. Nah: Zellen mit Kern, Vakuolen, Cilienkranz. Ganz nah: Organellen, Granula, Doppelmembran — auch jede Teppichzelle zeigt dann ihr Inneres.',
+  note:'Stufe G.1 + Zoom-Leiter · reine Malschicht, kein Gate · verlängert den Punkt-LOD, den der Renderer schon kennt.',
+  paint:paintTex},
+ {key:'bright', name:'Hellfeld', title:'Hellfeld — dieselben Körper, Grund invertiert',
+  blurb:'Exakt die Texturen-Darstellung samt Zoom-Leiter, nur auf hellem Grund mit Phasenkontrast-Halo und rundem Sichtfeld. Der einzige Unterschied zum Texturen-Tab ist der Grund — und was er mit den Artfarben macht.',
+  note:'§8-Frage 1 · bräche die Bernstein-Grammatik der Spielerhand und die Pigment-Begründung des dunklen Grunds.',
+  paint:paintBright},
+ {key:'today', name:'Heute', title:'Heute — der Ist-Stand',
+  blurb:'Der heutige Look, unter demselben Zoom: die weichen Punkte und das grobe 64er-Feld werden einfach vergrößert. Genau der Vergleich, den die Zoom-Leiter gewinnen muss.',
+  note:'Bucket-Sprites, 64er-Feld, Screen-Composite — wie im Renderer.',
+  paint:paintToday},
+];
+
+let cur=0, paused=false, t=0, last=performance.now();
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduced) paused=true;
+
+const tabs=document.getElementById('tabs');
+STYLES.forEach((s,i)=>{ const b=document.createElement('button');
+  b.textContent=s.name; b.setAttribute('aria-pressed',i===cur);
+  b.onclick=()=>{ cur=i; [...tabs.children].forEach((e,j)=>e.setAttribute('aria-pressed',j===cur)); syncCard(); if(paused) draw(); };
+  tabs.appendChild(b); });
+function syncCard(){ const s=STYLES[cur];
+  document.getElementById('hudName').textContent=s.name;
+  document.getElementById('cardTitle').textContent=s.title;
+  document.getElementById('cardBlurb').textContent=s.blurb;
+  document.getElementById('cardNote').textContent=s.note; }
+syncCard();
+
+let FOLLOW=false;
+const venrow=document.getElementById('venrow');
+[['Didinium',0],['Ghost-Ray',1],['Lanze',2]].forEach(([label,v])=>{
+  const b=document.createElement('button'); b.textContent=label;
+  b.setAttribute('aria-pressed',v===VSTYLE);
+  b.onclick=()=>{ VSTYLE=v;
+    [...venrow.querySelectorAll('button')].forEach(e=>{ if(e.id!=='followBtn') e.setAttribute('aria-pressed',e.textContent===label); });
+    if(paused) draw(); };
+  venrow.appendChild(b);
+});
+const fb=document.createElement('button'); fb.id='followBtn'; fb.textContent='Folgen';
+fb.setAttribute('aria-pressed','false');
+fb.onclick=()=>{ FOLLOW=!FOLLOW; fb.setAttribute('aria-pressed',FOLLOW);
+  if(FOLLOW){ const v=orgs.find(q=>q.sp==='ven'); camT={x:v.x,y:v.y}; clampCam(camT);
+    if(paused){ cam={...camT}; draw(); } } };
+venrow.appendChild(fb);
+
+const zoomEl=document.getElementById('zoom'), hudZoom=document.getElementById('hudZoom');
+zoomEl.addEventListener('input',()=>{ Z=parseFloat(zoomEl.value);
+  hudZoom.textContent=`Zoom ${Z.toFixed(1)}×`; clampCam(camT); clampCam(cam); if(paused) draw(); });
+
+cv.addEventListener('pointerdown',e=>{
+  if(FOLLOW){ FOLLOW=false; document.getElementById('followBtn').setAttribute('aria-pressed','false'); }
+  const rect=cv.getBoundingClientRect();
+  const px=(e.clientX-rect.left)*(W/rect.width), py=(e.clientY-rect.top)*(W/rect.height);
+  camT={x:cam.x+(px-W/2)/Z, y:cam.y+(py-W/2)/Z}; clampCam(camT);
+  if(paused){ cam={...camT}; draw(); }
+});
+
+const pb=document.getElementById('pauseBtn');
+function syncPause(){ pb.textContent=paused?'Weiter':'Pause'; pb.setAttribute('aria-pressed',paused); }
+pb.onclick=()=>{ paused=!paused; syncPause(); if(!paused){ last=performance.now(); requestAnimationFrame(loop); } };
+syncPause();
+
+function draw(){ STYLES[cur].paint(ctx); }
+function loop(now){
+  if(paused) return;
+  const dt=Math.min(0.05,(now-last)/1000); last=now; t+=dt;
+  tick(dt);
+  if(FOLLOW){ const v=orgs.find(q=>q.sp==='ven'); camT={x:v.x,y:v.y}; clampCam(camT); }
+  cam.x+=(camT.x-cam.x)*0.12; cam.y+=(camT.y-cam.y)*0.12;
+  draw();
+  requestAnimationFrame(loop);
+}
+tick(0.01); draw();
+if(!paused) requestAnimationFrame(loop);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ paused=true; syncPause(); } });
+</script>

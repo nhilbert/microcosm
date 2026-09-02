@@ -165,7 +165,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       undoTimer = setTimeout(() => { undoAction = null; setUndoChip(null); }, 5000);
     };
     actionsRef.current = {
-      stepOnce: () => { W.px.set(W.x); W.py.set(W.y); step(); },
+      stepOnce: () => { markPrev(W); levelScript(); step(); },
       feed: () => {
         if (!selValid()) return;
         const i = sel.i, g = W.gen[i], nm = SPECIES[W.sp[i]].name;
@@ -197,7 +197,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       },
       pushUndoExt: (label, fn) => pushUndo(label, fn),
       // 7.L suns: every change is an event (logged, undoable); a layout is one intervention
-      selectSource: k => { if (k >= 0 && !levelAllows("sources")) return; // an experiment's sky is not editable
+      selectSource: k => { if (k >= 0 && !levelAllowsSource(k)) return; // an experiment's founded sky is not editable (L7: only risen suns unlock)
         srcSel = k; if (k >= 0) wallSel = -1;
         setUi(u => ({ ...u, srcSel: k, wallSel: k >= 0 ? -1 : u.wallSel })); },
       // 7.W walls: select, arm the one-shot drawing tool, add from a drag, remove -- all events, all undoable
@@ -249,6 +249,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       },
       removeSelSource: () => { if (srcSel >= 0) actionsRef.current.removeSource(srcSel); },
       sourceLayout: (layout, label) => {
+        if (!levelAllowsSource(0)) return; // layouts rewrite the whole sky, the founded sun included
         const prev = W.sources.map(s => ({ ...s }));
         const apply = L => {
           for (let k = W.sources.length - 1; k >= 1; k--) queueEvent({ type:"sourceRemove", k });
@@ -270,7 +271,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
         undoAction = null; clearTimeout(undoTimer); setUndoChip(null);
         cam.x = W.sources[0].x; cam.y = W.sources[0].y;
         W.lightDirty = true; // sources and walls are back to the founding state: repaint every derived layer
-        setUi(us => ({ ...us, card: null, chips: [], spawnPick: null, tick: 0,
+        setUi(us => ({ ...us, card: null, chips: null, spawnPick: null, tick: 0, // null, not []: the chips overlay renders {x,y,opts} behind a truthiness guard, and [] is truthy (reset crashed the tree — caught by L7's playthrough)
           mineral: { b:0, f:0, l:0, add:0 }, lightMul: 1, srcSel: -1, wallSel: -1, wallArm: false }));
       },
       seedAt: (sp, wx, wy, sx, sy) => {
@@ -296,9 +297,10 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
         if (wallArm){ // 7.W: the armed wall tool claims the drag -- it starts under the finger
           wallDrag = { x0: wrap(cam.x + (pp.sx - vw/2)/cam.z), y0: wrap(cam.y + (pp.sy - vh/2)/cam.z), dx: 0, dy: 0 };
         } else {
-          // the drag target: the selected sun, else the sun nearest the finger at touch-down
+          // the drag target: the selected sun, else the sun nearest the finger at touch-down;
+          // a locked sun (L7's founded sky) takes no grip at all
           const k = srcSel >= 0 && W.sources[srcSel] ? srcSel : nearestSource(pp.sx, pp.sy).k, s = W.sources[k];
-          srcDrag = { k, x: s.x, y: s.y, ox: s.x, oy: s.y };
+          srcDrag = levelAllowsSource(k) ? { k, x: s.x, y: s.y, ox: s.x, oy: s.y } : null;
         }
       }
       if (mode === "observe" && pointers.size === 1){
@@ -410,7 +412,8 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       const maxSteps = spd >= 16 ? 9 : spd >= 4 ? 5 : 3;
       let steps = 0;
       while (acc >= P.TICK_MS && steps < maxSteps){
-        W.px.set(W.x); W.py.set(W.y);
+        markPrev(W);
+        levelScript(); // F4/F5: per-tick, inside the loop — a scripted sun rises on its tick at any speed
         step(); acc -= P.TICK_MS; steps++;
       }
       if (steps === maxSteps) acc = 0; // shed backlog: slow-motion, never death-spiral
@@ -421,7 +424,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       // follow-cam: ease toward the selected organism
       if (follow && selValid()){
         const si = sel.i;
-        const tx = W.px[si] + wd(W.x[si]-W.px[si])*alpha, ty = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
+        const [tx, ty] = ipos(W, si, alpha); // the follow-cam rides the same spline the sprite is drawn on
         cam.x = wrap(cam.x + wd(tx - cam.x)*0.10); cam.y = wrap(cam.y + wd(ty - cam.y)*0.10);
       }
 
@@ -1275,7 +1278,7 @@ function SourceCard({ k, desktop, mono, actions, lightMul, onClose, onLog }){
       <div style={row}><span style={lab}>warmth</span>{slider("a", -8, 15, 0.5, "Changed a source's warmth")}<span style={val}>{(s.a > 0 ? "+" : "") + s.a.toFixed(1)}°</span></div>
       <div style={row}><span style={lab}>spread</span>{slider("sigma", 90, 300, 10, "Changed a source's spread")}<span style={val}>{Math.round(s.sigma)}</span></div>
       <div style={{ ...row, flexWrap:"wrap", gap:6 }}>
-        {SOURCE_LAYOUTS.map(L => (
+        {(levelAllowsSource(0) ? SOURCE_LAYOUTS : []).map(L => ( // layouts rewrite the founded sun too — hidden while it is locked (L7)
           <button key={L.key} className="mc-hit" style={btn}
             onClick={() => actions.current.sourceLayout(L.sources.map(q => ({ ...q })), "Layout: " + L.label)}>{L.label}</button>))}
         <button className="mc-hit" disabled={last} onClick={() => actions.current.removeSource(k)}

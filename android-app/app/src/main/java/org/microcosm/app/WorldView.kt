@@ -136,7 +136,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     /** Put the sun back as founded — the badge's tap, logged as the presses it is. */
     fun putSunBack() = post {
         if (baseSun.size < 5 || Native.sourceCount() == 0) return@post
-        if (Native.levelAllows(2) == 0) return@post
+        if (Native.levelAllows(2) == 0 || Native.levelAllowsSource(0) == 0) return@post
         Native.ivPush(IV_SOURCE_SET)
         Native.evSourceSet(0, baseSun[2], baseSun[3], baseSun[4])
         Native.ivPush(IV_SOURCE)
@@ -170,6 +170,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var sunSel = -1
     /** The armed source-placement tool (EV sun card): 0 none, 1 a sun, 2 a heater — next tap places it. */
     @Volatile var placeSource = 0
+    /** L7: the founded sun is part of the experiment — published per frame for the UI's gating. */
+    @Volatile var homeSunLocked = false
     /** The gripped sun's live numbers for the card: [i, a, sigma, count], or null. Per frame. */
     @Volatile var sunInfo: DoubleArray? = null
         private set
@@ -453,7 +455,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 // presses longer and harder — and a long press used to do nothing at all unless
                 // a seed species was armed, which read as "I never get to grip it".
                 val k = nearestSun(lp[0], lp[1])
-                if (k >= 0) sunSel = k
+                if (k >= 0 && Native.levelAllowsSource(k) != 0) sunSel = k // a locked sun (L7) takes no grip
             }
         }
 
@@ -486,7 +488,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             // mineral is budgeted. `levelAllows` is open outside a level.
             if (Native.levelAllows(2) != 0) {
                 val k = nearestSun(sx, sy)
-                if (k >= 0) { sunSel = k; return }
+                // a locked sun (L7's founded sky) takes no grip — and swallows the tap, as the browser does
+                if (k >= 0) { if (Native.levelAllowsSource(k) != 0) sunSel = k; return }
             }
             if (Native.pick(wx, wy, Native.pickRadius(cam.z / density, 0)) == 0) {
                 if (Native.levelAllows(0) != 0 && Native.levelPourOk() != 0) {
@@ -539,10 +542,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
      * the render thread and published whole. `cap` mirrors P.capMul (10) for the energy bar —
      * display only, never simulation.
      */
+    /** One heritable dial as the sheet draws it: labelEn keys the explanation and stays the
+     *  core's English; label/lo/hi are display words, already through L10n. */
+    class Locus(
+        val label: String, val labelEn: String, val g: Double, val g0: Double,
+        val lo: String, val hi: String,
+    )
     class Specimen(
         val sp: Int, val dormant: Boolean, val energy: Double, val cap: Double,
         val size: Double, val mineral: Double, val ageMin: Long,
-        val loci: List<Triple<String, Double, String>>, // label, genotype, "low ↔ high"
+        val loci: List<Locus>,
     )
     @Volatile var specimen: Specimen? = null
         private set
@@ -618,25 +627,36 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             if (speed > 0) acc += dt * speed
             val maxSteps = if (speed >= 16) 9 else if (speed >= 4) 5 else 3
             var steps = 0
+            // The interpolation anchor is set once per frame BATCH, not per tick: at 4x/16x a
+            // frame runs 2-3 ticks, and a per-tick anchor left everything but the last tick as a
+            // raw jump — the owner's "springen", worst on the plankton, whose random walk also
+            // gets visually averaged by the longer chord. At 1x a batch is one tick, so nothing
+            // changes there. Zero cost: same calls, different cadence.
+            if (acc >= TICK_MS) Native.markPrev()
+            var shed = false
             while (acc >= TICK_MS && steps < maxSteps) {
-                Native.markPrev()
+                Native.levelScript() // F4/F5: per tick, inside the loop — a scripted sun rises on its tick at any pace
                 Native.step()
                 acc -= TICK_MS
                 steps++
             }
-            if (steps == maxSteps) acc = 0.0 // shed the backlog: slow motion, never a death spiral
-            val alpha = if (speed == 0.0) 1.0 else min(1.0, acc / TICK_MS)
+            if (steps == maxSteps) { acc = 0.0; shed = true } // shed the backlog: slow motion, never a death spiral
+            // After a shed the anchor is a whole batch old — interpolating toward it would walk
+            // the world BACKWARD on screen, so a shed frame shows the present outright.
+            val alpha = if (speed == 0.0 || shed) 1.0 else min(1.0, acc / TICK_MS)
 
-            val t0 = System.nanoTime()
             val build = paintOnce(alpha)
-            val ms = (System.nanoTime() - t0) / 1e6
+            // paintWorkNs stops BEFORE unlockCanvasAndPost: the owner's first read-outs were
+            // vsync-quantized (16.7/25.7/32) — the old wrapper here measured waiting for vblank,
+            // the exact trap the A.1 comment below runBenchmark records. This is work, not waiting.
+            val ms = paintWorkNs / 1e6
             // an exponential average, so the HUD reads steadily rather than flickering
             frameMs += (ms - frameMs) * 0.1
             buildMs += (build / 1e6 - buildMs) * 0.1
 
             stats = "t %d   %s".format(Native.tick(), popLine())
-            statsDev = "z %.2f   %.1f ms/frame  (core %.2f)  %d drawn".format(
-                cam.z / density, frameMs, buildMs, renderer.orgN,
+            statsDev = "z %.2f   work %.1f ms  (core %.2f)  %d drawn  %d cells".format(
+                cam.z / density, frameMs, buildMs, renderer.orgN, renderer.cellsDrawn,
             )
             card = renderer.cardText(selI, selGen)
             clock = "t %d".format(Native.tick())
@@ -671,6 +691,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             }
             mutationOn = Native.scalar(50) != 0.0
             evolutionAllowed = Native.levelAllows(4) != 0
+            homeSunLocked = Native.levelAllowsSource(0) == 0
             selSpecies = if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0)
                 Native.org(selI, 1).toInt() else -1
             specimen = if (selSpecies >= 0) {
@@ -679,8 +700,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                     10.0 * Native.org(selI, 6), Native.org(selI, 6), Native.org(selI, 7),
                     (Native.tick() - Native.org(selI, 8).toLong()) / 600,
                     renderer.locusText[sp].mapIndexed { k, t ->
-                        Triple(L10n.trait(t[0]), Native.org(selI, 20 + k),
-                            "${L10n.trait(t[2])} ↔ ${L10n.trait(t[1])}")
+                        Locus(L10n.trait(t[0]), t[0], Native.org(selI, 20 + k),
+                            Native.locusGet(sp, k, 16), L10n.trait(t[2]), L10n.trait(t[1]))
                     })
             } else null
             // The undo chip is an offer, not a monument (owner round 3: "undo pour never
@@ -888,9 +909,13 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     fun popOf(sp: Int): Int = if (::renderer.isInitialized) renderer.pops[sp] else 0
 
     /** One frame. Returns the nanoseconds the core spent building the display list. */
+    /** Nanoseconds of the last frame's actual drawing work — lock through last stroke, no post. */
+    @Volatile private var paintWorkNs = 0L
+
     private fun paintOnce(alpha: Double): Long {
         // A holder that cannot give a hardware canvas (a surface mid-teardown; Robolectric's
         // fake in the boot gate) gets the software one instead of killing the render thread.
+        val t0 = System.nanoTime()
         val c: Canvas = (try { holder.lockHardwareCanvas() }
             catch (e: IllegalStateException) { holder.lockCanvas() }) ?: return 0
         try {
@@ -907,6 +932,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 }
                 renderer.paintHand(c, ring, wallDrag, sunSel, cam, width.toFloat(), height.toFloat())
             }
+            paintWorkNs = System.nanoTime() - t0
             return n
         } finally {
             holder.unlockCanvasAndPost(c)
