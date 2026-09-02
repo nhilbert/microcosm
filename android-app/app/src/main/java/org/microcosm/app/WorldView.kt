@@ -627,15 +627,23 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             if (speed > 0) acc += dt * speed
             val maxSteps = if (speed >= 16) 9 else if (speed >= 4) 5 else 3
             var steps = 0
+            // The interpolation anchor is set once per frame BATCH, not per tick: at 4x/16x a
+            // frame runs 2-3 ticks, and a per-tick anchor left everything but the last tick as a
+            // raw jump — the owner's "springen", worst on the plankton, whose random walk also
+            // gets visually averaged by the longer chord. At 1x a batch is one tick, so nothing
+            // changes there. Zero cost: same calls, different cadence.
+            if (acc >= TICK_MS) Native.markPrev()
+            var shed = false
             while (acc >= TICK_MS && steps < maxSteps) {
-                Native.markPrev()
                 Native.levelScript() // F4/F5: per tick, inside the loop — a scripted sun rises on its tick at any pace
                 Native.step()
                 acc -= TICK_MS
                 steps++
             }
-            if (steps == maxSteps) acc = 0.0 // shed the backlog: slow motion, never a death spiral
-            val alpha = if (speed == 0.0) 1.0 else min(1.0, acc / TICK_MS)
+            if (steps == maxSteps) { acc = 0.0; shed = true } // shed the backlog: slow motion, never a death spiral
+            // After a shed the anchor is a whole batch old — interpolating toward it would walk
+            // the world BACKWARD on screen, so a shed frame shows the present outright.
+            val alpha = if (speed == 0.0 || shed) 1.0 else min(1.0, acc / TICK_MS)
 
             val build = paintOnce(alpha)
             // paintWorkNs stops BEFORE unlockCanvasAndPost: the owner's first read-outs were
