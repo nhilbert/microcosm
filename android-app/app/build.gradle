@@ -26,7 +26,7 @@ android {
     // signature so the phone treats them as updates. It guards nothing.
     signingConfigs {
         release {
-            storeFile file("../../android/keystore/microcosm.keystore")
+            storeFile file("../../keystore/microcosm.keystore")
             storePassword "microcosm"
             keyAlias "microcosm"
             keyPassword "microcosm"
