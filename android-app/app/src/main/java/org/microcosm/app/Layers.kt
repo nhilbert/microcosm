@@ -66,6 +66,10 @@ class Layers {
     var hasWalls = false
         private set
 
+    /** Whether the heat layer holds anything — a heatless world skips a full-screen fill. */
+    var hasHeat = false
+        private set
+
     private val px = IntArray(GRID * GRID)
     /**
      * The carpet field's straight ARGB per cell, kept for the near-zoom cell painter (GR.3).
@@ -159,6 +163,7 @@ class Layers {
     private fun drawHeat() {
         val g = Canvas(heat)
         g.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+        hasHeat = Native.glowCount(1) > 0 || Native.glowCount(3) > 0
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         // warmth as an ember glow, cold as a blue one — never amber, which is the hand's colour
         for (k in 0 until Native.glowCount(1)) {

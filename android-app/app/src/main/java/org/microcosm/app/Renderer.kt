@@ -183,7 +183,7 @@ class Renderer(private val density: Double = 1.0) {
             // the wall shade keeps the painted glow honest: it must not claim occluded light
             if (layers.hasWalls) paintLayer(c, layers.shade, cam, vw, vh)
         }
-        if (hidden and (1 shl 9) == 0) paintLayer(c, layers.heat, cam, vw, vh)
+        if (hidden and (1 shl 9) == 0 && layers.hasHeat) paintLayer(c, layers.heat, cam, vw, vh)
         paintLayer(c, layers.mineral, cam, vw, vh)
         if (hidden and 1 == 0) {
             paintLayer(c, layers.carpet, cam, vw, vh)

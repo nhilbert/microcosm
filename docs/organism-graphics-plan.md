@@ -90,9 +90,20 @@ cell zoom. Diagnosis by arithmetic: ~1,500 visible cells × two anti-aliased cir
 per-cell style switching. Fix (same day): cells paint through dedicated **non-AA**
 paints (they overlap densely — AA bought nothing visible), the seam ring starts at CSS
 zoom 3 where it stops being subpixel, and the dev telemetry line now prints a `cells`
-count so the next read-out can confirm or refute the diagnosis on the device. **Owed:
-the owner's re-measurement** — if the worst frame still misses the budget, the next
-levers are, in order: CELLS_AT up from 2.0, larger CELL_STEP, per-tick cell caching.
+count so the next read-out can confirm or refute the diagnosis on the device. **Overturned same day by the owner's three screenshots** (z 6.00 → 17.2 ms / 209 drawn,
+z 2.89 → 16.2 ms / 688 drawn, z 0.88 → 25.7 ms / 4,376 drawn): the worst zoom is the
+FAR view, where no cells run at all — and 16–17 ms at the other zooms is the 60 Hz
+vsync floor, not cost. The statsDev wrapper measured `unlockCanvasAndPost`, i.e.
+waiting for vblank — the exact instrument trap A.1's benchmark comment records. The
+cell diagnosis was wrong (the non-AA hardening stays as hygiene); the real margin is
+the far view: ~4,400 sprite blits (the population has doubled since A.1's table) plus
+up to seven full-viewport shader fills since the seam fix, occasionally exceeding one
+vsync — consistent with the owner's own feel report ("nicht besonders ruckelig").
+Fixed the instrument first: `paintWorkNs` stops before the post, the HUD line now
+reads `work X ms` (true cost) plus the `cells` count; and a heatless world skips the
+heat layer's full-screen fill. **Next lever if the owner's re-measurement still shows
+far-view work above ~16 ms: the recorded layer-composite fix** (compose the world
+layers into one tile per tick, one fill per frame); after that: cells thresholds.
 The far-zoom mat blockiness diagnostic (`Layers.kt` UP=4) still awaits an explicit
 verdict. Re-entry conditions for everything deliberately not built are in §3.
 
