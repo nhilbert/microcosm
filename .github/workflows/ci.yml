@@ -49,6 +49,11 @@ jobs:
       - name: Player-language gate
         run: node harness/prose.js
 
+      # The app's own strings (Kotlin, strings.xml, the German overlay). Shipped with U2.6 inside
+      # `npm test`, which CI does not call — so until now it ran nowhere here.
+      - name: Player-language gate (the app's strings, EN + DE)
+        run: node harness/prose-app.js
+
       - name: Render smoke (the painting path runs)
         run: node harness/render-smoke.js
 
