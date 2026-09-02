@@ -74,6 +74,14 @@ cost at mid zoom and carpet cell cost; both against the §1.3 budget, with the r
 
 ### GR.4 — alignment and closure
 
+Record (2026-09-02): the owner generated the Didinium portrait to the new prompt and
+pasted it into the session — where it arrived as conversation content only, no file on
+disk, so it could not be committed from here (recorded honestly rather than
+approximated). It lands via the documented portrait workflow: full-size original under
+`assets/species/full/` (local, gitignored), 640×640 JPG as `assets/species/venator.jpg`.
+CLAUDE.md status line written. The probe stays in `dev/graphics-probe/` as the phase's
+design record.
+
 Portrait prompt already updated (GR.1); the owner regenerates `assets/species/venator.jpg`
 when convenient (the card hides the slot meanwhile if removed). CLAUDE.md status line,
 plan record sections filled with measured numbers, probe retired or kept as bench toy —
