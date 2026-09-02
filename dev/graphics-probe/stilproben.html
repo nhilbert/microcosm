@@ -65,7 +65,7 @@
   <header>
     <h1>Microcosm <span class="sub">Stilproben</span></h1>
     <p class="lede">Gleiche Szene, gleicher Seed, gleiche Bewegung — nur der Malstil wechselt.
-    Tippe durch und sag: so, oder so nicht.</p>
+    Texturen und Hellfeld tragen dieselben Körper: dort vergleichst du nur den Grund.</p>
   </header>
 
   <div class="stage">
@@ -107,6 +107,7 @@ const wrap = v => (v%W+W)%W;
 const wd = d => { d = ((d+W/2)%W+W)%W - W/2; return d; };  // shortest toroidal delta
 function rgba(c,a){return `rgba(${c[0]},${c[1]},${c[2]},${a})`}
 function mix(a,b,t){return [a[0]+(b[0]-a[0])*t|0, a[1]+(b[1]-a[1])*t|0, a[2]+(b[2]-a[2])*t|0]}
+function shade(col,f){ return col.map(v=>Math.max(0,Math.min(255,v*f|0))); }
 
 // mat density: sum of gaussians around the sun
 const MATB = []; for(let i=0;i<7;i++){ MATB.push({x:SUN.x+(R()-0.5)*230, y:SUN.y+(R()-0.5)*230, s:45+R()*55}); }
@@ -168,7 +169,46 @@ function poly(c,x,y,r,n,rot,irr,seed){
     const px=x+Math.cos(a)*rr, py=y+Math.sin(a)*rr; i?c.lineTo(px,py):c.moveTo(px,py); }
   c.closePath();
 }
-function shade(col,f){ return col.map(v=>Math.max(0,Math.min(255,v*f|0))); }
+
+// ---------- the cellular carpet, prerendered once per ground ----------
+function buildCarpet(bright){
+  const cnv=document.createElement('canvas'); cnv.width=W; cnv.height=W;
+  const c=cnv.getContext('2d');
+  for(const b of MATB){ // soft base wash
+    const g=c.createRadialGradient(b.x,b.y,2,b.x,b.y,b.s*2.1);
+    if(bright){ g.addColorStop(0,'rgba(96,150,112,0.45)'); g.addColorStop(0.6,'rgba(120,170,132,0.25)'); g.addColorStop(1,'rgba(140,190,150,0)'); }
+    else{ g.addColorStop(0,rgba([30,110,70],0.85)); g.addColorStop(0.55,rgba([42,140,90],0.5)); g.addColorStop(1,rgba([96,205,150],0)); }
+    c.fillStyle=g; c.beginPath(); c.arc(b.x,b.y,b.s*2.1,0,TAU); c.fill();
+  }
+  // tiled cells with dark seams — "cells arranged in a tiled mat"
+  const pr=mulberry32(2026);
+  for(let gy=0;gy<W;gy+=7) for(let gx=0;gx<W;gx+=7){
+    const x=gx+pr()*7, y=gy+pr()*7, jn=pr(), js=pr();
+    const d=matDens(x,y); if(d<0.16) continue;
+    const q=Math.sqrt(d), r=(2.4+q*3.6)*(0.8+js*0.5);
+    const body = bright ? mix([150,200,165],[74,132,94],q) : mix([96,205,150],[26,96,60],q);
+    c.fillStyle=rgba(body, bright?0.55:(0.4+0.45*q));
+    c.beginPath(); c.arc(x,y,r,0,TAU); c.fill();
+    c.strokeStyle = bright?'rgba(58,104,74,0.5)':'rgba(8,44,28,0.55)';   // seam
+    c.lineWidth=0.9; c.stroke();
+    c.strokeStyle = bright?'rgba(235,245,238,0.35)':'rgba(190,255,220,0.18)'; // rim light
+    c.beginPath(); c.arc(x-r*0.25,y-r*0.25,r*0.62,Math.PI*0.9,Math.PI*1.7); c.stroke();
+    if(jn<0.07){ c.fillStyle = bright?'rgba(30,64,42,0.8)':'rgba(235,255,244,0.75)';  // nucleus point
+      c.beginPath(); c.arc(x+ (js-0.5)*r, y+(jn*8-0.3)*r*0.6, 1.0, 0, TAU); c.fill(); }
+  }
+  // filaments trailing off the margin
+  const fr=mulberry32(505);
+  c.lineWidth=1.1;
+  for(let i=0;i<16;i++){ const b=MATB[(fr()*MATB.length)|0];
+    const a=fr()*TAU; let x=b.x+Math.cos(a)*b.s*1.1, y=b.y+Math.sin(a)*b.s*1.1, hd=a;
+    c.strokeStyle = bright?'rgba(74,132,94,0.45)':'rgba(96,205,150,0.35)';
+    c.beginPath(); c.moveTo(x,y);
+    for(let s=0;s<9;s++){ hd+=(fr()-0.5)*0.9; x+=Math.cos(hd)*6; y+=Math.sin(hd)*6; c.lineTo(x,y); }
+    c.stroke();
+  }
+  return cnv;
+}
+let carpetDark=null, carpetBright=null;
 
 // ---------- painters ----------
 function paintWaterBase(c){ c.fillStyle='#0B131E'; c.fillRect(0,0,W,W);
@@ -219,17 +259,109 @@ function paintToday(c,t){
   c.globalCompositeOperation='source-over';
 }
 
-// shared micrograph bodies for B (static) and C (animated)
+// the micrograph BODIES — shared by Texturen (dark, still), Lebendig (dark, animated)
+// and Hellfeld (bright, still). bright inverts the ground, the bodies stay the same.
+function paintBodies(c,t,live,bright){
+  if(!bright) c.globalCompositeOperation='screen';
+  for(const o of orgs){
+    const wob=live?1:0;
+    if(o.sp==='dri'){
+      const col=COLS.dri, faded=mix(col,[105,105,100],0.55);
+      if(bright){ c.strokeStyle='rgba(255,255,252,0.9)'; c.lineWidth=2.6;   // phase halo
+        c.beginPath(); c.arc(o.x,o.y,o.r*1.12,0,TAU); c.stroke(); }
+      else{ const g=c.createRadialGradient(o.x,o.y,o.r*0.6,o.x,o.y,o.r*2.0); // gel halo
+        g.addColorStop(0,rgba(col,0.14)); g.addColorStop(1,rgba(col,0));
+        c.fillStyle=g; c.beginPath(); c.arc(o.x,o.y,o.r*2.0,0,TAU); c.fill(); }
+      blob(c,o.x,o.y,o.r,wob*t,o.ph,0.035,3,5);
+      c.fillStyle = bright?rgba(faded,0.35):rgba(mix(col,[10,25,40],0.55),0.55);   // interior
+      c.fill();
+      c.strokeStyle = bright?rgba(shade(faded,0.55),0.9):rgba(col,0.95);           // membrane
+      c.lineWidth=1.5; c.stroke();
+      c.fillStyle = bright?'rgba(50,56,62,0.8)':'rgba(235,250,255,0.9)';           // nucleus
+      c.beginPath(); c.arc(o.x+o.r*0.28,o.y-o.r*0.2,o.r*0.22,0,TAU); c.fill();
+      c.fillStyle = bright?'rgba(255,255,255,0.45)':rgba(mix(col,[0,0,0],0.4),0.5); // vacuole
+      c.beginPath(); c.arc(o.x-o.r*0.3,o.y+o.r*0.25,o.r*0.18,0,TAU); c.fill();
+      if(o.ring){ c.strokeStyle = bright?'rgba(55,60,66,0.7)':'rgba(235,246,255,0.85)'; c.lineWidth=1.4;
+        for(let s=0;s<10;s++){ const a=s/10*TAU+o.ph; c.beginPath();
+          c.moveTo(o.x+Math.cos(a)*o.r*1.02,o.y+Math.sin(a)*o.r*1.02);
+          c.lineTo(o.x+Math.cos(a)*o.r*1.3,o.y+Math.sin(a)*o.r*1.3); c.stroke(); } }
+    }
+    if(o.sp==='cil'){
+      const col=COLS.cil, faded=mix(col,[108,104,110],0.5);
+      if(bright){ c.strokeStyle='rgba(255,255,252,0.85)'; c.lineWidth=2.4;
+        teardrop(c,o.x,o.y,o.hd,o.r*1.07,1.25); c.stroke(); c.restore(); }
+      teardrop(c,o.x,o.y,o.hd,o.r,1.25);
+      c.fillStyle = bright?rgba(faded,0.35):rgba(mix(col,[12,20,34],0.5),0.6); c.fill();
+      c.strokeStyle = bright?rgba(shade(faded,0.5),0.85):rgba(col,0.95); c.lineWidth=1.6; c.stroke();
+      // cilia fringe
+      c.strokeStyle = bright?rgba(shade(faded,0.45),0.6):rgba(col,0.55); c.lineWidth=1;
+      for(let s=0;s<26;s++){ const a=s/26*TAU;
+        const bend=live?Math.sin(t*10+s*0.9+o.ph)*0.45:0.2;
+        const bx=Math.cos(a)*o.r*1.02, by=Math.sin(a)*o.r*0.86;
+        c.beginPath(); c.moveTo(bx,by);
+        c.lineTo(bx+Math.cos(a+bend)*o.r*0.28, by+Math.sin(a+bend)*o.r*0.28); c.stroke(); }
+      // oral groove + food vacuoles (its last Drifta meal)
+      c.strokeStyle = bright?'rgba(60,55,66,0.7)':'rgba(245,235,255,0.7)'; c.lineWidth=1.2;
+      c.beginPath(); c.moveTo(o.r*1.05,0); c.quadraticCurveTo(o.r*0.5,o.r*0.28,o.r*0.1,o.r*0.12); c.stroke();
+      const pulse=live?0.65+0.25*Math.sin(t*3+o.ph):0.75;
+      c.fillStyle = bright?rgba(mix(COLS.dri,[110,110,105],0.35),0.7):rgba(COLS.dri,pulse*0.8);
+      c.beginPath(); c.arc(-o.r*0.25,-o.r*0.18,o.r*0.16,0,TAU); c.fill();
+      c.beginPath(); c.arc(-o.r*0.5,o.r*0.15,o.r*0.12,0,TAU); c.fill();
+      c.restore();
+    }
+    if(o.sp==='bac'){
+      const col=COLS.bac, faded=mix(col,[110,110,100],0.45);
+      c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
+      if(live&&!bright){ // flagella wave while running
+        c.strokeStyle=rgba(col,0.5); c.lineWidth=1;
+        for(const off of [-1.6,1.6]){ c.beginPath(); c.moveTo(-o.r*0.9,off);
+          for(let sx=0;sx<=14;sx++){ const u=sx/14;
+            c.lineTo(-o.r*0.9-u*o.r*1.7, off+Math.sin(u*9-t*16+o.ph)*2.4*u); } c.stroke(); }
+      }
+      if(bright){ c.strokeStyle='rgba(255,255,252,0.8)'; c.lineWidth=2.2;   // halo
+        c.beginPath(); c.arc(0,0,o.r*0.95,0,TAU); c.stroke(); }
+      else{ const g=c.createRadialGradient(0,0,1,0,0,o.r*1.7);   // shared capsule
+        g.addColorStop(0,rgba(col,0.16)); g.addColorStop(1,rgba(col,0));
+        c.fillStyle=g; c.beginPath(); c.arc(0,0,o.r*1.7,0,TAU); c.fill(); }
+      for(const[rx,ry,rr]of[[-2,-2.4,0],[1.5,0.6,0.4],[-1,3.2,-0.3]]){
+        c.save(); c.translate(rx,ry); c.rotate(rr);
+        c.fillStyle = bright?rgba(faded,0.6):rgba(col,0.85); c.beginPath();
+        c.roundRect(-o.r*0.55,-o.r*0.2,o.r*1.1,o.r*0.4,o.r*0.2); c.fill();
+        if(bright){ c.strokeStyle='rgba(74,74,60,0.7)'; c.lineWidth=0.8; c.stroke(); }
+        c.restore(); }
+      c.restore();
+    }
+    if(o.sp==='ven'){
+      const col=COLS.ven, faded=mix(col,[105,108,112],0.5);
+      if(!bright) c.globalCompositeOperation='source-over';
+      if(bright){ c.strokeStyle='rgba(255,255,252,0.8)'; c.lineWidth=2.6;
+        spearhead(c,o.x,o.y,o.hd,o.r*1.1,o.strike>0); c.stroke(); c.restore(); }
+      spearhead(c,o.x,o.y,o.hd,o.r,o.strike>0);
+      c.fillStyle = bright?rgba(faded,0.22):rgba(col,0.10); c.fill();
+      c.strokeStyle = bright?'rgba(60,68,76,0.85)':rgba(col,0.35); c.lineWidth = bright?1.6:1; c.stroke();
+      const st=o.strike>0?1.4:1;
+      if(!bright){
+        c.strokeStyle=rgba([235,248,255],0.95); c.lineWidth=1.8;   // bright leading V
+        c.beginPath(); c.moveTo(-o.r*0.75,o.r*0.62); c.lineTo(o.r*1.15*st,0); c.lineTo(-o.r*0.75,-o.r*0.62); c.stroke();
+        c.strokeStyle=rgba(col,0.4); c.lineWidth=1;                // inner mantle lines
+        c.beginPath(); c.moveTo(-o.r*0.42,0); c.lineTo(o.r*0.5,0); c.stroke();
+      }
+      c.fillStyle = bright?'rgba(60,68,76,0.9)':rgba(col,1);
+      c.beginPath(); c.arc(o.r*1.15*st,0,1.7,0,TAU); c.fill();
+      if(live&&!bright&&o.strike>0){ c.strokeStyle=rgba(col,0.3); c.lineWidth=3;
+        c.beginPath(); c.moveTo(-o.r*2.6,0); c.lineTo(-o.r*0.8,0); c.stroke(); }
+      c.restore();
+      if(!bright) c.globalCompositeOperation='screen';
+    }
+  }
+  c.globalCompositeOperation='source-over';
+}
+
+// B/C — dark micrograph world around the shared bodies
 function paintMicro(c,t,live){
   paintWaterBase(c);
-  for(const b of MATB){ // smooth carpet: layered soft blobs + mottling
-    const g=c.createRadialGradient(b.x,b.y,2,b.x,b.y,b.s*2.1);
-    g.addColorStop(0,rgba([34,123,78],0.85)); g.addColorStop(0.55,rgba([46,150,96],0.5)); g.addColorStop(1,rgba([96,205,150],0));
-    c.fillStyle=g; c.beginPath(); c.arc(b.x,b.y,b.s*2.1,0,TAU); c.fill();
-  }
-  const pr=mulberry32(42);
-  for(let i=0;i<90;i++){ const x=pr()*W,y=pr()*W,d=matDens(x,y); if(d<0.25) continue;
-    c.fillStyle=rgba([20,80,52],0.25*d); c.beginPath(); c.arc(x,y,4+pr()*7,0,TAU); c.fill(); }
+  if(!carpetDark) carpetDark=buildCarpet(false);
+  c.drawImage(carpetDark,0,0);
   for(const m of solMarks){ // thinning margin cells
     c.fillStyle=rgba(COLS.sol,0.5); c.beginPath(); c.arc(m.x,m.y,2.6,0,TAU); c.fill();
     c.fillStyle='rgba(240,255,246,0.55)'; c.beginPath(); c.arc(m.x+0.8,m.y-0.8,0.9,0,TAU); c.fill(); }
@@ -247,80 +379,7 @@ function paintMicro(c,t,live){
     c.fillStyle='rgba(158,168,178,0.14)'; c.fill();
     c.strokeStyle='rgba(158,168,178,0.5)'; c.lineWidth=1; c.stroke();
     c.fillStyle='rgba(158,168,178,0.3)'; c.beginPath(); c.arc(k.x+k.r*0.2,k.y-k.r*0.15,k.r*0.3,0,TAU); c.fill(); }
-  c.globalCompositeOperation='screen';
-  for(const o of orgs){
-    const wob=live?1:0;
-    if(o.sp==='dri'){
-      const col=COLS.dri;
-      const g=c.createRadialGradient(o.x,o.y,o.r*0.6,o.x,o.y,o.r*2.0); // gel halo
-      g.addColorStop(0,rgba(col,0.14)); g.addColorStop(1,rgba(col,0));
-      c.fillStyle=g; c.beginPath(); c.arc(o.x,o.y,o.r*2.0,0,TAU); c.fill();
-      blob(c,o.x,o.y,o.r,wob*t,o.ph,0.035,3,5);
-      c.fillStyle=rgba(mix(col,[10,25,40],0.55),0.55); c.fill();          // translucent interior
-      c.strokeStyle=rgba(col,0.95); c.lineWidth=1.5; c.stroke();          // membrane
-      c.fillStyle=rgba([235,250,255],0.9); c.beginPath(); c.arc(o.x+o.r*0.28,o.y-o.r*0.2,o.r*0.22,0,TAU); c.fill(); // nucleus
-      c.fillStyle=rgba(mix(col,[0,0,0],0.4),0.5); c.beginPath(); c.arc(o.x-o.r*0.3,o.y+o.r*0.25,o.r*0.18,0,TAU); c.fill(); // vacuole
-      if(o.ring){ c.strokeStyle='rgba(235,246,255,0.85)'; c.lineWidth=1.4;
-        for(let s=0;s<10;s++){ const a=s/10*TAU+o.ph; c.beginPath();
-          c.moveTo(o.x+Math.cos(a)*o.r*1.02,o.y+Math.sin(a)*o.r*1.02);
-          c.lineTo(o.x+Math.cos(a)*o.r*1.3,o.y+Math.sin(a)*o.r*1.3); c.stroke(); } }
-    }
-    if(o.sp==='cil'){
-      const col=COLS.cil;
-      teardrop(c,o.x,o.y,o.hd,o.r,1.25);
-      c.fillStyle=rgba(mix(col,[12,20,34],0.5),0.6); c.fill();
-      c.strokeStyle=rgba(col,0.95); c.lineWidth=1.6; c.stroke();
-      // cilia fringe
-      c.strokeStyle=rgba(col,0.55); c.lineWidth=1;
-      for(let s=0;s<26;s++){ const a=s/26*TAU;
-        const bend=live?Math.sin(t*10+s*0.9+o.ph)*0.45:0.2;
-        const bx=Math.cos(a)*o.r*1.02, by=Math.sin(a)*o.r*0.86;
-        c.beginPath(); c.moveTo(bx,by);
-        c.lineTo(bx+Math.cos(a+bend)*o.r*0.28, by+Math.sin(a+bend)*o.r*0.28); c.stroke(); }
-      // oral groove + glowing food vacuoles (its last Drifta meal)
-      c.strokeStyle=rgba([245,235,255],0.7); c.lineWidth=1.2;
-      c.beginPath(); c.moveTo(o.r*1.05,0); c.quadraticCurveTo(o.r*0.5,o.r*0.28,o.r*0.1,o.r*0.12); c.stroke();
-      const pulse=live?0.65+0.25*Math.sin(t*3+o.ph):0.75;
-      c.fillStyle=rgba(COLS.dri,pulse*0.8);
-      c.beginPath(); c.arc(-o.r*0.25,-o.r*0.18,o.r*0.16,0,TAU); c.fill();
-      c.beginPath(); c.arc(-o.r*0.5,o.r*0.15,o.r*0.12,0,TAU); c.fill();
-      c.restore();
-    }
-    if(o.sp==='bac'){
-      const col=COLS.bac;
-      c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
-      if(live){ // flagella wave while running
-        c.strokeStyle=rgba(col,0.5); c.lineWidth=1;
-        for(const off of [-1.6,1.6]){ c.beginPath(); c.moveTo(-o.r*0.9,off);
-          for(let sx=0;sx<=14;sx++){ const u=sx/14;
-            c.lineTo(-o.r*0.9-u*o.r*1.7, off+Math.sin(u*9-t*16+o.ph)*2.4*u); } c.stroke(); }
-      }
-      const g=c.createRadialGradient(0,0,1,0,0,o.r*1.7);   // shared capsule
-      g.addColorStop(0,rgba(col,0.16)); g.addColorStop(1,rgba(col,0));
-      c.fillStyle=g; c.beginPath(); c.arc(0,0,o.r*1.7,0,TAU); c.fill();
-      for(const[rx,ry,rr]of[[-2,-2.4,0],[1.5,0.6,0.4],[-1,3.2,-0.3]]){
-        c.save(); c.translate(rx,ry); c.rotate(rr);
-        c.fillStyle=rgba(col,0.85); c.beginPath();
-        c.roundRect(-o.r*0.55,-o.r*0.2,o.r*1.1,o.r*0.4,o.r*0.2); c.fill(); c.restore(); }
-      c.restore();
-    }
-    if(o.sp==='ven'){
-      const col=COLS.ven; c.globalCompositeOperation='source-over';
-      spearhead(c,o.x,o.y,o.hd,o.r,o.strike>0);
-      c.fillStyle=rgba(col,0.10); c.fill();
-      c.strokeStyle=rgba(col,0.35); c.lineWidth=1; c.stroke();
-      const st=o.strike>0?1.4:1;
-      c.strokeStyle=rgba([235,248,255],0.95); c.lineWidth=1.8;   // bright leading V
-      c.beginPath(); c.moveTo(-o.r*0.75,o.r*0.62); c.lineTo(o.r*1.15*st,0); c.lineTo(-o.r*0.75,-o.r*0.62); c.stroke();
-      c.strokeStyle=rgba(col,0.4); c.lineWidth=1;                // inner mantle lines
-      c.beginPath(); c.moveTo(-o.r*0.42,0); c.lineTo(o.r*0.5,0); c.stroke();
-      c.fillStyle=rgba(col,1); c.beginPath(); c.arc(o.r*1.15*st,0,1.7,0,TAU); c.fill();
-      if(live&&o.strike>0){ c.strokeStyle=rgba(col,0.3); c.lineWidth=3;
-        c.beginPath(); c.moveTo(-o.r*2.6,0); c.lineTo(-o.r*0.8,0); c.stroke(); }
-      c.restore(); c.globalCompositeOperation='screen';
-    }
-  }
-  c.globalCompositeOperation='source-over';
+  paintBodies(c,t,live,false);
   if(live){ // vignette
     const g=c.createRadialGradient(W/2,W/2,W*0.35,W/2,W/2,W*0.72);
     g.addColorStop(0,'rgba(4,8,14,0)'); g.addColorStop(1,'rgba(4,8,14,0.5)');
@@ -368,7 +427,7 @@ function paintLowPoly(c,t){
   }
 }
 
-// E — Hellfeld: pale ground, phase-contrast halo, round field of view.
+// E — Hellfeld: same textured bodies, inverted ground, round field of view.
 function paintBright(c,t){
   c.fillStyle='#05070B'; c.fillRect(0,0,W,W);
   c.save(); c.beginPath(); c.arc(W/2,W/2,W*0.48,0,TAU); c.clip();
@@ -376,39 +435,17 @@ function paintBright(c,t){
   const g0=c.createRadialGradient(SUN.x,SUN.y,10,SUN.x,SUN.y,320);
   g0.addColorStop(0,'rgba(255,255,250,0.7)'); g0.addColorStop(1,'rgba(255,255,250,0)');
   c.fillStyle=g0; c.fillRect(0,0,W,W);
-  for(const b of MATB){ const g=c.createRadialGradient(b.x,b.y,2,b.x,b.y,b.s*2.0);
-    g.addColorStop(0,'rgba(88,150,110,0.4)'); g.addColorStop(1,'rgba(88,150,110,0)');
-    c.fillStyle=g; c.beginPath(); c.arc(b.x,b.y,b.s*2.0,0,TAU); c.fill(); }
+  if(!carpetBright) carpetBright=buildCarpet(true);
+  c.drawImage(carpetBright,0,0);
+  for(const m of solMarks){ c.fillStyle='rgba(96,150,112,0.55)'; c.beginPath(); c.arc(m.x,m.y,2.6,0,TAU); c.fill();
+    c.fillStyle='rgba(30,64,42,0.6)'; c.beginPath(); c.arc(m.x+0.8,m.y-0.8,0.9,0,TAU); c.fill(); }
   c.fillStyle='rgba(120,105,80,0.25)'; c.beginPath(); c.arc(DET.x,DET.y,DET.r,0,TAU); c.fill();
   for(const m of motes){ c.fillStyle=`rgba(60,60,55,${0.10+m.z*0.10})`; c.beginPath(); c.arc(m.x,m.y,0.6+m.z*0.7,0,TAU); c.fill(); }
+  for(const z of cysts){ c.fillStyle='rgba(110,115,120,0.4)'; c.beginPath(); c.arc(z.x,z.y,z.r,0,TAU); c.fill();
+    c.strokeStyle='rgba(80,85,90,0.7)'; c.lineWidth=1.4; c.beginPath(); c.arc(z.x,z.y,z.r,0,TAU); c.stroke(); }
   for(const k of corpses){ blob(c,k.x,k.y,k.r,0,k.ph,0.22,3,5);
     c.fillStyle='rgba(90,90,88,0.20)'; c.fill(); c.strokeStyle='rgba(70,70,68,0.5)'; c.lineWidth=1; c.stroke(); }
-  function ghost(x,y,r,col,drawBody){
-    c.strokeStyle='rgba(255,255,252,0.9)'; c.lineWidth=2.6;  // the halo
-    c.beginPath(); c.arc(x,y,r*1.08,0,TAU); c.stroke();
-    drawBody();
-  }
-  for(const o of orgs){
-    const col=COLS[o.sp==='dri'?'dri':o.sp==='cil'?'cil':o.sp==='bac'?'bac':'ven'];
-    const faded=mix(col,[95,95,92],0.62);   // pigment washes out on a bright ground
-    if(o.sp==='dri'){ ghost(o.x,o.y,o.r,faded,()=>{
-        c.fillStyle=rgba(faded,0.35); c.beginPath(); c.arc(o.x,o.y,o.r,0,TAU); c.fill();
-        c.strokeStyle=rgba(shade(faded,0.55),0.9); c.lineWidth=1.4; c.beginPath(); c.arc(o.x,o.y,o.r,0,TAU); c.stroke();
-        c.fillStyle='rgba(55,60,66,0.7)'; c.beginPath(); c.arc(o.x+o.r*0.25,o.y-o.r*0.2,o.r*0.2,0,TAU); c.fill(); });
-      if(o.ring){ c.strokeStyle='rgba(55,60,66,0.6)'; c.lineWidth=1.2; c.beginPath(); c.arc(o.x,o.y,o.r*1.28,0,TAU); c.stroke(); } }
-    if(o.sp==='cil'){ c.strokeStyle='rgba(255,255,252,0.85)'; c.lineWidth=2.4;
-      teardrop(c,o.x,o.y,o.hd,o.r*1.06,1.25); c.stroke(); c.restore();
-      teardrop(c,o.x,o.y,o.hd,o.r,1.25);
-      c.fillStyle=rgba(faded,0.35); c.fill();
-      c.strokeStyle='rgba(60,55,66,0.8)'; c.lineWidth=1.4; c.stroke(); c.restore(); }
-    if(o.sp==='bac'){ c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
-      c.fillStyle=rgba(faded,0.5);
-      c.beginPath(); c.roundRect(-o.r*0.7,-o.r*0.28,o.r*1.4,o.r*0.56,o.r*0.28); c.fill();
-      c.strokeStyle='rgba(70,70,60,0.7)'; c.lineWidth=1; c.stroke(); c.restore(); }
-    if(o.sp==='ven'){ spearhead(c,o.x,o.y,o.hd,o.r,o.strike>0);
-      c.fillStyle=rgba(faded,0.22); c.fill();
-      c.strokeStyle='rgba(60,68,76,0.85)'; c.lineWidth=1.6; c.stroke(); c.restore(); }
-  }
+  paintBodies(c,t,false,true);
   const vg=c.createRadialGradient(W/2,W/2,W*0.30,W/2,W/2,W*0.48);
   vg.addColorStop(0,'rgba(30,32,30,0)'); vg.addColorStop(1,'rgba(30,32,30,0.45)');
   c.fillStyle=vg; c.fillRect(0,0,W,W);
@@ -424,9 +461,13 @@ const STYLES=[
   note:'Bucket-Sprites, 64er-Feld, Screen-Composite — wie im Renderer.',
   paint:paintToday},
  {key:'tex', name:'Texturen', title:'Texturen — Mikrografie-Bakes',
-  blurb:'Dieselben Körper, prozedural reicher gebacken: Membran, Kern, Vakuolen, Fressvakuolen bei Cilio, Kapsel-Kolonie bei Bacillus, weiche Matte. Alles steht still.',
+  blurb:'Dieselben Körper, prozedural reicher gebacken: Membran, Kern, Vakuolen, Fressvakuolen bei Cilio, Kapsel-Kolonie bei Bacillus, die Matte als gekachelter Zellteppich. Alles steht still.',
   note:'Stufe G.1 · reine Malschicht, kein Gate berührt · pro Frame gleich teuer wie heute.',
   paint:(c,t)=>paintMicro(c,t,false)},
+ {key:'bright', name:'Hellfeld', title:'Hellfeld — dieselben Körper, Grund invertiert',
+  blurb:'Exakt die Texturen-Körper auf hellem Grund mit Phasenkontrast-Halo und rundem Sichtfeld. Tippe zwischen Texturen und Hellfeld hin und her: der einzige Unterschied ist der Grund — und was er mit den Artfarben macht.',
+  note:'§8-Frage 1 · bräche die Bernstein-Grammatik der Spielerhand und die Pigment-Begründung des dunklen Grunds.',
+  paint:paintBright},
  {key:'live', name:'Lebendig', title:'Lebendig — Vektor und Atmosphäre',
   blurb:'Texturen plus Bewegung: Cilienflimmern, Flagellenschlag bei Bacillus, Membranwobbeln, Schwebeteilchen, Vignette. Drifta bleibt passiv — es hat keinen Antrieb, eine Geißel wäre gelogen.',
   note:'Stufen G.2 + G.3 · gate-frei, aber Pfadkosten bei 2.000 Organismen ungemessen · stabile Einzel-Phasen bräuchten das ID-Feld aus G.4 (Grammatik-Entscheidung).',
@@ -435,10 +476,6 @@ const STYLES=[
   blurb:'Facetten statt Glühen: harte Kanten, flache Flächen, klare Silhouetten. Billig und lesbar — aber es zeigt bewusst vom Mikroskop weg.',
   note:'Stilisierung, kein Realismus · eine Identitätsentscheidung, halb geht nicht (§6.2 der Recherche).',
   paint:paintLowPoly},
- {key:'bright', name:'Hellfeld', title:'Hellfeld — die Paletten-Inversion',
-  blurb:'Heller Grund, rundes Sichtfeld, Phasenkontrast-Halo. Der ikonische Mikroskop-Blick — und schau, was mit den Artfarben passiert: die Identität wäscht aus.',
-  note:'§8-Frage 1 · bräche die Bernstein-Grammatik der Spielerhand und die Pigment-Begründung des dunklen Grunds.',
-  paint:paintBright},
 ];
 
 let cur=0, paused=false, t=0, last=performance.now();
