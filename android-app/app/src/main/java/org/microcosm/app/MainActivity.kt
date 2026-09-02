@@ -120,6 +120,9 @@ class MainActivity : Activity() {
     private lateinit var sunBadgeView: TextView
     private lateinit var verdict: TextView
     internal lateinit var startPanel: LinearLayout // internal: the boot gate walks the front door
+    /** GR.7: the two rows that say which microscope the world is in — front door and drawer. */
+    internal lateinit var opticRow: LinearLayout // internal: the boot gate taps the switch
+    internal lateinit var opticButton: android.widget.Button
     /** The front door's continue-the-experiment row — added after the fixed rows the boot gate walks. */
     internal lateinit var continueRow: LinearLayout
     internal lateinit var expPanel: LinearLayout
@@ -271,9 +274,13 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         Native.boot() // before anything asks the core for a name or a flag
         L10n.init(this) // the display language, before anything shows the core's words (DE.4)
+        // GR.7: the microscope the player last chose, read BEFORE the render thread bakes its
+        // first bodies — the bake depends on the ground they will land on.
+        Optics.lightField = prefs().getBoolean(KEY_OPTIC, false)
 
         val root = FrameLayout(this)
         world = WorldView(this)
+        world.lightField = Optics.lightField
         // The autosaved pond, restored before the render thread founds anything (U0.6). One pond
         // you keep: backgrounding the app no longer costs the world. A running experiment
         // autosaves to its own file (owner report 2026-09-02) and outranks the sandbox at boot —
@@ -775,6 +782,13 @@ class MainActivity : Activity() {
             closeDrawer()
             evoPanel.open()
         }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = Style.dp(this@MainActivity, 8f) })
+        // The same switch as the front door's, where a player already stands looking at the pond:
+        // the point of a second optic is the comparison, and the comparison needs the world in
+        // sight. One state, two ways to reach it.
+        opticButton = button("") { toggleOptic() }
+        drawerBody.addView(opticButton, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            topMargin = Style.dp(this@MainActivity, 8f)
+        })
         drawer.addView(ScrollView(this).apply { addView(drawerBody) },
             LinearLayout.LayoutParams(MATCH, MATCH))
         root.addView(drawer, FrameLayout.LayoutParams(
@@ -909,6 +923,12 @@ class MainActivity : Activity() {
         }
         continueRow.visibility = ViewGroup.GONE
         startPanel.addView(continueRow)
+        // The optic (GR.7). Last row, after the two fixed ones and the continue row, so the boot
+        // gate's child indices stay put. It is a view, not a lever: it changes how the world is
+        // painted and nothing about what the world does.
+        opticRow = startChoice("", "") { toggleOptic() }
+        startPanel.addView(opticRow)
+        refreshOptic()
         root.addView(startPanel, FrameLayout.LayoutParams(MATCH, MATCH))
 
         // The ladder, as a screen: every experiment open, none gated behind another.
@@ -1074,6 +1094,31 @@ class MainActivity : Activity() {
             }
             .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
+    }
+
+    /**
+     * GR.7 — the microscope's regime, and the one setting the app keeps outside a world file: it
+     * belongs to the player's eyes, not to any pond, so it survives a reset and rides along into
+     * every experiment.
+     */
+    private fun prefs() = getSharedPreferences(PREFS, MODE_PRIVATE)
+
+    /** Flip the optic. The render thread picks it up on its next frame and rebakes the bodies. */
+    private fun toggleOptic() {
+        val light = !world.lightField
+        world.lightField = light
+        prefs().edit().putBoolean(KEY_OPTIC, light).apply()
+        refreshOptic()
+    }
+
+    /** Both switches say the same thing: what you are looking at now, and what a tap gives you. */
+    private fun refreshOptic() {
+        val light = world.lightField
+        val title = getString(if (light) R.string.choice_view_light else R.string.choice_view_dark)
+        (opticRow.getChildAt(0) as TextView).text = title
+        (opticRow.getChildAt(1) as TextView).text =
+            getString(if (light) R.string.sub_view_light else R.string.sub_view_dark)
+        opticButton.text = title
     }
 
     private fun toast(s: String) =
@@ -1603,6 +1648,9 @@ class MainActivity : Activity() {
     private companion object {
         val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
+        /** The app's only preferences file, and the one key in it (GR.7). */
+        const val PREFS = "microcosm"
+        const val KEY_OPTIC = "light_field"
     }
 
     /**

@@ -417,6 +417,19 @@ class BootTest {
         assertTrue("the experiment menu should show at least one gameplay thumbnail",
             thumbs(activity.expPanel) > 0)
         activity.expPanel.visibility = android.view.View.GONE
+        // GR.7: the optic switch. It is a view, so the test's whole claim is that a tap flips the
+        // state both switches read, that the world hears it, and that the label follows — whether
+        // the light field LOOKS right is WorldCameraTest's photograph and the owner's device.
+        val darkLabel = activity.opticButton.text.toString()
+        activity.opticRow.performClick()
+        assertTrue("tapping the optic should put the world in the light field", activity.world.lightField)
+        assertTrue("the drawer's switch must say the same thing as the front door's",
+            activity.opticButton.text.toString() != darkLabel)
+        photograph(activity.startPanel, "frontdoor@light")
+        activity.opticRow.performClick()
+        assertTrue("tapping it again should return the dark field", !activity.world.lightField)
+        assertTrue("the label must come back with it",
+            activity.opticButton.text.toString() == darkLabel)
         activity.startPanel.getChildAt(2).performClick() // sandbox
         assertTrue("choosing sandbox should close the front door",
             activity.startPanel.visibility != android.view.View.VISIBLE)

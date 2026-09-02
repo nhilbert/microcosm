@@ -96,11 +96,27 @@ class Layers {
                 ((fieldBuf.get(o + 1).toInt() and 0xFF) shl 8) or
                 (fieldBuf.get(o + 2).toInt() and 0xFF)
         }
+        // The light field re-inks the fields here, once per tick, rather than at every read:
+        // the same hue faded onto the lamp instead of glowing over black water. The carpet's
+        // near-zoom cells copy the result, so the two can never drift apart.
+        if (Optics.lightField) {
+            for (i in px.indices) {
+                val a = px[i] and -0x1000000
+                if (a == 0) continue
+                px[i] = a or (Optics.washRGB((px[i] shr 16) and 0xFF, (px[i] shr 8) and 0xFF,
+                    px[i] and 0xFF) and 0xFFFFFF)
+            }
+        }
         if (which == 0) px.copyInto(carpetColor)
         cell.setPixels(px, 0, GRID, 0, 0, GRID, GRID)
         val g = Canvas(into)
         g.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
         g.drawRect(upDst, upPaint)
+    }
+
+    /** Drop the cached tick so the next frame repacks the fields — the optic changed under us. */
+    fun invalidate() {
+        fieldTick = -1L
     }
 
     /** Force a refresh and report the nanoseconds it took — the benchmark's `fields` row. */
@@ -133,7 +149,10 @@ class Layers {
 
     private fun drawLight() {
         val g = Canvas(light)
-        g.drawColor(Renderer.ABYSS, PorterDuff.Mode.SRC)
+        // Dark field: the layer IS the black water, and a source adds its glow to it. Light
+        // field: the layer is the lamp, so it starts a shade under the bare ground and a source
+        // adds warm white back — the same geometry, read as illumination instead of as glow.
+        g.drawColor(if (Optics.lightField) Optics.LAMP_DIM else Renderer.ABYSS, PorterDuff.Mode.SRC)
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         // one glow per source per wrapped offset, adding like the field they depict
         for (k in 0 until Native.glowCount(0)) {
@@ -142,10 +161,12 @@ class Layers {
             val r = Native.glowNum(0, k, 2).toFloat()
             if (r <= 0f) continue // a source with no spread has no glow to paint
             val a = Native.glowNum(0, k, 3)
+            val c0 = if (Optics.lightField) intArrayOf(255, 250, 232) else intArrayOf(214, 238, 255)
+            val c1 = if (Optics.lightField) intArrayOf(255, 244, 214) else intArrayOf(140, 190, 225)
             p.shader = RadialGradient(
                 x, y, r,
-                intArrayOf(argb(0.30 * a, 214, 238, 255), argb(0.30 * a, 214, 238, 255),
-                    argb(0.12 * a, 140, 190, 225), argb(0.0, 140, 190, 225)),
+                intArrayOf(argb(0.30 * a, c0[0], c0[1], c0[2]), argb(0.30 * a, c0[0], c0[1], c0[2]),
+                    argb(0.12 * a, c1[0], c1[1], c1[2]), argb(0.0, c1[0], c1[1], c1[2])),
                 floatArrayOf(0f, minOf(0.3f, 4f / r), 0.4f, 1f),
                 Shader.TileMode.CLAMP,
             )
@@ -155,7 +176,7 @@ class Layers {
         }
         p.xfermode = null
         p.shader = null
-        p.color = argb(0.9, 240, 250, 255)
+        p.color = Optics.ink(0.9f, 240, 250, 255)
         for (k in 0 until Native.glowCount(2))
             g.drawCircle(Native.glowNum(2, k, 0).toFloat(), Native.glowNum(2, k, 1).toFloat(), 5f, p)
     }
@@ -177,8 +198,10 @@ class Layers {
             val c1 = if (warm) intArrayOf(200, 70, 40) else intArrayOf(80, 120, 220)
             p.shader = RadialGradient(
                 x, y, r,
-                intArrayOf(argb(0.38 * m, c0[0], c0[1], c0[2]), argb(0.38 * m, c0[0], c0[1], c0[2]),
-                    argb(0.16 * m, c1[0], c1[1], c1[2]), argb(0.0, c1[0], c1[1], c1[2])),
+                intArrayOf(Optics.wash(0.38f * m.toFloat(), c0[0], c0[1], c0[2]),
+                    Optics.wash(0.38f * m.toFloat(), c0[0], c0[1], c0[2]),
+                    Optics.wash(0.16f * m.toFloat(), c1[0], c1[1], c1[2]),
+                    argb(0.0, c1[0], c1[1], c1[2])),
                 floatArrayOf(0f, minOf(0.3f, 2f / r), 0.45f, 1f),
                 Shader.TileMode.CLAMP,
             )
@@ -187,7 +210,7 @@ class Layers {
         p.shader = null
         for (k in 0 until Native.glowCount(3)) {
             val warm = Native.glowNum(3, k, 4) != 0.0
-            p.color = if (warm) argb(0.9, 255, 160, 110) else argb(0.9, 170, 210, 255)
+            p.color = if (warm) Optics.wash(0.9f, 255, 160, 110) else Optics.wash(0.9f, 170, 210, 255)
             g.drawCircle(Native.glowNum(3, k, 0).toFloat(), Native.glowNum(3, k, 1).toFloat(), 4f, p)
         }
     }
@@ -218,8 +241,11 @@ class Layers {
             // a wall that crosses the tile edge has to continue on the far side
             for (ox in -TILE..TILE step TILE) for (oy in -TILE..TILE step TILE) {
                 g.save(); g.translate(ox.toFloat(), oy.toFloat())
-                p.color = argb(0.8 * a, 11, 19, 30); p.strokeWidth = 4.4f; g.drawPath(path, p)
-                p.color = argb(a, 148, 167, 184); p.strokeWidth = 2.2f; g.drawPath(path, p)
+                // The backing is the ground's own colour, so the wall reads as a solid edge
+                // against whatever it crosses; the line above it is the contrast ink.
+                p.color = if (Optics.lightField) argb(0.8 * a, 252, 250, 244) else argb(0.8 * a, 11, 19, 30)
+                p.strokeWidth = 4.4f; g.drawPath(path, p)
+                p.color = Optics.ink(a.toFloat(), 148, 167, 184); p.strokeWidth = 2.2f; g.drawPath(path, p)
                 g.restore()
             }
         }

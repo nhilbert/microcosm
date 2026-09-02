@@ -24,7 +24,11 @@ import kotlin.math.sqrt
  * harness/fingerprint-frame.js. What is left here is strokes: blend modes, blits, paths.
  *
  * Nothing in this file may decide anything — if a number here would change what the player sees
- * about the *world* rather than how it is drawn, it belongs in frame.rs instead.
+ * about the *world* rather than how it is drawn, it belongs in frame.rs instead. The light field
+ * (GR.7) is exactly that kind of change and no other: the same display list, painted for a lamp
+ * instead of for black water. Every colour goes through `Optics`; the two structural differences
+ * are named where they are made — the blits stop compositing with SCREEN, and the bloom becomes
+ * a bright rim.
  *
  * @param density device pixels per CSS pixel. The browser draws on a CSS-pixel canvas and lets the
  * device pixel ratio scale it; this canvas is in device pixels, so every screen-space number
@@ -47,7 +51,8 @@ class Renderer(private val density: Double = 1.0) {
     }
 
     private val layers = Layers()
-    private val sprites: Array<Array<Bitmap>>
+    /** Rebaked when the optic changes; assigned whole, so a frame sees one regime or the other. */
+    @Volatile private var sprites: Array<Array<Bitmap>>
     private val grammar = Array(7) { sp -> DoubleArray(6) { f -> Native.grammarNum(sp, f) } }
     /** A CSS-pixel threshold in `frame.rs`, so it has to be compared against a CSS-pixel zoom. */
     private val lodZ = Native.frameConst(0) * density
@@ -62,6 +67,14 @@ class Renderer(private val density: Double = 1.0) {
     private val screen = Paint(Paint.FILTER_BITMAP_FLAG).apply {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
     }
+    /**
+     * The light field's blit paint. On black water a body ADDS its light to the ground, which is
+     * what SCREEN says; on the lamp it takes light away, so the bake — which already carries its
+     * own absorbing ink — is composited plainly. SCREEN over a bright ground would wash every
+     * body out to white, which is the one thing brightfield never looks like.
+     */
+    private val plain = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val screenMode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
     private val flat = Paint(Paint.ANTI_ALIAS_FLAG)
     private val dst = RectF()
     private val rayPath = Path()
@@ -126,8 +139,16 @@ class Renderer(private val density: Double = 1.0) {
     init {
         Native.grammarBuild()
         for (sp in 0 until 7) for (f in 0 until 6) grammar[sp][f] = Native.grammarNum(sp, f)
-        // One bitmap per bucket, built once. The bucket table is the core's; the pixels are ours.
-        sprites = Array(7) { sp ->
+        sprites = bake()
+        layers.refreshTiles()
+    }
+
+    /**
+     * One bitmap per bucket. The bucket table is the core's; the pixels are ours — and since GR.7
+     * the pixels also depend on which optic is on, so this can be called again.
+     */
+    private fun bake(): Array<Array<Bitmap>> =
+        Array(7) { sp ->
             val tN = if (grammar[sp][4] > 0) grammar[sp][4].toInt() else 1
             val mN = if (grammar[sp][5] > 0) grammar[sp][5].toInt() else 1
             specShape[sp] = Native.specNum(sp, 0, 0, 3).toInt()
@@ -150,6 +171,17 @@ class Renderer(private val density: Double = 1.0) {
                 )
             }
         }
+
+    /**
+     * Switch the microscope's regime (GR.7). Called from the menu on the UI thread: the flag
+     * flips, the bodies are rebaked for the new ground, and both the tile paintings and the
+     * per-cell fields are dropped so the next frame builds them in the new ink.
+     */
+    fun setOptic(light: Boolean) {
+        if (Optics.lightField == light) return
+        Optics.lightField = light
+        sprites = bake()
+        layers.invalidate()
         layers.refreshTiles()
     }
 
@@ -176,7 +208,9 @@ class Renderer(private val density: Double = 1.0) {
         layers.refreshFields(Native.tick())
         if (layers.tilesDirty()) layers.refreshTiles()
 
-        c.drawColor(ABYSS, PorterDuff.Mode.SRC)
+        val body = if (Optics.lightField) plain else screen
+        vecPaint.xfermode = if (Optics.lightField) null else screenMode
+        c.drawColor(Optics.ground(), PorterDuff.Mode.SRC)
         // world layers, seam-free: each covers the viewport once through its REPEAT shader
         if (hidden and (1 shl 8) == 0) {
             paintLayer(c, layers.light, cam, vw, vh)
@@ -192,7 +226,7 @@ class Renderer(private val density: Double = 1.0) {
         if (cam.z < lodZ && hidden and (1 shl 7) == 0) paintLayer(c, layers.pall, cam, vw, vh)
         if (layers.hasWalls) paintLayer(c, layers.walls, cam, vw, vh)
 
-        paintOrganisms(c)
+        paintOrganisms(c, body)
         paintCorpses(c, cam, vw, vh)
         // The selection ring is an affordance, above the world and never additive. Slate, not
         // amber: amber is the player's hand on the world, and looking is not touching.
@@ -201,10 +235,10 @@ class Renderer(private val density: Double = 1.0) {
             val sy = Native.frameSel(selI, selGen, 2).toFloat()
             val rr = Native.frameSel(selI, selGen, 3).toFloat()
             flat.style = Paint.Style.STROKE
-            flat.color = Color.argb(242, 201, 215, 227)
+            flat.color = Optics.ink(0.95f, 201, 215, 227)
             flat.strokeWidth = 1.5f * dp
             c.drawCircle(sx, sy, rr, flat)
-            flat.color = Color.argb(64, 201, 215, 227)
+            flat.color = Optics.ink(0.25f, 201, 215, 227)
             flat.strokeWidth = 5f * dp
             c.drawCircle(sx, sy, rr + 4f * dp, flat)
             flat.style = Paint.Style.FILL
@@ -250,7 +284,7 @@ class Renderer(private val density: Double = 1.0) {
         var q = 0
         while (q + 2 < pours.size) {
             val age = pours[q + 2]
-            flat.color = Color.argb(((0.7f * (1f - age)) * 255).toInt().coerceIn(0, 255), 242, 178, 74)
+            flat.color = Optics.hand(0.7f * (1f - age))
             flat.strokeWidth = 2f * dp
             c.drawCircle(pours[q], pours[q + 1], (10f + age * 34f) * dp, flat)
             q += 3
@@ -260,15 +294,15 @@ class Renderer(private val density: Double = 1.0) {
             val sx = (vw / 2 + wd(Native.sourceNum(k, 0) - cam.x) * cam.z).toFloat()
             val sy = (vh / 2 + wd(Native.sourceNum(k, 1) - cam.y) * cam.z).toFloat()
             val on = k == sunSel
-            flat.color = Color.argb(if (on) 255 else 230, 242, 178, 74)
+            flat.color = Optics.hand(if (on) 1f else 0.9f)
             flat.strokeWidth = (if (on) 2.5f else 1.5f) * dp
             c.drawCircle(sx, sy, 16f * dp, flat)
-            flat.color = Color.argb(if (on) 128 else 77, 242, 178, 74)
+            flat.color = Optics.hand(if (on) 0.5f else 0.3f)
             flat.strokeWidth = 6f * dp
             c.drawCircle(sx, sy, 22f * dp, flat)
         }
         if (wallDrag != null) {
-            flat.color = Color.argb(230, 242, 178, 74)
+            flat.color = Optics.hand(0.9f)
             flat.strokeWidth = 2.2f * dp
             c.drawLine(wallDrag[0], wallDrag[1], wallDrag[2], wallDrag[3], flat)
             flat.style = Paint.Style.FILL
@@ -301,7 +335,7 @@ class Renderer(private val density: Double = 1.0) {
         return sb.toString()
     }
 
-    private fun paintOrganisms(c: Canvas) {
+    private fun paintOrganisms(c: Canvas, body: Paint) {
         for (q in 0 until orgN) {
             val b = q * orgStride
             val kind = orgBuf.get(b).toInt()
@@ -312,12 +346,12 @@ class Renderer(private val density: Double = 1.0) {
             val bucket = orgBuf.get(b + 5).toInt()
             when (kind) {
                 0 -> { // dormant cyst: dim ember, no glow
-                    flat.color = Color.argb(128, 120, 135, 150)
+                    flat.color = Optics.line(0.5f, 120, 135, 150)
                     flat.style = Paint.Style.FILL
                     c.drawCircle(sx, sy, r, flat)
                 }
                 1 -> { // bacteria dot-LOD
-                    flat.color = Color.argb(204, 196, 206, 150)
+                    flat.color = Optics.line(0.8f, 196, 206, 150)
                     flat.style = Paint.Style.FILL
                     c.drawRect(sx - r, sy - r, sx + r, sy + r, flat)
                 }
@@ -334,7 +368,7 @@ class Renderer(private val density: Double = 1.0) {
                         c.translate(sx, sy)
                         c.rotate(Math.toDegrees(orgBuf.get(b + 6)).toFloat())
                         dst.set(-r, -r, r, r)
-                        c.drawBitmap(bmp, null, dst, screen)
+                        c.drawBitmap(bmp, null, dst, body)
                         if (fade > 0f && specShape[sp] == Sprites.TRI) vecTri(c, r, sp, bk, fade)
                         c.restore()
                     } else if (specShape[sp] == Sprites.SQUARE) {
@@ -346,11 +380,11 @@ class Renderer(private val density: Double = 1.0) {
                         c.translate(sx, sy)
                         c.rotate(Math.toDegrees(orgBuf.get(b + 6)).toFloat())
                         dst.set(-r, -r, r, r)
-                        c.drawBitmap(bmp, null, dst, screen)
+                        c.drawBitmap(bmp, null, dst, body)
                         c.restore()
                     } else {
                         dst.set(sx - r, sy - r, sx + r, sy + r)
-                        c.drawBitmap(bmp, null, dst, screen)
+                        c.drawBitmap(bmp, null, dst, body)
                         if (fade > 0f && specShape[sp] == Sprites.DOT) vecDot(c, sx, sy, r, sp, bk, fade)
                     }
                 }
@@ -412,7 +446,7 @@ class Renderer(private val density: Double = 1.0) {
             val rr = r * (0.7f + 0.3f * fresh) * (1.1f - 0.1f * arrive) // deflates as the mass leaves; settles on arrival
             if (rr < 8f * dp) { // far tier: the old simple husk
                 flat.style = Paint.Style.FILL
-                flat.color = Color.argb((aa * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
+                flat.color = Optics.wash(aa.toFloat(), cr, cg, cb)
                 c.drawCircle(sx, sy, rr, flat)
                 continue
             }
@@ -428,15 +462,14 @@ class Renderer(private val density: Double = 1.0) {
             }
             rayPath.close()
             flat.style = Paint.Style.FILL
-            flat.color = Color.argb((aa * 0.6 * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
+            flat.color = Optics.wash((aa * 0.6).toFloat(), cr, cg, cb)
             c.drawPath(rayPath, flat)
             flat.style = Paint.Style.STROKE
             flat.strokeWidth = 1f * dp
-            flat.color = Color.argb((aa * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
+            flat.color = Optics.line(aa.toFloat(), cr, cg, cb)
             c.drawPath(rayPath, flat)
             flat.style = Paint.Style.FILL // the inner fold — the collapsed contents
-            flat.color = Color.argb((aa * 0.7 * 255).roundToInt().coerceIn(0, 255),
-                cr * 8 / 10, cg * 8 / 10, cb * 8 / 10)
+            flat.color = Optics.line((aa * 0.7).toFloat(), cr * 8 / 10, cg * 8 / 10, cb * 8 / 10)
             c.drawCircle(sx + rr * 0.2f, sy - rr * 0.15f, rr * 0.3f, flat)
         }
         flat.style = Paint.Style.FILL
@@ -457,25 +490,31 @@ class Renderer(private val density: Double = 1.0) {
         val cb = specRGB[sp][bk * 3 + 2]
         val outline = specOut[sp][bk]
         vecPaint.style = Paint.Style.STROKE
+        if (Optics.lightField) { // the rim the bake wears, at the size the blit is drawn
+            vecPaint.strokeWidth = 2.6f * s
+            vecPaint.color = Optics.halo(0.9f * fade)
+            c.drawCircle(sx, sy, 15.7f * s, vecPaint)
+        }
         vecPaint.strokeWidth = 1.8f * s
-        vecPaint.color = vecArgb(0.95f * fade, cr, cg, cb)
+        vecPaint.color = Optics.line(0.95f * fade, cr, cg, cb)
         c.drawCircle(sx, sy, 14f * s, vecPaint)
         vecPaint.strokeWidth = 1f * s
-        vecPaint.color = vecArgb(0.3f * fade, cr, cg, cb)
+        vecPaint.color = Optics.line(0.3f * fade, cr, cg, cb)
         c.drawCircle(sx, sy, 11.5f * s, vecPaint)
         vecPaint.style = Paint.Style.FILL
-        vecPaint.color = vecArgb(0.9f * fade, 235, 250, 255)
+        vecPaint.color = Optics.ink(0.9f * fade, 235, 250, 255)
         c.drawCircle(sx + 4f * s, sy - 2.8f * s, 3.1f * s, vecPaint)
-        vecPaint.color = vecArgb(0.5f * fade, cr * 6 / 10, cg * 6 / 10, cb * 6 / 10)
+        vecPaint.color = if (Optics.lightField) Optics.halo(0.45f * fade)
+            else vecArgb(0.5f * fade, cr * 6 / 10, cg * 6 / 10, cb * 6 / 10)
         c.drawCircle(sx - 4.2f * s, sy + 3.5f * s, 2.5f * s, vecPaint)
-        vecPaint.color = vecArgb(0.3f * fade, cr, cg, cb)
+        vecPaint.color = Optics.line(0.3f * fade, cr, cg, cb)
         for (i in 0 until 8) {
             c.drawCircle(sx + granule[i * 2] * s, sy + granule[i * 2 + 1] * s, 0.9f * s, vecPaint)
         }
         if (outline > 0.02f) {
             vecPaint.style = Paint.Style.STROKE
             vecPaint.strokeWidth = (1f + 1.2f * outline) * s
-            vecPaint.color = vecArgb((0.15f + 0.7f * outline) * fade, 235, 246, 255)
+            vecPaint.color = Optics.ink((0.15f + 0.7f * outline) * fade, 235, 246, 255)
             val s0 = 14.5f * s
             val s1 = (16f + 3.5f * outline) * s
             for (i in 0 until 10) {
@@ -508,13 +547,18 @@ class Renderer(private val density: Double = 1.0) {
         vecPath.close()
         vecPaint.style = Paint.Style.STROKE
         vecPaint.strokeJoin = Paint.Join.ROUND
+        if (Optics.lightField) {
+            vecPaint.strokeWidth = (3.4f + round * 2.5f) * s
+            vecPaint.color = Optics.halo(0.9f * fade)
+            c.drawPath(vecPath, vecPaint)
+        }
         vecPaint.strokeWidth = (1.8f + round * 2.5f) * s
-        vecPaint.color = vecArgb(0.95f * fade, cr, cg, cb)
+        vecPaint.color = Optics.line(0.95f * fade, cr, cg, cb)
         c.drawPath(vecPath, vecPaint)
         // fainter than the bake's fringe: overlay and blit add under SCREEN, and at this size
         // the doubled strokes read sun-white instead of the species colour (first photograph)
         vecPaint.strokeWidth = 1f * s
-        vecPaint.color = vecArgb(0.4f * fade, cr, cg, cb)
+        vecPaint.color = Optics.line(0.4f * fade, cr, cg, cb)
         for (i in 0 until 26) {
             val a = i / 26.0 * 2.0 * Math.PI
             c.drawLine(
@@ -523,18 +567,18 @@ class Renderer(private val density: Double = 1.0) {
             )
         }
         vecPaint.strokeWidth = 1.2f * s
-        vecPaint.color = vecArgb(0.7f * fade, 245, 235, 255)
+        vecPaint.color = Optics.ink(0.7f * fade, 245, 235, 255)
         vecPath.reset()
         vecPath.moveTo(nose * 0.95f, 0f)
         vecPath.quadTo(6f * s, 3.4f * s, 1f * s, 1.5f * s)
         c.drawPath(vecPath, vecPaint)
         vecPaint.style = Paint.Style.FILL
-        vecPaint.color = vecArgb(0.55f * fade, 225, 240, 250)
+        vecPaint.color = Optics.ink(0.55f * fade, 225, 240, 250)
         venOval.set(-4.5f * s, -1.3f * s, 3.5f * s, 1.7f * s)
         c.save(); c.rotate(24f)
         c.drawOval(venOval, vecPaint)
         c.restore()
-        vecPaint.color = vecArgb(0.7f * fade, Sprites.MEAL[0], Sprites.MEAL[1], Sprites.MEAL[2])
+        vecPaint.color = Optics.wash(0.7f * fade, Sprites.MEAL[0], Sprites.MEAL[1], Sprites.MEAL[2])
         c.drawCircle(-3f * s, -2.2f * s, 2.2f * s, vecPaint)
         c.drawCircle(-6.2f * s, 2.4f * s, 1.7f * s, vecPaint)
     }
@@ -589,7 +633,7 @@ class Renderer(private val density: Double = 1.0) {
                     c.drawCircle(sx, sy, rad, cellSeam)
                 }
                 if (h1 < 0.14f) { // a nucleus point, here and there
-                    cellDot.color = vecArgb(fade * 0.6f, 235, 255, 244)
+                    cellDot.color = Optics.ink(fade * 0.6f, 235, 255, 244)
                     c.drawCircle(sx + (h2 - 0.5f) * rad, sy + (h3 - 0.5f) * rad, 1.1f * dp, cellDot)
                 }
                 cellsDrawn++
@@ -623,12 +667,20 @@ class Renderer(private val density: Double = 1.0) {
         c.rotate(Math.toDegrees(hd.toDouble()).toFloat())
         // body — a real body, not a ghost: dark translucent interior, glacier membrane
         venOval.set(-len, -wid, len, wid)
+        if (Optics.lightField) { // the rim, in place of the glacier glow
+            flat.style = Paint.Style.STROKE
+            flat.strokeWidth = 2.6f * dp
+            flat.color = Optics.halo(0.9f)
+            venOval.set(-len * 1.07f, -wid * 1.09f, len * 1.07f, wid * 1.09f)
+            c.drawOval(venOval, flat)
+            venOval.set(-len, -wid, len, wid)
+        }
         flat.style = Paint.Style.FILL
-        flat.color = Color.argb(128, 90, 120, 142)
+        flat.color = Optics.wash(0.5f, 90, 120, 142)
         c.drawOval(venOval, flat)
         flat.style = Paint.Style.STROKE
         flat.strokeWidth = 1.7f * dp
-        flat.color = Color.argb(242, 168, 214, 244)
+        flat.color = Optics.line(0.95f, 168, 214, 244)
         c.drawOval(venOval, flat)
         // the proboscis: the seizing organ, brighter than anything behind it
         val px = len * 0.92f
@@ -638,11 +690,11 @@ class Renderer(private val density: Double = 1.0) {
         rayPath.quadTo(px + pl * 1.15f, 0f, px, wid * 0.34f)
         rayPath.close()
         flat.style = Paint.Style.FILL
-        flat.color = Color.argb(115, 203, 230, 248)
+        flat.color = Optics.wash(0.45f, 203, 230, 248)
         c.drawPath(rayPath, flat)
         flat.style = Paint.Style.STROKE
         flat.strokeWidth = 1.5f * dp
-        flat.color = Color.argb(242, 235, 248, 255)
+        flat.color = Optics.ink(0.95f, 235, 248, 255)
         c.drawPath(rayPath, flat)
         if (r >= 12f * dp) {
             // the two pectinelle girdles — the fast-swim rings, fringe densest at the rim
@@ -650,11 +702,11 @@ class Renderer(private val density: Double = 1.0) {
                 val gx = len * f
                 val yh = wid * sqrt((1f - f * f).coerceAtLeast(0f))
                 flat.strokeWidth = 1f * dp
-                flat.color = Color.argb(102, 168, 214, 244)
+                flat.color = Optics.line(0.4f, 168, 214, 244)
                 venOval.set(gx - r * 0.13f, -yh, gx + r * 0.13f, yh)
                 c.drawOval(venOval, flat)
                 flat.strokeWidth = 1.3f * dp
-                flat.color = Color.argb(217, 225, 242, 252)
+                flat.color = Optics.ink(0.85f, 225, 242, 252)
                 for (s in -4..4) {
                     if (s == 0) continue
                     val yy = yh * (s / 4.6f)
@@ -669,16 +721,16 @@ class Renderer(private val density: Double = 1.0) {
             // Toxicyst positions are a fixed pattern — the display list carries no per-organism
             // seed (organism-graphics-plan.md §3, per-individual variation is a grammar change).
             flat.strokeWidth = 1f * dp
-            flat.color = Color.argb(89, 168, 214, 244)
+            flat.color = Optics.line(0.35f, 168, 214, 244)
             for (i in -2..2) {
                 c.drawLine(px - r * 0.15f, i * wid * 0.12f, px + pl * 0.85f, i * wid * 0.05f, flat)
             }
             flat.strokeWidth = 3f * dp
-            flat.color = Color.argb(204, 225, 240, 250)
+            flat.color = Optics.ink(0.8f, 225, 240, 250)
             venOval.set(-len * 0.1f - r * 0.42f, -r * 0.42f, -len * 0.1f + r * 0.42f, r * 0.42f)
             c.drawArc(venOval, 135f, 207f, false, flat)
             flat.style = Paint.Style.FILL
-            flat.color = Color.argb(204, 212, 235, 250)
+            flat.color = Optics.ink(0.8f, 212, 235, 250)
             c.drawCircle(px + pl * 0.55f, -wid * 0.10f, 1.1f * dp, flat)
             c.drawCircle(px + pl * 0.75f, wid * 0.06f, 1.1f * dp, flat)
             c.drawCircle(px + pl * 0.92f, -wid * 0.02f, 1.1f * dp, flat)
@@ -686,7 +738,7 @@ class Renderer(private val density: Double = 1.0) {
         if (striking) {
             flat.style = Paint.Style.STROKE
             flat.strokeWidth = 2f * dp
-            flat.color = Color.argb(89, 212, 236, 255)
+            flat.color = Optics.ink(0.35f, 212, 236, 255)
             c.drawLine(-r * 3.2f, 0f, -len, 0f, flat)
         }
         c.restore()
