@@ -67,6 +67,13 @@ class Layers {
         private set
 
     private val px = IntArray(GRID * GRID)
+    /**
+     * The carpet field's straight ARGB per cell, kept for the near-zoom cell painter (GR.3).
+     * The field already carries the mat's colour ramp AND the light-locus genotype turn (the
+     * recorded grammar exception), so the cells take their colour from the core's own pixels
+     * instead of a second ramp that could drift.
+     */
+    val carpetColor = IntArray(GRID * GRID)
     // The core's scratch field lives at a fixed address, so this is wrapped once, not per frame.
     private val fieldBuf: ByteBuffer = Native.fieldBuffer()
     private var fieldTick = -1L
@@ -85,6 +92,7 @@ class Layers {
                 ((fieldBuf.get(o + 1).toInt() and 0xFF) shl 8) or
                 (fieldBuf.get(o + 2).toInt() and 0xFF)
         }
+        if (which == 0) px.copyInto(carpetColor)
         cell.setPixels(px, 0, GRID, 0, 0, GRID, GRID)
         val g = Canvas(into)
         g.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)

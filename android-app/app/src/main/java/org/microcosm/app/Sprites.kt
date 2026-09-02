@@ -43,7 +43,7 @@ object Sprites {
     const val RAY = 4
 
     /** Drifta's own light — a Cilio food vacuole glows in its last meal's colour. */
-    private val MEAL = intArrayOf(91, 200, 232)
+    val MEAL = intArrayOf(91, 200, 232)
 
     /** Map a Canvas 2D gradient stop onto Android's single-radius gradient. */
     private fun stop(t: Float) = (2f + 30f * t) / 32f

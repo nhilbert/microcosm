@@ -122,5 +122,26 @@ owner's call.
   twice on first contact**: Bacillus's corner-radius-only dial was invisible (34 px —
   the dial was amplified to constant-area rod reshaping, not the threshold lowered), and
   the first photograph showed the three rods merged into one blob (spread + dark seams).
-  Gates: android unit gates 15/15 green, npm test green. Owner look-acceptance on
-  device pending; LOD thresholds and the carpet move to GR.3.
+  Gates: android unit gates 15/15 green, npm test green. **Owner look-acceptance on
+  device (2026-09-02): APK installed, "sieht gut aus."**
+
+- **GR.3 shipped (2026-09-02)**: the zoom ladder and the carpet's tissue, painting tier
+  only. (1) **Near tier**: above 28 CSS px screen radius (8 px fade-in) a crisp vector
+  overlay in the bake's own geometry draws over the blit — the blit keeps carrying the
+  glow, so the handoff cannot pop; Drifta gains inner membrane, granules (fixed pattern —
+  no per-organism seed, plan §3) and crisp spines, Cilio crisp membrane, fringe, groove,
+  food vacuoles and a pale macronucleus (bright, because the overlay composites with
+  SCREEN). Bucket specs cached at init — the overlay never crosses JNI per frame.
+  Bacillus never reaches the tier at the zoom ceiling (r ≈ 19 CSS px at 6×) — recorded,
+  no code for it. (2) **Carpet cells**: above CSS zoom 2 (0.6 fade), viewport-culled
+  jittered cells (hash layout, zero PRNG) draw over the upscaled field, coloured from
+  the core's own field pixels (`Layers.carpetColor`) so the ramp AND the light-locus
+  turn survive by construction; margin thins to scattered single cells; ~2 candidates
+  per field cell axis (8 world units). (3) New instrument **WorldCameraTest**: real host
+  core, 3,000 ticks, photographs the three rungs (overview / mat-cells / close-up) to
+  `build/reports/screens/world@*.png`. Its first photographs convicted the overlay
+  fringe reading sun-white (blit + overlay adding under SCREEN) — alpha lowered in the
+  overlay, not the bake. Field prescale (UP=4) and far look untouched; the mat
+  blockiness diagnostic stays open for the owner's far-zoom judgment. **Owed from the
+  owner's device**: the §1.3 budget numbers (record ms at the five standard zooms, dev
+  telemetry) and the look verdict; thresholds VEC_AT=28, CELLS_AT=2.0 are start values.

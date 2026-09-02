@@ -10,7 +10,12 @@ import android.graphics.PorterDuffXfermode
 
 import android.graphics.RectF
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -32,6 +37,13 @@ class Renderer(private val density: Double = 1.0) {
     companion object {
         val ABYSS: Int = Color.rgb(0x0B, 0x13, 0x1E)
         const val WORLD = 1024.0
+        /** GR.3: CSS-px screen radius where the crisp overlay starts, and its fade-in span. */
+        private const val VEC_AT = 28f
+        private const val VEC_FADE = 8f
+        /** GR.3: CSS zoom where the carpet's cells fade in over the upscaled field. */
+        private const val CELLS_AT = 2.0
+        /** World units between carpet cell candidates — 2x2 per 16-unit field cell. */
+        private const val CELL_STEP = 8.0
     }
 
     private val layers = Layers()
@@ -69,6 +81,21 @@ class Renderer(private val density: Double = 1.0) {
     /** Girdle positions as fractions of the barrel half-length — a frame allocates nothing. */
     private val girdleFrac = floatArrayOf(0.42f, -0.18f)
 
+    // GR.3 (docs/organism-graphics-plan.md): the zoom ladder's near tier. Above VEC_AT the 64px
+    // bake blurs, so a crisp vector overlay — same geometry as the bake, so the handoff does not
+    // pop — draws over the blit, fading in across VEC_FADE. Bucket specs are cached at init so
+    // the overlay never crosses JNI per frame.
+    private val vecPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
+    }
+    private val vecPath = Path()
+    private val specShape = IntArray(7)
+    private val specRGB = Array(7) { IntArray(0) }
+    private val specOut = Array(7) { FloatArray(0) }
+    private val specRound = Array(7) { FloatArray(0) }
+    /** Fixed granule pattern (bake-space offsets) — the display list carries no per-organism seed. */
+    private val granule = floatArrayOf(-6f, 2f, 3f, 6f, -2f, -6.5f, 7f, 3f, -8f, -3f, 1f, 9f, 8f, -4f, -3f, 7.5f)
+
     /**
      * Species names and locus words, read once from the trait rows. They belong to the traits, not
      * to any renderer — the browser reads the same strings — so they are fetched, never retyped.
@@ -94,18 +121,23 @@ class Renderer(private val density: Double = 1.0) {
         sprites = Array(7) { sp ->
             val tN = if (grammar[sp][4] > 0) grammar[sp][4].toInt() else 1
             val mN = if (grammar[sp][5] > 0) grammar[sp][5].toInt() else 1
+            specShape[sp] = Native.specNum(sp, 0, 0, 3).toInt()
+            specRGB[sp] = IntArray(tN * mN * 3)
+            specOut[sp] = FloatArray(tN * mN)
+            specRound[sp] = FloatArray(tN * mN)
             Array(tN * mN) { i ->
                 val tb = i / mN
                 val mb = i % mN
+                specRGB[sp][i * 3] = Native.specNum(sp, tb, mb, 0).toInt()
+                specRGB[sp][i * 3 + 1] = Native.specNum(sp, tb, mb, 1).toInt()
+                specRGB[sp][i * 3 + 2] = Native.specNum(sp, tb, mb, 2).toInt()
+                specOut[sp][i] = Native.specNum(sp, tb, mb, 5).toFloat()
+                specRound[sp][i] = Native.specNum(sp, tb, mb, 6).toFloat()
                 Sprites.make(
-                    intArrayOf(
-                        Native.specNum(sp, tb, mb, 0).toInt(),
-                        Native.specNum(sp, tb, mb, 1).toInt(),
-                        Native.specNum(sp, tb, mb, 2).toInt(),
-                    ),
+                    intArrayOf(specRGB[sp][i * 3], specRGB[sp][i * 3 + 1], specRGB[sp][i * 3 + 2]),
                     Native.specNum(sp, tb, mb, 3).toInt(),
-                    Native.specNum(sp, tb, mb, 5),
-                    Native.specNum(sp, tb, mb, 6),
+                    specOut[sp][i].toDouble(),
+                    specRound[sp][i].toDouble(),
                 )
             }
         }
@@ -144,7 +176,10 @@ class Renderer(private val density: Double = 1.0) {
         }
         if (hidden and (1 shl 9) == 0) paintLayer(c, layers.heat, cam, vw, vh)
         paintLayer(c, layers.mineral, cam, vw, vh)
-        if (hidden and 1 == 0) paintLayer(c, layers.carpet, cam, vw, vh)
+        if (hidden and 1 == 0) {
+            paintLayer(c, layers.carpet, cam, vw, vh)
+            paintCarpetCells(c, cam, vw, vh)
+        }
         if (cam.z < lodZ && hidden and (1 shl 7) == 0) paintLayer(c, layers.pall, cam, vw, vh)
         if (layers.hasWalls) paintLayer(c, layers.walls, cam, vw, vh)
 
@@ -280,17 +315,23 @@ class Renderer(private val density: Double = 1.0) {
                 4 -> didinium(c, sx, sy, orgBuf.get(b + 6).toFloat(), r, orgBuf.get(b + 7) != 0.0)
                 else -> {
                     val set = sprites[sp]
-                    val bmp = if (bucket >= 0 && bucket < set.size) set[bucket] else set[0]
-                    dst.set(sx - r, sy - r, sx + r, sy + r)
+                    val bk = if (bucket >= 0 && bucket < set.size) bucket else 0
+                    val bmp = set[bk]
+                    // GR.3 near tier: the blit stays (it carries the glow), a crisp vector
+                    // overlay in the bake's own geometry fades in where the 64px bake blurs
+                    val fade = ((r - VEC_AT * dp) / (VEC_FADE * dp)).coerceIn(0f, 1f)
                     if (kind == 3) {
                         c.save()
                         c.translate(sx, sy)
                         c.rotate(Math.toDegrees(orgBuf.get(b + 6)).toFloat())
                         dst.set(-r, -r, r, r)
                         c.drawBitmap(bmp, null, dst, screen)
+                        if (fade > 0f && specShape[sp] == Sprites.TRI) vecTri(c, r, sp, bk, fade)
                         c.restore()
                     } else {
+                        dst.set(sx - r, sy - r, sx + r, sy + r)
                         c.drawBitmap(bmp, null, dst, screen)
+                        if (fade > 0f && specShape[sp] == Sprites.DOT) vecDot(c, sx, sy, r, sp, bk, fade)
                     }
                 }
             }
@@ -313,6 +354,168 @@ class Renderer(private val density: Double = 1.0) {
             c.drawCircle(sx, sy, r * 0.55f, flat)
         }
         flat.style = Paint.Style.FILL
+    }
+
+    private fun vecArgb(a: Float, r: Int, g: Int, b: Int) =
+        Color.argb((a * 255f).roundToInt().coerceIn(0, 255), r, g, b)
+
+    /**
+     * Drifta above the blur line: crisp membrane, nucleus, vacuole, spines and granules over the
+     * blit. Geometry is the bake's, scaled by r/32 (bake half-size), so the handoff does not pop.
+     * The granule pattern is fixed — the display list carries no per-organism seed (plan §3).
+     */
+    private fun vecDot(c: Canvas, sx: Float, sy: Float, r: Float, sp: Int, bk: Int, fade: Float) {
+        val s = r / 32f
+        val cr = specRGB[sp][bk * 3]
+        val cg = specRGB[sp][bk * 3 + 1]
+        val cb = specRGB[sp][bk * 3 + 2]
+        val outline = specOut[sp][bk]
+        vecPaint.style = Paint.Style.STROKE
+        vecPaint.strokeWidth = 1.8f * s
+        vecPaint.color = vecArgb(0.95f * fade, cr, cg, cb)
+        c.drawCircle(sx, sy, 14f * s, vecPaint)
+        vecPaint.strokeWidth = 1f * s
+        vecPaint.color = vecArgb(0.3f * fade, cr, cg, cb)
+        c.drawCircle(sx, sy, 11.5f * s, vecPaint)
+        vecPaint.style = Paint.Style.FILL
+        vecPaint.color = vecArgb(0.9f * fade, 235, 250, 255)
+        c.drawCircle(sx + 4f * s, sy - 2.8f * s, 3.1f * s, vecPaint)
+        vecPaint.color = vecArgb(0.5f * fade, cr * 6 / 10, cg * 6 / 10, cb * 6 / 10)
+        c.drawCircle(sx - 4.2f * s, sy + 3.5f * s, 2.5f * s, vecPaint)
+        vecPaint.color = vecArgb(0.3f * fade, cr, cg, cb)
+        for (i in 0 until 8) {
+            c.drawCircle(sx + granule[i * 2] * s, sy + granule[i * 2 + 1] * s, 0.9f * s, vecPaint)
+        }
+        if (outline > 0.02f) {
+            vecPaint.style = Paint.Style.STROKE
+            vecPaint.strokeWidth = (1f + 1.2f * outline) * s
+            vecPaint.color = vecArgb((0.15f + 0.7f * outline) * fade, 235, 246, 255)
+            val s0 = 14.5f * s
+            val s1 = (16f + 3.5f * outline) * s
+            for (i in 0 until 10) {
+                val a = i / 10.0 * 2.0 * Math.PI
+                c.drawLine(
+                    sx + (cos(a) * s0).toFloat(), sy + (sin(a) * s0).toFloat(),
+                    sx + (cos(a) * s1).toFloat(), sy + (sin(a) * s1).toFloat(), vecPaint,
+                )
+            }
+        }
+        vecPaint.style = Paint.Style.FILL
+    }
+
+    /**
+     * Cilio above the blur line, drawn at the origin of the already-rotated canvas: crisp
+     * teardrop, fringe, groove, food vacuoles and a pale macronucleus (bright, because the
+     * overlay composites with SCREEN — dark ink would vanish).
+     */
+    private fun vecTri(c: Canvas, r: Float, sp: Int, bk: Int, fade: Float) {
+        val s = r / 32f
+        val cr = specRGB[sp][bk * 3]
+        val cg = specRGB[sp][bk * 3 + 1]
+        val cb = specRGB[sp][bk * 3 + 2]
+        val round = specRound[sp][bk]
+        val nose = (15f - 3.5f * round) * s
+        vecPath.reset()
+        vecPath.moveTo(nose, 0f)
+        vecPath.cubicTo(nose * 0.55f, 8.6f * s, -11.7f * s, 8.2f * s, -12.4f * s, 0f)
+        vecPath.cubicTo(-11.7f * s, -8.2f * s, nose * 0.55f, -8.6f * s, nose, 0f)
+        vecPath.close()
+        vecPaint.style = Paint.Style.STROKE
+        vecPaint.strokeJoin = Paint.Join.ROUND
+        vecPaint.strokeWidth = (1.8f + round * 2.5f) * s
+        vecPaint.color = vecArgb(0.95f * fade, cr, cg, cb)
+        c.drawPath(vecPath, vecPaint)
+        // fainter than the bake's fringe: overlay and blit add under SCREEN, and at this size
+        // the doubled strokes read sun-white instead of the species colour (first photograph)
+        vecPaint.strokeWidth = 1f * s
+        vecPaint.color = vecArgb(0.4f * fade, cr, cg, cb)
+        for (i in 0 until 26) {
+            val a = i / 26.0 * 2.0 * Math.PI
+            c.drawLine(
+                (cos(a) * 12.5 * s).toFloat(), (sin(a) * 8.3 * s).toFloat(),
+                (cos(a) * 15.5 * s).toFloat(), (sin(a) * 11.2 * s).toFloat(), vecPaint,
+            )
+        }
+        vecPaint.strokeWidth = 1.2f * s
+        vecPaint.color = vecArgb(0.7f * fade, 245, 235, 255)
+        vecPath.reset()
+        vecPath.moveTo(nose * 0.95f, 0f)
+        vecPath.quadTo(6f * s, 3.4f * s, 1f * s, 1.5f * s)
+        c.drawPath(vecPath, vecPaint)
+        vecPaint.style = Paint.Style.FILL
+        vecPaint.color = vecArgb(0.55f * fade, 225, 240, 250)
+        venOval.set(-4.5f * s, -1.3f * s, 3.5f * s, 1.7f * s)
+        c.save(); c.rotate(24f)
+        c.drawOval(venOval, vecPaint)
+        c.restore()
+        vecPaint.color = vecArgb(0.7f * fade, Sprites.MEAL[0], Sprites.MEAL[1], Sprites.MEAL[2])
+        c.drawCircle(-3f * s, -2.2f * s, 2.2f * s, vecPaint)
+        c.drawCircle(-6.2f * s, 2.4f * s, 1.7f * s, vecPaint)
+    }
+
+    /**
+     * GR.3: the carpet's tissue. Below CELLS_AT the mat is the upscaled field alone; above it,
+     * viewport-culled cells fade in, coloured by the core's own field pixels (ramp AND light-locus
+     * turn included — Layers.carpetColor). Layout is a hash of the grid point — no PRNG, no state,
+     * no draws — and the margin thins into scattered single cells as the field weakens.
+     */
+    private fun paintCarpetCells(c: Canvas, cam: Camera, vw: Float, vh: Float) {
+        val cssZ = cam.z / density
+        if (cssZ < CELLS_AT) return
+        val fade = min(1.0, (cssZ - CELLS_AT) / 0.6).toFloat()
+        val z = cam.z.toFloat()
+        val colors = layers.carpetColor
+        val halfW = vw / (2f * z) + CELL_STEP.toFloat()
+        val halfH = vh / (2f * z) + CELL_STEP.toFloat()
+        val ix0 = floor((cam.x - halfW) / CELL_STEP).toInt()
+        val ix1 = ceil((cam.x + halfW) / CELL_STEP).toInt()
+        val iy0 = floor((cam.y - halfH) / CELL_STEP).toInt()
+        val iy1 = ceil((cam.y + halfH) / CELL_STEP).toInt()
+        val camX = cam.x.toFloat()
+        val camY = cam.y.toFloat()
+        val step = CELL_STEP.toFloat()
+        for (iy in iy0..iy1) {
+            val fy = (((iy % 128) + 128) % 128) shr 1
+            for (ix in ix0..ix1) {
+                val fx = (((ix % 128) + 128) % 128) shr 1
+                val col = colors[(fy shl 6) or fx]
+                val aByte = col ushr 24
+                if (aByte < 64) continue // no mat in this field cell
+                val q = ((aByte - 70) / 150f).coerceIn(0f, 1f)
+                val h1 = hash01(ix, iy, 1)
+                val h2 = hash01(ix, iy, 2)
+                val h3 = hash01(ix, iy, 3)
+                if (q < 0.25f && h3 > 0.3f + q * 2f) continue // the margin thins to single cells
+                val sx = vw / 2f + (ix * step + h1 * step - camX) * z
+                val sy = vh / 2f + (iy * step + h2 * step - camY) * z
+                val rad = (2.6f + q * 3.2f) * (0.85f + h3 * 0.35f) * z
+                val r8 = (col shr 16) and 0xFF
+                val g8 = (col shr 8) and 0xFF
+                val b8 = col and 0xFF
+                flat.style = Paint.Style.FILL
+                flat.color = vecArgb(fade * (0.6f + 0.35f * q), r8, g8, b8)
+                c.drawCircle(sx, sy, rad, flat)
+                flat.style = Paint.Style.STROKE
+                flat.strokeWidth = 1f * dp
+                flat.color = vecArgb(fade * 0.5f, r8 * 35 / 100, g8 * 35 / 100, b8 * 35 / 100)
+                c.drawCircle(sx, sy, rad, flat)
+                if (h1 < 0.14f) { // a nucleus point, here and there
+                    flat.style = Paint.Style.FILL
+                    flat.color = vecArgb(fade * 0.6f, 235, 255, 244)
+                    c.drawCircle(sx + (h2 - 0.5f) * rad, sy + (h3 - 0.5f) * rad, 1.1f * dp, flat)
+                }
+            }
+        }
+        flat.style = Paint.Style.FILL
+    }
+
+    /** Deterministic layout without a PRNG: the same grid point hashes the same every frame. */
+    private fun hash01(ix: Int, iy: Int, salt: Int): Float {
+        var h = ix * 73856093 xor iy * 19349663 xor salt * 83492791
+        h = h xor (h shr 13)
+        h *= -0x61c88647
+        h = h xor (h ushr 16)
+        return (h ushr 8) * (1f / (1 shl 24))
     }
 
     /**
