@@ -102,7 +102,7 @@ function report(label){
       console.log(`  view${v} ${hlabel.padEnd(15)} org ${String(fr.orgN).padStart(5)}` +
         ` corpse ${String(fr.corpseN).padStart(4)} pops ${fr.pops.join(",")}` +
         ` mn ${h(fr.mnBound)} orgHash ${shaD(fr.org, fr.orgN * 8)}` +
-        ` corpseHash ${shaD(fr.corpse, fr.corpseN * 4)}`);
+        ` corpseHash ${shaD(fr.corpse, fr.corpseN * 6)}`);
       if (hlabel === "nothing hidden"){ // the first record of each kind in full, so a diff names the path
         const seen = new Set();
         for (let q = 0; q < fr.orgN; q++){
@@ -113,7 +113,7 @@ function report(label){
             ` r ${h(fr.org[b+3])} sp ${fr.org[b+4]} bucket ${fr.org[b+5]} hd ${h(fr.org[b+6])} flags ${fr.org[b+7]}`);
         }
         if (fr.corpseN) console.log(`    corpse[0] sx ${h(fr.corpse[0])} sy ${h(fr.corpse[1])}` +
-          ` r ${h(fr.corpse[2])} a ${h(fr.corpse[3])}`);
+          ` r ${h(fr.corpse[2])} a ${h(fr.corpse[3])} sp ${h(fr.corpse[4])} fresh ${h(fr.corpse[5])}`);
       }
     }
   }

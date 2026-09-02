@@ -394,11 +394,13 @@ function pickCandidates(wx, wy, rad){
 //   kind 0 dormant cyst | 1 bacteria dot-LOD | 2 sprite | 3 sprite, heading-aligned | 4 ghost ray
 //   bucket = tintBin*mN + morphBin, or -1 for a species with no grammar
 //   flags  bit 0: striking (the ray's stretched form)
-// Corpse record (4 doubles): sx, sy, r, alpha.
+// Corpse record (6 doubles): sx, sy, r, alpha, sp, fresh. `fresh` = remaining mass over size —
+// the sim's own decay clock (GR.6, declared frame change 2026-09-02): a husk may wear a ghost of
+// its species colour and deflate as it rots, so a death reads as a collapse, not a pop.
 // Preallocated and reused: a frame allocates nothing, exactly like a tick.
 const FRAME = {
   org: new Float64Array(MAXN * 8), orgN: 0,
-  corpse: new Float64Array(1500 * 4), corpseN: 0,
+  corpse: new Float64Array(1500 * 6), corpseN: 0,
   pops: [0,0,0,0,0,0,0], mnBound: 0,
 };
 function frameOf(view, hidden, G){
@@ -443,10 +445,12 @@ function frameOf(view, hidden, G){
     if (!W.cAlive[k]) continue;
     const sx = hw + wd(W.cX[k] - camX)*z, sy = hh + wd(W.cY[k] - camY)*z;
     if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
-    const mass = W.cE[k] + W.cP[k] + W.cM[k], b = m*4;
+    const mass = W.cE[k] + W.cP[k] + W.cM[k], b = m*6;
     c[b] = sx; c[b+1] = sy;
     c[b+2] = Math.max(1.5, W.cSz[k]*1.0*z);
     c[b+3] = Math.min(0.55, 0.12 + 0.05*mass/W.cSz[k]);
+    c[b+4] = W.cSp[k];
+    c[b+5] = mass/W.cSz[k];
     m++;
   }
   F.corpseN = m;
@@ -641,7 +645,7 @@ function drawPours(ctx, pours, nowT){
 function paintCorpses(ctx, F){
   const c = F.corpse;
   for (let q = 0; q < F.corpseN; q++){
-    const b = q*4, sx = c[b], sy = c[b+1], r = c[b+2], a = c[b+3];
+    const b = q*6, sx = c[b], sy = c[b+1], r = c[b+2], a = c[b+3]; // look unchanged: frozen oracle
     ctx.fillStyle = `rgba(158,168,178,${a.toFixed(3)})`;
     ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill();
     ctx.strokeStyle = `rgba(110,120,130,${(a*0.8).toFixed(3)})`; ctx.lineWidth = 1;

@@ -358,6 +358,21 @@ class Renderer(private val density: Double = 1.0) {
         }
     }
 
+    /** Species base colours, mirroring frame.rs SPECIES_RGB — the one palette, do not drift. */
+    private val speciesRGB = arrayOf(
+        intArrayOf(70, 214, 140), intArrayOf(91, 200, 232), intArrayOf(215, 166, 232),
+        intArrayOf(158, 168, 104), intArrayOf(206, 182, 148), intArrayOf(228, 224, 210),
+        intArrayOf(168, 214, 244),
+    )
+    private val CORPSE_GRAY = intArrayOf(158, 168, 178)
+
+    /**
+     * GR.6: a death reads as a collapse, not a pop. The record carries the species and the sim's
+     * own decay clock (`fresh` = remaining mass over size, drained by rot and by Bacillus), so a
+     * fresh husk still wears a ghost of its colour, then greys, deflates, and slowly changes
+     * shape as it rots — every visible change is driven by the simulation, never by a UI clock.
+     * A starved body starts lean and its husk starts already sunken: honest by construction.
+     */
     private fun paintCorpses(c: Canvas) {
         for (q in 0 until corpseN) {
             val b = q * corpseStride
@@ -365,13 +380,42 @@ class Renderer(private val density: Double = 1.0) {
             val sy = corpseBuf.get(b + 1).toFloat()
             val r = corpseBuf.get(b + 2).toFloat()
             val a = corpseBuf.get(b + 3)
+            val sp = corpseBuf.get(b + 4).toInt().coerceIn(0, 6)
+            val fresh = (corpseBuf.get(b + 5) / 8.0).coerceIn(0.0, 1.0).toFloat()
+            val col = speciesRGB[sp]
+            val t = fresh * 0.45f // colour ghost strength: fresh tinted, decayed grey
+            val cr = (CORPSE_GRAY[0] + (col[0] - CORPSE_GRAY[0]) * t).toInt()
+            val cg = (CORPSE_GRAY[1] + (col[1] - CORPSE_GRAY[1]) * t).toInt()
+            val cb = (CORPSE_GRAY[2] + (col[2] - CORPSE_GRAY[2]) * t).toInt()
+            val rr = r * (0.7f + 0.3f * fresh) // deflates as the mass leaves
+            if (rr < 8f * dp) { // far tier: the old simple husk
+                flat.style = Paint.Style.FILL
+                flat.color = Color.argb((a * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
+                c.drawCircle(sx, sy, rr, flat)
+                continue
+            }
+            // near tier: a collapsed membrane ghost whose outline drifts as the decay advances
+            val ph = fresh * 7f + sp
+            rayPath.reset()
+            for (s in 0..20) {
+                val ang = s / 20f * (Math.PI * 2).toFloat()
+                val w = 1f + 0.16f * kotlin.math.sin(3f * ang + ph) + 0.10f * kotlin.math.sin(5f * ang - 1.3f * ph)
+                val px = sx + kotlin.math.cos(ang) * rr * w
+                val py = sy + kotlin.math.sin(ang) * rr * w
+                if (s == 0) rayPath.moveTo(px, py) else rayPath.lineTo(px, py)
+            }
+            rayPath.close()
             flat.style = Paint.Style.FILL
-            flat.color = Color.argb((a * 255).roundToInt().coerceIn(0, 255), 158, 168, 178)
-            c.drawCircle(sx, sy, r, flat)
+            flat.color = Color.argb((a * 0.6 * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
+            c.drawPath(rayPath, flat)
             flat.style = Paint.Style.STROKE
             flat.strokeWidth = 1f * dp
-            flat.color = Color.argb((a * 0.8 * 255).roundToInt().coerceIn(0, 255), 110, 120, 130)
-            c.drawCircle(sx, sy, r * 0.55f, flat)
+            flat.color = Color.argb((a * 255).roundToInt().coerceIn(0, 255), cr, cg, cb)
+            c.drawPath(rayPath, flat)
+            flat.style = Paint.Style.FILL // the inner fold — the collapsed contents
+            flat.color = Color.argb((a * 0.7 * 255).roundToInt().coerceIn(0, 255),
+                cr * 8 / 10, cg * 8 / 10, cb * 8 / 10)
+            c.drawCircle(sx + rr * 0.2f, sy - rr * 0.15f, rr * 0.3f, flat)
         }
         flat.style = Paint.Style.FILL
     }

@@ -461,14 +461,17 @@ pub const KIND_SPRITE_ROT: f64 = 3.0;
 pub const KIND_RAY: f64 = 4.0;
 
 pub const ORG_STRIDE: usize = 8;
-pub const CORPSE_STRIDE: usize = 4;
+pub const CORPSE_STRIDE: usize = 6;
 
 /// Preallocated and reused: a frame allocates nothing, exactly like a tick.
 pub struct Frame {
     /// kind, sx, sy, r, sp, bucket, hd, flags — `ORG_STRIDE` doubles per instance.
     pub org: Vec<f64>,
     pub org_n: usize,
-    /// sx, sy, r, alpha — `CORPSE_STRIDE` doubles per instance.
+    /// sx, sy, r, alpha, sp, fresh — `CORPSE_STRIDE` doubles per instance. `sp` and `fresh`
+    /// (remaining mass over size — the sim's own decay clock, drained by rot and by Bacillus)
+    /// joined in GR.6 (declared frame change 2026-09-02): a fresh husk may wear a ghost of its
+    /// species colour and deflate as it decays, so a death reads as a collapse, not a pop.
     pub corpse: Vec<f64>,
     pub corpse_n: usize,
     pub pops: [i32; 7],
@@ -617,6 +620,8 @@ pub fn frame_of(
             f.corpse[b + 1] = sy;
             f.corpse[b + 2] = (w.c_sz[k] as f64 * 1.0 * v.z).max(1.5);
             f.corpse[b + 3] = (0.12 + 0.05 * mass / w.c_sz[k] as f64).min(0.55);
+            f.corpse[b + 4] = w.c_sp[k] as f64;
+            f.corpse[b + 5] = mass / w.c_sz[k] as f64;
             m += 1;
         }
     }
