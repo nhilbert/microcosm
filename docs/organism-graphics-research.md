@@ -355,6 +355,36 @@ touched and the owner decides.
 
 ---
 
+## 9. Owner verdicts from the probe rounds (2026-09-02)
+
+A live probe (`dev/graphics-probe/stilproben.html` — its own mini-simulation, one seed,
+switchable painters) put the candidates in front of the owner. Verdicts, in order:
+
+1. **Low poly: rejected** ("sicher nicht"). §3(d) closes; the stylization-vs-realism
+   contradiction resolved for realism.
+2. **Ornament animation: rejected** ("die Animationen finde ich auch albern — sind ja
+   keine Raketen"). The Lebendig probe (cilia phase, flagellar wave, wobble, motes,
+   vignette) read as gimmick, and the probe's darty movement compounded it. G.3 shrinks
+   accordingly: no clock-driven appendage animation; whatever motion realism survives
+   must come from the sim's own state, and calm. The wake-cut precedent held twice now.
+3. **Textures: confirmed and wanted deeper** ("mehr Liebe für die Texturen"). G.1 is the
+   spine of the phase.
+4. **Zoom-dependent representation requested by the owner unprompted**: far = carpet as
+   surface and organisms as points; near = cells, then details. This is a painter-side
+   **LOD ladder** (dot → body → cell → organelles), extending the dot-LOD the grammar
+   already contains — tier P, gate-free, since the record's screen radius decides the
+   tier. Probe round 3 implements it (dot &lt;6 px, body 6–14, cell 14–32, organelles
+   &gt;32, carpet: wash → tiled cells → per-cell organelles) with a zoom slider.
+5. From round 2: **Hellfeld and Texturen must differ only in the ground** — the bright
+   probe now paints identical bodies, so the §8-question-1 comparison is single-variable.
+   The mat needs real texture (tiled cells, seams, nuclei, margin filaments); on the real
+   renderer this lands together with the G.0 field-pipeline repair.
+
+Still open from §8: darkfield vs brightfield (now honestly comparable in the probe), and
+the elongation reservation (moot while animation stays out).
+
+---
+
 ### Sources (external)
 
 - Nikon MicroscopyU, [phase contrast introduction](https://www.microscopyu.com/techniques/phase-contrast/introduction-to-phase-contrast-microscopy); Microbehunter, [brightfield vs darkfield vs phase contrast](https://www.microbehunter.com/what-are-the-differences-between-brightfield-darkfield-and-phase-contrast/).
