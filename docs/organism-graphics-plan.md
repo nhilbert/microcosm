@@ -84,11 +84,17 @@ from the bundled assets. CLAUDE.md status line written. The probe stays in
 `dev/graphics-probe/` as the phase's design record.
 
 **Phase closure (2026-09-02)**: GR.1 ("sieht super aus"), GR.2 and GR.3 ("gr2+3 are
-very good") all owner-accepted on the device; the portrait shipped. Still open, carried
-as watch items rather than blockers: the §1.3 budget numbers from the device telemetry
-were never read out (no jank was reported at any zoom), and the far-zoom mat blockiness
-diagnostic (`Layers.kt` UP=4) awaits an explicit far-zoom verdict. Re-entry conditions
-for everything deliberately not built are in §3.
+very good") all owner-accepted on the device; the portrait shipped. Watch item that then
+bit: the owner read the telemetry — **worst 32 ms/frame**, ~9× over the §1.3 budget, at
+cell zoom. Diagnosis by arithmetic: ~1,500 visible cells × two anti-aliased circles plus
+per-cell style switching. Fix (same day): cells paint through dedicated **non-AA**
+paints (they overlap densely — AA bought nothing visible), the seam ring starts at CSS
+zoom 3 where it stops being subpixel, and the dev telemetry line now prints a `cells`
+count so the next read-out can confirm or refute the diagnosis on the device. **Owed:
+the owner's re-measurement** — if the worst frame still misses the budget, the next
+levers are, in order: CELLS_AT up from 2.0, larger CELL_STEP, per-tick cell caching.
+The far-zoom mat blockiness diagnostic (`Layers.kt` UP=4) still awaits an explicit
+verdict. Re-entry conditions for everything deliberately not built are in §3.
 
 Portrait prompt already updated (GR.1); the owner regenerates `assets/species/venator.jpg`
 when convenient (the card hides the slot meanwhile if removed). CLAUDE.md status line,
