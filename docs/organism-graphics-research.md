@@ -383,6 +383,34 @@ switchable painters) put the candidates in front of the owner. Verdicts, in orde
 Still open from §8: darkfield vs brightfield (now honestly comparable in the probe), and
 the elongation reservation (moot while animation stays out).
 
+## 10. Venator's model (owner request, 2026-09-02: "der braucht ein besseres Vorbild")
+
+The Ghost Ray was an invented form; the owner asked for a real one. Researched candidates
+among raptorial protists, audited against the rule that form must predict motion
+(Venator: fast straight-line pursuit, jet burst, feeds on the ciliate Cilio alone,
+engulfs its kill):
+
+| candidate | look | motion truthfulness | verdict |
+|---|---|---|---|
+| **Didinium nasutum** | barrel body ~2:1, conical proboscis on a nematodesmata rod palisade, two pectinelle girdles (cilia used *only* for fast swimming), band macronucleus; toxicysts fired on contact | **exact**: hits ciliate prey head-on at speed, engulfs it whole — Didinium–Paramecium is *the* textbook ciliate predator–prey pair, i.e. Venator–Cilio's real twin; even the burst-locomotion girdles fit the jet | **the recommended model** |
+| Lacrymaria olor | teardrop body, neck extensible to tens of body lengths, head knob with toxicysts | wrong: an anchored ambush hunter — a telescoping neck on a straight-line pursuer would lie | silhouette-only variant ("Lanze"), honestly labeled |
+| Dileptus / Litonotus | proboscis-bearing creepers | wrong: substrate-creeping hunters, not open-water pursuit | dropped |
+| Ghost Ray (refined) | the shipped spearhead with interior: mantle ribs, trailing veil, nose lens | neutral (invented, but shaped by the strike) | kept as the incumbent for comparison |
+
+Probe round 4 renders all three as switchable Venator variants (full LOD tiers, dark and
+bright), plus a follow-cam so the hunter can be judged while hunting. Owner's pick
+pending. If Didinium wins, the species-profiles.md portrait prompt and the app's
+Steckbrief text should be updated in the same increment, and the frame grammar is
+untouched (the record already carries heading and strike — everything a barrel, snout
+and girdles need).
+
+Sources: [Nikon/Micscape "Didinium the master feeder"](http://www.microscopy-uk.org.uk/mag/art97/dingley3.html),
+[NIES Didinium morphology](https://www.nies.go.jp/chiiki1/protoz/morpho/ciliopho/didinium.htm),
+[Wessenberg &amp; Antipa 1970, capture and ingestion of Paramecium by D. nasutum](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1550-7408.1970.tb02366.x),
+[Current Biology on Lacrymaria's hunt](https://www.cell.com/current-biology/fulltext/S0960-9822(19)31319-3),
+[Wikipedia: Lacrymaria olor](https://en.wikipedia.org/wiki/Lacrymaria_olor),
+[Litonotus lamella motor/predatory behavior](https://cdnsciencepub.com/doi/10.1139/z88-289).
+
 ---
 
 ### Sources (external)

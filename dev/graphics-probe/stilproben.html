@@ -44,6 +44,18 @@
     color:var(--faint); text-transform:uppercase;
   }
   .zoomrow input{flex:1; accent-color:var(--accent); min-height:28px}
+  .chips{
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:10px 2px 0;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em;
+    color:var(--faint); text-transform:uppercase;
+  }
+  .chips button{
+    cursor:pointer; font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    color:var(--dim); background:var(--panel2); border:1px solid var(--line);
+    border-radius:6px; padding:6px 10px; min-height:32px; letter-spacing:.03em;
+  }
+  .chips button[aria-pressed="true"]{color:var(--abyss); background:var(--accent); border-color:var(--accent); font-weight:500}
+  .chips button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
   .tabs{display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 0}
   .tabs button{
     cursor:pointer; font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:500;
@@ -89,6 +101,10 @@
     <span>Nah</span>
   </div>
 
+  <div class="chips" role="group" aria-label="Venator-Vorbild" id="venrow">
+    <span>Venator</span>
+  </div>
+
   <div class="tabs" role="group" aria-label="Malstil wählen" id="tabs"></div>
 
   <div class="card">
@@ -103,6 +119,13 @@
     nach deinem Urteil raus (2026-09-02); die Kreaturen treiben jetzt ruhig. Die Zoom-Leiter
     (Punkte → Körper → Zellen → Organellen) ist reine Malschicht und verlängert den Punkt-LOD,
     den der Renderer für Bacillus schon hat. Drifta trägt keine Geißel — es hat keinen Antrieb.
+    <br><br><b>Venator-Vorbilder:</b> Didinium nasutum ist der reale Zwilling — der berühmteste
+    Ciliatenjäger der Mikrobiologie, frontaler Schnellangriff, exakt Venators Jagdweise
+    (Tonnenkörper, Rüssel auf Stäbchen-Palisade, zwei Wimpernkränze nur fürs Schnellschwimmen,
+    Band-Makronukleus). Ghost-Ray ist die bisherige Kunstfigur, veredelt. Die Lanze borgt nur
+    die Silhouette von Lacrymaria olor — das echte Tier ist ein verankerter Lauerjäger mit
+    Teleskophals, seine Form würde über Venators Geradeausjagd lügen. „Folgen" heftet die
+    Kamera an einen Jäger.
   </footer>
 </div>
 
@@ -341,28 +364,120 @@ function drawBodies(c,bright){
   }
   c.globalCompositeOperation='source-over';
 }
+// Venator variants — the model question. 0 Didinium · 1 Ghost-Ray · 2 Lanze (Lacrymaria-inspired)
+let VSTYLE=0;
+function venInk(bright,col,faded){ return {
+  memb:  bright?'rgba(60,68,76,0.85)':rgba(col,0.8),
+  fill:  bright?rgba(faded,0.28):rgba(col,0.13),
+  brightLine: bright?'rgba(50,58,66,0.9)':'rgba(235,248,255,0.95)',
+  soft:  bright?'rgba(60,68,76,0.5)':rgba(col,0.4),
+  halo:  'rgba(255,255,252,0.8)',
+};}
 function drawVen(c,o,sr,bright){
-  const col=COLS.ven, faded=mix(col,[105,108,112],0.5);
+  const col=COLS.ven, faded=mix(col,[105,108,112],0.5), ink=venInk(bright,col,faded);
+  const st=o.strike>0?1.18:1;
   if(!bright) c.globalCompositeOperation='source-over';
-  if(bright){ c.strokeStyle='rgba(255,255,252,0.8)'; c.lineWidth=lw(2.6);
-    spearhead(c,o.x,o.y,o.hd,o.r*1.1,o.strike>0); c.stroke(); c.restore(); }
-  spearhead(c,o.x,o.y,o.hd,o.r,o.strike>0);
-  c.fillStyle=bright?rgba(faded,0.22):rgba(col,0.10); c.fill();
-  c.strokeStyle=bright?'rgba(60,68,76,0.85)':rgba(col,0.35); c.lineWidth=lw(bright?1.6:1); c.stroke();
-  const st=o.strike>0?1.4:1;
-  if(!bright){
-    c.strokeStyle='rgba(235,248,255,0.95)'; c.lineWidth=lw(1.8);
-    c.beginPath(); c.moveTo(-o.r*0.75,o.r*0.62); c.lineTo(o.r*1.15*st,0); c.lineTo(-o.r*0.75,-o.r*0.62); c.stroke();
-    if(sr>=14){ c.strokeStyle=rgba(col,0.4); c.lineWidth=lw(1);
-      c.beginPath(); c.moveTo(-o.r*0.42,0); c.lineTo(o.r*0.5,0); c.stroke(); }
-    if(sr>=32){ c.strokeStyle=rgba(col,0.25); c.lineWidth=lw(1);   // mantle ribs
-      for(const f of [0.33,0.66]){ c.beginPath();
-        c.moveTo(-o.r*0.75+f*o.r*1.5,o.r*0.62*(1-f)); c.lineTo(-o.r*0.75+f*o.r*1.5,-o.r*0.62*(1-f)); c.stroke(); } }
-  }
-  c.fillStyle=bright?'rgba(60,68,76,0.9)':rgba(col,1);
-  c.beginPath(); c.arc(o.r*1.15*st,0,lw(1.8),0,TAU); c.fill();
+  c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
+  if(VSTYLE===0) venDidinium(c,o,sr,bright,ink,col,st);
+  else if(VSTYLE===1) venGhost(c,o,sr,bright,ink,col,st);
+  else venLance(c,o,sr,bright,ink,col,st);
   c.restore();
   if(!bright) c.globalCompositeOperation='screen';
+}
+// Didinium nasutum: barrel body, conical proboscis on a rod palisade, two
+// pectinelle girdles (fast-swim cilia rings), band macronucleus. Hits its prey head-on.
+function venDidinium(c,o,sr,bright,ink,col,st){
+  const L=o.r*1.4, wdt=o.r*0.72;                                   // a stretched barrel, ~2:1
+  const bodyY = x => wdt*Math.sqrt(Math.max(0,1-(x/L)*(x/L)));
+  if(bright){ c.strokeStyle=ink.halo; c.lineWidth=lw(2.6);
+    c.beginPath(); c.ellipse(0,0,L*1.07,wdt*1.09,0,0,TAU); c.stroke(); }
+  else{ const g=c.createRadialGradient(0,0,o.r*0.4,0,0,o.r*1.9);   // faint aura
+    g.addColorStop(0,rgba(col,0.12)); g.addColorStop(1,rgba(col,0));
+    c.fillStyle=g; c.beginPath(); c.arc(0,0,o.r*1.9,0,TAU); c.fill(); }
+  c.beginPath(); c.ellipse(0,0,L,wdt,0,0,TAU);                     // body — a real body, not a ghost
+  c.fillStyle = bright?rgba(mix(col,[105,108,112],0.5),0.4):rgba(mix(col,[12,26,40],0.5),0.5);
+  c.fill(); c.strokeStyle=bright?ink.memb:rgba(col,0.95); c.lineWidth=lw(1.7); c.stroke();
+  // proboscis: cone at the front, brighter — the seizing organ
+  const px=L*0.92, pl=o.r*0.55*st;
+  c.beginPath(); c.moveTo(px,-wdt*0.34); c.quadraticCurveTo(px+pl*1.15,0,px,wdt*0.34); c.closePath();
+  c.fillStyle = bright?'rgba(130,138,146,0.5)':rgba(mix(col,[255,255,255],0.4),0.45);
+  c.fill(); c.strokeStyle=ink.brightLine; c.lineWidth=lw(1.5); c.stroke();
+  if(sr>=12){                                                      // the two pectinelle girdles
+    for(const gx of [L*0.42,-L*0.18]){
+      const yh=bodyY(gx);
+      c.strokeStyle=ink.soft; c.lineWidth=lw(1);
+      c.beginPath(); c.ellipse(gx,0,o.r*0.13,yh,0,0,TAU); c.stroke();   // the hoop
+      c.strokeStyle=bright?'rgba(50,58,66,0.8)':'rgba(225,242,252,0.85)'; c.lineWidth=lw(1.3);
+      for(let s=-4;s<=4;s++){ if(s===0) continue;                        // fringe along the hoop, denser at the rim
+        const f=s/4.6, yy=yh*f, bx=gx+o.r*0.05;
+        const out=(Math.abs(s)>2?1:0.6)*o.r*0.34, ny=(yy>=0?1:-1);
+        c.beginPath(); c.moveTo(bx,yy);
+        c.lineTo(bx+o.r*0.09, yy+ny*out); c.stroke();
+      }
+    }
+  }
+  if(sr>=32){
+    c.strokeStyle=bright?'rgba(80,88,96,0.5)':rgba(col,0.35); c.lineWidth=lw(1);  // nematodesmata rods
+    for(let i=-2;i<=2;i++){ c.beginPath(); c.moveTo(px-o.r*0.15,i*wdt*0.12);
+      c.lineTo(px+pl*0.85,i*wdt*0.05); c.stroke(); }
+    c.strokeStyle=bright?'rgba(50,56,62,0.75)':'rgba(225,240,250,0.8)';           // band macronucleus
+    c.lineWidth=lw(3);
+    c.beginPath(); c.arc(-L*0.1,0,o.r*0.42,Math.PI*0.75,Math.PI*1.9); c.stroke();
+    const pr=mulberry32(o.seed);                                                   // toxicyst dots at the snout
+    c.fillStyle=bright?'rgba(60,68,76,0.7)':rgba(mix(col,[255,255,255],0.5),0.8);
+    for(let i=0;i<5;i++){ c.beginPath();
+      c.arc(px+pl*(0.5+pr()*0.45),(pr()-0.5)*wdt*0.3,lw(1.1),0,TAU); c.fill(); }
+  }
+}
+// The refined Ghost-Ray: today's spearhead identity with an interior worth looking at.
+function venGhost(c,o,sr,bright,ink,col,st){
+  const stx=o.strike>0?1.4:1;
+  if(bright){ c.strokeStyle=ink.halo; c.lineWidth=lw(2.6);
+    spearhead(c,0,0,0,o.r*1.1,o.strike>0); c.restore(); c.stroke(); }
+  spearhead(c,0,0,0,o.r,o.strike>0);
+  c.fillStyle=bright?ink.fill:rgba(col,0.2); c.fill();
+  c.strokeStyle=ink.soft; c.lineWidth=lw(1); c.stroke();
+  c.restore();                                                           // spearhead() saves; body frame continues
+  c.strokeStyle=ink.brightLine; c.lineWidth=lw(1.8);                     // luminous leading V
+  c.beginPath(); c.moveTo(-o.r*0.75,o.r*0.62); c.lineTo(o.r*1.15*stx,0); c.lineTo(-o.r*0.75,-o.r*0.62); c.stroke();
+  if(sr>=14){                                                            // curved mantle ribs
+    c.strokeStyle=ink.soft; c.lineWidth=lw(1);
+    for(const s of [1,-1]){ c.beginPath(); c.moveTo(o.r*1.05*stx,0);
+      c.quadraticCurveTo(o.r*0.1,s*o.r*0.18,-o.r*0.72,s*o.r*0.58); c.stroke(); }
+  }
+  if(sr>=32){                                                            // trailing veil + lens
+    c.strokeStyle=bright?'rgba(80,88,96,0.4)':rgba(col,0.25); c.lineWidth=lw(1);
+    for(const s of [1,-1]){ c.beginPath(); c.moveTo(-o.r*0.75,s*o.r*0.62);
+      c.quadraticCurveTo(-o.r*1.5,s*o.r*0.3,-o.r*1.85,s*o.r*0.05); c.stroke(); }
+    c.strokeStyle=ink.brightLine; c.lineWidth=lw(1);
+    c.beginPath(); c.arc(o.r*1.15*stx,0,o.r*0.1,0,TAU); c.stroke();
+  }
+  c.fillStyle=bright?'rgba(60,68,76,0.9)':rgba(col,1);
+  c.beginPath(); c.arc(o.r*1.15*stx,0,lw(1.8),0,TAU); c.fill();
+}
+// Lanze — Lacrymaria-inspired silhouette: teardrop body, stiff short neck, head knob.
+// Honest caveat: the real animal is an anchored ambusher; only the silhouette is borrowed.
+function venLance(c,o,sr,bright,ink,col,st){
+  const nl=o.r*1.35*st;
+  if(bright){ c.strokeStyle=ink.halo; c.lineWidth=lw(2.4);
+    c.beginPath(); c.ellipse(-o.r*0.35,0,o.r*0.95,o.r*0.62,0,0,TAU); c.stroke(); }
+  c.beginPath(); c.ellipse(-o.r*0.35,0,o.r*0.9,o.r*0.58,0,0,TAU);       // teardrop body
+  c.fillStyle=ink.fill; c.fill(); c.strokeStyle=ink.memb; c.lineWidth=lw(1.5); c.stroke();
+  c.strokeStyle=ink.brightLine; c.lineWidth=lw(1.6);                     // the neck, stiff
+  c.beginPath(); c.moveTo(o.r*0.5,0); c.lineTo(o.r*0.5+nl,0); c.stroke();
+  c.beginPath(); c.arc(o.r*0.5+nl,0,o.r*0.14,0,TAU);                     // head knob
+  c.fillStyle=bright?rgba(mix(col,[110,110,105],0.4),0.7):rgba(mix(col,[255,255,255],0.4),0.8); c.fill();
+  if(sr>=14){ c.strokeStyle=ink.soft; c.lineWidth=lw(1);                 // crown cilia on the knob
+    for(let s=-2;s<=2;s++){ const a=s*0.5;
+      c.beginPath(); c.moveTo(o.r*0.5+nl+Math.cos(a)*o.r*0.14,Math.sin(a)*o.r*0.14);
+      c.lineTo(o.r*0.5+nl+Math.cos(a)*o.r*0.3,Math.sin(a)*o.r*0.3); c.stroke(); } }
+  if(sr>=32){
+    c.fillStyle=bright?'rgba(50,56,62,0.8)':'rgba(235,250,255,0.85)';    // nucleus
+    c.beginPath(); c.ellipse(-o.r*0.5,0,o.r*0.24,o.r*0.14,0,0,TAU); c.fill();
+    c.fillStyle=bright?'rgba(60,68,76,0.6)':rgba(mix(col,[255,255,255],0.5),0.7);
+    for(let i=0;i<4;i++){ c.beginPath();                                  // toxicysts along the neck
+      c.arc(o.r*0.5+nl*(0.25+i*0.2),0,lw(1),0,TAU); c.fill(); }
+  }
 }
 function drawStills(c,bright){                    // cysts + corpses, tiered
   for(const z of cysts){ const sr=z.r*Z;
@@ -490,11 +605,29 @@ function syncCard(){ const s=STYLES[cur];
   document.getElementById('cardNote').textContent=s.note; }
 syncCard();
 
+let FOLLOW=false;
+const venrow=document.getElementById('venrow');
+[['Didinium',0],['Ghost-Ray',1],['Lanze',2]].forEach(([label,v])=>{
+  const b=document.createElement('button'); b.textContent=label;
+  b.setAttribute('aria-pressed',v===VSTYLE);
+  b.onclick=()=>{ VSTYLE=v;
+    [...venrow.querySelectorAll('button')].forEach(e=>{ if(e.id!=='followBtn') e.setAttribute('aria-pressed',e.textContent===label); });
+    if(paused) draw(); };
+  venrow.appendChild(b);
+});
+const fb=document.createElement('button'); fb.id='followBtn'; fb.textContent='Folgen';
+fb.setAttribute('aria-pressed','false');
+fb.onclick=()=>{ FOLLOW=!FOLLOW; fb.setAttribute('aria-pressed',FOLLOW);
+  if(FOLLOW){ const v=orgs.find(q=>q.sp==='ven'); camT={x:v.x,y:v.y}; clampCam(camT);
+    if(paused){ cam={...camT}; draw(); } } };
+venrow.appendChild(fb);
+
 const zoomEl=document.getElementById('zoom'), hudZoom=document.getElementById('hudZoom');
 zoomEl.addEventListener('input',()=>{ Z=parseFloat(zoomEl.value);
   hudZoom.textContent=`Zoom ${Z.toFixed(1)}×`; clampCam(camT); clampCam(cam); if(paused) draw(); });
 
 cv.addEventListener('pointerdown',e=>{
+  if(FOLLOW){ FOLLOW=false; document.getElementById('followBtn').setAttribute('aria-pressed','false'); }
   const rect=cv.getBoundingClientRect();
   const px=(e.clientX-rect.left)*(W/rect.width), py=(e.clientY-rect.top)*(W/rect.height);
   camT={x:cam.x+(px-W/2)/Z, y:cam.y+(py-W/2)/Z}; clampCam(camT);
@@ -511,6 +644,7 @@ function loop(now){
   if(paused) return;
   const dt=Math.min(0.05,(now-last)/1000); last=now; t+=dt;
   tick(dt);
+  if(FOLLOW){ const v=orgs.find(q=>q.sp==='ven'); camT={x:v.x,y:v.y}; clampCam(camT); }
   cam.x+=(camT.x-cam.x)*0.12; cam.y+=(camT.y-cam.y)*0.12;
   draw();
   requestAnimationFrame(loop);
