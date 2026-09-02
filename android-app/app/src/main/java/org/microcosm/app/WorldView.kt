@@ -627,26 +627,36 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             if (speed > 0) acc += dt * speed
             val maxSteps = if (speed >= 16) 9 else if (speed >= 4) 5 else 3
             var steps = 0
+            // The interpolation anchor is set once per frame BATCH, not per tick: at 4x/16x a
+            // frame runs 2-3 ticks, and a per-tick anchor left everything but the last tick as a
+            // raw jump — the owner's "springen", worst on the plankton, whose random walk also
+            // gets visually averaged by the longer chord. At 1x a batch is one tick, so nothing
+            // changes there. Zero cost: same calls, different cadence.
+            if (acc >= TICK_MS) Native.markPrev()
+            var shed = false
             while (acc >= TICK_MS && steps < maxSteps) {
-                Native.markPrev()
                 Native.levelScript() // F4/F5: per tick, inside the loop — a scripted sun rises on its tick at any pace
                 Native.step()
                 acc -= TICK_MS
                 steps++
             }
-            if (steps == maxSteps) acc = 0.0 // shed the backlog: slow motion, never a death spiral
-            val alpha = if (speed == 0.0) 1.0 else min(1.0, acc / TICK_MS)
+            if (steps == maxSteps) { acc = 0.0; shed = true } // shed the backlog: slow motion, never a death spiral
+            // After a shed the anchor is a whole batch old — interpolating toward it would walk
+            // the world BACKWARD on screen, so a shed frame shows the present outright.
+            val alpha = if (speed == 0.0 || shed) 1.0 else min(1.0, acc / TICK_MS)
 
-            val t0 = System.nanoTime()
             val build = paintOnce(alpha)
-            val ms = (System.nanoTime() - t0) / 1e6
+            // paintWorkNs stops BEFORE unlockCanvasAndPost: the owner's first read-outs were
+            // vsync-quantized (16.7/25.7/32) — the old wrapper here measured waiting for vblank,
+            // the exact trap the A.1 comment below runBenchmark records. This is work, not waiting.
+            val ms = paintWorkNs / 1e6
             // an exponential average, so the HUD reads steadily rather than flickering
             frameMs += (ms - frameMs) * 0.1
             buildMs += (build / 1e6 - buildMs) * 0.1
 
             stats = "t %d   %s".format(Native.tick(), popLine())
-            statsDev = "z %.2f   %.1f ms/frame  (core %.2f)  %d drawn".format(
-                cam.z / density, frameMs, buildMs, renderer.orgN,
+            statsDev = "z %.2f   work %.1f ms  (core %.2f)  %d drawn  %d cells".format(
+                cam.z / density, frameMs, buildMs, renderer.orgN, renderer.cellsDrawn,
             )
             card = renderer.cardText(selI, selGen)
             clock = "t %d".format(Native.tick())
@@ -899,9 +909,13 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     fun popOf(sp: Int): Int = if (::renderer.isInitialized) renderer.pops[sp] else 0
 
     /** One frame. Returns the nanoseconds the core spent building the display list. */
+    /** Nanoseconds of the last frame's actual drawing work — lock through last stroke, no post. */
+    @Volatile private var paintWorkNs = 0L
+
     private fun paintOnce(alpha: Double): Long {
         // A holder that cannot give a hardware canvas (a surface mid-teardown; Robolectric's
         // fake in the boot gate) gets the software one instead of killing the render thread.
+        val t0 = System.nanoTime()
         val c: Canvas = (try { holder.lockHardwareCanvas() }
             catch (e: IllegalStateException) { holder.lockCanvas() }) ?: return 0
         try {
@@ -918,6 +932,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                 }
                 renderer.paintHand(c, ring, wallDrag, sunSel, cam, width.toFloat(), height.toFloat())
             }
+            paintWorkNs = System.nanoTime() - t0
             return n
         } finally {
             holder.unlockCanvasAndPost(c)

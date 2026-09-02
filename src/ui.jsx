@@ -164,7 +164,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       undoTimer = setTimeout(() => { undoAction = null; setUndoChip(null); }, 5000);
     };
     actionsRef.current = {
-      stepOnce: () => { W.px.set(W.x); W.py.set(W.y); levelScript(); step(); },
+      stepOnce: () => { markPrev(W); levelScript(); step(); },
       feed: () => {
         if (!selValid()) return;
         const i = sel.i, g = W.gen[i], nm = SPECIES[W.sp[i]].name;
@@ -408,7 +408,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       const maxSteps = spd >= 16 ? 9 : spd >= 4 ? 5 : 3;
       let steps = 0;
       while (acc >= P.TICK_MS && steps < maxSteps){
-        W.px.set(W.x); W.py.set(W.y);
+        markPrev(W);
         levelScript(); // F4/F5: per-tick, inside the loop — a scripted sun rises on its tick at any speed
         step(); acc -= P.TICK_MS; steps++;
       }
@@ -420,7 +420,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       // follow-cam: ease toward the selected organism
       if (follow && selValid()){
         const si = sel.i;
-        const tx = W.px[si] + wd(W.x[si]-W.px[si])*alpha, ty = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
+        const [tx, ty] = ipos(W, si, alpha); // the follow-cam rides the same spline the sprite is drawn on
         cam.x = wrap(cam.x + wd(tx - cam.x)*0.10); cam.y = wrap(cam.y + wd(ty - cam.y)*0.10);
       }
 

@@ -67,6 +67,10 @@ pub struct World {
     pub y: Vec<f32>,
     pub px: Vec<f32>,
     pub py: Vec<f32>,
+    /// The tick BEFORE `px/py` — render scratch for the GR.5 display spline, shifted by
+    /// `mc_mark_prev`, never read by the tick, never serialized (a load straightens one frame).
+    pub ppx: Vec<f32>,
+    pub ppy: Vec<f32>,
     pub vx: Vec<f32>,
     pub vy: Vec<f32>,
     pub en: Vec<f32>,
@@ -193,6 +197,8 @@ impl World {
             y: vec![0.0; MAXN],
             px: vec![0.0; MAXN],
             py: vec![0.0; MAXN],
+            ppx: vec![0.0; MAXN],
+            ppy: vec![0.0; MAXN],
             vx: vec![0.0; MAXN],
             vy: vec![0.0; MAXN],
             en: vec![0.0; MAXN],
