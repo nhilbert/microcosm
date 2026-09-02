@@ -126,6 +126,7 @@ class MainActivity : Activity() {
     /** The front door's continue-the-experiment row — added after the fixed rows the boot gate walks. */
     internal lateinit var continueRow: LinearLayout
     internal lateinit var expPanel: LinearLayout
+    internal lateinit var helpPanel: LinearLayout // internal: the boot gate opens the help page
     private val levels by lazy { Level.all(this) }
     private var running: Level? = null
     private var lastVerdict = 0
@@ -923,6 +924,12 @@ class MainActivity : Activity() {
         }
         continueRow.visibility = ViewGroup.GONE
         startPanel.addView(continueRow)
+        // Help (owner request, 2026-09-02): the page a beginner opens first and a curious player
+        // comes back to. It sits on the front door, where someone who does not know what any of
+        // this is has already been handed a choice.
+        startPanel.addView(startChoice(getString(R.string.choice_help), getString(R.string.sub_help)) {
+            helpPanel.visibility = ViewGroup.VISIBLE
+        })
         // The optic (GR.7). Last row, after the two fixed ones and the continue row, so the boot
         // gate's child indices stay put. It is a view, not a lever: it changes how the world is
         // painted and nothing about what the world does.
@@ -956,6 +963,9 @@ class MainActivity : Activity() {
         expPanel.addView(button(getString(R.string.btn_back)) { expPanel.visibility = ViewGroup.GONE })
         root.addView(expPanel, FrameLayout.LayoutParams(MATCH, MATCH))
 
+        helpPanel = Help.page(this) { helpPanel.visibility = ViewGroup.GONE }
+        root.addView(helpPanel, FrameLayout.LayoutParams(MATCH, MATCH))
+
         world.speed = 0.0 // the pond waits behind the front door
 
         // targetSdk 35 draws edge to edge on Android 15, so without this the HUD sits under the
@@ -981,6 +991,7 @@ class MainActivity : Activity() {
             dataPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             startPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             expPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
+            helpPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             insets
         }
         root.requestApplyInsets()
@@ -1577,6 +1588,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
+            helpPanel.visibility == ViewGroup.VISIBLE -> helpPanel.visibility = ViewGroup.GONE
             expPanel.visibility == ViewGroup.VISIBLE -> expPanel.visibility = ViewGroup.GONE
             // On the front door, back leaves the app — the pond was saved on the way here, so
             // the exit costs nothing. (The old back-exit saved-then-finished because the

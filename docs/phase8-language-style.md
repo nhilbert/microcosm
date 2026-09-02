@@ -219,6 +219,28 @@ manual audit found, which is the point of promoting it. All texts rewritten to
 text; the K6 aside left L3's debrief; the L5 worked rewrite above shipped verbatim
 (minus one merged sentence).
 
+## 11. The reference register — the one place the science may be named (owner, 2026-09-02)
+
+The banned list in §4 exists to stop chrome lecturing a player who did not ask for a lecture.
+The help page is the place a player DID ask: it is opened deliberately, from the front door, by
+someone who wants to know how the world works. Applying the ban there would forbid the page its
+own subject — it could not name a ciliate, a genotype, or photosynthesis.
+
+So `help_*` resource keys, and only those, are checked in the **reference register**:
+
+| rule | chrome | reference |
+|---|---|---|
+| banned vocabulary (§4) | enforced | **not applied** — the page names its subject |
+| sentence cap (EN 20 words) | enforced | enforced, unchanged |
+| clause cap (DE 18 words) | enforced | enforced, unchanged |
+| readability | FK / WSTF ≤ 8 | ≤ 12 — a reference grade, not a waiver |
+
+The shape of the exemption is the point. What is relaxed is *vocabulary*, which a curious reader
+can look up; what is not relaxed is *clause length*, which no reader can work around. The gate
+convicted this page's first draft eleven times on sentence length, and every one of those was a
+real fix. `harness/prose-app.js` keys the register on the resource name, so nothing outside the
+help page can drift into it by accident — a named exemption, never a global hole.
+
 ## 10. The ten-second checklist for any new player text
 
 1. Read it aloud. Does it sound like a friend at the pond's edge?

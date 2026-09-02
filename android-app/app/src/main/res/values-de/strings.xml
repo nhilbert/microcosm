@@ -22,6 +22,74 @@
     <string name="sub_view_dark">leuchtendes Leben auf schwarzem Wasser — tippe für das Hellfeld</string>
     <string name="sub_view_light">gefärbtes Leben auf hellem Grund — tippe für das Dunkelfeld</string>
 
+    <string name="choice_help">Hilfe</string>
+    <string name="sub_help">wie der Teich funktioniert</string>
+    <string name="help_title">Hilfe</string>
+
+    <!-- die Hilfeseite: erst der Überblick, dann der Stoffwechsel -->
+    <string-array name="help_titles">
+        <item>Was das hier ist</item>
+        <item>Die Regel des Hauses</item>
+        <item>Wer frisst wen</item>
+        <item>Vier Konten</item>
+        <item>Sterben geht nur über Energie</item>
+        <item>Mineral ist ein Ventil</item>
+        <item>Protein ist für den Nachwuchs</item>
+        <item>Der Kreislauf</item>
+        <item>Bacillus schließt den Kreis</item>
+        <item>Bernstein ist deine Hand</item>
+        <item>Was du drehen kannst</item>
+        <item>Die Experimente</item>
+    </string-array>
+
+    <string-array name="help_bodies">
+        <item>Ein Teich, in dem Leben von allein läuft. Fünf Arten fressen, wachsen und sterben. Du schaust zu und greifst ein.</item>
+        <item>Nichts entsteht, nichts geht verloren. Ein Korn Mineral wandert nur weiter: in einen Körper, in eine Leiche, zurück ins Wasser.</item>
+        <item>Solara ist die Matte am Grund. Drifta schwebt im Wasser. Beide leben vom Licht. Cilio jagt Drifta. Venator jagt Cilio. Bacillus zersetzt, was übrig bleibt.</item>
+        <item>Jedes Wesen führt vier Konten: Energie, Mineral, Protein und Größe. Energie ist der Treibstoff. Die anderen drei werden nie verbrannt.</item>
+        <item>Schon das bloße Dasein kostet Energie. Fällt dieses Konto auf null, ist Schluss. Kein anderer Mangel tötet direkt.</item>
+        <item>Mineral wird nie verbraucht, nur geparkt. Es regelt, wie gut eine Pflanze das Licht nutzt. Ohne Vorrat kommt nichts herein, und das Wesen verhungert.</item>
+        <item>Protein wird nie verbrannt. Es ist die Eintrittskarte zur Teilung. Pflanzen bauen es aus Überschuss. Jäger holen es aus der Beute.</item>
+        <item>Eine Pflanze saugt Mineral aus dem Wasser. Ein Jäger frisst die Pflanze. Der Tote zerfällt zu Detritus. Bacillus frisst ihn und gibt das Mineral frei.</item>
+        <item>Schalte Bacillus ab, und das Mineral bleibt in den Resten liegen. Der Teich erstickt langsam an seinem eigenen Abfall.</item>
+        <item>Alles in Bernstein hast du getan. Die Welt selbst trägt diese Farbe nie. So bleibt sichtbar, was von dir kam.</item>
+        <item>Sonne verschieben oder dimmen. Mineral nachgießen. Füttern, töten, Arten aussetzen, Wände ziehen. Jeder Eingriff wird notiert und lässt sich zurücknehmen.</item>
+        <item>Jedes Experiment stellt eine Frage. Du sagst vorher, was du erwartest. Danach hält die App deine Antwort neben das, was geschah.</item>
+    </string-array>
+
+    <string name="help_lede">Ein Teich, der von allein läuft, und fünf Arten, die darin zurechtkommen müssen.</string>
+    <string name="help_h_cycle">Wohin das Mineral geht</string>
+    <string name="help_cycle_caption">Ein Korn Mineral auf seiner Runde. Nichts verlässt den Kreis.</string>
+    <string name="help_h_species">Die fünf und ihre Vorbilder</string>
+    <string name="help_species_lede">Jede Kreatur hier ist einem echten Lebewesen nachgebaut. Es folgt, was das echte tut, und welchen Teil davon die Simulation übernommen hat.</string>
+    <string name="help_label_pond">Im Teich</string>
+    <string name="help_label_real">In echt</string>
+    <string name="help_h_sources">Quellen</string>
+    <string name="help_sources_note">Die Notizen zu den Vorbildern sind nach den unten genannten Artikeln geschrieben und nicht aus ihnen zitiert. Quelle ist die englische Wikipedia, en.wikipedia.org. Ihr Text steht unter CC BY-SA 4.0. Abgerufen am 2. September 2026.</string>
+
+    <string-array name="help_real">
+        <item>Vorbild sind die Algenrasen auf dem belichteten Grund. Der bekannteste Rasenbildner ist &lt;i&gt;Cladophora&lt;/i&gt;, eine verzweigte fädige Grünalge. Echte Rasen wachsen so dicht, dass Licht, Sauerstoff und Mineral schon auf wenigen Zentimetern abfallen. Was darunter liegt, verschattet. Genau das erbt Solara. Eine dichtere Matte wird dunkler gemalt, und sie schluckt das Licht.</item>
+        <item>Vorbild sind treibende einzellige Grünalgen wie &lt;i&gt;Chlamydomonas reinhardtii&lt;/i&gt;. Sie ist rund zehn Mikrometer groß und schwimmt mit zwei Geißeln. Sie trägt einen Augenfleck, ein lichtempfindliches Organell. Damit steuert sie auf schwaches Licht zu und von grellem weg. Drifta behält die nützliche Hälfte. Es klettert den örtlichen Lichtgradienten hoch, und nur bei Lichtmangel.</item>
+        <item>Vorbild ist &lt;i&gt;Paramecium&lt;/i&gt;, das Pantoffeltierchen aus dem Lehrbuch. Es ist 170 bis 330 Mikrometer lang und überall von Cilien überzogen. Eine tiefe Mundrinne mit schlagenden Cilien strudelt Bakterien, Algen und Hefen herein. Sie werden in Nahrungsvakuolen verpackt. Stößt es auf etwas Unangenehmes, zeigt es die Schreckreaktion. Es fährt zurück, dreht und schwimmt in eine neue Richtung. Cilios Flucht vor dem Schreckstoff ist genau diese Reaktion. Die leuchtende Vakuole im Körper ist seine letzte Mahlzeit.</item>
+        <item>Vorbild ist &lt;i&gt;Bacillus subtilis&lt;/i&gt;, das stäbchenförmige Bodenbakterium. Es sucht Futter im Wechsel aus Lauf und Taumel: eine gerade Strecke, dann eine zufällige neue Richtung. Bei Mangel gibt es Enzyme ab und zerlegt, was um es herum übrig ist. Hilft das nicht, bildet es eine zähe Spore und wartet. Alle drei stecken in der Simulation. Der taumelnde Gang, die Verwertung und die Zyste, die auf Detritus wartet.</item>
+        <item>Vorbild ist &lt;i&gt;Didinium nasutum&lt;/i&gt;, der klassische Wimperntierjäger. Er ist eine Tonne von 80 bis 200 Mikrometern. Zwei Cilienkränze treiben sein schnelles Schwimmen an. Er stürmt frontal auf die Beute zu. Pexicysten halten sie fest, Toxicysten töten sie. Dann verschlingt er sie ganz, durch einen Mund, der sich weit dehnt. Seine Beute in der Natur ist &lt;i&gt;Paramecium&lt;/i&gt;. Die zwei sind das Lehrbuchpaar aus Jäger und Gejagtem. Darum jagt Venator ausschließlich Cilio.</item>
+    </string-array>
+
+    <string-array name="help_sources">
+        <item>Wikipedia: “Cladophora”, “Cladophoraceae”</item>
+        <item>Wikipedia: “Chlamydomonas reinhardtii”</item>
+        <item>Wikipedia: “Paramecium”, “Paramecium caudatum”, “Ciliate”</item>
+        <item>Wikipedia: “Bacillus subtilis”, “Run-and-tumble motion”</item>
+        <item>Wikipedia: “Didinium”; Wessenberg &amp; Antipa 1970, J. Protozool. 17(2)</item>
+    </string-array>
+
+    <string-array name="help_cycle_labels">
+        <item>Wasser</item>
+        <item>Pflanze</item>
+        <item>Jäger</item>
+        <item>Reste</item>
+    </string-array>
+
     <!-- gemeinsame Knöpfe -->
     <string name="btn_back">zurück</string>
     <string name="btn_close">schließen</string>
