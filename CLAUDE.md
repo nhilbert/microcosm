@@ -80,8 +80,9 @@ for L8/L11/L12 (wall drawing, feed cadence and σ sliders need gesture
 scripting); deferred with re-entry conditions are F3 post-pass twists, F6 A/B
 memory and L10's geometry. Also queued: the post-phase Yoshida study, third loci
 where a question warrants them, a split detector once a split is observed.
-Mycora/Necro re-entry conditions unchanged. Two graphics watch items are open,
-not blockers: device budget read-out and far-zoom mat blockiness.
+Mycora/Necro re-entry conditions unchanged. Four graphics watch items are open,
+none a blocker: device budget read-out, far-zoom mat blockiness, and — from the
+light field — Cilio's stacked membrane and the cool lit pool.
 
 **Staged retirement of the JS oracle (decided 2026-09-02, not yet started).**
 The oracle is not deletable as it stands: `tools/gen-species-rs.js` reads the
