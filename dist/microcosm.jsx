@@ -3906,6 +3906,29 @@ function bucketSpec(G, sp, tb, mb){
 // Grammar too: the radius and the tie-breaking decide WHICH organism a thumb lands on, and the
 // platforms must not disagree about that. Raw positions, not interpolated ones — a tap picks what
 // is there, not what is being drawn on the way there. Ties keep slot order (sort is stable).
+// The display-path spline (GR.5, declared frame change 2026-09-02 — the Rust builder carries the
+// identical arithmetic in the identical order; harness/fingerprint-frame.js holds them bit-equal):
+// a quadratic B-spline through the midpoints of the last two tick segments. Velocity-continuous
+// across ticks, half a tick of display latency, never outside the hull; the guard straightens a
+// stale previous segment (fresh slot, fresh load) back to linear. ppx/ppy are render scratch —
+// created and shifted only by markPrev, never read by the sim.
+function ipos(W, i, alpha){
+  const ppx = W.ppx || W.px, ppy = W.ppy || W.py;
+  const px = W.px[i], py = W.py[i];
+  let d1x = wd(px - ppx[i]), d1y = wd(py - ppy[i]);
+  const d2x = wd(W.x[i] - px), d2y = wd(W.y[i] - py);
+  if (Math.max(Math.abs(d1x), Math.abs(d1y)) > 4*Math.max(Math.abs(d2x), Math.abs(d2y)) + 8){ d1x = d2x; d1y = d2y; }
+  const omt = 1 - alpha;
+  return [px - omt*omt*d1x*0.5 + alpha*alpha*d2x*0.5,
+          py - omt*omt*d1y*0.5 + alpha*alpha*d2y*0.5];
+}
+// The one legal way to advance the interpolation anchors. Works on the JS core (lazily attaching
+// the scratch arrays) and on the wasm wrapper's memory views alike.
+function markPrev(W){
+  if (!W.ppx){ W.ppx = new Float32Array(W.px.length); W.ppy = new Float32Array(W.py.length); }
+  W.ppx.set(W.px); W.ppy.set(W.py);
+  W.px.set(W.x); W.py.set(W.y);
+}
 function pickRadius(z, tight){ return tight ? Math.max(10/z, 7) : Math.max(24/z, 14); }
 function pickCandidates(wx, wy, rad){
   const cand = [], rr = rad*rad;
@@ -3940,8 +3963,7 @@ function frameOf(view, hidden, G){
     pops[W.sp[i]]++;
     mnBound += W.mn[i];
     if (hidden[W.sp[i]]) continue; // hidden from view, still counted
-    const ix = W.px[i] + wd(W.x[i]-W.px[i])*alpha;
-    const iy = W.py[i] + wd(W.y[i]-W.py[i])*alpha;
+    const [ix, iy] = ipos(W, i, alpha);
     const sx = hw + wd(ix - camX)*z, sy = hh + wd(iy - camY)*z;
     if (sx < -cull || sx > vw+cull || sy < -cull || sy > vh+cull) continue;
     const sp = W.sp[i], b = n*8;
@@ -4190,7 +4212,7 @@ function drawSunAffordance(ctx, view, selSun){
 }
 function drawSelectionRing(ctx, view, si){
   const { camX, camY, z, hw, hh, alpha } = view;
-  const ix = W.px[si] + wd(W.x[si]-W.px[si])*alpha, iy = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
+  const [ix, iy] = ipos(W, si, alpha);
   const sx = hw + wd(ix - camX)*z, sy = hh + wd(iy - camY)*z;
   const rr = Math.max(14, W.sz[si]*2.6*z);
   ctx.strokeStyle = "rgba(201,215,227,0.95)"; ctx.lineWidth = 1.5;
@@ -4969,7 +4991,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       undoTimer = setTimeout(() => { undoAction = null; setUndoChip(null); }, 5000);
     };
     actionsRef.current = {
-      stepOnce: () => { W.px.set(W.x); W.py.set(W.y); levelScript(); step(); },
+      stepOnce: () => { markPrev(W); levelScript(); step(); },
       feed: () => {
         if (!selValid()) return;
         const i = sel.i, g = W.gen[i], nm = SPECIES[W.sp[i]].name;
@@ -5213,7 +5235,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       const maxSteps = spd >= 16 ? 9 : spd >= 4 ? 5 : 3;
       let steps = 0;
       while (acc >= P.TICK_MS && steps < maxSteps){
-        W.px.set(W.x); W.py.set(W.y);
+        markPrev(W);
         levelScript(); // F4/F5: per-tick, inside the loop — a scripted sun rises on its tick at any speed
         step(); acc -= P.TICK_MS; steps++;
       }
@@ -5225,7 +5247,7 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
       // follow-cam: ease toward the selected organism
       if (follow && selValid()){
         const si = sel.i;
-        const tx = W.px[si] + wd(W.x[si]-W.px[si])*alpha, ty = W.py[si] + wd(W.y[si]-W.py[si])*alpha;
+        const [tx, ty] = ipos(W, si, alpha); // the follow-cam rides the same spline the sprite is drawn on
         cam.x = wrap(cam.x + wd(tx - cam.x)*0.10); cam.y = wrap(cam.y + wd(ty - cam.y)*0.10);
       }
 

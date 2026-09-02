@@ -111,6 +111,8 @@ pub extern "C" fn mc_ptr(id: i32) -> usize {
         23 => w.sz_pow.as_ptr() as *const u8,
         24 => w.px.as_ptr() as *const u8,
         25 => w.py.as_ptr() as *const u8,
+        26 => w.ppx.as_ptr() as *const u8,
+        27 => w.ppy.as_ptr() as *const u8,
         30 => w.m.as_ptr() as *const u8,
         31 => w.d_e.as_ptr() as *const u8,
         32 => w.d_p.as_ptr() as *const u8,
@@ -890,6 +892,13 @@ pub extern "C" fn mc_level_meter(row: u32, field: i32) -> f64 {
 #[no_mangle]
 pub extern "C" fn mc_mark_prev() {
     let sim = s();
+    // shift the pipeline: the GR.5 display spline reads two segments back
+    let w = &mut sim.w;
+    let n = w.px.len();
+    for i in 0..n {
+        w.ppx[i] = w.px[i];
+        w.ppy[i] = w.py[i];
+    }
     sim.w.px.copy_from_slice(&sim.w.x);
     sim.w.py.copy_from_slice(&sim.w.y);
 }

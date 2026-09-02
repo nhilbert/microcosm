@@ -498,6 +498,31 @@ impl Default for Frame {
     }
 }
 
+/// The display-path spline (GR.5, declared frame change 2026-09-02, both builders in lockstep):
+/// a quadratic B-spline through the midpoints of the last two tick segments. Velocity is
+/// continuous across tick boundaries — the 10 Hz kinks of a random walk stop reading as jumps —
+/// at the price of half a tick of display latency, and the curve never leaves the segment hull.
+/// The guard straightens a stale previous segment (a recycled slot, a fresh load, a teleport)
+/// back to plain linear. Zero draws, zero mutation: `ppx/ppy` are render scratch fed by
+/// `mc_mark_prev` and never read by the tick.
+fn ipos(w: &World, i: usize, alpha: f64) -> (f64, f64) {
+    let px = w.px[i] as f64;
+    let py = w.py[i] as f64;
+    let mut d1x = wd(px - w.ppx[i] as f64);
+    let mut d1y = wd(py - w.ppy[i] as f64);
+    let d2x = wd(w.x[i] as f64 - px);
+    let d2y = wd(w.y[i] as f64 - py);
+    if d1x.abs().max(d1y.abs()) > 4.0 * d2x.abs().max(d2y.abs()) + 8.0 {
+        d1x = d2x;
+        d1y = d2y;
+    }
+    let omt = 1.0 - alpha;
+    (
+        px - omt * omt * d1x * 0.5 + alpha * alpha * d2x * 0.5,
+        py - omt * omt * d1y * 0.5 + alpha * alpha * d2y * 0.5,
+    )
+}
+
 pub fn frame_of(
     f: &mut Frame,
     w: &World,
@@ -520,8 +545,7 @@ pub fn frame_of(
         if hidden[sp] {
             continue; // hidden from view, still counted
         }
-        let ix = w.px[i] as f64 + wd(w.x[i] as f64 - w.px[i] as f64) * v.alpha;
-        let iy = w.py[i] as f64 + wd(w.y[i] as f64 - w.py[i] as f64) * v.alpha;
+        let (ix, iy) = ipos(w, i, v.alpha);
         let sx = v.hw + wd(ix - v.cam_x) * v.z;
         let sy = v.hh + wd(iy - v.cam_y) * v.z;
         if sx < -cull || sx > v.vw + cull || sy < -cull || sy > v.vh + cull {
@@ -638,8 +662,7 @@ pub fn sel_screen(w: &World, i: usize, gen: u16, v: &View) -> Option<(f64, f64, 
     if i >= w.n_slots() || w.alive[i] == 0 || w.gen[i] != gen {
         return None;
     }
-    let ix = w.px[i] as f64 + wd(w.x[i] as f64 - w.px[i] as f64) * v.alpha;
-    let iy = w.py[i] as f64 + wd(w.y[i] as f64 - w.py[i] as f64) * v.alpha;
+    let (ix, iy) = ipos(w, i, v.alpha);
     Some((
         v.hw + wd(ix - v.cam_x) * v.z,
         v.hh + wd(iy - v.cam_y) * v.z,

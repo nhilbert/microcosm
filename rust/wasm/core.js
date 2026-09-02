@@ -48,6 +48,7 @@ const COLS = [
   [21, "gen", Uint16Array, MAXN], [22, "birth", Int32Array, MAXN],
   [23, "szPow", Float64Array, MAXN],
   [24, "px", Float32Array, MAXN], [25, "py", Float32Array, MAXN],
+  [26, "ppx", Float32Array, MAXN], [27, "ppy", Float32Array, MAXN],
   [30, "M", Float32Array, NCELL], [31, "dE", Float32Array, NCELL],
   [32, "dP", Float32Array, NCELL], [33, "dM", Float32Array, NCELL],
   [34, "sc", Float32Array, NCELL], [35, "al", Float32Array, NCELL],
