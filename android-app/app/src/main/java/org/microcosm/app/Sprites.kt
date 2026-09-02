@@ -6,17 +6,27 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
+import android.graphics.RectF
 import android.graphics.Shader
+import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /**
  * PAINTING, not grammar (docs/android-app-plan.md §3).
  *
  * The core decides which bucket an organism is in and what colour and shape dials that bucket
- * carries; this turns one bucket into a 64x64 bitmap. It is a port of `makeSprite` in
- * src/ui-render.js and deliberately not gate-compared: two platforms will not produce identical
- * gradient pixels, and nothing depends on their doing so.
+ * carries; this turns one bucket into a 64x64 bitmap. Since GR.2 (docs/organism-graphics-plan.md)
+ * the bodies are micrograph cells — membrane distinct from interior, nucleus, vacuoles — in the
+ * style the owner chose from the probe (dev/graphics-probe/stilproben.html, the design record).
+ * Deliberately not gate-compared: two platforms will not produce identical gradient pixels, and
+ * nothing depends on their doing so. SpriteSheetTest photographs the full bucket grid and holds
+ * the two dials visible at their rails.
+ *
+ * The channel meanings are the certified grammar's and do not move here: `rgb` arrives already
+ * tint-turned (temperature locus), `outline` is the defense dial (tougher wears spines — the old
+ * ring, grown bristles), `round` the feeding/metabolic dial (thrifty rounds, keen stays sharp).
  *
  * One faithful detail worth naming. Canvas 2D's `createRadialGradient(c,c,2, c,c,32)` has an inner
  * radius; Android's `RadialGradient` does not. A stop at fraction t of the JS gradient sits at
@@ -32,11 +42,17 @@ object Sprites {
     const val SQUARE = 3
     const val RAY = 4
 
+    /** Drifta's own light — a Cilio food vacuole glows in its last meal's colour. */
+    private val MEAL = intArrayOf(91, 200, 232)
+
     /** Map a Canvas 2D gradient stop onto Android's single-radius gradient. */
     private fun stop(t: Float) = (2f + 30f * t) / 32f
 
     private fun argb(a: Double, r: Int, g: Int, b: Int) =
         Color.argb((a * 255.0).roundToInt().coerceIn(0, 255), r, g, b)
+
+    /** One channel leaned toward a target — the interior is the species colour in shadow. */
+    private fun lean(v: Int, target: Int, t: Double) = (v + (target - v) * t).roundToInt()
 
     private fun glow(r: Int, g: Int, b: Int, a0: Double, a1: Double): RadialGradient =
         RadialGradient(
@@ -65,76 +81,124 @@ object Sprites {
         }
 
         if (shape == SQUARE) {
-            // Bacillus: dim earthy speck, square = decomposer
+            // Bacillus: a rod colony in a shared capsule — still the dimmest body by design.
+            // The feeding dial rounds the rod corners; the rods never change size with it.
             p.shader = RadialGradient(
                 C, C, C,
-                intArrayOf(argb(0.55, r, gg, b), argb(0.55, r, gg, b), argb(0.18, r, gg, b), argb(0.0, r, gg, b)),
+                intArrayOf(argb(0.45, r, gg, b), argb(0.45, r, gg, b), argb(0.15, r, gg, b), argb(0.0, r, gg, b)),
                 floatArrayOf(0f, stop(0f), stop(0.45f), stop(1f)),
                 Shader.TileMode.CLAMP,
             )
             g.drawRect(0f, 0f, S.toFloat(), S.toFloat(), p)
             p.shader = null
-            // stroke-rounding fattens the core; shrink so the body stays one size
-            val half = (3.4 - round * 1.1).toFloat()
-            p.color = argb(0.85, min(255, r + 60), min(255, gg + 60), min(255, b + 50))
             p.style = Paint.Style.FILL
-            g.drawRect(C - half, C - half, C + half, C + half, p)
-            if (round > 0.02) {
+            p.color = argb(0.85, min(255, r + 45), min(255, gg + 45), min(255, b + 40))
+            // the dial reshapes the rods at constant area — rounding must never read as growth:
+            // keen = long sharp rods, thrifty = short plump ones (its first bake failed the
+            // dial-visibility gate at 34 px; corner radius alone was too subtle)
+            val hw = (5.0 - round * 1.1).toFloat()
+            val hh = (1.9 + round * 0.6).toFloat()
+            val corner = (1.0 + round * 2.4).toFloat()
+            val rod = RectF(-hw, -hh, hw, hh)
+            // spread far enough apart to read as a colony of rods, not one blob (its first
+            // photograph merged them); each rod wears a dark seam so overlaps stay separable
+            val place = floatArrayOf(-4.5f, -5f, 8f, 4f, 1.2f, 28f, -2.5f, 6f, -14f)
+            val seam = argb(0.6, (r * 0.35).roundToInt(), (gg * 0.35).roundToInt(), (b * 0.35).roundToInt())
+            val body = p.color
+            for (i in 0 until 3) {
+                g.save()
+                g.translate(C + place[i * 3], C + place[i * 3 + 1])
+                g.rotate(place[i * 3 + 2])
+                p.style = Paint.Style.FILL
+                p.color = body
+                g.drawRoundRect(rod, corner, corner, p)
                 p.style = Paint.Style.STROKE
-                p.strokeJoin = Paint.Join.ROUND
-                p.strokeWidth = (round * 4.5).toFloat()
-                g.drawRect(C - half, C - half, C + half, C + half, p)
+                p.strokeWidth = 1f
+                p.color = seam
+                g.drawRoundRect(rod, corner, corner, p)
+                g.restore()
             }
             return bmp
         }
 
         if (shape == TRI || shape == RAY) {
-            // Cilio: rare and moving, so it is allowed the luminance peak. (The ray is drawn as
-            // paths, never blitted — it gets a bitmap only so the array has no holes.)
-            p.shader = glow(r, gg, b, 0.9, 0.4)
+            // Cilio: teardrop cell in pursuit — membrane, shadowed interior, static cilia
+            // fringe, oral groove, glowing food vacuoles. (The ray is drawn as paths, never
+            // blitted — it gets a bitmap only so the array has no holes.)
+            p.shader = glow(r, gg, b, 0.8, 0.35)
             g.drawRect(0f, 0f, S.toFloat(), S.toFloat(), p)
             p.shader = null
-            // the mark carries the colour: a pure white triangle washed every tint out under screen
-            g.save()
-            if (round > 0.02) {
-                val k = (1.0 - 0.09 * round).toFloat()
-                g.translate(C, C); g.scale(k, k); g.translate(-C, -C)
-            }
-            val path = Path().apply {
-                moveTo(S * 0.72f, S * 0.5f)
-                lineTo(S * 0.38f, S * 0.36f)
-                lineTo(S * 0.38f, S * 0.64f)
+            // thrifty rounds: the nose blunts and the edge softens; keen stays sharp
+            val nose = (15.0 - 3.5 * round).toFloat()
+            val body = Path().apply {
+                moveTo(C + nose, C)
+                cubicTo(C + nose * 0.55f, C + 8.6f, C - 11.7f, C + 8.2f, C - 12.4f, C)
+                cubicTo(C - 11.7f, C - 8.2f, C + nose * 0.55f, C - 8.6f, C + nose, C)
                 close()
             }
-            p.color = argb(0.95, min(255, r + 55), min(255, gg + 55), min(255, b + 55))
             p.style = Paint.Style.FILL
-            g.drawPath(path, p)
+            p.color = argb(0.6, lean(r, 12, 0.5), lean(gg, 20, 0.5), lean(b, 34, 0.5))
+            g.drawPath(body, p)
             p.style = Paint.Style.STROKE
             p.strokeJoin = Paint.Join.ROUND
-            if (round > 0.02) {
-                p.strokeWidth = (round * 7).toFloat()
-                g.drawPath(path, p)
+            p.strokeWidth = (1.8 + round * 2.5).toFloat()
+            p.color = argb(0.95, r, gg, b)
+            g.drawPath(body, p)
+            // the fringe: short strokes around an inscribed ellipse, still — texture, not animation
+            p.strokeWidth = 1f
+            p.color = argb(0.55, r, gg, b)
+            for (i in 0 until 22) {
+                val a = i / 22.0 * 2.0 * Math.PI
+                g.drawLine(
+                    C + (cos(a) * 12.5).toFloat(), C + (sin(a) * 8.3).toFloat(),
+                    C + (cos(a) * 15.5).toFloat(), C + (sin(a) * 11.2).toFloat(), p,
+                )
             }
-            p.color = argb(0.55, 255, 255, 255)
-            p.strokeWidth = (1.2 + round * 4).toFloat()
-            g.drawPath(path, p)
-            g.restore()
+            p.strokeWidth = 1.2f
+            p.color = argb(0.7, 245, 235, 255)
+            val groove = Path().apply {
+                moveTo(C + nose * 0.95f, C)
+                quadTo(C + 6f, C + 3.4f, C + 1f, C + 1.5f)
+            }
+            g.drawPath(groove, p)
+            p.style = Paint.Style.FILL
+            p.color = argb(0.7, MEAL[0], MEAL[1], MEAL[2])
+            g.drawCircle(C - 3f, C - 2.2f, 2.2f, p)
+            g.drawCircle(C - 6.2f, C + 2.4f, 1.7f, p)
             return bmp
         }
 
-        // Drifta: soft glow, coloured (not white) centre, modest alpha
-        p.shader = glow(r, gg, b, 0.6, 0.22)
+        // Drifta: gel halo, membrane over a shadowed interior, off-centre nucleus, one vacuole.
+        // The defense dial grew from a plain ring into spines — same meaning, tougher bristles.
+        p.shader = glow(r, gg, b, 0.4, 0.16)
         g.drawRect(0f, 0f, S.toFloat(), S.toFloat(), p)
         p.shader = null
-        p.color = argb(0.9, min(255, r + 40), min(255, gg + 35), min(255, b + 30))
+        val ir = 14f
         p.style = Paint.Style.FILL
-        g.drawCircle(C, C, 3.6f, p)
+        p.color = argb(0.55, lean(r, 10, 0.55), lean(gg, 25, 0.55), lean(b, 40, 0.55))
+        g.drawCircle(C, C, ir, p)
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 1.8f
+        p.color = argb(0.95, r, gg, b)
+        g.drawCircle(C, C, ir, p)
+        p.style = Paint.Style.FILL
+        p.color = argb(0.9, 235, 250, 255)
+        g.drawCircle(C + 4f, C - 2.8f, 3.1f, p)
+        p.color = argb(0.5, (r * 0.6).roundToInt(), (gg * 0.6).roundToInt(), (b * 0.6).roundToInt())
+        g.drawCircle(C - 4.2f, C + 3.5f, 2.5f, p)
         if (outline > 0.02) {
-            // defense ring: the tougher end wears a shell
             p.style = Paint.Style.STROKE
-            p.color = argb(0.10 + 0.75 * outline, 235, 246, 255)
-            p.strokeWidth = (1 + 1.6 * outline).toFloat()
-            g.drawCircle(C, C, 5.6f, p)
+            p.strokeWidth = (1 + 1.2 * outline).toFloat()
+            p.color = argb(0.15 + 0.7 * outline, 235, 246, 255)
+            val s0 = ir + 0.5f
+            val s1 = ir + (2.0 + 3.5 * outline).toFloat()
+            for (i in 0 until 10) {
+                val a = i / 10.0 * 2.0 * Math.PI
+                g.drawLine(
+                    C + (cos(a) * s0).toFloat(), C + (sin(a) * s0).toFloat(),
+                    C + (cos(a) * s1).toFloat(), C + (sin(a) * s1).toFloat(), p,
+                )
+            }
         }
         return bmp
     }

@@ -101,4 +101,26 @@ owner's call.
   species-profiles.md Venator section rewritten (Didinium description + portrait prompt;
   "Ghost Ray" reference removed). Gates this session: android-app unit gates run locally
   (see commit); fingerprint-frame untouched by construction (no src/ or rust/ edit).
-  Owner look-acceptance pending on device.
+  **Owner look-acceptance on device (2026-09-02): "sieht super aus der neue venator."**
+
+- **Main merged (2026-09-02)** before GR.2, per owner instruction: the seam fix (REPEAT
+  shaders replacing the tile loop), experiment save/load v2, thumbnails. One conflict in
+  Renderer.kt (both sides touched the field block), resolved by hand — didinium() kept,
+  main's shader fields kept, the dead `src`/`srcTile`/`floor` dropped. One instructive
+  red after the merge: BootTest's save/load test failed against the PRE-merge host
+  `libmicrocosm.so` — a stale native artifact, not a code fault; rebuilt, green.
+
+- **GR.2 shipped (2026-09-02)**: Sprites.kt rebuilt to the probe's micrograph style —
+  Drifta (gel halo, membrane over shadowed interior, nucleus, vacuole; defense dial =
+  spines, gated `>0.02` as the old ring was), Cilio (teardrop, static fringe, oral
+  groove, food vacuoles in Drifta's colour; feeding dial = nose sharpness + edge
+  softness), Bacillus (three-rod colony in a shared capsule, still dimmest; feeding dial
+  reshapes rods at constant area), Solara marker unchanged. New instrument
+  `SpriteSheetTest` (BootTest's sandbox signature): photographs every species' full
+  tint×morph grid to `build/reports/screens/sprites.png` AND asserts every bucket paints
+  (>200 lit px) and both dials stay visible at the rails (>40 px differ). **It convicted
+  twice on first contact**: Bacillus's corner-radius-only dial was invisible (34 px —
+  the dial was amplified to constant-area rod reshaping, not the threshold lowered), and
+  the first photograph showed the three rods merged into one blob (spread + dark seams).
+  Gates: android unit gates 15/15 green, npm test green. Owner look-acceptance on
+  device pending; LOD thresholds and the carpet move to GR.3.
