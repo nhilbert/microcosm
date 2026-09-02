@@ -137,7 +137,25 @@ the same spline. Proof chain: conform + conform:core bit-identical ×4 (hash reb
 under this declaration), **port:check PASS bit-identical** (visual-grammar row
 included), port:snapshot PASS, android gates green on the rebuilt host core under
 `--rerun-tasks` (the native lib is not a tracked gradle input — a trap met twice this
-session). Owner verdict on the device pending.
+session). **Owner verdict on the device (2026-09-02): "klappt gut, flüssig."**
+
+**GR.6 — death reads as a collapse, not a pop (shipped 2026-09-02; second declared
+frame change)**: owner request — dead organisms vanished abruptly; he proposed a grey
+corpse or a decay process, "können wir uns an die Realität annähern?" The reality was
+already simulated: every non-eaten death leaves a corpse whose mass rots into detritus
+and feeds Bacillus (the K6 loop); only the display was mute (kinless grey circles).
+The corpse record grew 4 → 6 doubles (`sp`, `fresh` = remaining mass over size — the
+sim's own decay clock), both builders in lockstep, corpse rows fingerprinted with the
+new fields. The app paints a collapsed membrane ghost: fresh wears a ghost of its
+species colour, then greys, deflates, and slowly shifts outline as decay advances —
+every visible change sim-driven, no UI clock (the §0 verdict holds). Truthfulness
+notes: a starved body starts lean, so its husk starts sunken — honest by construction;
+eaten prey still vanishes at the bite (swallowed, not left behind); the far tier keeps
+the simple husk below 8 CSS px and the pall field carries the aggregate below lodZ.
+Browser oracle keeps its two-circle look, stride-aware. Proof chain: conform +
+conform:core bit-identical ×4 (hash rebound under this declaration), port:check PASS
+bit-identical, android gates green (`--rerun-tasks`), npm test green. Owner verdict on
+the device pending.
 
 Portrait prompt already updated (GR.1); the owner regenerates `assets/species/venator.jpg`
 when convenient (the card hides the slot meanwhile if removed). CLAUDE.md status line,
