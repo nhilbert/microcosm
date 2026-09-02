@@ -7,9 +7,9 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
-import android.graphics.Rect
+
 import android.graphics.RectF
-import kotlin.math.floor
+
 import kotlin.math.roundToInt
 
 /**
@@ -49,19 +49,21 @@ class Renderer(private val density: Double = 1.0) {
     private val screen = Paint(Paint.FILTER_BITMAP_FLAG).apply {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
     }
-    // The per-cell fields are 64x64 upscaled to the whole world tile, so filtering is what keeps
-    // the mat carpet from reading as hard squares. The browser sets imageSmoothingEnabled for the
-    // same reason. Set on the instance as well as through the flag, because the flag alone has been
-    // unreliable across versions.
-    private val plain = Paint(Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
+    private val flat = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val dst = RectF()
+    private val rayPath = Path()
+    // The world is a torus, and a torus has no edge to filter against: every layer is sampled
+    // through a REPEAT shader, so bilinear filtering interpolates across the wrap exactly as it
+    // does everywhere else (filtering itself is what keeps the upscaled fields from reading as
+    // hard squares — the browser's imageSmoothingEnabled). The per-tile drawBitmap loop this
+    // replaces clamped at each tile's edge, which painted a visible vertical/horizontal seam
+    // wherever the wrap crossed the screen (owner report, 2026-09-02).
+    private val layerShaders = HashMap<Bitmap, android.graphics.BitmapShader>()
+    private val layerMatrix = android.graphics.Matrix()
+    private val layerPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
         isFilterBitmap = true
         isDither = true
     }
-    private val flat = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val src = Rect(0, 0, Layers.FIELD, Layers.FIELD)
-    private val srcTile = Rect(0, 0, Layers.TILE, Layers.TILE)
-    private val dst = RectF()
-    private val rayPath = Path()
 
     /**
      * Species names and locus words, read once from the trait rows. They belong to the traits, not
@@ -130,34 +132,17 @@ class Renderer(private val density: Double = 1.0) {
         if (layers.tilesDirty()) layers.refreshTiles()
 
         c.drawColor(ABYSS, PorterDuff.Mode.SRC)
-        val hw = vw / 2
-        val hh = vh / 2
-        val span = (WORLD * cam.z).toFloat()
-        val tlx = cam.x - hw / cam.z
-        val tly = cam.y - hh / cam.z
-
-        // the torus tiles that touch the viewport
-        var ky = floor(tly / WORLD).toInt()
-        while (ky * WORLD < tly + vh / cam.z) {
-            var kx = floor(tlx / WORLD).toInt()
-            while (kx * WORLD < tlx + vw / cam.z) {
-                val dx0 = ((kx * WORLD - cam.x) * cam.z).toFloat() + hw
-                val dy0 = ((ky * WORLD - cam.y) * cam.z).toFloat() + hh
-                dst.set(dx0, dy0, dx0 + span, dy0 + span)
-                if (hidden and (1 shl 8) == 0) {
-                    c.drawBitmap(layers.light, srcTile, dst, plain)
-                    // the wall shade keeps the painted glow honest: it must not claim occluded light
-                    if (layers.hasWalls) c.drawBitmap(layers.shade, src, dst, plain)
-                }
-                if (hidden and (1 shl 9) == 0) c.drawBitmap(layers.heat, srcTile, dst, plain)
-                c.drawBitmap(layers.mineral, src, dst, plain)
-                if (hidden and 1 == 0) c.drawBitmap(layers.carpet, src, dst, plain)
-                if (cam.z < lodZ && hidden and (1 shl 7) == 0) c.drawBitmap(layers.pall, src, dst, plain)
-                if (layers.hasWalls) c.drawBitmap(layers.walls, srcTile, dst, plain)
-                kx++
-            }
-            ky++
+        // world layers, seam-free: each covers the viewport once through its REPEAT shader
+        if (hidden and (1 shl 8) == 0) {
+            paintLayer(c, layers.light, cam, vw, vh)
+            // the wall shade keeps the painted glow honest: it must not claim occluded light
+            if (layers.hasWalls) paintLayer(c, layers.shade, cam, vw, vh)
         }
+        if (hidden and (1 shl 9) == 0) paintLayer(c, layers.heat, cam, vw, vh)
+        paintLayer(c, layers.mineral, cam, vw, vh)
+        if (hidden and 1 == 0) paintLayer(c, layers.carpet, cam, vw, vh)
+        if (cam.z < lodZ && hidden and (1 shl 7) == 0) paintLayer(c, layers.pall, cam, vw, vh)
+        if (layers.hasWalls) paintLayer(c, layers.walls, cam, vw, vh)
 
         paintOrganisms(c)
         paintCorpses(c)
@@ -177,6 +162,31 @@ class Renderer(private val density: Double = 1.0) {
             flat.style = Paint.Style.FILL
         }
         return buildNanos
+    }
+
+    /**
+     * One world layer over the whole viewport, sampled toroidally. The shader's local matrix maps
+     * bitmap pixels to screen exactly as the old tile rects did (world w lands at
+     * `vw/2 + (w - cam.x) * z`); REPEAT supplies every torus copy AND lets the bilinear filter
+     * read across the wrap, which per-tile blits cannot.
+     */
+    private fun paintLayer(c: Canvas, bmp: Bitmap, cam: Camera, vw: Float, vh: Float) {
+        val sh = layerShaders.getOrPut(bmp) {
+            android.graphics.BitmapShader(
+                bmp,
+                android.graphics.Shader.TileMode.REPEAT,
+                android.graphics.Shader.TileMode.REPEAT,
+            )
+        }
+        val scale = (WORLD * cam.z / bmp.width).toFloat()
+        layerMatrix.setScale(scale, scale)
+        layerMatrix.postTranslate(
+            (vw / 2 - cam.x * cam.z).toFloat(),
+            (vh / 2 - cam.y * cam.z).toFloat(),
+        )
+        sh.setLocalMatrix(layerMatrix)
+        layerPaint.shader = sh
+        c.drawRect(0f, 0f, vw, vh, layerPaint)
     }
 
     /**
