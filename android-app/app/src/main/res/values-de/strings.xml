@@ -15,6 +15,8 @@
     <string name="experiments_title">Experimente</string>
     <string name="start_sub_behind_experiment">dein Teich wartet hinter dem Experiment</string>
     <string name="start_sub_as_stands">dein Teich, wie er gerade ist</string>
+    <string name="choice_continue_exp">Experiment fortsetzen</string>
+    <string name="sub_continue_exp">E%1$d %2$s — wie du es verlassen hast</string>
 
     <!-- gemeinsame Knöpfe -->
     <string name="btn_back">zurück</string>

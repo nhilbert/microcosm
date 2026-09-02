@@ -125,6 +125,90 @@ fn main() {
         fails += 1;
     }
 
+    // 5. the running experiment rides the snapshot (version 2). L7 "outpost" is the richest
+    //    runtime — a scripted sunrise (fired), region census ring (rg), pour budget — and its
+    //    null run fails at the deadline, so resuming must reproduce the exact verdict, not just
+    //    world bytes. Save mid-run, load into a fresh sim, drive both the way every caller
+    //    drives a level (script, step, check), and require identical level state throughout.
+    {
+        let lvl_hash = |sim: &Sim| {
+            let l = &sim.lvl;
+            let mut rg = 0.0f64;
+            for v in &l.rg {
+                rg += v;
+            }
+            format!(
+                "def={} state={:?} run={} seenS={} pred={} pour={} mem={:?} fired={} src0={} rgS={} rg={:016x}",
+                l.def, l.state, l.run, l.seen_s, l.predicted, l.pour_left, l.mem, l.fired,
+                l.src0, l.rg_s, rg.to_bits()
+            )
+        };
+        let idx = microcosm_core::levels_gen::LEVELS
+            .iter()
+            .position(|d| d.key == "outpost")
+            .expect("the shipped table carries L7");
+        let drive = |sim: &mut Sim, to: i64| {
+            while sim.w.tick < to {
+                sim.level_script();
+                sim.step();
+                sim.level_check();
+            }
+        };
+        let mut a = Sim::new();
+        a.level_start(idx, 1);
+        drive(&mut a, 3_000); // past the scripted sunrise, region ring filling
+        let lvl_at_save = lvl_hash(&a);
+        let bytes = a.save();
+        drive(&mut a, 12_500); // across the deadline: the null run settles its verdict
+        let reference = (lvl_hash(&a), a.lvl.fail_why, state_hash(&a));
+
+        let mut b = Sim::new();
+        b.load(&bytes).expect("level snapshot loads");
+        check("level state at save == after load", &lvl_at_save, &lvl_hash(&b), &mut fails);
+        drive(&mut b, 12_500);
+        let resumed = (lvl_hash(&b), b.lvl.fail_why, state_hash(&b));
+        check("resumed level verdict == uninterrupted", &reference.0, &resumed.0, &mut fails);
+        check("resumed fail reason == uninterrupted", reference.1, resumed.1, &mut fails);
+        check("resumed level world == uninterrupted", &reference.2, &resumed.2, &mut fails);
+
+        let mut c = Sim::new();
+        c.load(&bytes).unwrap();
+        if c.save() == bytes {
+            println!("  {:<44} identical", "level re-save is byte-identical");
+        } else {
+            println!("  {:<44} DIFFERS", "level re-save is byte-identical");
+            fails += 1;
+        }
+    }
+
+    // 6. a version-1 file (no level section) still loads — the owner's existing saves survive
+    //    the format bump. Built from a sandbox save: strip the trailing "no level" byte and
+    //    stamp the old version.
+    {
+        let mut v1 = bytes.clone();
+        assert_eq!(*v1.last().unwrap(), 0u8, "a sandbox save ends with the empty level section");
+        v1.pop();
+        v1[4..8].copy_from_slice(&1u32.to_le_bytes());
+        let mut d = Sim::new();
+        match d.load(&v1) {
+            Ok(()) => {
+                let sandbox = d.lvl.def < 0;
+                println!(
+                    "  {:<44} {}",
+                    "version-1 file loads, sandbox",
+                    if sandbox { "identical" } else { "LEVEL SET — should be idle" }
+                );
+                if !sandbox {
+                    fails += 1;
+                }
+            }
+            Err(e) => {
+                println!("  {:<44} REFUSED ({})", "version-1 file loads, sandbox", e);
+                fails += 1;
+            }
+        }
+    }
+
     // 4. refusals: a snapshot must not half-load
     let mut d = Sim::new();
     let mut bad = bytes.clone();

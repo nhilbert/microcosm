@@ -301,7 +301,74 @@ Recorded gaps: the Steckbrief is per-species, not per-individual (age/size/energ
 individual's rows above it); no portrait in the seed picker yet; the browser's specimen card
 keeps its text-only form — the app is the product, the browser the renderer's oracle.
 
-## 11. TH — experiment-menu thumbnails from gameplay (owner request, 2026-09-02)
+## 11. Owner round 4 — the seam and the lost experiment (2026-09-02)
+
+Two reports from the device, both reproduced before repair.
+
+**The world-boundary seam.** The screenshot showed a hard vertical edge where the torus wrap
+crossed the screen (t=69,035). Pixel analysis: a constant step, one side reading darker than the
+ABYSS ground, the other brighter — compositing, not content. Reproduced in a Robolectric NATIVE
+probe (the wrap column's neighbouring-pixel difference spiked 2.4x against its surroundings) and
+bisected by `hidden` bits: every layer carried it, the light tile loudest. Cause: the per-tile
+`drawBitmap` loop clamps bilinear filtering at each tile's edge, so no layer could interpolate
+across the wrap — and the 4x field prescale clamped the same way, flattening the edge texels on
+top of it. Fix: every world layer samples through a `BitmapShader` in REPEAT mode (a torus has
+no edge, so the filter must not either) — `Renderer.paintLayer` replaces the tile loop with one
+viewport rect per layer, `Layers.upPaint` wraps the prescale. Painting only; frame.rs and the
+display list untouched, the frame gate stands. New gate `WorldSeamTest`: sun parked on the wrap
+corner, both wrap lines rendered mid-screen at the phone's zoom, seam column/row must not spike
+1.8x over its neighbourhood — negative-tested (convicts the old renderer at 2.42x, passes the
+fix at 1.03x). The browser's canvas tiling has the same clamp seam; it stays as the renderer's
+frozen oracle and is recorded here rather than patched.
+
+**Experiments don't save.** "World state is saved but the fact that I run an experiment is not"
+— exact: the snapshot carried no level runtime, so a mid-experiment save (manual slot) restored
+as sandbox, and the pause-time autosave skipped levels entirely by the U0.6 decision. That
+decision existed only because a restored half-experiment would have been a lie; the owner's
+report overturned it the day the snapshot could tell the truth. Shipped:
+
+- **Snapshot format v2** (snapshot.rs): the running experiment rides at the end — keyed by the
+  level's NAME (a reordered table cannot swap experiments), state/run/seenS/prediction/pour
+  budget/latches/script watermark/fail reason (as a reference into the shipped table) and the
+  F5 census ring; `rg_def` is derived (`levels::collect_regions`, factored out of level_start),
+  so only state is stored. Loading always ends whatever level the session was in (verdicts must
+  never judge a foreign world); a version-1 file still loads, with no level — the owner's
+  existing saves survive. A key or ring shape this build cannot honour drops the experiment and
+  keeps the world.
+- **Proof** extended in `cargo run --bin snapshot` (inside `port:snapshot`): L7 saved mid-run
+  past its scripted sunrise, loaded into a fresh sim, driven across the deadline — level state,
+  fail reason and world all bit-identical to the uninterrupted run; level re-save
+  byte-identical; the synthesised v1 file loads sandbox. Fingerprints bit-identical ×4,
+  native == wasm, core baseline rebound (declared: snapshot format v2 + collect_regions
+  factoring, behavior-neutral), no NOTE.
+- **The shell adopts what it loads** (`adoptCoreLevel`): after any load — boot restore, manual
+  slot — the core says whether an experiment rode along; the shell adopts running level, meter
+  labels and deadline, or clears a stale one. This also re-adopts a live experiment after an
+  activity recreation, which silently lost the shell's experiment context before.
+- **The experiment autosaves to its own file** (`experiment.mcsm`): a mid-experiment pause can
+  never clobber the kept sandbox pond (`autosave.mcsm` untouched); a sandbox pause deletes the
+  stale experiment file. Boot prefers the experiment file — the player left mid-experiment, so
+  mid-experiment is where the app comes back. Routing reads the CORE's level state on the
+  render thread, not the shell's `running`, which can lag a frame around boot.
+- **The front door offers both**: a "continue the experiment" row (after the two fixed rows, so
+  the boot gate's child indices hold) appears whenever an experiment is live, named E{n} {title};
+  the Sandbox row now honours its own subtitle — choosing it mid-experiment stops the level,
+  deletes the experiment file and loads the kept pond back, instead of handing over the
+  experiment's world wearing sandbox clothes. Strings EN+DE, prose gate PASS (414).
+
+Gates: new boot-gate test `theExperimentSurvivesSaveAndLoad` (L7 saved mid-run through the real
+render thread, world walked away to a fresh sandbox, loaded back: core mid-experiment at the
+saved tick with the risen sun intact, shell adopts meters and shows the continue row). Full app
+suite 14/14, `npm test` green, `test:port` green (levels gate byte-identical on the ported
+core).
+
+Recorded gaps: the Observatory ring is not in the snapshot (never was), so a restored
+experiment's narration and Data pages start fresh — verdicts are unaffected because judged
+samples travel as state (seenS, run, latches); the census strip in the level HUD resumes within
+a sample (20 ticks). Levels are still never autosaved DURING a run below onPause granularity;
+a hard kill between pauses loses since-pause progress, as the sandbox always has.
+
+## 12. TH — experiment-menu thumbnails from gameplay (owner request, 2026-09-02)
 
 One small picture per experiment, on both menus (browser start screen, app experiments list),
 and a tool that makes them: `tools/level-thumbs.js` (`npm run thumbs`).

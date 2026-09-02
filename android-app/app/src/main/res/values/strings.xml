@@ -20,6 +20,8 @@
     <string name="experiments_title">Experiments</string>
     <string name="start_sub_behind_experiment">your pond is waiting behind the experiment</string>
     <string name="start_sub_as_stands">your pond, as it stands</string>
+    <string name="choice_continue_exp">continue the experiment</string>
+    <string name="sub_continue_exp">E%1$d %2$s — as you left it</string>
 
     <!-- shared buttons -->
     <string name="btn_back">back</string>
