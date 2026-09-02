@@ -119,6 +119,26 @@ which the §0 verdict rules out; heading dynamics carry the life instead. Residu
 sameness (every colony the same chain) remains the per-individual-variation grammar
 spend of §3.
 
+**GR.5 — the display spline (shipped 2026-09-02; the phase's one declared frame
+change)**: owner request — between-tick motion reads as jumping, worst on the plankton,
+**at 1×** ("bei höherem Speed erwartet man ja die Sprünge"). Diagnosis instrument-first:
+his `work` read-outs (1.7–3.9 ms across z 0.88/3.03/6.00, full vsync headroom) killed
+the dropped-frames hypothesis, leaving the walk's own 10 Hz velocity kinks — linear
+interpolation keeps position continuous but velocity discontinuous, and Drifta turns
+every tick. Fix: both frame builders interpolate on a **quadratic B-spline through the
+midpoints of the last two tick segments** — velocity-continuous across ticks, half a
+tick of display latency, hull-bounded, with a guard straightening stale anchors
+(recycled slot, fresh load) to linear. Substrate: `ppx/ppy` render scratch (never read
+by the tick, never serialized), shifted by `mc_mark_prev` and the render layer's new
+`markPrev(W)`, exposed as wasm views (ids 26/27) so the fingerprint harness drives the
+identical anchor pipeline on both cores — the curve arithmetic itself is fingerprinted.
+Composes with the app's per-batch anchor (4×/16× chords); the browser follow-cam rides
+the same spline. Proof chain: conform + conform:core bit-identical ×4 (hash rebound
+under this declaration), **port:check PASS bit-identical** (visual-grammar row
+included), port:snapshot PASS, android gates green on the rebuilt host core under
+`--rerun-tasks` (the native lib is not a tracked gradle input — a trap met twice this
+session). Owner verdict on the device pending.
+
 Portrait prompt already updated (GR.1); the owner regenerates `assets/species/venator.jpg`
 when convenient (the card hides the slot meanwhile if removed). CLAUDE.md status line,
 plan record sections filled with measured numbers, probe retired or kept as bench toy —
