@@ -404,12 +404,38 @@ Steckbrief text should be updated in the same increment, and the frame grammar i
 untouched (the record already carries heading and strike — everything a barrel, snout
 and girdles need).
 
+**Decision (owner, 2026-09-02): Didinium.** The probe's three variants were played;
+"Didinium gefällt mir." The Ghost Ray retires from the app's render layer with GR.1 of the
+implementation plan; it remains in the frozen browser oracle and in this document's record.
+
 Sources: [Nikon/Micscape "Didinium the master feeder"](http://www.microscopy-uk.org.uk/mag/art97/dingley3.html),
 [NIES Didinium morphology](https://www.nies.go.jp/chiiki1/protoz/morpho/ciliopho/didinium.htm),
 [Wessenberg &amp; Antipa 1970, capture and ingestion of Paramecium by D. nasutum](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1550-7408.1970.tb02366.x),
 [Current Biology on Lacrymaria's hunt](https://www.cell.com/current-biology/fulltext/S0960-9822(19)31319-3),
 [Wikipedia: Lacrymaria olor](https://en.wikipedia.org/wiki/Lacrymaria_olor),
 [Litonotus lamella motor/predatory behavior](https://cdnsciencepub.com/doi/10.1139/z88-289).
+
+## 11. Where this research ends (2026-09-02)
+
+The open questions of §8, as they now stand:
+
+1. **Which microscope** — resolved by conduct, flagged as an assumption: the owner judged
+   the dark Texturen probe "gut" and never chose Hellfeld, which stays in the probe as
+   evidence. The implementation proceeds **darkfield-fluorescence**; a veto reopens it.
+2. **Realism vs the 10-second test** — unchanged recommendation: the test wins. GR.2
+   proofs every bake at the tint rails and ring extremes before it ships.
+3. **Elongation reservation** — stays reserved; moot while animation stays out (§9.2).
+4. **Browser look-fork** — accepted for now; the app diverges visually from the frozen
+   browser oracle with GR.1. The recorded exit (web consumes the WASM frame builder)
+   stands unchanged.
+5. **Taste** — unchanged: the owner's device is the only look-gate. Every increment ends
+   there.
+
+Deliverables of this research: this document; the probe
+(`dev/graphics-probe/stilproben.html`, four rounds, now the **design record** for the
+texture style, the LOD ladder and the Didinium form); and the implementation plan it
+hands off to: **docs/organism-graphics-plan.md** (increments GR.1–GR.4). The research
+phase is closed; findings after this point belong to the plan's record sections.
 
 ---
 

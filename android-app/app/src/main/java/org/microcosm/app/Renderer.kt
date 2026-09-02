@@ -9,8 +9,10 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.graphics.RectF
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * PAINTING. Every decision behind this frame was already made by the core's frame builder
@@ -62,6 +64,9 @@ class Renderer(private val density: Double = 1.0) {
     private val srcTile = Rect(0, 0, Layers.TILE, Layers.TILE)
     private val dst = RectF()
     private val rayPath = Path()
+    private val venOval = RectF()
+    /** Girdle positions as fractions of the barrel half-length — a frame allocates nothing. */
+    private val girdleFrac = floatArrayOf(0.42f, -0.18f)
 
     /**
      * Species names and locus words, read once from the trait rows. They belong to the traits, not
@@ -263,7 +268,7 @@ class Renderer(private val density: Double = 1.0) {
                     flat.style = Paint.Style.FILL
                     c.drawRect(sx - r, sy - r, sx + r, sy + r, flat)
                 }
-                4 -> ghostRay(c, sx, sy, orgBuf.get(b + 6).toFloat(), r, orgBuf.get(b + 7) != 0.0)
+                4 -> didinium(c, sx, sy, orgBuf.get(b + 6).toFloat(), r, orgBuf.get(b + 7) != 0.0)
                 else -> {
                     val set = sprites[sp]
                     val bmp = if (bucket >= 0 && bucket < set.size) set[bucket] else set[0]
@@ -301,41 +306,88 @@ class Renderer(private val density: Double = 1.0) {
         flat.style = Paint.Style.FILL
     }
 
-    /** The Ghost Ray (Venator): hollow spearhead, bright leading edge. Paths, never a blit. */
-    private fun ghostRay(c: Canvas, sx: Float, sy: Float, hd: Float, r: Float, striking: Boolean) {
-        val stretch = if (striking) 1.4f else 1.0f
-        val l = r * stretch
-        val w = r * 0.95f
-        val back = r * 0.75f * stretch
-        val notch = r * 0.5f * stretch
+    /**
+     * Venator as Didinium nasutum (GR.1, docs/organism-graphics-plan.md; model research in
+     * docs/organism-graphics-research.md §10): stretched barrel ~2:1, rod-palisade proboscis,
+     * two pectinelle girdles, band macronucleus. Paths, never a blit — the population is small
+     * by nature. Same display-list inputs the Ghost Ray read; the strike flag reads as a
+     * proboscis-forward lunge. Detail gates on the screen radius in CSS px (probe start values,
+     * to be tuned on the owner's device).
+     */
+    private fun didinium(c: Canvas, sx: Float, sy: Float, hd: Float, r: Float, striking: Boolean) {
+        val st = if (striking) 1.18f else 1.0f
+        val len = r * 1.4f
+        val wid = r * 0.72f
         c.save()
         c.translate(sx, sy)
         c.rotate(Math.toDegrees(hd.toDouble()).toFloat())
+        // body — a real body, not a ghost: dark translucent interior, glacier membrane
+        venOval.set(-len, -wid, len, wid)
+        flat.style = Paint.Style.FILL
+        flat.color = Color.argb(128, 90, 120, 142)
+        c.drawOval(venOval, flat)
+        flat.style = Paint.Style.STROKE
+        flat.strokeWidth = 1.7f * dp
+        flat.color = Color.argb(242, 168, 214, 244)
+        c.drawOval(venOval, flat)
+        // the proboscis: the seizing organ, brighter than anything behind it
+        val px = len * 0.92f
+        val pl = r * 0.55f * st
         rayPath.reset()
-        rayPath.moveTo(l, 0f); rayPath.lineTo(-back, w); rayPath.lineTo(-notch, 0f); rayPath.lineTo(-back, -w)
+        rayPath.moveTo(px, -wid * 0.34f)
+        rayPath.quadTo(px + pl * 1.15f, 0f, px, wid * 0.34f)
         rayPath.close()
         flat.style = Paint.Style.FILL
-        flat.color = Color.argb(26, 150, 200, 235)
+        flat.color = Color.argb(115, 203, 230, 248)
         c.drawPath(rayPath, flat)
         flat.style = Paint.Style.STROKE
-        flat.strokeWidth = 1.6f * dp
-        flat.color = Color.argb(217, 212, 236, 255)
-        rayPath.reset()
-        rayPath.moveTo(-back, w); rayPath.lineTo(l, 0f); rayPath.lineTo(-back, -w)
+        flat.strokeWidth = 1.5f * dp
+        flat.color = Color.argb(242, 235, 248, 255)
         c.drawPath(rayPath, flat)
-        flat.strokeWidth = 1f * dp
-        flat.color = Color.argb(51, 150, 200, 235)
-        rayPath.reset()
-        rayPath.moveTo(-back, w); rayPath.lineTo(-notch, 0f); rayPath.lineTo(-back, -w)
-        c.drawPath(rayPath, flat)
-        flat.style = Paint.Style.FILL
-        flat.color = Color.argb(242, 240, 250, 255)
-        c.drawCircle(l, 0f, 1.4f * dp, flat)
+        if (r >= 12f * dp) {
+            // the two pectinelle girdles — the fast-swim rings, fringe densest at the rim
+            for (f in girdleFrac) {
+                val gx = len * f
+                val yh = wid * sqrt((1f - f * f).coerceAtLeast(0f))
+                flat.strokeWidth = 1f * dp
+                flat.color = Color.argb(102, 168, 214, 244)
+                venOval.set(gx - r * 0.13f, -yh, gx + r * 0.13f, yh)
+                c.drawOval(venOval, flat)
+                flat.strokeWidth = 1.3f * dp
+                flat.color = Color.argb(217, 225, 242, 252)
+                for (s in -4..4) {
+                    if (s == 0) continue
+                    val yy = yh * (s / 4.6f)
+                    val out = (if (abs(s) > 2) 1f else 0.6f) * r * 0.34f
+                    val ny = if (yy >= 0f) 1f else -1f
+                    c.drawLine(gx + r * 0.05f, yy, gx + r * 0.09f, yy + ny * out, flat)
+                }
+            }
+        }
+        if (r >= 32f * dp) {
+            // organelle tier: nematodesmata rods, band macronucleus, toxicysts at the snout.
+            // Toxicyst positions are a fixed pattern — the display list carries no per-organism
+            // seed (organism-graphics-plan.md §3, per-individual variation is a grammar change).
+            flat.strokeWidth = 1f * dp
+            flat.color = Color.argb(89, 168, 214, 244)
+            for (i in -2..2) {
+                c.drawLine(px - r * 0.15f, i * wid * 0.12f, px + pl * 0.85f, i * wid * 0.05f, flat)
+            }
+            flat.strokeWidth = 3f * dp
+            flat.color = Color.argb(204, 225, 240, 250)
+            venOval.set(-len * 0.1f - r * 0.42f, -r * 0.42f, -len * 0.1f + r * 0.42f, r * 0.42f)
+            c.drawArc(venOval, 135f, 207f, false, flat)
+            flat.style = Paint.Style.FILL
+            flat.color = Color.argb(204, 212, 235, 250)
+            c.drawCircle(px + pl * 0.55f, -wid * 0.10f, 1.1f * dp, flat)
+            c.drawCircle(px + pl * 0.75f, wid * 0.06f, 1.1f * dp, flat)
+            c.drawCircle(px + pl * 0.92f, -wid * 0.02f, 1.1f * dp, flat)
+        }
         if (striking) {
             flat.style = Paint.Style.STROKE
             flat.strokeWidth = 2f * dp
             flat.color = Color.argb(89, 212, 236, 255)
-            c.drawLine(-r * 3.2f, 0f, r * 0.8f, 0f, flat)
+            c.drawLine(-r * 3.2f, 0f, -len, 0f, flat)
         }
         c.restore()
         flat.style = Paint.Style.FILL

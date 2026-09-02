@@ -85,13 +85,19 @@ alone. It strikes in a straight line with a jet burst, holds a territory against
 its own kind, and breeds slower than anything else in the water. An apex is
 knife-edged by nature: it persists in most worlds and is lost in some.
 
+Its visual model is *Didinium nasutum* (owner decision 2026-09-02, research in
+organism-graphics-research.md §10) — the textbook ciliate hunter whose head-on
+charge and engulf-whole feeding match Venator's code exactly: a stretched barrel,
+a conical proboscis on a palisade of rods, and two girdles of cilia used only for
+fast swimming. The earlier Ghost Ray form is retired from the app's render layer.
+
 **Habitat** the hunting grounds around the core; a pack founds together as cysts and wakes when prey is near.
 **Behaviour** fast straight-line pursuit (speed 2.4, senses 50 units) with a jet burst (×1.8 for 6 ticks, long cooldown); outturned by its prey; territorial — hunters near each other pay an interference cost; finishes the carcasses of its own kills.
 **Food** Cilio only (80% yield). **Eaten by** nothing.
 **Size** 9 units; the slowest breeder (700-tick cooldown). A knife-edged apex: present on most seeds, lost on some — reported, never required.
 **Heritable** none, by decision: at ~25 individuals drift would dominate selection.
 
-> Prompt: a sleek, spearhead-shaped predatory protist, glacier blue (#A8D6F4) with a bright leading edge and a translucent trailing mantle, seen head-on-quarter as it strikes; hollow, almost ghostly body with a luminous rim — the Ghost Ray of the app's render layer.
+> Prompt: a barrel-shaped predatory ciliate modeled on Didinium nasutum, glacier blue (#A8D6F4), seen slightly from above in mid-charge; the barrel about twice as long as wide with a luminous membrane rim, a pale conical proboscis at the front supported by faint internal rods, two shimmering girdles of short cilia banding the body, and a curved band nucleus visible through the translucent cytoplasm.
 
 ## Mycora, Necro — defined, dormant
 
