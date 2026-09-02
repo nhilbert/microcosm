@@ -493,6 +493,95 @@ class BootTest {
     }
 
     /**
+     * The owner's experiment-save report, played back (2026-09-02): "world state is saved but the
+     * fact that I run an experiment is not." A save taken mid-experiment must carry the
+     * experiment (snapshot format v2), and loading it back must land the shell in that
+     * experiment — running level adopted, meters labelled, the front door offering to continue —
+     * not in a sandbox wearing the experiment's world.
+     */
+    @Test
+    fun theExperimentSurvivesSaveAndLoad() {
+        requireNativeLib()
+        org.robolectric.RuntimeEnvironment.setQualifiers("w408dp-h900dp-xxhdpi")
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val world = activity.world
+        world.surfaceCreated(world.holder)
+        world.surfaceChanged(world.holder, 0, world.width, world.height)
+        try {
+            world.speed = 0.0
+            // L7 again: the richest runtime — a scripted sunrise, a region census ring, a budget
+            val idx = intArrayOf(-1)
+            val found = java.util.concurrent.CountDownLatch(1)
+            world.post {
+                val a = org.json.JSONArray(Native.levelsJson())
+                for (i in 0 until a.length())
+                    if (a.getJSONObject(i).optString("key") == "outpost") idx[0] = i
+                found.countDown()
+            }
+            assertTrue(found.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue(idx[0] >= 0)
+            world.startLevel(idx[0], 1, arrayOf("S", "D"), arrayOf("", ""), 12000)
+            // across the scripted sunrise, driven exactly as the render loop drives it
+            val ran = java.util.concurrent.CountDownLatch(1)
+            world.post {
+                while (Native.tick() < 2500) { Native.markPrev(); Native.levelScript(); Native.step() }
+                Native.levelCheck()
+                ran.countDown()
+            }
+            assertTrue("the fast-forward never finished", ran.await(60, java.util.concurrent.TimeUnit.SECONDS))
+
+            // save mid-experiment, then walk away to a fresh sandbox world
+            val saved = java.util.concurrent.atomic.AtomicReference<ByteArray?>()
+            world.save { b -> saved.set(b) }
+            var until = System.currentTimeMillis() + 5000
+            while (saved.get() == null && System.currentTimeMillis() < until) {
+                shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(10)
+            }
+            val bytes = saved.get()
+            assertTrue("the mid-experiment save never arrived", bytes != null && bytes.isNotEmpty())
+            world.stopLevel()
+            world.resetWorld(99)
+
+            // load it back: the core must be mid-experiment again, and the shell must adopt it
+            val loaded = java.util.concurrent.atomic.AtomicInteger(-1)
+            world.load(bytes!!) { ok -> loaded.set(if (ok) 1 else 0) }
+            until = System.currentTimeMillis() + 5000
+            while (loaded.get() < 0 && System.currentTimeMillis() < until) {
+                shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(10)
+            }
+            assertTrue("the snapshot must load", loaded.get() == 1)
+            val core = DoubleArray(4)
+            val read = java.util.concurrent.CountDownLatch(1)
+            world.post {
+                core[0] = Native.levelNum(0) // state
+                core[1] = Native.levelNum(1) // level index
+                core[2] = Native.tick().toDouble()
+                core[3] = Native.sourceCount().toDouble()
+                read.countDown()
+            }
+            assertTrue(read.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue("the loaded world must be running the experiment", core[0] == 1.0)
+            assertTrue("the loaded world must be running L7", core[1].toInt() == idx[0])
+            assertTrue("the loaded world resumes at the save's tick", core[2] >= 2500.0)
+            assertTrue("the scripted second sun must have survived the round trip", core[3] == 2.0)
+
+            world.meterLabels = emptyArray() // so adoption's own labels are what the assert sees
+            activity.adoptCoreLevel()
+            until = System.currentTimeMillis() + 5000
+            while (world.meterLabels.isEmpty() && System.currentTimeMillis() < until) {
+                shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(10)
+            }
+            assertTrue("the shell must adopt the loaded experiment's meters", world.meterLabels.isNotEmpty())
+            assertTrue("the front door must offer to continue the experiment",
+                activity.continueRow.visibility == android.view.View.VISIBLE)
+            println("BOOT GATE: a mid-experiment save restores the experiment, and the shell adopts it")
+        } finally {
+            world.stopLevel()
+            world.surfaceDestroyed(world.holder)
+        }
+    }
+
+    /**
      * The owner's screen-lock report, played back (2026-09-01): "when my screen locks, all data
      * is lost, no save." Two faults compounded. A lock destroys the surface and an unlock
      * creates a new one, and `WorldView.run()` founded a fresh world on every new surface — so

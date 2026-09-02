@@ -237,6 +237,48 @@ impl Lvl {
     }
 }
 
+/// F5: the level's deduplicated region reads, derived from its definition alone — so a restored
+/// level (snapshot.rs) rebuilds exactly the list `level_start` built, and only the census ring
+/// itself needs to be stored.
+pub fn collect_regions(def: &LevelDef) -> Vec<Region> {
+    let mut rg_def: Vec<Region> = Vec::new();
+    {
+        let need_m = |m: Metric, rg_def: &mut Vec<Region>| {
+            let g = match m {
+                Metric::Near { sp, src, r } => Region::Near { sp, src, r },
+                Metric::At { sp, x, y, r } => Region::At { sp, x, y, r },
+                Metric::Share { sp, plane, side } => Region::Share { sp, plane, side },
+                _ => return,
+            };
+            if !rg_def.contains(&g) {
+                rg_def.push(g);
+            }
+        };
+        let need = |c: &Cond, rg_def: &mut Vec<Region>| {
+            if let Cond::Cmp(m, _, _) = *c {
+                need_m(m, rg_def);
+            }
+        };
+        for c in def.pass {
+            need(c, &mut rg_def);
+        }
+        for l in def.latch {
+            for c in l.when {
+                need(c, &mut rg_def);
+            }
+        }
+        for f in def.fail_now {
+            for c in f.when {
+                need(c, &mut rg_def);
+            }
+        }
+        for m in def.meter {
+            need_m(m.m, &mut rg_def);
+        }
+    }
+    rg_def
+}
+
 /// One recorder sample: `back` samples before the latest. Pure ring-buffer reads.
 #[derive(Clone, Copy, Debug)]
 pub struct LvlSample {
@@ -461,41 +503,7 @@ impl Sim {
             self.apply_event(Event::LightMul { v: def.light_mul });
         }
         // F5: collect the level's census reads (deduplicated) from every predicate and meter row
-        let mut rg_def: Vec<Region> = Vec::new();
-        {
-            let mut need_m = |m: Metric, rg_def: &mut Vec<Region>| {
-                let g = match m {
-                    Metric::Near { sp, src, r } => Region::Near { sp, src, r },
-                    Metric::At { sp, x, y, r } => Region::At { sp, x, y, r },
-                    Metric::Share { sp, plane, side } => Region::Share { sp, plane, side },
-                    _ => return,
-                };
-                if !rg_def.contains(&g) {
-                    rg_def.push(g);
-                }
-            };
-            let mut need = |c: &Cond, rg_def: &mut Vec<Region>| {
-                if let Cond::Cmp(m, _, _) = *c {
-                    need_m(m, rg_def);
-                }
-            };
-            for c in def.pass {
-                need(c, &mut rg_def);
-            }
-            for l in def.latch {
-                for c in l.when {
-                    need(c, &mut rg_def);
-                }
-            }
-            for f in def.fail_now {
-                for c in f.when {
-                    need(c, &mut rg_def);
-                }
-            }
-            for m in def.meter {
-                need_m(m.m, &mut rg_def);
-            }
-        }
+        let rg_def = collect_regions(def);
         let rg = vec![0.0; REC_N * rg_def.len()];
         self.lvl = Lvl {
             def: idx as i32,
