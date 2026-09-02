@@ -42,7 +42,19 @@ class Layers {
     val pall: Bitmap = Bitmap.createBitmap(FIELD, FIELD, Bitmap.Config.ARGB_8888)
     val shade: Bitmap = Bitmap.createBitmap(FIELD, FIELD, Bitmap.Config.ARGB_8888)
     private val cell: Bitmap = Bitmap.createBitmap(GRID, GRID, Bitmap.Config.ARGB_8888)
-    private val upPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { isFilterBitmap = true }
+    // The upscale samples the cell grid through a REPEAT shader: the world is a torus, so the
+    // filter must read the wrapped neighbour at the edges — a plain scaled drawBitmap clamps
+    // there, and that flat edge column became half of the visible world-boundary seam.
+    private val upPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
+        isFilterBitmap = true
+        shader = android.graphics.BitmapShader(
+            cell,
+            android.graphics.Shader.TileMode.REPEAT,
+            android.graphics.Shader.TileMode.REPEAT,
+        ).apply {
+            setLocalMatrix(android.graphics.Matrix().apply { setScale(UP.toFloat(), UP.toFloat()) })
+        }
+    }
     private val upDst = android.graphics.RectF(0f, 0f, FIELD.toFloat(), FIELD.toFloat())
 
     // world-tile paintings
@@ -76,7 +88,7 @@ class Layers {
         cell.setPixels(px, 0, GRID, 0, 0, GRID, GRID)
         val g = Canvas(into)
         g.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-        g.drawBitmap(cell, null, upDst, upPaint)
+        g.drawRect(upDst, upPaint)
     }
 
     /** Force a refresh and report the nanoseconds it took — the benchmark's `fields` row. */
