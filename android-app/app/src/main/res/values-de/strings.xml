@@ -103,6 +103,8 @@
     <string name="specimen_dormant">ruht</string>
     <string name="specimen_sub">Alter %1$d min · Größe %2$.1f · Mineral %3$.2f</string>
     <string name="label_energy">Energie</string>
+    <string name="specimen_details">Merkmale</string>
+    <string name="specimen_close">schließen</string>
 
     <!-- der Steckbrief -->
     <string name="spec_eats">frisst %1$s</string>

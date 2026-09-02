@@ -1,7 +1,21 @@
+<!-- The kill glyph (owner, 2026-09-02). It was a circled cross, which sat next to the sheet's
+     dismiss — also a cross — and one of the two is irreversible in consequence. A skull cannot
+     be confused with "close", and it says what the tool does without a word.
+
+     Stroked outline in the set's own weight (1.4), with the sockets and nose FILLED: a purely
+     stroked skull is illegible at 18 dp, and dark sockets are what makes the shape read. Used
+     both in the specimen header and as the armed kill tool in the dial. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="18dp" android:height="18dp"
     android:viewportWidth="18" android:viewportHeight="18">
   <group>
-    <path android:strokeColor="#C9D7E3" android:strokeWidth="1.4" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M9,2.5a6.5,6.5 0 1 0 0,13a6.5,6.5 0 1 0 0,-13 M6.5,6.5l5,5 M11.5,6.5l-5,5"/>
+    <path android:strokeColor="#C9D7E3" android:strokeWidth="1.4" android:strokeLineCap="round"
+        android:strokeLineJoin="round" android:fillColor="#00000000"
+        android:pathData="M9,2.6C6.1,2.6 3.8,4.9 3.8,7.8C3.8,9.5 4.6,11 5.8,11.9L5.8,13.6C5.8,14.6 6.6,15.4 7.6,15.4L10.4,15.4C11.4,15.4 12.2,14.6 12.2,13.6L12.2,11.9C13.4,11 14.2,9.5 14.2,7.8C14.2,4.9 11.9,2.6 9,2.6Z"/>
+    <path android:fillColor="#C9D7E3"
+        android:pathData="M6.9,6.55a1.35,1.35 0 1,0 0,2.7a1.35,1.35 0 1,0 0,-2.7Z M11.1,6.55a1.35,1.35 0 1,0 0,2.7a1.35,1.35 0 1,0 0,-2.7Z M9,10.1L9.85,11.7L8.15,11.7Z"/>
+    <path android:strokeColor="#C9D7E3" android:strokeWidth="1.1" android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M8.1,13.1L8.1,15.3 M9.9,13.1L9.9,15.3"/>
   </group>
 </vector>
