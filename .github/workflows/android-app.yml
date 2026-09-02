@@ -4,8 +4,7 @@ name: Android app
 # display list on a SurfaceView. M5.1 of docs/android-port-plan.md, planned in
 # docs/android-app-plan.md.
 #
-# Separate from android-native.yml (the diagnostics probe) and android-apk.yml (the WebView
-# wrapper). Three applicationIds, so all three install side by side and none can break the others.
+# The only Android workflow since the diagnostics probe and the WebView wrapper retired.
 #
 # This workflow is also the only compiler the Kotlin ever sees: the development container has no
 # Android SDK, so a red build here is the first signal that something does not compile.
