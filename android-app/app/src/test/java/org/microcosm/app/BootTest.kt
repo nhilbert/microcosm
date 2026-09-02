@@ -171,6 +171,15 @@ class BootTest {
             assertTrue("a founded world should hold something alive", spot[2] == 1.0)
             world.cam.x = spot[0]
             world.cam.y = spot[1]
+            // Let go first, and WAIT for it. The Observe-mode tap above already left a selection
+            // standing, so "wait until specimen != null" was satisfied the moment it was asked
+            // and this block read the OLD creature: the gate printed a 4-locus Drifta while the
+            // card on screen was a 1-locus Solara. The app was right and the gate was lying —
+            // measured 2026-09-02, and the reason `snap` is trustworthy below.
+            world.deselect()
+            until = System.currentTimeMillis() + 3000
+            while (world.specimen != null && System.currentTimeMillis() < until) Thread.sleep(10)
+            assertTrue("the previous selection must be let go before this one", world.specimen == null)
             val t3 = SystemClock.uptimeMillis()
             world.onTouchEvent(MotionEvent.obtain(t3, t3, MotionEvent.ACTION_DOWN, cx, cy, 0))
             world.onTouchEvent(MotionEvent.obtain(t3, t3 + 50, MotionEvent.ACTION_UP, cx, cy, 0))
@@ -181,34 +190,117 @@ class BootTest {
             assertTrue("the card should carry the creature's traits", snap!!.loci.isNotEmpty() || snap.sp == 0)
             println("BOOT GATE: selection published a structured card (sp ${snap.sp}, ${snap.loci.size} loci)")
 
-            // The Steckbrief (species-details): a HUD tick populates the sheet from the
-            // published card, the header unfolds the profile, and the selected species'
-            // portrait decodes from the bundled assets (assets/species, via build.gradle).
+            // The specimen card's ORDER (owner, 2026-09-02). It used to open on the numbers —
+            // the mono line and the trait tiles — and hide the portrait and the description
+            // behind a second tap. Now the first glance is what the creature IS (picture, role,
+            // food web, description) plus its energy, and the tiles are the fold.
+            //
+            // This block was run against the old build before the change and failed on exactly
+            // the two visibility claims below: a gate that does not convict the state it is
+            // meant to replace proves nothing.
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
             assertTrue("a selection must open the specimen sheet",
                 activity.specimenSheet.visibility == android.view.View.VISIBLE)
-            activity.setProfileOpen(true)
-            assertTrue("the unfolded Steckbrief must be visible",
+            assertTrue("the first glance must show the Steckbrief, untouched",
                 activity.specimenProfile.visibility == android.view.View.VISIBLE)
+            assertTrue("the first glance must fold the trait tiles away",
+                activity.specimenTiles.visibility == android.view.View.GONE)
             assertTrue("the Steckbrief must carry words for a founded species",
                 activity.profileAbout.text.isNotBlank())
             assertTrue("every founded species ships with its portrait",
                 Profiles.portrait(activity, Native.traitText(snap.sp, 0)) != null)
             assertTrue("the portrait slot must show the art",
                 activity.profilePortrait.visibility == android.view.View.VISIBLE)
+            // The order as the sheet stacks it: who it is, then what it is doing, then the fold.
+            val sheet = activity.specimenSheet
+            fun at(v: android.view.View) = sheet.indexOfChild(v)
+            assertTrue("the Steckbrief must come before the numbers",
+                at(activity.specimenProfile) in 1 until at(activity.specimenTiles))
+            assertTrue("the fold's own row must sit directly above the tiles",
+                at(activity.specimenDetails) == at(activity.specimenTiles) - 1)
             // Lay the sheet out for real before judging it: a VISIBLE flag with zero height is
             // exactly the kind of green a stale layout hands out (the first run of this block
             // photographed a sheet whose unfolded profile had never been measured).
-            val sheet = activity.specimenSheet
-            sheet.measure(
-                android.view.View.MeasureSpec.makeMeasureSpec(world.width, android.view.View.MeasureSpec.EXACTLY),
-                android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED),
-            )
-            sheet.layout(0, 0, sheet.measuredWidth, sheet.measuredHeight)
-            assertTrue("the unfolded Steckbrief must take real space",
+            fun layOut() {
+                sheet.measure(
+                    android.view.View.MeasureSpec.makeMeasureSpec(world.width, android.view.View.MeasureSpec.EXACTLY),
+                    android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED),
+                )
+                sheet.layout(0, 0, sheet.measuredWidth, sheet.measuredHeight)
+            }
+            layOut()
+            assertTrue("the Steckbrief must take real space at first glance",
                 activity.specimenProfile.height > 0 && activity.profilePortrait.height > 0)
-            photograph(sheet, "specimen@profile")
-            println("BOOT GATE: the Steckbrief unfolds with portrait and words (sp ${snap.sp})")
+            val firstGlance = sheet.measuredHeight
+            photograph(sheet, "specimen@first")
+
+            // Icons, not words: both actions must speak their word to a screen reader, in the
+            // locale's own language. An icon with no contentDescription is an unlabelled button.
+            val header = sheet.getChildAt(0) as android.widget.LinearLayout
+            val actions = header.getChildAt(header.childCount - 1) as android.widget.LinearLayout
+            val described = (0 until actions.childCount)
+                .map { actions.getChildAt(it) }
+                .filterIsInstance<android.widget.ImageButton>()
+            assertTrue("the header must carry three icon buttons (feed, kill, close)",
+                described.size == 3)
+            for (b in described) assertTrue(
+                "every icon button must carry the word it replaced",
+                !b.contentDescription.isNullOrBlank())
+            assertTrue("feed and kill must speak their own labels",
+                described[0].contentDescription == Chrome.label(activity, "feed") &&
+                described[1].contentDescription == Chrome.label(activity, "kill"))
+            println("BOOT GATE: header icons speak ${described.map { it.contentDescription }}")
+
+            // The fold still opens — on the tiles now, and only on the tiles.
+            activity.specimenDetails.performClick()
+            assertTrue("the disclosure row must unfold the trait tiles",
+                activity.specimenTiles.visibility == android.view.View.VISIBLE)
+            assertTrue("unfolding must not hide the Steckbrief",
+                activity.specimenProfile.visibility == android.view.View.VISIBLE)
+            layOut()
+            assertTrue("the fold must actually add height",
+                sheet.measuredHeight > firstGlance)
+            photograph(sheet, "specimen@details")
+            activity.specimenDetails.performClick()
+            assertTrue("the disclosure row must fold them back",
+                activity.specimenTiles.visibility == android.view.View.GONE)
+
+            // BOTH ways out. The finding this was asked to check (src/ui.jsx line 921): the
+            // BROWSER's close button clears the card and LEAVES the selection standing, so its
+            // 500 ms loop rebuilds the card and the sheet reopens by itself. The app must not
+            // do that — so the test does not stop at "the sheet went away", it keeps ticking
+            // and demands it stays away.
+            activity.specimenClose.performClick()
+            var until2 = System.currentTimeMillis() + 3000
+            while (world.specimen != null && System.currentTimeMillis() < until2) Thread.sleep(10)
+            assertTrue("the close icon must let the selection GO, not just hide the card",
+                world.specimen == null && world.selSpecies < 0)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1500))
+            assertTrue("the sheet must stay closed — the render thread must not re-select",
+                world.specimen == null && activity.specimenSheet.visibility != android.view.View.VISIBLE)
+            println("BOOT GATE: the close icon released the selection, and 1.5 s did not bring it back")
+
+            // ...and the gesture the owner kept: select again, then press back.
+            val t4 = SystemClock.uptimeMillis()
+            world.onTouchEvent(MotionEvent.obtain(t4, t4, MotionEvent.ACTION_DOWN, cx, cy, 0))
+            world.onTouchEvent(MotionEvent.obtain(t4, t4 + 50, MotionEvent.ACTION_UP, cx, cy, 0))
+            until2 = System.currentTimeMillis() + 3000
+            while (world.specimen == null && System.currentTimeMillis() < until2) Thread.sleep(10)
+            assertTrue("a second tap must select again", world.specimen != null)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            // This test drives the WorldView directly and never walked the front door, so the
+            // start screen is still up — and back correctly exits THAT first. Put the activity
+            // in the state a player pressing back on a selection is actually in. (Found by the
+            // gate itself: the first run failed here, and the reason was the front door, not
+            // the sheet.)
+            activity.startPanel.visibility = android.view.View.GONE
+            activity.onBackPressed()
+            until2 = System.currentTimeMillis() + 3000
+            while (world.specimen != null && System.currentTimeMillis() < until2) Thread.sleep(10)
+            assertTrue("back must still close the sheet — the gesture stays",
+                world.specimen == null && world.selSpecies < 0)
+            println("BOOT GATE: both ways out work — the icon and the back gesture")
+            println("BOOT GATE: the card opens on the Steckbrief; the tiles are the fold (sp ${snap.sp})")
         } finally {
             world.surfaceDestroyed(world.holder)
         }

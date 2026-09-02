@@ -109,6 +109,8 @@
     <string name="specimen_dormant">dormant</string>
     <string name="specimen_sub">age %1$d min · size %2$.1f · mineral %3$.2f</string>
     <string name="label_energy">energy</string>
+    <string name="specimen_details">traits</string>
+    <string name="specimen_close">close</string>
 
     <!-- the species profile (Steckbrief) — docs/species-profiles.md in player language.
          Rule 6 holds here too, and the trait lines stay teleology-proof: lines out-grow and
