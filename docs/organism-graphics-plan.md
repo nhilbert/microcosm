@@ -107,6 +107,18 @@ layers into one tile per tick, one fill per frame); after that: cells thresholds
 The far-zoom mat blockiness diagnostic (`Layers.kt` UP=4) still awaits an explicit
 verdict. Re-entry conditions for everything deliberately not built are in §3.
 
+**Owner round (2026-09-02), Bacillus**: the fixed three-rod constellation, identical for
+every individual and never rotating, read as "Formationsflug/Raumschiff". Root cause:
+one bake per bucket, drawn as kind 2 (unrotated). Fix, painting tier: the bake became a
+loose end-to-end CHAIN along +x (streptobacillus-style, elongated capsule glow), and the
+painter rotates SQUARE-shape blits by the record's own heading — `hd` is written into
+every organism record by both frame builders, so this reveals certified data rather than
+deciding anything. The colony now swims lengthwise and slews at each tumble. The owner's
+alternative (rods moving loosely against each other) was declined as clock animation,
+which the §0 verdict rules out; heading dynamics carry the life instead. Residual
+sameness (every colony the same chain) remains the per-individual-variation grammar
+spend of §3.
+
 Portrait prompt already updated (GR.1); the owner regenerates `assets/species/venator.jpg`
 when convenient (the card hides the slot meanwhile if removed). CLAUDE.md status line,
 plan record sections filled with measured numbers, probe retired or kept as bench toy —
