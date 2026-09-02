@@ -645,8 +645,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             buildMs += (build / 1e6 - buildMs) * 0.1
 
             stats = "t %d   %s".format(Native.tick(), popLine())
-            statsDev = "z %.2f   %.1f ms/frame  (core %.2f)  %d drawn".format(
-                cam.z / density, frameMs, buildMs, renderer.orgN,
+            statsDev = "z %.2f   %.1f ms/frame  (core %.2f)  %d drawn  %d cells".format(
+                cam.z / density, frameMs, buildMs, renderer.orgN, renderer.cellsDrawn,
             )
             card = renderer.cardText(selI, selGen)
             clock = "t %d".format(Native.tick())

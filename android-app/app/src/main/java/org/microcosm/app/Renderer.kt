@@ -88,6 +88,15 @@ class Renderer(private val density: Double = 1.0) {
     private val vecPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
     }
+    // Cell paints deliberately carry NO anti-alias: the owner's first device read-out was
+    // 32 ms/frame at cell zoom — ~1,500 visible cells x two AA circles. Cells overlap densely,
+    // so AA buys nothing visible; dedicated paints also spare per-cell style switching.
+    private val cellFill = Paint()
+    private val cellSeam = Paint().apply { style = Paint.Style.STROKE }
+    private val cellDot = Paint()
+    /** Cells drawn last frame — the dev telemetry's read-out, so a budget claim is checkable. */
+    @Volatile var cellsDrawn = 0
+        private set
     private val vecPath = Path()
     private val specShape = IntArray(7)
     private val specRGB = Array(7) { IntArray(0) }
@@ -179,7 +188,7 @@ class Renderer(private val density: Double = 1.0) {
         if (hidden and 1 == 0) {
             paintLayer(c, layers.carpet, cam, vw, vh)
             paintCarpetCells(c, cam, vw, vh)
-        }
+        } else cellsDrawn = 0
         if (cam.z < lodZ && hidden and (1 shl 7) == 0) paintLayer(c, layers.pall, cam, vw, vh)
         if (layers.hasWalls) paintLayer(c, layers.walls, cam, vw, vh)
 
@@ -460,9 +469,13 @@ class Renderer(private val density: Double = 1.0) {
      * no draws — and the margin thins into scattered single cells as the field weakens.
      */
     private fun paintCarpetCells(c: Canvas, cam: Camera, vw: Float, vh: Float) {
+        cellsDrawn = 0
         val cssZ = cam.z / density
         if (cssZ < CELLS_AT) return
         val fade = min(1.0, (cssZ - CELLS_AT) / 0.6).toFloat()
+        // the seam ring is subpixel until the cells are big; below this zoom it is only cost
+        val seams = cssZ >= 3.0
+        cellSeam.strokeWidth = 1f * dp
         val z = cam.z.toFloat()
         val colors = layers.carpetColor
         val halfW = vw / (2f * z) + CELL_STEP.toFloat()
@@ -492,21 +505,19 @@ class Renderer(private val density: Double = 1.0) {
                 val r8 = (col shr 16) and 0xFF
                 val g8 = (col shr 8) and 0xFF
                 val b8 = col and 0xFF
-                flat.style = Paint.Style.FILL
-                flat.color = vecArgb(fade * (0.6f + 0.35f * q), r8, g8, b8)
-                c.drawCircle(sx, sy, rad, flat)
-                flat.style = Paint.Style.STROKE
-                flat.strokeWidth = 1f * dp
-                flat.color = vecArgb(fade * 0.5f, r8 * 35 / 100, g8 * 35 / 100, b8 * 35 / 100)
-                c.drawCircle(sx, sy, rad, flat)
-                if (h1 < 0.14f) { // a nucleus point, here and there
-                    flat.style = Paint.Style.FILL
-                    flat.color = vecArgb(fade * 0.6f, 235, 255, 244)
-                    c.drawCircle(sx + (h2 - 0.5f) * rad, sy + (h3 - 0.5f) * rad, 1.1f * dp, flat)
+                cellFill.color = vecArgb(fade * (0.6f + 0.35f * q), r8, g8, b8)
+                c.drawCircle(sx, sy, rad, cellFill)
+                if (seams) {
+                    cellSeam.color = vecArgb(fade * 0.5f, r8 * 35 / 100, g8 * 35 / 100, b8 * 35 / 100)
+                    c.drawCircle(sx, sy, rad, cellSeam)
                 }
+                if (h1 < 0.14f) { // a nucleus point, here and there
+                    cellDot.color = vecArgb(fade * 0.6f, 235, 255, 244)
+                    c.drawCircle(sx + (h2 - 0.5f) * rad, sy + (h3 - 0.5f) * rad, 1.1f * dp, cellDot)
+                }
+                cellsDrawn++
             }
         }
-        flat.style = Paint.Style.FILL
     }
 
     /** Deterministic layout without a PRNG: the same grid point hashes the same every frame. */
