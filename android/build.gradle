@@ -1,7 +1,0 @@
-// Android WebView wrapper around the built artifact (dist/microcosm.jsx).
-// The wrapper is a shell, not the Kotlin port: the sim still runs as JS
-// inside a WebView. tools/build-app.js generates app/src/main/assets/.
-plugins {
-    id "com.android.application" version "8.7.3" apply false
-    id "org.jetbrains.kotlin.android" version "2.0.21" apply false
-}

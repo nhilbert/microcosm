@@ -81,20 +81,20 @@ Nothing in `dev/` ships. It exists so a browser has something to load; the
 artifact is unaffected by it.
 
 To run it **on an Android phone**: the Releases page carries a rolling
-**Microcosm APK (latest)** (tag `apk-latest`), rebuilt by CI from the current
-artifact on every relevant push. Download `microcosm.apk` on the phone and
-install it. The wrapper in `android/` is a dependency-free WebView shell —
-the sim still runs as JS; `docs/android-wrapper.md` has the details and the
-decisions (offline, no permissions, no localStorage, committed identity-only
-keystore).
+**Microcosm app** (tag `app-latest`), built by CI from `android-app/`. Download
+the APK on the phone and install it. This is the native app — the Rust core
+running on the device, painting the frame builder's display list on a
+SurfaceView. It is the product; the browser build above is the reference the
+renderer is proved against. Background: `docs/android-app-plan.md`.
 
-A second, separate APK — **Microcosm native probe** (tag `probe-latest`, built
-from `android-native/`) — runs the *Rust* core natively through JNI and prints
-what it measures: whether the certified world reproduces bit-for-bit on ARM64,
-whether the math matches V8's own results, whether a saved world resumes
-identically, and how fast the core ticks on that device. It is a diagnostics
-screen, not the game, and it installs alongside the sandbox app without touching
-it. Background: `docs/android-port-plan.md` §8.
+Two earlier APKs have retired. The WebView wrapper (`apk-latest`) existed
+because the simulation was JavaScript, which it no longer is; the M5.0
+diagnostics probe (`probe-latest`) existed to answer whether the arithmetic is
+bit-exact on ARM64 and how fast the core ticks on real hardware, and it
+answered both — a Fairphone 5 reproduced the four certified fingerprints
+bit-for-bit and ticked at 0.400 ms. The measurements are recorded in
+`docs/android-port-plan.md` §8, and the host-side half of that check still runs
+in CI on every push.
 
 ## The harnesses
 
