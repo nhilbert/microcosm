@@ -314,6 +314,16 @@ class BootTest {
         photograph(activity.startPanel, "frontdoor@boot")
         activity.expPanel.visibility = android.view.View.VISIBLE
         photograph(activity.expPanel, "experiments@boot")
+        // The menu thumbnails (tools/level-thumbs.js): SP's lesson is that a picture must take
+        // laid-out space, not merely exist — require at least one row's captured moment measured.
+        fun thumbs(v: android.view.View): Int = when (v) {
+            is PortraitView ->
+                if (v.visibility == android.view.View.VISIBLE && v.width > 0 && v.height > 0) 1 else 0
+            is android.view.ViewGroup -> (0 until v.childCount).sumOf { thumbs(v.getChildAt(it)) }
+            else -> 0
+        }
+        assertTrue("the experiment menu should show at least one gameplay thumbnail",
+            thumbs(activity.expPanel) > 0)
         activity.expPanel.visibility = android.view.View.GONE
         activity.startPanel.getChildAt(2).performClick() // sandbox
         assertTrue("choosing sandbox should close the front door",

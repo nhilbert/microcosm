@@ -38,6 +38,23 @@ object Profiles {
         return b
     }
 
+    private val levelCache = HashMap<String, Bitmap?>()
+
+    /**
+     * A level's experiment-menu thumbnail: a moment of that level's own world, photographed from
+     * real gameplay by tools/level-thumbs.js into assets/levels/<key>.jpg (the same committed
+     * home and bundling path as the portraits). Keyed by the core's level key; null when the
+     * level has no picture — the menu row then shows the words alone, never a placeholder.
+     */
+    fun levelThumb(ctx: Context, key: String): Bitmap? {
+        if (levelCache.containsKey(key)) return levelCache[key]
+        val b = try {
+            ctx.assets.open("levels/$key.jpg").use { BitmapFactory.decodeStream(it) }
+        } catch (e: Exception) { null }
+        levelCache[key] = b
+        return b
+    }
+
     /** What this species does, one line. 0 = no profile written for this species. */
     fun role(species: String) = when (species.lowercase()) {
         "solara" -> R.string.spec_role_solara
