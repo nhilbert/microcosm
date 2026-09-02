@@ -22,6 +22,10 @@
     <string name="start_sub_as_stands">your pond, as it stands</string>
     <string name="choice_continue_exp">continue the experiment</string>
     <string name="sub_continue_exp">E%1$d %2$s — as you left it</string>
+    <string name="choice_view_dark">view: dark field</string>
+    <string name="choice_view_light">view: light field</string>
+    <string name="sub_view_dark">glowing life on black water — tap for the light field</string>
+    <string name="sub_view_light">stained life on a lit ground — tap for the dark field</string>
 
     <!-- shared buttons -->
     <string name="btn_back">back</string>

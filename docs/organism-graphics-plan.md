@@ -170,10 +170,55 @@ when convenient (the card hides the slot meanwhile if removed). CLAUDE.md status
 plan record sections filled with measured numbers, probe retired or kept as bench toy —
 owner's call.
 
+**GR.7 — the light field (shipped 2026-09-02; NOT a frame change)**: the owner asked for
+the Hellfeld the probe has carried since round 2, switchable against the dark field. The
+look was never the open question — `dev/graphics-probe/stilproben.html`'s bright tab was
+built for exactly this comparison, and its recipe is implemented verbatim: the `#ECE9DF`
+ground, `mix(col, [105,105,100], 0.5)`, the `x0.55` that turns a fade into a membrane, one
+charcoal ink, the white phase-contrast rim. What was missing was a renderer able to hold
+two regimes; the probe is a standalone page with its own mini-simulation and shares no code
+with the app, by its own design.
+
+`android-app/.../Optics.kt` is the seam, and it is three rules the painters route through
+instead of branching: **wash** (a fill), **line** (a structure), **ink** (the contrast). In
+the dark field all three are the identity function, which is the whole point — measured, not
+assumed: the world camera's three rungs are byte-identical to main's (`sha256`, 0 of
+1,713,600 px differing at every rung). Only five differences are structural, and each says
+so where it is made: the bloom becomes a rim, the blits stop compositing with SCREEN (on a
+lit ground SCREEN washes every body to white), the light layer paints a lamp instead of
+black water, the wall's backing follows its ground, and Bacillus trades its capsule glow
+for a stain. A rebake per regime rather than a `MULTIPLY` composite, because the bakes are
+premultiplied ARGB and MULTIPLY drives their transparent surround to black.
+
+**The core is untouched.** `frame.rs` decides the same display list, no fingerprint moves,
+and the browser oracle keeps its one look — a second ground is painting, which is where a
+look belongs (rule 11, plan A.0). Reached from the front door and from the drawer, since
+comparing two optics needs the pond in sight; the choice is the app's only preference,
+because it belongs to the player's eyes rather than to any pond.
+
+*The one concession, recorded rather than hidden*: amber (rule 7) is the player's hand, and
+`#F2B24A` on a lit ground is a pale mark on a pale ground. The hand keeps the hue and takes
+a deeper tone in the light field only. One amber, two tones; the alternative was an
+illegible affordance.
+
+*Two things the photographs show and the owner should judge on the device*: Cilio's
+membrane reads HEAVIER in the light field than in the dark, because the bake's stroke and
+the near-tier vector overlay's stroke coincide by design and two dark strokes stack where
+SCREEN used to soften them — not tuned blind (rule 4); and the lit pool around a source
+reads slightly cool rather than warm, since the mineral field's blue sits over it.
+
+*Found while proving the above, not fixed and not mine*: `WorldCameraTest`'s frames differ
+between an isolated run and a full-suite run — 98% of pixels, on MAIN, with no code change
+involved. Something earlier in the app suite survives `boot(); resetWorld(); initWorld(11)`
+and changes 3,000 ticks of evolution. Harmless today (the camera asserts only that
+something was painted), and disqualifying the day anyone wants the camera to be a
+fingerprint gate. Re-entry: someone wants pixel-stable app photographs.
+
 ## 3. Non-goals (with re-entry conditions)
 
-- **Brightfield/Hellfeld** — rejected by conduct; re-entry: owner asks after seeing the
-  probe again.
+- ~~**Brightfield/Hellfeld**~~ — the re-entry condition fired: the owner asked for it on
+  2026-09-02. Shipped as GR.7 below, as a switchable second regime rather than a
+  replacement, which is what makes it cost the dark field nothing.
 - **Atmosphere** (motes, vignette, DOF) — fell with "Lebendig"; re-entry: owner asks for
   the water, not the creatures.
 - **Clock animation** (cilia phase, flagella, wobble) — rejected; re-entry: a future

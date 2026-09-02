@@ -89,6 +89,12 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     /** The viewport has to exist before the floor means anything. */
     private var camPlaced = false
     // Touched from the UI thread, read by the render thread.
+    /**
+     * GR.7 — which microscope the world is painted in: false = dark field, the shipped ground.
+     * The menu writes it from the UI thread; the render thread reads it and does the actual
+     * switch, so every bitmap the painter owns is only ever built where it is used.
+     */
+    @Volatile var lightField = Optics.lightField
     @Volatile var speed = 1.0
     @Volatile var hidden = 0
 
@@ -624,6 +630,8 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             }
 
             takeInput()
+            // the optic the menu asked for, applied where the bakes live
+            if (lightField != Optics.lightField) renderer.setOptic(lightField)
             if (speed > 0) acc += dt * speed
             val maxSteps = if (speed >= 16) 9 else if (speed >= 4) 5 else 3
             var steps = 0
