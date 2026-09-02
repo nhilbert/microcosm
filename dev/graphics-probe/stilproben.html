@@ -1,0 +1,475 @@
+<title>Microcosm Stilproben</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --abyss:#0B131E; --panel:#101A27; --panel2:#0D1622;
+    --ink:#E7EDF4; --dim:#8FA0B5; --faint:#5A6B80;
+    --line:#1D2A3A; --accent:#A8D6F4;
+    --sol:#46D68C; --dri:#5BC8E8; --cil:#D7A6E8; --bac:#9EA868; --ven:#A8D6F4;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--abyss); color:var(--ink); margin:0;
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:20px 14px 48px}
+  header{margin:6px 2px 14px}
+  h1{font-size:22px; font-weight:700; letter-spacing:.01em; margin:0 0 6px; text-wrap:balance}
+  h1 .sub{color:var(--accent)}
+  .lede{color:var(--dim); font-size:14.5px; line-height:1.5; margin:0; max-width:56ch}
+  .stage{
+    position:relative; border-radius:10px; overflow:hidden;
+    border:1px solid var(--line); background:var(--abyss);
+  }
+  canvas{display:block; width:100%; height:auto}
+  .hud{
+    position:absolute; top:10px; left:12px; right:12px;
+    display:flex; justify-content:space-between; align-items:center;
+    pointer-events:none;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em;
+    color:rgba(231,237,244,.55); text-transform:uppercase;
+  }
+  .hud .tag{background:rgba(11,19,30,.55); padding:3px 8px; border-radius:4px}
+  .hud button{
+    pointer-events:auto; cursor:pointer;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em;
+    color:var(--ink); background:rgba(16,26,39,.75); border:1px solid var(--line);
+    border-radius:4px; padding:4px 10px; text-transform:uppercase;
+  }
+  .hud button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .tabs{display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 0}
+  .tabs button{
+    cursor:pointer; font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:500;
+    color:var(--dim); background:var(--panel2); border:1px solid var(--line);
+    border-radius:999px; padding:9px 16px; min-height:40px;
+  }
+  .tabs button[aria-pressed="true"]{color:var(--abyss); background:var(--accent); border-color:var(--accent); font-weight:700}
+  .tabs button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .card{
+    margin-top:14px; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:14px 16px;
+  }
+  .card h2{font-size:15px; margin:0 0 6px; font-weight:700}
+  .card p{margin:0; color:var(--dim); font-size:14px; line-height:1.55; max-width:62ch}
+  .card .note{
+    margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
+    font-family:'IBM Plex Mono',monospace; font-size:12px; line-height:1.55; color:var(--faint);
+  }
+  footer{margin-top:22px; color:var(--faint); font-size:12.5px; line-height:1.6; max-width:62ch}
+  footer b{color:var(--dim); font-weight:500}
+  @media (prefers-reduced-motion: reduce){ .tabs button{transition:none} }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Microcosm <span class="sub">Stilproben</span></h1>
+    <p class="lede">Gleiche Szene, gleicher Seed, gleiche Bewegung — nur der Malstil wechselt.
+    Tippe durch und sag: so, oder so nicht.</p>
+  </header>
+
+  <div class="stage">
+    <canvas id="cv" width="640" height="640" aria-label="Stilprobe der Teichszene"></canvas>
+    <div class="hud">
+      <span class="tag" id="hudName">Heute</span>
+      <button id="pauseBtn" aria-pressed="false">Pause</button>
+    </div>
+  </div>
+
+  <div class="tabs" role="group" aria-label="Malstil wählen" id="tabs"></div>
+
+  <div class="card">
+    <h2 id="cardTitle"></h2>
+    <p id="cardBlurb"></p>
+    <div class="note" id="cardNote"></div>
+  </div>
+
+  <footer>
+    <b>Was das ist:</b> ein Wegwerf-Prototyp mit eigener Mini-Simulation, nicht der Renderer —
+    damit alle Stile exakt dieselbe Szene zeigen. Besetzung wie im Teich: Solara-Matte am Licht,
+    Drifta treibend, Cilio auf Jagd, Bacillus taumelnd am Detritus, zwei Venator, Kadaver, Zysten.
+    Drifta trägt absichtlich keine Geißel — es hat keinen Antrieb.
+    Zuordnung zur Recherche: Texturen ≈ Stufe G.1, Lebendig ≈ G.2+G.3 (Einzel-Phasen bräuchten
+    das ID-Feld aus G.4), Low Poly und Hellfeld sind die Identitätsfragen aus §8.
+  </footer>
+</div>
+
+<script>
+"use strict";
+// ---------- deterministic scene ----------
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R = mulberry32(1122);
+const W = 640, TAU = Math.PI*2;
+const SUN = {x:210, y:190};
+const DET = {x:500, y:500, r:95};           // detritus patch
+const COLS = {sol:[70,214,140], dri:[91,200,232], cil:[215,166,232], bac:[158,168,104], ven:[168,214,244], corpse:[158,168,178]};
+const wrap = v => (v%W+W)%W;
+const wd = d => { d = ((d+W/2)%W+W)%W - W/2; return d; };  // shortest toroidal delta
+function rgba(c,a){return `rgba(${c[0]},${c[1]},${c[2]},${a})`}
+function mix(a,b,t){return [a[0]+(b[0]-a[0])*t|0, a[1]+(b[1]-a[1])*t|0, a[2]+(b[2]-a[2])*t|0]}
+
+// mat density: sum of gaussians around the sun
+const MATB = []; for(let i=0;i<7;i++){ MATB.push({x:SUN.x+(R()-0.5)*230, y:SUN.y+(R()-0.5)*230, s:45+R()*55}); }
+function matDens(x,y){ let d=0; for(const b of MATB){ const dx=wd(x-b.x), dy=wd(y-b.y); d+=Math.exp(-(dx*dx+dy*dy)/(2*b.s*b.s)); } return Math.min(1,d*0.85); }
+
+// organisms — {sp,x,y,hd,r,ph,ring}
+const orgs=[];
+function add(sp,n,f){ for(let i=0;i<n;i++){ const o={sp,x:R()*W,y:R()*W,hd:R()*TAU,ph:R()*TAU,r:0,ring:false,strike:0,run:0}; f&&f(o); orgs.push(o);} }
+add('dri',26,o=>{ o.r=7+R()*3; o.ring=R()<0.45; o.x=wrap(SUN.x+(R()-0.5)*420); o.y=wrap(SUN.y+(R()-0.5)*420); });
+add('cil',7, o=>{ o.r=12+R()*3; });
+add('bac',12,o=>{ o.r=6+R()*2; o.x=wrap(DET.x+(R()-0.5)*220); o.y=wrap(DET.y+(R()-0.5)*220); });
+add('ven',2, o=>{ o.r=17; });
+const cysts=[]; for(let i=0;i<3;i++) cysts.push({x:R()*W,y:R()*W,r:5+R()*2});
+const corpses=[]; for(let i=0;i<5;i++) corpses.push({x:wrap(DET.x+(R()-0.5)*180),y:wrap(DET.y+(R()-0.5)*180),r:6+R()*4,ph:R()*TAU});
+const solMarks=[]; for(let i=0;i<200;i++){ const x=R()*W,y=R()*W; if(matDens(x,y)>0.35&&R()<0.12) solMarks.push({x,y,ph:R()*TAU}); }
+const motes=[]; for(let i=0;i<70;i++) motes.push({x:R()*W,y:R()*W,z:0.4+R()*0.8,ph:R()*TAU});
+
+const S = mulberry32(7788);       // behaviour randomness, separate stream
+function nearest(o,sp){ let best=null,bd=1e9; for(const q of orgs){ if(q.sp!==sp) continue; const dx=wd(q.x-o.x),dy=wd(q.y-o.y),d=dx*dx+dy*dy; if(d<bd){bd=d;best=q;} } return best; }
+function steer(o,tx,ty,rate){ const want=Math.atan2(wd(ty-o.y),wd(tx-o.x)); let d=want-o.hd; while(d>Math.PI)d-=TAU; while(d<-Math.PI)d+=TAU; o.hd+=Math.max(-rate,Math.min(rate,d)); }
+
+function tick(dt){
+  for(const o of orgs){
+    let spd=0;
+    if(o.sp==='dri'){ o.hd+=(S()-0.5)*0.25; steer(o,SUN.x,SUN.y,0.006); spd=9; }
+    if(o.sp==='cil'){ const p=nearest(o,'dri'); if(p) steer(o,p.x,p.y,0.045); spd=26; }
+    if(o.sp==='bac'){ o.run-=dt; if(o.run<=0){ o.hd=S()*TAU; o.run=0.6+S()*1.6; } spd=17; }
+    if(o.sp==='ven'){ const p=nearest(o,'cil'); if(p) steer(o,p.x,p.y,0.022);
+      o.strike-=dt; if(o.strike<-5-S()*4) o.strike=0.55; spd=(o.strike>0)?66:30; }
+    o.x=wrap(o.x+Math.cos(o.hd)*spd*dt); o.y=wrap(o.y+Math.sin(o.hd)*spd*dt);
+  }
+  for(const m of motes){ m.x=wrap(m.x+ (4+m.z*5)*dt ); m.y=wrap(m.y+Math.sin(m.ph+=dt*0.4)*0.12); }
+}
+
+// ---------- shared drawing helpers ----------
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+function blob(c,x,y,r,t,ph,amp,n1,n2){  // wobbly membrane path
+  c.beginPath();
+  for(let i=0;i<=28;i++){ const a=i/28*TAU;
+    const w=1+amp*Math.sin(a*n1+ph+t*1.7)+amp*0.6*Math.sin(a*n2-ph*1.3+t*2.3);
+    const rr=r*w, px=x+Math.cos(a)*rr, py=y+Math.sin(a)*rr;
+    i?c.lineTo(px,py):c.moveTo(px,py);
+  } c.closePath();
+}
+function teardrop(c,x,y,hd,r,e){ // e = elongation 1..1.5
+  c.save(); c.translate(x,y); c.rotate(hd);
+  c.beginPath(); c.moveTo(r*e,0);
+  c.bezierCurveTo(r*e*0.55,r*0.86, -r*0.9,r*0.82, -r*0.95,0);
+  c.bezierCurveTo(-r*0.9,-r*0.82, r*e*0.55,-r*0.86, r*e,0);
+  c.closePath();
+}
+function spearhead(c,x,y,hd,r,striking){
+  c.save(); c.translate(x,y); c.rotate(hd); const st=striking?1.4:1;
+  c.beginPath(); c.moveTo(r*1.15*st,0); c.lineTo(-r*0.75,r*0.62); c.lineTo(-r*0.42,0); c.lineTo(-r*0.75,-r*0.62); c.closePath();
+}
+function poly(c,x,y,r,n,rot,irr,seed){
+  const pr=mulberry32(seed|0); c.beginPath();
+  for(let i=0;i<n;i++){ const a=rot+i/n*TAU, rr=r*(1+(pr()-0.5)*irr);
+    const px=x+Math.cos(a)*rr, py=y+Math.sin(a)*rr; i?c.lineTo(px,py):c.moveTo(px,py); }
+  c.closePath();
+}
+function shade(col,f){ return col.map(v=>Math.max(0,Math.min(255,v*f|0))); }
+
+// ---------- painters ----------
+function paintWaterBase(c){ c.fillStyle='#0B131E'; c.fillRect(0,0,W,W);
+  const g=c.createRadialGradient(DET.x,DET.y,10,DET.x,DET.y,DET.r+50);
+  g.addColorStop(0,'rgba(64,138,205,0.10)'); g.addColorStop(1,'rgba(64,138,205,0)');
+  c.fillStyle=g; c.fillRect(0,0,W,W);
+  c.fillStyle='rgba(60,52,40,0.35)'; c.beginPath(); c.arc(DET.x,DET.y,DET.r,0,TAU); c.fill();
+}
+function paintSun(c,soft){
+  const g=c.createRadialGradient(SUN.x,SUN.y,4,SUN.x,SUN.y,soft?300:230);
+  g.addColorStop(0,'rgba(255,243,214,0.30)'); g.addColorStop(0.4,'rgba(255,243,214,0.10)'); g.addColorStop(1,'rgba(255,243,214,0)');
+  c.fillStyle=g; c.fillRect(0,0,W,W);
+}
+
+// A — Heute: soft gradient dots, shape marks, blocky carpet.
+function paintToday(c,t){
+  paintWaterBase(c);
+  const cell=16;                       // the 64-grid, honestly blocky
+  for(let gy=0;gy<W;gy+=cell) for(let gx=0;gx<W;gx+=cell){
+    const d=matDens(gx+8,gy+8); if(d<0.12) continue;
+    const q=Math.sqrt(d), col=mix([96,205,150],[34,123,78],q);
+    c.fillStyle=rgba(col,(70+150*q)/255); c.fillRect(gx,gy,cell,cell);
+  }
+  paintSun(c,false);
+  c.fillStyle='rgba(120,135,150,0.5)';
+  for(const z of cysts){ c.beginPath(); c.arc(z.x,z.y,z.r,0,TAU); c.fill(); }
+  for(const k of corpses){ c.fillStyle='rgba(158,168,178,0.4)'; c.beginPath(); c.arc(k.x,k.y,k.r,0,TAU); c.fill();
+    c.strokeStyle='rgba(158,168,178,0.5)'; c.beginPath(); c.arc(k.x,k.y,k.r*0.55,0,TAU); c.stroke(); }
+  c.globalCompositeOperation='screen';
+  for(const m of solMarks){ c.fillStyle=rgba(COLS.sol,0.35); c.beginPath(); c.arc(m.x,m.y,2.2,0,TAU); c.fill(); }
+  for(const o of orgs){
+    const col=COLS[o.sp==='dri'?'dri':o.sp==='cil'?'cil':o.sp==='bac'?'bac':'ven'];
+    if(o.sp==='ven'){ c.globalCompositeOperation='source-over';
+      spearhead(c,o.x,o.y,o.hd,o.r,o.strike>0);
+      c.fillStyle=rgba(col,0.16); c.fill(); c.strokeStyle=rgba(col,0.9); c.lineWidth=1.6; c.stroke();
+      c.beginPath(); c.arc(o.r*1.15*(o.strike>0?1.4:1),0,1.6,0,TAU); c.fillStyle=rgba(col,1); c.fill();
+      c.restore(); c.globalCompositeOperation='screen'; continue; }
+    const g=c.createRadialGradient(o.x,o.y,0.5,o.x,o.y,o.r*1.6);
+    g.addColorStop(0,rgba(col,0.55)); g.addColorStop(0.55,rgba(col,0.18)); g.addColorStop(1,rgba(col,0));
+    c.fillStyle=g; c.beginPath(); c.arc(o.x,o.y,o.r*1.6,0,TAU); c.fill();
+    if(o.sp==='dri'){ c.fillStyle=rgba(col,0.95); c.beginPath(); c.arc(o.x,o.y,o.r*0.42,0,TAU); c.fill();
+      if(o.ring){ c.strokeStyle='rgba(235,246,255,0.7)'; c.lineWidth=1.8; c.beginPath(); c.arc(o.x,o.y,o.r*0.85,0,TAU); c.stroke(); } }
+    if(o.sp==='cil'){ c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
+      c.beginPath(); c.moveTo(o.r*0.75,0); c.lineTo(-o.r*0.45,o.r*0.5); c.lineTo(-o.r*0.45,-o.r*0.5); c.closePath();
+      c.fillStyle=rgba(col,0.95); c.fill(); c.restore(); }
+    if(o.sp==='bac'){ c.fillStyle=rgba(col,0.9); c.fillRect(o.x-o.r*0.4,o.y-o.r*0.4,o.r*0.8,o.r*0.8); }
+  }
+  c.globalCompositeOperation='source-over';
+}
+
+// shared micrograph bodies for B (static) and C (animated)
+function paintMicro(c,t,live){
+  paintWaterBase(c);
+  for(const b of MATB){ // smooth carpet: layered soft blobs + mottling
+    const g=c.createRadialGradient(b.x,b.y,2,b.x,b.y,b.s*2.1);
+    g.addColorStop(0,rgba([34,123,78],0.85)); g.addColorStop(0.55,rgba([46,150,96],0.5)); g.addColorStop(1,rgba([96,205,150],0));
+    c.fillStyle=g; c.beginPath(); c.arc(b.x,b.y,b.s*2.1,0,TAU); c.fill();
+  }
+  const pr=mulberry32(42);
+  for(let i=0;i<90;i++){ const x=pr()*W,y=pr()*W,d=matDens(x,y); if(d<0.25) continue;
+    c.fillStyle=rgba([20,80,52],0.25*d); c.beginPath(); c.arc(x,y,4+pr()*7,0,TAU); c.fill(); }
+  for(const m of solMarks){ // thinning margin cells
+    c.fillStyle=rgba(COLS.sol,0.5); c.beginPath(); c.arc(m.x,m.y,2.6,0,TAU); c.fill();
+    c.fillStyle='rgba(240,255,246,0.55)'; c.beginPath(); c.arc(m.x+0.8,m.y-0.8,0.9,0,TAU); c.fill(); }
+  paintSun(c,true);
+  if(live){ // far bokeh + motes
+    c.fillStyle='rgba(200,220,235,0.03)';
+    const bp=mulberry32(9); for(let i=0;i<6;i++){ c.beginPath(); c.arc(bp()*W,bp()*W,30+bp()*50,0,TAU); c.fill(); }
+    for(const m of motes){ c.fillStyle=`rgba(205,220,232,${0.05+m.z*0.09})`; c.beginPath(); c.arc(m.x,m.y,0.7+m.z*0.9,0,TAU); c.fill(); }
+  }
+  for(const z of cysts){ // dormancy: dense wall, dim heart
+    c.fillStyle='rgba(96,110,124,0.45)'; c.beginPath(); c.arc(z.x,z.y,z.r,0,TAU); c.fill();
+    c.strokeStyle='rgba(150,164,178,0.6)'; c.lineWidth=1.6; c.beginPath(); c.arc(z.x,z.y,z.r,0,TAU); c.stroke(); }
+  for(const k of corpses){ // deflated membrane ghost
+    blob(c,k.x,k.y,k.r,0,k.ph,0.22,3,5);
+    c.fillStyle='rgba(158,168,178,0.14)'; c.fill();
+    c.strokeStyle='rgba(158,168,178,0.5)'; c.lineWidth=1; c.stroke();
+    c.fillStyle='rgba(158,168,178,0.3)'; c.beginPath(); c.arc(k.x+k.r*0.2,k.y-k.r*0.15,k.r*0.3,0,TAU); c.fill(); }
+  c.globalCompositeOperation='screen';
+  for(const o of orgs){
+    const wob=live?1:0;
+    if(o.sp==='dri'){
+      const col=COLS.dri;
+      const g=c.createRadialGradient(o.x,o.y,o.r*0.6,o.x,o.y,o.r*2.0); // gel halo
+      g.addColorStop(0,rgba(col,0.14)); g.addColorStop(1,rgba(col,0));
+      c.fillStyle=g; c.beginPath(); c.arc(o.x,o.y,o.r*2.0,0,TAU); c.fill();
+      blob(c,o.x,o.y,o.r,wob*t,o.ph,0.035,3,5);
+      c.fillStyle=rgba(mix(col,[10,25,40],0.55),0.55); c.fill();          // translucent interior
+      c.strokeStyle=rgba(col,0.95); c.lineWidth=1.5; c.stroke();          // membrane
+      c.fillStyle=rgba([235,250,255],0.9); c.beginPath(); c.arc(o.x+o.r*0.28,o.y-o.r*0.2,o.r*0.22,0,TAU); c.fill(); // nucleus
+      c.fillStyle=rgba(mix(col,[0,0,0],0.4),0.5); c.beginPath(); c.arc(o.x-o.r*0.3,o.y+o.r*0.25,o.r*0.18,0,TAU); c.fill(); // vacuole
+      if(o.ring){ c.strokeStyle='rgba(235,246,255,0.85)'; c.lineWidth=1.4;
+        for(let s=0;s<10;s++){ const a=s/10*TAU+o.ph; c.beginPath();
+          c.moveTo(o.x+Math.cos(a)*o.r*1.02,o.y+Math.sin(a)*o.r*1.02);
+          c.lineTo(o.x+Math.cos(a)*o.r*1.3,o.y+Math.sin(a)*o.r*1.3); c.stroke(); } }
+    }
+    if(o.sp==='cil'){
+      const col=COLS.cil;
+      teardrop(c,o.x,o.y,o.hd,o.r,1.25);
+      c.fillStyle=rgba(mix(col,[12,20,34],0.5),0.6); c.fill();
+      c.strokeStyle=rgba(col,0.95); c.lineWidth=1.6; c.stroke();
+      // cilia fringe
+      c.strokeStyle=rgba(col,0.55); c.lineWidth=1;
+      for(let s=0;s<26;s++){ const a=s/26*TAU;
+        const bend=live?Math.sin(t*10+s*0.9+o.ph)*0.45:0.2;
+        const bx=Math.cos(a)*o.r*1.02, by=Math.sin(a)*o.r*0.86;
+        c.beginPath(); c.moveTo(bx,by);
+        c.lineTo(bx+Math.cos(a+bend)*o.r*0.28, by+Math.sin(a+bend)*o.r*0.28); c.stroke(); }
+      // oral groove + glowing food vacuoles (its last Drifta meal)
+      c.strokeStyle=rgba([245,235,255],0.7); c.lineWidth=1.2;
+      c.beginPath(); c.moveTo(o.r*1.05,0); c.quadraticCurveTo(o.r*0.5,o.r*0.28,o.r*0.1,o.r*0.12); c.stroke();
+      const pulse=live?0.65+0.25*Math.sin(t*3+o.ph):0.75;
+      c.fillStyle=rgba(COLS.dri,pulse*0.8);
+      c.beginPath(); c.arc(-o.r*0.25,-o.r*0.18,o.r*0.16,0,TAU); c.fill();
+      c.beginPath(); c.arc(-o.r*0.5,o.r*0.15,o.r*0.12,0,TAU); c.fill();
+      c.restore();
+    }
+    if(o.sp==='bac'){
+      const col=COLS.bac;
+      c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
+      if(live){ // flagella wave while running
+        c.strokeStyle=rgba(col,0.5); c.lineWidth=1;
+        for(const off of [-1.6,1.6]){ c.beginPath(); c.moveTo(-o.r*0.9,off);
+          for(let sx=0;sx<=14;sx++){ const u=sx/14;
+            c.lineTo(-o.r*0.9-u*o.r*1.7, off+Math.sin(u*9-t*16+o.ph)*2.4*u); } c.stroke(); }
+      }
+      const g=c.createRadialGradient(0,0,1,0,0,o.r*1.7);   // shared capsule
+      g.addColorStop(0,rgba(col,0.16)); g.addColorStop(1,rgba(col,0));
+      c.fillStyle=g; c.beginPath(); c.arc(0,0,o.r*1.7,0,TAU); c.fill();
+      for(const[rx,ry,rr]of[[-2,-2.4,0],[1.5,0.6,0.4],[-1,3.2,-0.3]]){
+        c.save(); c.translate(rx,ry); c.rotate(rr);
+        c.fillStyle=rgba(col,0.85); c.beginPath();
+        c.roundRect(-o.r*0.55,-o.r*0.2,o.r*1.1,o.r*0.4,o.r*0.2); c.fill(); c.restore(); }
+      c.restore();
+    }
+    if(o.sp==='ven'){
+      const col=COLS.ven; c.globalCompositeOperation='source-over';
+      spearhead(c,o.x,o.y,o.hd,o.r,o.strike>0);
+      c.fillStyle=rgba(col,0.10); c.fill();
+      c.strokeStyle=rgba(col,0.35); c.lineWidth=1; c.stroke();
+      const st=o.strike>0?1.4:1;
+      c.strokeStyle=rgba([235,248,255],0.95); c.lineWidth=1.8;   // bright leading V
+      c.beginPath(); c.moveTo(-o.r*0.75,o.r*0.62); c.lineTo(o.r*1.15*st,0); c.lineTo(-o.r*0.75,-o.r*0.62); c.stroke();
+      c.strokeStyle=rgba(col,0.4); c.lineWidth=1;                // inner mantle lines
+      c.beginPath(); c.moveTo(-o.r*0.42,0); c.lineTo(o.r*0.5,0); c.stroke();
+      c.fillStyle=rgba(col,1); c.beginPath(); c.arc(o.r*1.15*st,0,1.7,0,TAU); c.fill();
+      if(live&&o.strike>0){ c.strokeStyle=rgba(col,0.3); c.lineWidth=3;
+        c.beginPath(); c.moveTo(-o.r*2.6,0); c.lineTo(-o.r*0.8,0); c.stroke(); }
+      c.restore(); c.globalCompositeOperation='screen';
+    }
+  }
+  c.globalCompositeOperation='source-over';
+  if(live){ // vignette
+    const g=c.createRadialGradient(W/2,W/2,W*0.35,W/2,W/2,W*0.72);
+    g.addColorStop(0,'rgba(4,8,14,0)'); g.addColorStop(1,'rgba(4,8,14,0.5)');
+    c.fillStyle=g; c.fillRect(0,0,W,W);
+  }
+}
+
+// D — Low poly: flat facets, hard edges, no glow.
+function paintLowPoly(c,t){
+  c.fillStyle='#0D1523'; c.fillRect(0,0,W,W);
+  poly(c,DET.x,DET.y,DET.r,7,0.4,0.3,55); c.fillStyle='rgba(70,62,50,0.5)'; c.fill();
+  for(const b of MATB){ // triangulated carpet
+    const pr=mulberry32(b.x*7+b.y|0);
+    for(let i=0;i<12;i++){ const a=pr()*TAU, rc=pr()*b.s*0.9;
+      const cx=b.x+Math.cos(a)*rc, cy=b.y+Math.sin(a)*rc, r1=b.s*(0.25+pr()*0.3), a2=pr()*TAU;
+      c.beginPath(); c.moveTo(cx,cy);
+      c.lineTo(cx+Math.cos(a2)*r1, cy+Math.sin(a2)*r1);
+      c.lineTo(cx+Math.cos(a2+1.0)*r1*0.9, cy+Math.sin(a2+1.0)*r1*0.9); c.closePath();
+      c.fillStyle=rgba(shade(COLS.sol,0.35+pr()*0.45),0.75); c.fill(); }
+  }
+  poly(c,SUN.x,SUN.y,46,8,0.2,0.15,3); c.fillStyle='rgba(255,243,214,0.16)'; c.fill();
+  poly(c,SUN.x,SUN.y,26,8,0.6,0.15,4); c.fillStyle='rgba(255,243,214,0.30)'; c.fill();
+  for(const k of corpses){ poly(c,k.x,k.y,k.r,5,k.ph,0.4,k.x|0);
+    c.fillStyle='rgba(158,168,178,0.45)'; c.fill(); }
+  for(const z of cysts){ poly(c,z.x,z.y,z.r,6,0.5,0.2,z.x|0); c.fillStyle='rgba(120,135,150,0.6)'; c.fill(); }
+  let id=0;
+  for(const o of orgs){ id++;
+    const col=COLS[o.sp==='dri'?'dri':o.sp==='cil'?'cil':o.sp==='bac'?'bac':'ven'];
+    c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
+    const n=o.sp==='dri'?6:o.sp==='cil'?7:o.sp==='bac'?4:3;
+    const ex=o.sp==='cil'?1.3:o.sp==='ven'?1.6:1;
+    c.scale(ex,1);
+    poly(c,0,0,o.r,n,0,0.25,id*13);
+    c.fillStyle=rgba(shade(col,0.8),0.95); c.fill();
+    c.strokeStyle=rgba(shade(col,0.45),1); c.lineWidth=1.4; c.stroke();
+    const pr=mulberry32(id*29); // one light facet
+    const a=pr()*TAU;
+    c.beginPath(); c.moveTo(0,0);
+    c.lineTo(Math.cos(a)*o.r,Math.sin(a)*o.r);
+    c.lineTo(Math.cos(a+TAU/n)*o.r,Math.sin(a+TAU/n)*o.r); c.closePath();
+    c.fillStyle=rgba(shade(col,1.15),0.9); c.fill();
+    if(o.sp==='dri'&&o.ring){ poly(c,0,0,o.r*1.25,6,0.3,0.1,id*7);
+      c.strokeStyle='rgba(235,246,255,0.8)'; c.lineWidth=1.6; c.stroke(); }
+    c.restore();
+  }
+}
+
+// E — Hellfeld: pale ground, phase-contrast halo, round field of view.
+function paintBright(c,t){
+  c.fillStyle='#05070B'; c.fillRect(0,0,W,W);
+  c.save(); c.beginPath(); c.arc(W/2,W/2,W*0.48,0,TAU); c.clip();
+  c.fillStyle='#ECE9DF'; c.fillRect(0,0,W,W);
+  const g0=c.createRadialGradient(SUN.x,SUN.y,10,SUN.x,SUN.y,320);
+  g0.addColorStop(0,'rgba(255,255,250,0.7)'); g0.addColorStop(1,'rgba(255,255,250,0)');
+  c.fillStyle=g0; c.fillRect(0,0,W,W);
+  for(const b of MATB){ const g=c.createRadialGradient(b.x,b.y,2,b.x,b.y,b.s*2.0);
+    g.addColorStop(0,'rgba(88,150,110,0.4)'); g.addColorStop(1,'rgba(88,150,110,0)');
+    c.fillStyle=g; c.beginPath(); c.arc(b.x,b.y,b.s*2.0,0,TAU); c.fill(); }
+  c.fillStyle='rgba(120,105,80,0.25)'; c.beginPath(); c.arc(DET.x,DET.y,DET.r,0,TAU); c.fill();
+  for(const m of motes){ c.fillStyle=`rgba(60,60,55,${0.10+m.z*0.10})`; c.beginPath(); c.arc(m.x,m.y,0.6+m.z*0.7,0,TAU); c.fill(); }
+  for(const k of corpses){ blob(c,k.x,k.y,k.r,0,k.ph,0.22,3,5);
+    c.fillStyle='rgba(90,90,88,0.20)'; c.fill(); c.strokeStyle='rgba(70,70,68,0.5)'; c.lineWidth=1; c.stroke(); }
+  function ghost(x,y,r,col,drawBody){
+    c.strokeStyle='rgba(255,255,252,0.9)'; c.lineWidth=2.6;  // the halo
+    c.beginPath(); c.arc(x,y,r*1.08,0,TAU); c.stroke();
+    drawBody();
+  }
+  for(const o of orgs){
+    const col=COLS[o.sp==='dri'?'dri':o.sp==='cil'?'cil':o.sp==='bac'?'bac':'ven'];
+    const faded=mix(col,[95,95,92],0.62);   // pigment washes out on a bright ground
+    if(o.sp==='dri'){ ghost(o.x,o.y,o.r,faded,()=>{
+        c.fillStyle=rgba(faded,0.35); c.beginPath(); c.arc(o.x,o.y,o.r,0,TAU); c.fill();
+        c.strokeStyle=rgba(shade(faded,0.55),0.9); c.lineWidth=1.4; c.beginPath(); c.arc(o.x,o.y,o.r,0,TAU); c.stroke();
+        c.fillStyle='rgba(55,60,66,0.7)'; c.beginPath(); c.arc(o.x+o.r*0.25,o.y-o.r*0.2,o.r*0.2,0,TAU); c.fill(); });
+      if(o.ring){ c.strokeStyle='rgba(55,60,66,0.6)'; c.lineWidth=1.2; c.beginPath(); c.arc(o.x,o.y,o.r*1.28,0,TAU); c.stroke(); } }
+    if(o.sp==='cil'){ c.strokeStyle='rgba(255,255,252,0.85)'; c.lineWidth=2.4;
+      teardrop(c,o.x,o.y,o.hd,o.r*1.06,1.25); c.stroke(); c.restore();
+      teardrop(c,o.x,o.y,o.hd,o.r,1.25);
+      c.fillStyle=rgba(faded,0.35); c.fill();
+      c.strokeStyle='rgba(60,55,66,0.8)'; c.lineWidth=1.4; c.stroke(); c.restore(); }
+    if(o.sp==='bac'){ c.save(); c.translate(o.x,o.y); c.rotate(o.hd);
+      c.fillStyle=rgba(faded,0.5);
+      c.beginPath(); c.roundRect(-o.r*0.7,-o.r*0.28,o.r*1.4,o.r*0.56,o.r*0.28); c.fill();
+      c.strokeStyle='rgba(70,70,60,0.7)'; c.lineWidth=1; c.stroke(); c.restore(); }
+    if(o.sp==='ven'){ spearhead(c,o.x,o.y,o.hd,o.r,o.strike>0);
+      c.fillStyle=rgba(faded,0.22); c.fill();
+      c.strokeStyle='rgba(60,68,76,0.85)'; c.lineWidth=1.6; c.stroke(); c.restore(); }
+  }
+  const vg=c.createRadialGradient(W/2,W/2,W*0.30,W/2,W/2,W*0.48);
+  vg.addColorStop(0,'rgba(30,32,30,0)'); vg.addColorStop(1,'rgba(30,32,30,0.45)');
+  c.fillStyle=vg; c.fillRect(0,0,W,W);
+  c.restore();
+  c.strokeStyle='rgba(150,160,175,0.35)'; c.lineWidth=2;
+  c.beginPath(); c.arc(W/2,W/2,W*0.48,0,TAU); c.stroke();
+}
+
+// ---------- styles, tabs, loop ----------
+const STYLES=[
+ {key:'today', name:'Heute', title:'Heute — der Ist-Stand',
+  blurb:'Weiche Leuchtpunkte mit Formzeichen auf dunklem Grund, die Matte als grobes Pixelfeld. Die Referenz, gegen die alles andere antritt.',
+  note:'Bucket-Sprites, 64er-Feld, Screen-Composite — wie im Renderer.',
+  paint:paintToday},
+ {key:'tex', name:'Texturen', title:'Texturen — Mikrografie-Bakes',
+  blurb:'Dieselben Körper, prozedural reicher gebacken: Membran, Kern, Vakuolen, Fressvakuolen bei Cilio, Kapsel-Kolonie bei Bacillus, weiche Matte. Alles steht still.',
+  note:'Stufe G.1 · reine Malschicht, kein Gate berührt · pro Frame gleich teuer wie heute.',
+  paint:(c,t)=>paintMicro(c,t,false)},
+ {key:'live', name:'Lebendig', title:'Lebendig — Vektor und Atmosphäre',
+  blurb:'Texturen plus Bewegung: Cilienflimmern, Flagellenschlag bei Bacillus, Membranwobbeln, Schwebeteilchen, Vignette. Drifta bleibt passiv — es hat keinen Antrieb, eine Geißel wäre gelogen.',
+  note:'Stufen G.2 + G.3 · gate-frei, aber Pfadkosten bei 2.000 Organismen ungemessen · stabile Einzel-Phasen bräuchten das ID-Feld aus G.4 (Grammatik-Entscheidung).',
+  paint:(c,t)=>paintMicro(c,t,true)},
+ {key:'poly', name:'Low Poly', title:'Low Poly — die Gegenposition',
+  blurb:'Facetten statt Glühen: harte Kanten, flache Flächen, klare Silhouetten. Billig und lesbar — aber es zeigt bewusst vom Mikroskop weg.',
+  note:'Stilisierung, kein Realismus · eine Identitätsentscheidung, halb geht nicht (§6.2 der Recherche).',
+  paint:paintLowPoly},
+ {key:'bright', name:'Hellfeld', title:'Hellfeld — die Paletten-Inversion',
+  blurb:'Heller Grund, rundes Sichtfeld, Phasenkontrast-Halo. Der ikonische Mikroskop-Blick — und schau, was mit den Artfarben passiert: die Identität wäscht aus.',
+  note:'§8-Frage 1 · bräche die Bernstein-Grammatik der Spielerhand und die Pigment-Begründung des dunklen Grunds.',
+  paint:paintBright},
+];
+
+let cur=0, paused=false, t=0, last=performance.now();
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduced) paused=true;
+
+const tabs=document.getElementById('tabs');
+STYLES.forEach((s,i)=>{ const b=document.createElement('button');
+  b.textContent=s.name; b.setAttribute('aria-pressed',i===cur);
+  b.onclick=()=>{ cur=i; [...tabs.children].forEach((e,j)=>e.setAttribute('aria-pressed',j===cur)); syncCard(); if(paused) draw(); };
+  tabs.appendChild(b); });
+function syncCard(){ const s=STYLES[cur];
+  document.getElementById('hudName').textContent=s.name;
+  document.getElementById('cardTitle').textContent=s.title;
+  document.getElementById('cardBlurb').textContent=s.blurb;
+  document.getElementById('cardNote').textContent=s.note; }
+syncCard();
+
+const pb=document.getElementById('pauseBtn');
+function syncPause(){ pb.textContent=paused?'Weiter':'Pause'; pb.setAttribute('aria-pressed',paused); }
+pb.onclick=()=>{ paused=!paused; syncPause(); if(!paused){ last=performance.now(); requestAnimationFrame(loop); } };
+syncPause();
+
+function draw(){ STYLES[cur].paint(ctx,t); }
+function loop(now){
+  if(paused) return;
+  const dt=Math.min(0.05,(now-last)/1000); last=now; t+=dt;
+  tick(dt); draw();
+  requestAnimationFrame(loop);
+}
+tick(0.01); draw();
+if(!paused) requestAnimationFrame(loop);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ paused=true; syncPause(); } });
+</script>
