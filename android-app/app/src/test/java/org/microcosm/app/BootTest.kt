@@ -621,6 +621,27 @@ class BootTest {
             assertTrue("an armed tool's tap must not select", world.specimen == null)
             assertTrue("a fresh kill must offer its undo", world.undoKind != 0)
             println("BOOT GATE: the armed kill tool erased the creature it touched, without selecting")
+
+            // The chip is an offer, not a monument: it retires by itself once the intervention
+            // stops being fresh (owner 2026-09-03: no undo button stands longer than 10 s). The
+            // window is shortened here so the gate need not wait it out; the shipped one is
+            // WorldView.UNDO_SHOW_NS. A bare ivPush stands in for "another intervention landed",
+            // which is what re-arms the freshness clock.
+            world.undoShowNs = 1_500_000_000L
+            val rearmed = java.util.concurrent.CountDownLatch(1)
+            world.post { Native.ivPush(WorldView.IV_KILL); rearmed.countDown() }
+            assertTrue(rearmed.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            fun awaitChip(want: Boolean): Boolean {
+                val stop = System.currentTimeMillis() + 8000
+                while ((world.undoKind != 0) != want && System.currentTimeMillis() < stop)
+                    Thread.sleep(10)
+                return (world.undoKind != 0) == want
+            }
+            assertTrue("a fresh intervention must re-arm the undo chip", awaitChip(true))
+            assertTrue("the undo chip must retire on its own once the offer is stale",
+                awaitChip(false))
+            world.undoShowNs = WorldView.UNDO_SHOW_NS
+            println("BOOT GATE: the undo chip retires by itself when the offer goes stale")
         } finally {
             world.toolArmed = 0
             world.intervene = false
