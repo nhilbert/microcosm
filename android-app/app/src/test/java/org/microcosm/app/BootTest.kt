@@ -523,6 +523,30 @@ class BootTest {
             activity.world.wallArmed && !activity.dialOpen)
         activity.interveneFab.performClick() // an armed fab tap stands the tool down
         assertTrue("the fab should stand the wall down", !activity.world.wallArmed)
+
+        // The sun lever (owner, 2026-09-03): the sky is reachable from the dial, with nothing
+        // gripped. Before this the sheet was a selected sun's card and nothing else, so placing
+        // a source meant finding a sun and tapping it first — the lever's own entry point was
+        // the thing it makes. Cold, the sheet shows the scenarios and the placements; the three
+        // per-source sliders wait for a grip.
+        (activity.toolsDial.getChildAt(4) as android.widget.LinearLayout).performClick() // sun
+        assertTrue("choosing the sun lever should close the dial", !activity.dialOpen)
+        looper.idleFor(Duration.ofMillis(300)) // a HUD tick paints the sheet
+        assertTrue("the sun lever should open its sheet with nothing gripped",
+            activity.sunSheet.visibility == android.view.View.VISIBLE && activity.world.sunSel < 0)
+        // A second tick: the sheet's height settles a frame after it becomes visible, and the
+        // floating chrome's lift is computed from it — one tick early the fabs sit ON the sheet.
+        looper.idleFor(Duration.ofMillis(300))
+        relayout()
+        photograph(activity.sunSheet, "sun@sky") // the cold sheet, beside sun@card's gripped one
+        activity.sunAddBtn.performClick()
+        assertTrue("+ sun should arm the placement", activity.world.placeSource == 1)
+        activity.sunCloseBtn.performClick()
+        looper.idleFor(Duration.ofMillis(300))
+        assertTrue("closing the sheet should put the placement away too",
+            activity.sunSheet.visibility != android.view.View.VISIBLE && activity.world.placeSource == 0)
+
+        activity.interveneFab.performClick() // the dial again, so back has something to close
         activity.onBackPressed() // dial is open again after standing down; back closes the hand
         assertTrue("back should close the hand", !activity.dialOpen && !activity.world.intervene)
         activity.menuFab.performClick()
