@@ -178,6 +178,26 @@ function check() {
     for (let t = 0; t < T; t++) C.step();
     gate(`${STARTS[k].key}: crate-founded === event-composed`, fp() === a);
   }
+  // The painter has to survive every start, and `still` is the one no world has ever been:
+  // zero organisms, zero corpses. A frame builder that divides by a population would find out
+  // here rather than on a phone.
+  const field = new Uint8Array(P.GRID * P.GRID * 4);
+  for (let k = 0; k < STARTS.length; k++) {
+    founded(k, 11);
+    for (let t = 0; t < 50; t++) C.step();
+    const view = { camX: 512, camY: 512, vw: 1080, vh: 1920, z: 2.64, hw: 540, hh: 960,
+      alpha: 0, lodZ: C.LOD_Z };
+    let ok = true, info = "";
+    try {
+      const f = C.frameOf(view, {}, null);
+      C.fieldCarpet(field); C.fieldMineral(field); C.fieldCorpsePall(field); C.fieldShade(field);
+      C.sunGlows(); C.sunMarks(); C.heatGlows(); C.heatMarks(); C.wallStrokes();
+      ok = Number.isFinite(f.orgN) && Number.isFinite(f.corpseN) && f.pops.every(Number.isFinite);
+      info = `orgN ${f.orgN}, ${C.sunGlows().length} glows, ${C.wallStrokes().length} wall strokes`;
+    } catch (e) { ok = false; info = String(e).slice(0, 120); }
+    gate(`${STARTS[k].key}: the frame builder paints it`, ok, info);
+  }
+
   // A start may not leave the player holding the world's own founding as their last move,
   // and may not touch the Evolution panel's switch.
   for (let k = 0; k < STARTS.length; k++) {
