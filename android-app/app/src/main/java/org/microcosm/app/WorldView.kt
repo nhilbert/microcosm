@@ -201,6 +201,13 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     @Volatile var placeSource = 0
     /** L7: the founded sun is part of the experiment — published per frame for the UI's gating. */
     @Volatile var homeSunLocked = false
+    /**
+     * Whether the running experiment hands out the sky at all (levelAllows 2). Published per
+     * frame so the intervene dial can dim its sun lever instead of offering a sheet whose every
+     * button the core would silently refuse.
+     */
+    @Volatile var sourcesAllowed = true
+        private set
     /** The gripped sun's live numbers for the card: [i, a, sigma, count], or null. Per frame. */
     @Volatile var sunInfo: DoubleArray? = null
         private set
@@ -731,6 +738,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             mutationOn = Native.scalar(50) != 0.0
             evolutionAllowed = Native.levelAllows(4) != 0
             homeSunLocked = Native.levelAllowsSource(0) == 0
+            sourcesAllowed = Native.levelAllows(2) != 0
             selSpecies = if (selI >= 0 && Native.frameSel(selI, selGen, 0) != 0.0)
                 Native.org(selI, 1).toInt() else -1
             specimen = if (selSpecies >= 0) {

@@ -478,3 +478,65 @@ Gate: unchanged and still honest. The badge block's boot gate drives the whole l
 appears, clears on restore, leaves on its own while the change stands, re-arms on the next
 touch — through `world.sunBadgeShowNs`, so it proves the mechanism at any window rather than
 pinning the number. Core untouched; conformance bit-identical.
+
+## 16. The sun leaves the sun (owner report, 2026-09-03)
+
+"Placing new suns and sun scenarios are now hidden behind the sun settings. I need to click a sun
+first to place a new one."
+
+Reproduced by reading the shell: EV shipped the sun card as the **selected source's** card, and
+nothing else opened it. `sunSheet.visibility` was gated on `world.sunSel >= 0`, so the two levers
+that make a sky — placing a source and applying one of the six scenarios — could only be reached
+*through* a source that already existed. The lever's entry point was the thing it creates.
+
+**The lever moves to the dial.** `Chrome.TOOLS` gains a fifth tile, `sun`, appended rather than
+slotted beside `seed` so the four older indices keep their meaning (the boot gate keys on them).
+It opens the sheet **cold**: nothing gripped, the title reading *sky*, the scenarios and the two
+placements offered, and the three per-source sliders hidden because they would have no source to
+act on. Gripping a source — by tapping one, by placing one, or by applying a scenario — deepens
+the same sheet into the card it always was. One surface, two states, and the state is visible in
+what it shows.
+
+Gating: the sun row dims and refuses its tap where a level keeps the sky to itself
+(`levelAllows(2)`, published per frame as `world.sourcesAllowed`) — the first dial tool that can
+be taken away, and a dimmed row that still acted would be decoration. The founded-sky lock (L7,
+`homeSunLocked`) keeps hiding the scenarios exactly as before.
+
+**The owner's second round, same day, on the first build of it:**
+
+- *"Close should always be the same small cross icon."* It was a word — "release" gripped,
+  "close" cold. Now it is `ic_close`, unboxed and dim, in the same corner as the specimen sheet's
+  dismiss, built through the same `Chrome` factory. A player learns one dismiss, not one per
+  sheet. `remove` moved up beside it as the header's other action, with the specimen row's own
+  14 dp gap between a destructive word and the way out.
+- *"'+ heater' breaks the button size."* Three weighted buttons on one row gave each a third of a
+  408 dp phone, and the German and English words for the second one wrapped. The placements are
+  now two `Chrome.tile`s — glyph and word in one quiet box, half the width each — and `remove`,
+  which acts on the source in hand, is gone from the row entirely.
+- *"This looks like a sloppy text based menu."* The six scenarios were six identical text
+  buttons, which made the player read names to learn what is really a spatial fact. Each is now a
+  card carrying **the sky it would make** (`Sky.kt`: `SkyPreview`, painted from the same five
+  numbers per source that the tap applies, so the picture cannot drift from the act). It is the
+  seed picker's species dot one step further — a swatch of the thing itself, beside its name.
+- *"Two suns should have two suns, archipelago three; cold blue, warm red-orange, normal
+  yellow; dim dimmed."* The first preview was true to the geometry and useless as a picture: the
+  world is a torus, so a source at (0,0) genuinely belongs in all four corners, and it drew as a
+  wash rather than as a second sun. The cut moved instead — every source is taken at the copy
+  nearest the first, and the view is rolled until that constellation sits in the middle. One sun
+  stays centred, a pair lands on the diagonal, the archipelago's three land apart. Nothing about
+  the sky changes; only where the picture's edge falls. Ember and cold are `Layers.kt`'s own
+  (255,120,60) and (110,170,255), so swatch and pond cannot disagree; light is sunlight yellow by
+  the owner's call, the one deliberate departure from the darkfield's pale blue, kept clear of the
+  hand's amber (rule 7) and confined to this picker.
+
+Recorded, not smoothed: the sheet is 485 dp tall gripped on a 408 dp phone — the scenarios' second
+section label was cut for exactly this reason — and a placement armed from the cold sheet leaves
+both the sheet and the arming to be walked back, so back is pressed twice. Both are the price of
+one surface rather than two.
+
+Gates: `ChromeLayoutTest` measures the sheet's three new rows at the sheet's inner width
+(`Chrome.IN_SHEET`, which the specimen cluster already used) — 0 violations across four devices in
+both languages, and it convicted the scenario card's first draft on the 320 dp phone in German
+("Heizquelle" is what decides whether two cards fit a row). The boot gate walks the new path: the
+dial's sun lever opens the sheet with nothing gripped, "+ sun" arms the placement, and the cross
+puts both away. `npm test` green, conformance bit-identical — the core is untouched.
