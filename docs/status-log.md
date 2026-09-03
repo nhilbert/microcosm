@@ -75,3 +75,18 @@ index that says what happened when.
 P1 built the living pond and the observation UI. P2 built conserved chemistry, corpses and detritus, and Bacillus — its crown finding was the K6 experiment (decomposers off → slow mineral strangulation), which became the ground truth for everything after; also the transport discovery (mixing feeds the core) and the M-audit discipline. P3 added Cilio flee/alarm and Venator (pack founding, after five failed establishment designs — an apex predator is knife-edged by nature; accepted with a natural-turnover criterion), deferred Necro and Mycora with named re-entry conditions, and dropped barriers when the project refocused on monitoring. P4 built the Observatory: ring-buffer recorder (pure observer, bit-identity enforced), detectors, calibrated indicators (every detector's first theory died against measurement — absolute thresholds, EWS statistics, and level-based depletion all failed; shipped: mechanistic vitals against measured reference bands, plus trend+level+destination depletion logic), levers with honest provenance and undo, five chart pages, impact cards (ITS baselines, natural-variability tiers, press-backdrop flags), and passed the narrate-the-collapse gate. Post-P4: research and plan for heredity; a tweak batch (reset, seeding, Ghost-Ray Venator — final form a single heading-aligned spearhead, wake animation cut as beside the point); and the integrity incident with its hash-binding fix.
 
 The project's meta-lesson, worth carrying into every future phase: the instrument is only as honest as the calibration fights behind it.
+
+- **The undo chip stands 10 s, not 45 (owner instruction, 2026-09-03)**: "all undo buttons after
+  placing, moving suns, editing etc. should show no longer than 10 seconds." The window from
+  U2.R3 is cut to `WorldView.UNDO_SHOW_NS` = 10 s — one named constant beside
+  `SUN_BADGE_SHOW_NS` instead of the literal that sat in the frame loop, plus `world.undoShowNs`
+  for the gate to shorten. One chip covers every lever (pour, seed, feed/kill, sun, walls): the
+  freshness clock hangs off the core's `ivCount`, so this is a single number, not a sweep. The
+  browser build's chip was already 5 s and is untouched. The standing-sun badge stays at 90 s —
+  it is a notice that a change stands, not an offer to put it back, and §13's point was that it
+  outlives the offer. Recorded cost, not smoothed over: an intervention whose consequence needs
+  half a minute of sim time to show is now un-undoable by the time the player sees it; if that
+  bites, the answer is a permanent per-lever restore row, not a longer window. Boot gate
+  `theArmedToolTouchesTheWorld` extended — a fresh intervention arms the chip and it retires on
+  its own while the change still stands. Core untouched, conformance bit-identical. Record:
+  app-ux-design-plan.md §14.

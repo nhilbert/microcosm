@@ -26,11 +26,13 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     companion object {
         const val TICK_MS = 100.0
         /**
-         * How long a touched sun wears the standing-change badge. Twice the undo chip's 45 s: the
-         * notice outlives the offer to put the world back, which is the whole point of U2.3, and
-         * then it stops taking up the top of the screen.
+         * How long a touched sun wears the standing-change badge. Far longer than the undo
+         * chip's 10 s: the notice outlives the offer to put the world back, which is the whole
+         * point of U2.3, and then it stops taking up the top of the screen.
          */
         const val SUN_BADGE_SHOW_NS = 90_000_000_000L
+        /** How long the undo chip stands after an intervention (owner, 2026-09-03). */
+        const val UNDO_SHOW_NS = 10_000_000_000L
         // The core's KINDS table (impact.rs), by index. A press changes the regime; a pulse pokes it.
         const val IV_POUR = 0
         const val IV_KILL = 1
@@ -148,6 +150,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     private var lastSun = DoubleArray(0)
     private var sunBadgeUntil = 0L
     @Volatile var sunBadgeShowNs = SUN_BADGE_SHOW_NS
+    @Volatile var undoShowNs = UNDO_SHOW_NS
 
     /** Remember the sun as this world was founded; the badge measures departure from here. */
     private fun captureSunBaseline() {
@@ -222,7 +225,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         private set
     @Volatile var undoSpecies = -1
         private set
-    /** Undo-chip freshness (render thread): the chip shows for 45 s after each intervention. */
+    /** Undo-chip freshness (render thread): the chip shows for 10 s after each intervention. */
     private var ivSeen = 0
     private var ivFreshUntil = 0L
 
@@ -740,13 +743,13 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
                     })
             } else null
             // The undo chip is an offer, not a monument (owner round 3: "undo pour never
-            // vanishes"): it shows while the intervention is fresh and leaves after 45 s. The
-            // outrun study's ground for the number: undo within a minute is functionally a time
-            // machine; past that the world has moved on, and so should the chrome.
+            // vanishes"): it shows while the intervention is fresh and leaves after 10 s (owner,
+            // 2026-09-03; it stood at 45 s before). The chip is an offer made in the moment the
+            // finger lifts; past that the world has moved on, and so should the chrome.
             val ivn = Native.ivCount()
             if (ivn != ivSeen) {
                 ivSeen = ivn
-                ivFreshUntil = System.nanoTime() + 45_000_000_000L
+                ivFreshUntil = System.nanoTime() + undoShowNs
             }
             undoKind = if (System.nanoTime() < ivFreshUntil) Native.undoKind() else 0
             undoSpecies = Native.undoSpecies()
