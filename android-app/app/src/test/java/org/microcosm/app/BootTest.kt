@@ -68,6 +68,39 @@ class BootTest {
         println("SCREEN  ${f.path}  ${w}x${h}px")
     }
 
+    /** Which side of its track a switch's thumb has been put on. */
+    private fun thumbAtEnd(track: android.widget.FrameLayout): Boolean {
+        val lp = track.getChildAt(0).layoutParams as android.widget.FrameLayout.LayoutParams
+        return lp.gravity == (android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL)
+    }
+
+    /** Re-measure and re-lay a view at the size it already has, so a photograph is current. */
+    private fun relayout(v: android.view.View) {
+        val w = v.width.coerceAtLeast(1)
+        val h = v.height.coerceAtLeast(1)
+        v.measure(
+            android.view.View.MeasureSpec.makeMeasureSpec(w, android.view.View.MeasureSpec.EXACTLY),
+            android.view.View.MeasureSpec.makeMeasureSpec(h, android.view.View.MeasureSpec.EXACTLY),
+        )
+        v.layout(v.left, v.top, v.left + w, v.top + h)
+    }
+
+    /** The swatch's mean luminance — which ground it is painting, as one number. */
+    private fun swatchMean(v: OpticSwatch): Double {
+        val bmp = android.graphics.Bitmap.createBitmap(
+            v.width.coerceAtLeast(1), v.height.coerceAtLeast(1),
+            android.graphics.Bitmap.Config.ARGB_8888)
+        v.draw(android.graphics.Canvas(bmp))
+        var sum = 0.0
+        for (y in 0 until bmp.height) for (x in 0 until bmp.width) {
+            val c = bmp.getPixel(x, y)
+            sum += 0.299 * android.graphics.Color.red(c) +
+                0.587 * android.graphics.Color.green(c) +
+                0.114 * android.graphics.Color.blue(c)
+        }
+        return sum / (bmp.width * bmp.height)
+    }
+
     private fun requireNativeLib() {
         val dir = System.getProperty("microcosm.native.dir") ?: ""
         assumeTrue(
@@ -441,6 +474,19 @@ class BootTest {
             activity.startPanel.visibility == android.view.View.VISIBLE)
         assertTrue("the pond must wait behind the front door", activity.world.speed == 0.0)
         photograph(activity.startPanel, "frontdoor@boot")
+        // The front door scrolls (owner request, 2026-09-03). Before it did, the panel was
+        // clamped to the screen and centred inside it, so on a small phone its first row was laid
+        // out above the top edge and its last — the optic — below the bottom one, with nothing on
+        // screen to say either existed. The claim here is that every row is inside the door it
+        // belongs to; how much of the door the screen shows at once is the scroller's business.
+        val door = activity.startPanel
+        assertTrue("the front door should live in a scroller",
+            door.parent is android.widget.ScrollView)
+        assertTrue("the front door's first row must start inside it",
+            door.getChildAt(0).top >= 0)
+        val lastRow = door.getChildAt(door.childCount - 1)
+        assertTrue("the front door's last row must end inside it, not past its edge",
+            lastRow.bottom in 1..door.height)
         activity.expPanel.visibility = android.view.View.VISIBLE
         photograph(activity.expPanel, "experiments@boot")
         // The menu thumbnails (tools/level-thumbs.js): SP's lesson is that a picture must take
@@ -482,16 +528,36 @@ class BootTest {
         // GR.7: the optic switch. It is a view, so the test's whole claim is that a tap flips the
         // state both switches read, that the world hears it, and that the label follows — whether
         // the light field LOOKS right is WorldCameraTest's photograph and the owner's device.
-        val darkLabel = activity.opticButton.text.toString()
+        val darkLabel = activity.opticLabel.text.toString()
+        // The preview (2026-09-03) replaced the sentence under the switch, so the gate has to be
+        // able to say the picture is doing that sentence's job. Mean luminance of the swatch,
+        // drawn in each regime: the dark field's ground is #0B131E and the light field's is
+        // #ECE9DF, so a swatch that painted nothing, painted the same picture twice, or lagged a
+        // frame behind the tap (the render thread owns Optics.lightField, not this thread) all
+        // land in the same place — the two numbers stop being far apart.
+        val darkMean = swatchMean(activity.opticSwatch)
+        assertTrue("the preview must paint something", darkMean > 4)
+        // The thumb's side is the other half of the claim, and it is asserted rather than looked
+        // at: a switch repaints its thumb by moving the child's gravity and asking for a layout,
+        // and whether a photograph taken in this container reflects that is Robolectric's
+        // business, not the app's.
+        assertTrue("the switch must start on the dark side", thumbAtEnd(activity.opticTrack) == false)
         activity.opticRow.performClick()
         assertTrue("tapping the optic should put the world in the light field", activity.world.lightField)
         assertTrue("the drawer's switch must say the same thing as the front door's",
-            activity.opticButton.text.toString() != darkLabel)
+            activity.opticLabel.text.toString() != darkLabel)
+        assertTrue("the switch must move to the light side", thumbAtEnd(activity.opticTrack))
+        relayout(activity.opticTrack) // so the photograph below shows the thumb where it now is
+        val lightMean = swatchMean(activity.opticSwatch)
+        assertTrue("the preview must show the lit ground in the same frame as the tap, " +
+            "not the microscope the player just left (dark $darkMean, light $lightMean)",
+            lightMean > darkMean + 100)
         photograph(activity.startPanel, "frontdoor@light")
         activity.opticRow.performClick()
         assertTrue("tapping it again should return the dark field", !activity.world.lightField)
+        assertTrue("and the switch must come back with it", !thumbAtEnd(activity.opticTrack))
         assertTrue("the label must come back with it",
-            activity.opticButton.text.toString() == darkLabel)
+            activity.opticLabel.text.toString() == darkLabel)
         activity.startPanel.getChildAt(2).performClick() // sandbox
         assertTrue("choosing sandbox should close the front door",
             activity.startPanel.visibility != android.view.View.VISIBLE)
@@ -554,8 +620,22 @@ class BootTest {
         looper.idleFor(Duration.ofMillis(50))
         relayout()
         photograph(decor, "app@drawer")
+        // The drawer's head and foot (owner, 2026-09-03): home | save | reset as glyphs above the
+        // scroll, data | Evolution as tiles below it. What this can claim is that both rows ship
+        // and that home really goes home; whether they FIT is the layout gate's question, and it
+        // measures the very same constructs at the drawer's own width.
+        val head = activity.drawer.getChildAt(0) as android.widget.LinearLayout
+        assertTrue("the drawer should open with three glyphs at its head", head.childCount == 3)
+        val foot = activity.drawer.getChildAt(2) as android.widget.LinearLayout
+        assertTrue("the drawer should end with two destinations", foot.childCount == 2)
         activity.onBackPressed()
         assertTrue("back should close the menu", activity.drawer.visibility != android.view.View.VISIBLE)
+        activity.menuFab.performClick()
+        head.getChildAt(0).performClick() // home
+        assertTrue("home should close the menu", activity.drawer.visibility != android.view.View.VISIBLE)
+        assertTrue("home should go to the front door",
+            activity.startPanel.visibility == android.view.View.VISIBLE)
+        activity.startPanel.getChildAt(2).performClick() // back into the sandbox
 
         controller.pause()   // U0.6's autosave path
         controller.resume()
