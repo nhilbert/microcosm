@@ -34,8 +34,8 @@
     <string name="start_sub_as_stands">your pond, as it stands</string>
     <string name="choice_continue_exp">continue the experiment</string>
     <string name="sub_continue_exp">E%1$d %2$s — as you left it</string>
-    <string name="choice_view_dark">view: dark field</string>
-    <string name="choice_view_light">view: light field</string>
+    <string name="choice_view_dark">dark field</string>
+    <string name="choice_view_light">light field</string>
     <string name="sub_view_dark">glowing life on black water — tap for the light field</string>
     <string name="sub_view_light">stained life on a lit ground — tap for the dark field</string>
 
@@ -117,7 +117,6 @@
     <string name="btn_begin">begin</string>
     <string name="btn_skip">skip</string>
     <string name="btn_undo">undo</string>
-    <string name="btn_experiments">experiments</string>
     <string name="btn_reset_sure">sure?</string>
 
     <!-- the chrome inventory's faces (the keys stay English in Chrome.kt; the gates key on them) -->
@@ -126,7 +125,7 @@
     <string name="tool_kill">kill</string>
     <string name="tool_seed">seed</string>
     <string name="tool_wall">wall</string>
-    <string name="sun_release">release</string>
+    <string name="tool_sun">sun</string>
     <string name="page_pops">pops</string>
     <string name="page_traits">traits</string>
     <string name="page_chem">chem</string>
@@ -137,10 +136,12 @@
     <string name="util_save">save</string>
     <string name="util_data">data</string>
     <string name="util_bench" translatable="false">bench</string>
+    <string name="util_home">home</string>
 
     <!-- the drawer -->
     <string name="section_pace">pace</string>
     <string name="section_species">species · tap to hide</string>
+    <string name="section_view">view</string>
 
     <!-- the hand's hints and the sun -->
     <string name="hint_wall_drag">drag on the water</string>
@@ -168,6 +169,8 @@
     <string name="layout_isles">archipelago</string>
     <string name="layout_hot">hot sun</string>
     <string name="layout_heater">heater</string>
+    <string name="sun_sky">sky</string>
+    <string name="sun_scenarios">sky scenarios</string>
 
     <!-- the Evolution panel (EV) -->
     <string name="evo_title">Evolution</string>
@@ -269,18 +272,48 @@
     <!-- the Health page -->
     <string name="health_gathering">gathering history…</string>
     <string name="axis_now">now</string>
-    <string name="health_variety">VARIETY %1$.2f    P/R %2$.2f</string>
-    <string name="health_recycling">RECYCLING %1$s    LOCKED %2$d%%</string>
     <string name="health_every">every %1$d s</string>
-    <string name="health_adapt">ADAPTABILITY %1$.2f</string>
-    <string name="health_vitals_header">SPECIES VITALS</string>
-    <string name="vital_critical">critical</string>
-    <string name="vital_tense">tense</string>
-    <string name="vital_calm">calm</string>
-    <string name="health_row">%1$-9s reserve %2$3d%% %3$s  pop x%4$.2f   %5$s</string>
-    <string name="health_venator">%1$-9s reserve %2$3d%%    prey losses %3$.1f/s</string>
+    <string name="health_vitals_header">species vitals</string>
+    <!-- the vitals tiles, in the order HealthPanel binds them -->
+    <string-array name="health_tiles">
+        <item>variety</item>
+        <item>plants per grazer</item>
+        <item>recycling</item>
+        <item>locked away</item>
+        <item>adaptability</item>
+    </string-array>
+    <!-- a species\' state, by level: 0 calm, 1 tense, 2 critical -->
+    <string-array name="vital_states">
+        <item>calm</item>
+        <item>tense</item>
+        <item>critical</item>
+    </string-array>
+    <string name="health_factor">×%1$s</string>
+    <string name="health_prey">prey losses %1$.1f/s</string>
     <string name="health_reference">Reference ranges measured on six healthy archived worlds.</string>
     <string name="events_none">nothing to report yet.</string>
+    <string name="events_yours">what you did</string>
+    <string name="events_world">what the world did</string>
+
+    <!-- the Data screen -->
+    <string name="data_title">Data</string>
+    <string name="desc_page_info">what this page shows</string>
+    <!-- the mineral\'s four addresses, bottom of the stack first -->
+    <string-array name="chem_parts">
+        <item>in living bodies</item>
+        <item>in the dead</item>
+        <item>in detritus</item>
+        <item>dissolved in water</item>
+    </string-array>
+    <!-- what the world makes, burns and wins back -->
+    <string-array name="metab_parts">
+        <item>made</item>
+        <item>burned</item>
+        <item>won back</item>
+    </string-array>
+    <string name="metab_panel_flows">made and burned</string>
+    <string name="metab_panel_recycle">won back</string>
+    <string name="traits_alive">%1$d alive</string>
 
     <!-- what the Events page calls each intervention, by the core's KINDS index (impact.rs) -->
     <string-array name="iv_labels">

@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="18dp" android:height="18dp"
+    android:viewportWidth="18" android:viewportHeight="18">
+  <!-- A source that carries warmth and no light: waves rising off a hot floor — the ♨ the sun
+       sheet already names this kind of source by, in the chrome's own stroke weight. The lobes
+       are true S-curves (control points out and back, ending straight above the start); the
+       first draft's shallower curve rendered as a row of chevrons at 18 dp. -->
+  <group>
+    <path android:strokeColor="#C9D7E3" android:strokeWidth="1.4" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M4,15.4h10"/>
+    <path android:strokeColor="#C9D7E3" android:strokeWidth="1.3" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M6.4,12.6c1.7,-1.4 -1.7,-2.6 0,-4c1.7,-1.4 -1.7,-2.6 0,-4 M11.6,12.6c1.7,-1.4 -1.7,-2.6 0,-4c1.7,-1.4 -1.7,-2.6 0,-4"/>
+  </group>
+</vector>

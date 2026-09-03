@@ -38,7 +38,7 @@ class MainActivity : Activity() {
     private lateinit var hud: TextView
     private lateinit var reportView: TextView
     private lateinit var undoChip: Button
-    private lateinit var resetButton: Button
+    private lateinit var resetIcon: android.widget.ImageButton
     private lateinit var benchButton: Button
     private var resetArmedAt = 0L
 
@@ -47,21 +47,26 @@ class MainActivity : Activity() {
     private lateinit var sunTitle: TextView
     private lateinit var sunRemoveBtn: Button
     private lateinit var sunLayoutsRow: android.view.View // hidden while the founded sky is locked (L7)
+    /** The rows that need a gripped source to mean anything; hidden when the sheet opens cold. */
+    private val sunTuneRows = ArrayList<View>()
+    /** The sheet's own dismiss — the specimen sheet's cross, in the same corner. The boot gate
+     *  closes the sheet through it. */
+    internal lateinit var sunCloseBtn: android.widget.ImageButton
+    /** "+ sun"; internal, the boot gate arms the placement through it. */
+    internal lateinit var sunAddBtn: View
     private val sunSliders = HashMap<String, android.widget.SeekBar>()
     private val sunValues = HashMap<String, TextView>()
     private var sunGripShown = -1
+    /**
+     * The sun lever, opened from the intervene dial with nothing gripped (owner, 2026-09-03).
+     *
+     * Until now the sheet was the SELECTED sun's card and nothing else, so placing a source or
+     * reshaping the sky meant finding a sun and tapping it first — the lever's entry point was
+     * the thing it makes. The sheet is now the sun lever: cold it offers the sky's scenarios and
+     * the two placements, and gripping a source deepens it with that source's own three sliders.
+     */
+    private var sunPanelOpen = false
     internal val evoPanel by lazy { EvolutionPanel(this, world) } // internal: the boot gate drives it
-
-    /** The browser's SOURCE_LAYOUTS (src/ui.jsx), verbatim: additive by the L.2 finding. */
-    private data class Src(val x: Double, val y: Double, val i: Double, val a: Double, val sigma: Double)
-    private val sourceLayouts = listOf(
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0)),
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 1.0, 0.0, 130.0)),
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 0.7, 0.0, 130.0)),
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 0.8, 0.0, 110.0), Src(0.0, 512.0, 0.8, 0.0, 110.0)),
-        listOf(Src(512.0, 512.0, 1.0, 8.0, 210.0)),
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 0.0, 10.0, 130.0)),
-    )
 
     // ---- the floating chrome (U2.R2, owner round 2). Internal pieces: the boot gate drives them. ----
     internal lateinit var interveneFab: android.widget.ImageButton
@@ -108,21 +113,33 @@ class MainActivity : Activity() {
     /** The gesture-pill inset, recorded by the insets listener for the lift arithmetic. */
     private var insetBottom = 0
     private val speciesPills = ArrayList<LinearLayout>()
-    private lateinit var dataPanel: LinearLayout
+    internal lateinit var dataPanel: LinearLayout // internal: the data-page gate photographs it
     private lateinit var pagesRow: View
     private lateinit var dataView: DataView
     private lateinit var dataText: TextView
     private lateinit var dataTitle: TextView
+    /** The Vitals page (U3): built once, re-bound four times a second. */
+    private lateinit var healthPanel: DataPages.HealthPanel
+    /** The ⓘ card carrying the current page's one sentence, and the icon that opens it. */
+    private lateinit var dataInfo: TextView
+    private lateinit var dataInfoButton: android.widget.ImageButton
     private var dataPage = 0
+    /** The two written pages' indices into [Chrome.PAGES] — named, so `dataPage == 3` stops. */
+    private val PAGE_HEALTH = 3
     private lateinit var levelChip: TextView
     private lateinit var strip: LinearLayout
     private lateinit var clockView: TextView
     private lateinit var sunBadgeView: TextView
     private lateinit var verdict: TextView
     internal lateinit var startPanel: LinearLayout // internal: the boot gate walks the front door
-    /** GR.7: the two rows that say which microscope the world is in — front door and drawer. */
+    /** GR.7: the two switches that say which microscope the world is in — front door and drawer.
+     *  One state, two ways to reach it; [refreshOptic] paints both from `world.lightField`. */
     internal lateinit var opticRow: LinearLayout // internal: the boot gate taps the switch
-    internal lateinit var opticButton: android.widget.Button
+    private lateinit var opticTitle: TextView
+    internal lateinit var opticSwatch: OpticSwatch // internal: the boot gate compares its grounds
+    internal lateinit var opticTrack: android.widget.FrameLayout // internal: the gate reads the thumb's side
+    private lateinit var opticSwitch: LinearLayout
+    internal lateinit var opticLabel: TextView // internal: the boot gate reads the drawer's word
     /** The front door's continue-the-experiment row — added after the fixed rows the boot gate walks. */
     internal lateinit var continueRow: LinearLayout
     internal lateinit var expPanel: LinearLayout
@@ -165,6 +182,7 @@ class MainActivity : Activity() {
             // wearing the armed tool's icon while one stands, × while the dial is open.
             val on = world.intervene
             val armedIcon = when {
+                world.placeSource != 0 -> R.drawable.ic_sun
                 world.wallArmed -> R.drawable.ic_wall
                 world.seedSpecies >= 0 -> R.drawable.ic_seed
                 world.toolArmed == WorldView.TOOL_FEED -> R.drawable.ic_feed
@@ -189,21 +207,37 @@ class MainActivity : Activity() {
                     0 -> world.toolArmed == WorldView.TOOL_FEED
                     1 -> world.toolArmed == WorldView.TOOL_KILL
                     2 -> world.seedSpecies >= 0
-                    else -> world.wallArmed
+                    3 -> world.wallArmed
+                    else -> sunPanelOpen || world.sunSel >= 0 || world.placeSource != 0
                 },
-                true) // round 3: no tool needs a selection any more
+                // Round 3: no tool needs a selection any more. The sun is the one exception a
+                // level can take away (levelAllows 2), and a lever that cannot act should look
+                // like it — dimmed here and refused in onTool, not silently swallowed by the core.
+                k != 4 || world.sourcesAllowed)
             Chrome.paceSelect(this@MainActivity, paceBox,
                 when { world.speed >= 16 -> 3; world.speed >= 4 -> 2; world.speed >= 1 -> 1; else -> 0 })
-            // The sun card (EV) follows the grip and outranks the specimen sheet at the bottom.
+            // The sun sheet (EV) follows the grip, or the dial's sun lever, and outranks the
+            // specimen sheet at the bottom. Closing the hand closes it: it is the hand's.
+            if (!on) sunPanelOpen = false
             val si = world.sunInfo
-            val sunOpen = on && world.sunSel >= 0 && si != null
+            val gripped = world.sunSel >= 0 && si != null
+            val sunOpen = on && (gripped || sunPanelOpen)
             sunSheet.visibility = if (sunOpen) ViewGroup.VISIBLE else ViewGroup.GONE
-            if (sunOpen && si != null) {
+            if (sunOpen) {
+                // Cold, the sheet is the sky's: scenarios and the two placements. The three
+                // sliders belong to one source, so they wait until one is in hand.
+                for (row in sunTuneRows) row.visibility = if (gripped) ViewGroup.VISIBLE else ViewGroup.GONE
+                // Remove acts on the source in hand, so cold it has nothing to act on. The cross
+                // beside it never changes its face — one dismiss glyph in one corner, whatever
+                // the sheet is showing.
+                sunRemoveBtn.visibility = if (gripped) ViewGroup.VISIBLE else ViewGroup.GONE
+                sunLayoutsRow.visibility = if (world.homeSunLocked) ViewGroup.GONE else ViewGroup.VISIBLE
+            }
+            if (sunOpen && si != null) { // non-null only while a source is gripped
                 sunTitle.text = "${sunKind(si[0], si[1])}  ·  ${world.sunSel + 1}/${si[3].toInt()}"
                 val last = si[3] <= 1.0
                 sunRemoveBtn.isEnabled = !last
                 sunRemoveBtn.alpha = if (last) 0.4f else 1f
-                sunLayoutsRow.visibility = if (world.homeSunLocked) ViewGroup.GONE else ViewGroup.VISIBLE
                 if (world.sunSel != sunGripShown) { // a fresh grip: sliders take the sun's values
                     sunGripShown = world.sunSel
                     sunSliders["i"]?.progress = Math.round(si[0] / 0.05).toInt()
@@ -213,7 +247,10 @@ class MainActivity : Activity() {
                     sunSliders["sigma"]?.progress = Math.round((si[2] - 90.0) / 10.0).toInt()
                     sunValues["sigma"]?.text = "%.0f".format(si[2])
                 }
-            } else sunGripShown = -1
+            } else {
+                sunGripShown = -1
+                if (sunOpen) sunTitle.text = getString(R.string.sun_sky) // cold: the sky's card
+            }
             undoChip.visibility =
                 if (world.undoKind != 0 && armedText.isEmpty()) ViewGroup.VISIBLE else ViewGroup.GONE
             undoChip.text = undoLabel(world.undoKind, world.undoSpecies)
@@ -595,9 +632,13 @@ class MainActivity : Activity() {
         specimenSheet.addView(specimenTiles)
         root.addView(specimenSheet, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
-        // The sun card (EV): the gripped ENERGY SOURCE's own sheet — light, warmth and spread as
-        // sliders (the browser's SourceCard ranges), the six additive layouts, add and remove.
-        // It replaces U2.R2's three-button sun bar: dimmer/brighter was a slider wearing buttons.
+        // The sun sheet (EV): the sun lever — light, warmth and spread as sliders (the browser's
+        // SourceCard ranges), the six additive layouts, add and remove. It replaces U2.R2's
+        // three-button sun bar: dimmer/brighter was a slider wearing buttons.
+        //
+        // Two states since 2026-09-03. Gripped, it is a source's card and shows everything.
+        // Cold — opened from the dial's sun lever — it is the SKY's card: scenarios and the two
+        // placements, without the three sliders that would have no source to act on.
         sunSheet = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = Style.sheet(this@MainActivity)
@@ -615,36 +656,36 @@ class MainActivity : Activity() {
             typeface = Style.wordMedium(this@MainActivity)
         }
         sunHeader.addView(sunTitle, LinearLayout.LayoutParams(0, WRAP, 1f))
-        sunHeader.addView(button(getString(R.string.sun_release)) { world.sunSel = -1; world.placeSource = 0 })
+        // Remove and the dismiss, built through Chrome so the layout gate measures the cluster
+        // that ships. The cross is the specimen sheet's, deliberately: one dismiss glyph, one
+        // corner, whatever the sheet (owner, 2026-09-03).
+        val sunActionsHead = Chrome.build(this, "sunhead") { k ->
+            if (k == 0) removeGrippedSource() else closeSunPanel()
+        } as LinearLayout
+        sunRemoveBtn = sunActionsHead.getChildAt(0) as Button
+        sunCloseBtn = sunActionsHead.getChildAt(1) as android.widget.ImageButton
+        sunHeader.addView(sunActionsHead)
+        sunHeader.minimumHeight = Style.dp(this, 48f)
         sunSheet.addView(sunHeader)
-        sunSheet.addView(sunSliderRow("i", getString(R.string.sun_light), 0.0, 1.5, 0.05) { v -> "%.2f".format(v) })
-        sunSheet.addView(sunSliderRow("a", getString(R.string.sun_warmth), -8.0, 15.0, 0.5) { v ->
-            (if (v > 0) "+" else "") + "%.1f°".format(v) })
-        sunSheet.addView(sunSliderRow("sigma", getString(R.string.sun_spread), 90.0, 300.0, 10.0) { v ->
-            "%.0f".format(v) })
-        sunLayoutsRow = Chrome.build(this, "layouts") { k -> applyLayout(k) }
-        sunSheet.addView(sunLayoutsRow,
-            LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = Style.dp(this@MainActivity, 10f) })
-        val sunActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        sunActions.addView(button(getString(R.string.sun_add)) { world.placeSource = 1 },
-            LinearLayout.LayoutParams(0, WRAP, 1f))
-        sunActions.addView(button(getString(R.string.heater_add)) { world.placeSource = 2 },
-            LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = Style.dp(this@MainActivity, 8f) })
-        sunRemoveBtn = button(getString(R.string.sun_remove)) {
-            val k = world.sunSel
-            if (k >= 0) world.post {
-                if (Native.sourceCount() > 1 && Native.levelAllowsSource(k) != 0) { // keep one source; a locked sky stays (L7)
-                    Native.ivPush(WorldView.IV_SOURCE_REMOVE)
-                    Native.evSourceRemove(k)
-                }
-            }
-            world.sunSel = -1
+        for (row in listOf(
+            sunSliderRow("i", getString(R.string.sun_light), 0.0, 1.5, 0.05) { v -> "%.2f".format(v) },
+            sunSliderRow("a", getString(R.string.sun_warmth), -8.0, 15.0, 0.5) { v ->
+                (if (v > 0) "+" else "") + "%.1f°".format(v) },
+            sunSliderRow("sigma", getString(R.string.sun_spread), 90.0, 300.0, 10.0) { v ->
+                "%.0f".format(v) })) {
+            sunTuneRows.add(row)
+            sunSheet.addView(row)
         }
-        sunActions.addView(sunRemoveBtn, LinearLayout.LayoutParams(0, WRAP, 1f).apply {
-            marginStart = Style.dp(this@MainActivity, 8f)
-        })
+        sunSheet.addView(sectionLabel(getString(R.string.sun_scenarios)))
+        sunLayoutsRow = Chrome.build(this, "layouts") { k -> applyLayout(k) }
+        sunSheet.addView(sunLayoutsRow, LinearLayout.LayoutParams(MATCH, WRAP))
+        // No section label over the placements: the two tiles say what they do, and the sheet is
+        // tall enough already. The scenarios need theirs — six pictures in a grid do not say what
+        // the grid IS.
+        val sunActions = Chrome.build(this, "place") { k -> world.placeSource = k + 1 } as LinearLayout
+        sunAddBtn = sunActions.getChildAt(0)
         sunSheet.addView(sunActions, LinearLayout.LayoutParams(MATCH, WRAP).apply {
-            topMargin = Style.dp(this@MainActivity, 8f)
+            topMargin = Style.dp(this@MainActivity, 10f)
         })
         root.addView(sunSheet, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
@@ -725,19 +766,42 @@ class MainActivity : Activity() {
             val pad = Style.dp(this@MainActivity, Chrome.DRAWER_PAD_DP.toFloat())
             setPadding(pad, pad, pad, pad)
         }
-        val drawerBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        drawerBody.addView(TextView(this).apply {
-            text = "Microcosm"
-            setTextColor(Style.BRIGHT)
-            textSize = 20f
-            typeface = Style.wordBold(this@MainActivity)
-            setPadding(0, 0, 0, Style.dp(this@MainActivity, 8f))
+        // The drawer's head (owner, 2026-09-03): home, save and reset as glyphs, pinned above
+        // the scroll. They are the session's own three — leave the pond, keep it, start it over —
+        // and they take one 48 dp line instead of the 2x2 word grid that used to sit at the foot.
+        // The wordmark went with it: the way home is now a button rather than a title, and the
+        // front door carries the name in full the moment it is tapped.
+        val drawerTop = Chrome.build(this, "drawerTop") { k ->
+            when (Chrome.DRAWER_TOP[k]) {
+                "home" -> {
+                    // The same path back-at-top-level takes: the pond is saved to its own file
+                    // first, so leaving through the drawer costs exactly nothing.
+                    closeDrawer()
+                    autosave()
+                    showStart(getString(if (running != null) R.string.start_sub_behind_experiment
+                                        else R.string.start_sub_as_stands))
+                }
+                "save" -> { closeDrawer(); saveOrLoad() }
+                else -> resetTapped()
+            }
+        } as LinearLayout
+        resetIcon = drawerTop.getChildAt(2) as android.widget.ImageButton
+        drawer.addView(drawerTop, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            bottomMargin = Style.dp(this@MainActivity, 6f)
         })
+        val drawerBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         drawerBody.addView(sectionLabel(getString(R.string.section_pace)))
         paceBox = Chrome.build(this, "pace") { k ->
             world.speed = when (k) { 0 -> 0.0; 1 -> 1.0; 2 -> 4.0; else -> 16.0 }
         } as LinearLayout
         drawerBody.addView(paceBox, LinearLayout.LayoutParams(MATCH, WRAP))
+        // The same switch as the front door's, where a player already stands looking at the pond:
+        // the point of a second optic is the comparison, and the comparison needs the world in
+        // sight. One state, two ways to reach it.
+        drawerBody.addView(sectionLabel(getString(R.string.section_view)))
+        opticSwitch = Chrome.build(this, "optic") { toggleOptic() } as LinearLayout
+        drawerBody.addView(opticSwitch, LinearLayout.LayoutParams(MATCH, WRAP))
+        opticLabel = Chrome.switchLabel(opticSwitch)
         drawerBody.addView(sectionLabel(getString(R.string.section_species)))
         for (sp in live) {
             val pill = LinearLayout(this).apply {
@@ -765,45 +829,33 @@ class MainActivity : Activity() {
                 bottomMargin = Style.dp(this@MainActivity, 8f)
             })
         }
-        drawerBody.addView(sectionLabel(""))
-        val utility = Chrome.build(this, "utility") { k ->
-            when (Chrome.UTILITY[k]) {
-                "reset" -> resetTapped()
-                "save" -> { closeDrawer(); saveOrLoad() }
-                "data" -> {
-                    closeDrawer()
-                    world.dataOpen = true
-                    dataPanel.visibility = ViewGroup.VISIBLE
-                    refreshData()
-                }
-                else -> {
-                    closeDrawer()
-                    reportView.visibility = ViewGroup.GONE
-                    world.speed = 0.0
-                    world.benchmark()
-                }
-            }
-        } as LinearLayout
-        resetButton = Chrome.at(utility, Chrome.UTILITY, "reset")
-        benchButton = Chrome.at(utility, Chrome.UTILITY, "bench").apply { visibility = ViewGroup.GONE }
-        drawerBody.addView(utility, LinearLayout.LayoutParams(MATCH, WRAP))
-        drawerBody.addView(sectionLabel(""))
-        drawerBody.addView(button(getString(R.string.btn_experiments)) { closeDrawer(); expPanel.visibility = ViewGroup.VISIBLE },
-            LinearLayout.LayoutParams(MATCH, WRAP))
-        drawerBody.addView(button(getString(R.string.evo_title)) {
-            if (!world.evolutionAllowed) { toast(getString(R.string.evo_locked)); return@button }
+        // The bench is dev-mode only and stays a word: nobody who has not long-pressed the census
+        // strip will ever see it, and a glyph for it would be a picture of a stopwatch nobody
+        // asked for. The experiments button left the drawer with this round — the ladder is the
+        // front door's second row, and a menu entry that duplicates the door is a second door.
+        val benchRow = Chrome.build(this, "bench") {
             closeDrawer()
-            evoPanel.open()
-        }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = Style.dp(this@MainActivity, 8f) })
-        // The same switch as the front door's, where a player already stands looking at the pond:
-        // the point of a second optic is the comparison, and the comparison needs the world in
-        // sight. One state, two ways to reach it.
-        opticButton = button("") { toggleOptic() }
-        drawerBody.addView(opticButton, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            reportView.visibility = ViewGroup.GONE
+            world.speed = 0.0
+            world.benchmark()
+        } as LinearLayout
+        benchButton = Chrome.at(benchRow, Chrome.BENCH, "bench").apply { visibility = ViewGroup.GONE }
+        drawerBody.addView(benchRow, LinearLayout.LayoutParams(MATCH, WRAP).apply {
             topMargin = Style.dp(this@MainActivity, 8f)
         })
         drawer.addView(ScrollView(this).apply { addView(drawerBody) },
-            LinearLayout.LayoutParams(MATCH, MATCH))
+            LinearLayout.LayoutParams(MATCH, 0, 1f))
+        // The drawer's foot: the two screens it leads to, pinned under the scroll so they are in
+        // the same place whatever the species list is doing above them.
+        drawer.addView(Chrome.build(this, "drawerNav") { k ->
+            if (Chrome.DRAWER_NAV[k] == "data") {
+                closeDrawer()
+                openData(dataPage)
+            } else if (!world.evolutionAllowed) toast(getString(R.string.evo_locked))
+            else { closeDrawer(); evoPanel.open() }
+        }, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            topMargin = Style.dp(this@MainActivity, 10f)
+        })
         root.addView(drawer, FrameLayout.LayoutParams(
             Style.dp(this, Chrome.DRAWER_DP.toFloat()), MATCH).apply {
             gravity = Gravity.START
@@ -819,32 +871,84 @@ class MainActivity : Activity() {
             setBackgroundColor(Style.SURFACE_SCRIM)
             visibility = ViewGroup.GONE
         }
-        dataTitle = TextView(this).apply {
-            setTextColor(Style.BRIGHT)
-            textSize = 14f
-            typeface = Style.wordMedium(this@MainActivity)
-            setPadding(24, 20, 24, 8)
+        // The header (U3): the screen says what it is, and the two things a player does with a
+        // screen — find out what it means, and leave — sit at the far end as icons. The full-width
+        // "close" button that used to hold the bottom of this panel is gone: it was a whole row of
+        // phone spent on the one action the back gesture already performs.
+        val dataHead = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(Style.dp(this@MainActivity, 18f), Style.dp(this@MainActivity, 10f),
+                Style.dp(this@MainActivity, 10f), Style.dp(this@MainActivity, 2f))
         }
-        dataPanel.addView(dataTitle)
+        dataTitle = TextView(this).apply {
+            text = getString(R.string.data_title)
+            setTextColor(Style.BRIGHT)
+            textSize = Style.PAGE_TITLE_SP
+            typeface = Style.wordBold(this@MainActivity)
+        }
+        dataHead.addView(dataTitle, LinearLayout.LayoutParams(0, WRAP, 1f))
+        dataInfoButton = Chrome.iconButton(this, R.drawable.ic_info,
+            getString(R.string.desc_page_info), Style.TEXT, bordered = false) { toggleDataInfo() }
+        dataHead.addView(dataInfoButton)
+        dataHead.addView(Chrome.iconButton(this, R.drawable.ic_close, getString(R.string.btn_close),
+            Style.TEXT, bordered = false) { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE })
+        dataPanel.addView(dataHead)
+
         pagesRow = Chrome.build(this, "pages") { k -> dataPage = k; refreshData() }
-            .apply { setPadding(12, 0, 12, 0) }
+            .apply { setPadding(Style.dp(this@MainActivity, 10f), 0, Style.dp(this@MainActivity, 10f), 0) }
         dataPanel.addView(pagesRow)
+        // the strip's own baseline, so the selected tab's underline sits ON something
+        dataPanel.addView(View(this).apply { setBackgroundColor(Style.HAIRLINE_FAINT) },
+            LinearLayout.LayoutParams(MATCH, Style.dp(this@MainActivity, 1f)))
+
+        // One body, three tenants: the drawn pages, the vitals, the feed. Exactly one is visible.
+        val dataBody = FrameLayout(this)
         dataView = DataView(this)
-        // In a scroll container since EV: the Traits page is taller than any screen (160 dp per
-        // (species, locus) band, eleven bands); fillViewport keeps the chart pages full-height.
-        dataPanel.addView(ScrollView(this).apply {
+        // In a scroll container since EV: the Traits page is taller than any screen (172 dp per
+        // (species, locus) band, eleven bands); fillViewport keeps the chart pages full-height,
+        // and since U3 the chart pages decline the extra rather than stretching into it.
+        dataBody.addView(ScrollView(this).apply {
             isFillViewport = true
             addView(dataView, ViewGroup.LayoutParams(MATCH, WRAP))
-        }, LinearLayout.LayoutParams(MATCH, 0, 1f))
+        }, FrameLayout.LayoutParams(MATCH, MATCH))
+
+        healthPanel = DataPages.HealthPanel(this)
+        dataBody.addView(DataPages.scroller(this, healthPanel), FrameLayout.LayoutParams(MATCH, MATCH))
+
         dataText = TextView(this).apply {
-            setTextColor(Color.parseColor("#C9D7E3"))
-            textSize = 11f
-            typeface = Style.mono(this@MainActivity)
-            setPadding(24, 12, 24, 24)
+            setTextColor(Style.TEXT)
+            typeface = Style.word(this@MainActivity)
+            setLineSpacing(0f, 1.15f)
+            setPadding(Style.dp(this@MainActivity, 18f), Style.dp(this@MainActivity, 14f),
+                Style.dp(this@MainActivity, 18f), Style.dp(this@MainActivity, 28f))
         }
-        dataPanel.addView(ScrollView(this).apply { addView(dataText) },
-            LinearLayout.LayoutParams(MATCH, 0, 1f))
-        dataPanel.addView(button(getString(R.string.btn_close)) { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE })
+        dataBody.addView(DataPages.scroller(this, dataText), FrameLayout.LayoutParams(MATCH, MATCH))
+
+        // The explanation, behind the header's ⓘ (owner: "short explanation ... behind a small
+        // help icon"). A page's own sentence, shown only when it is asked for, dismissed by a tap
+        // anywhere on it — so the charts get the room the subtitle used to take permanently.
+        dataInfo = TextView(this).apply {
+            setTextColor(Style.TEXT)
+            textSize = Style.CHART_LEGEND_SP
+            typeface = Style.word(this@MainActivity)
+            background = Style.solidCard(this@MainActivity)
+            setLineSpacing(0f, 1.3f)
+            setPadding(Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f))
+            elevation = Style.dp(this@MainActivity, 8f).toFloat()
+            visibility = ViewGroup.GONE
+            isClickable = true
+            setOnClickListener { toggleDataInfo() }
+        }
+        dataBody.addView(dataInfo, FrameLayout.LayoutParams(MATCH, WRAP).apply {
+            gravity = Gravity.TOP
+            leftMargin = Style.dp(this@MainActivity, 14f)
+            rightMargin = Style.dp(this@MainActivity, 14f)
+            topMargin = Style.dp(this@MainActivity, 10f)
+        })
+
+        dataPanel.addView(dataBody, LinearLayout.LayoutParams(MATCH, 0, 1f))
         root.addView(dataPanel, FrameLayout.LayoutParams(MATCH, MATCH))
         root.addView(evoPanel.view, FrameLayout.LayoutParams(MATCH, MATCH))
 
@@ -877,7 +981,7 @@ class MainActivity : Activity() {
         // screen over the world, not a dialog behind a bar button — the ladder was the most
         // carefully built thing in the app and the least reachable. The world waits underneath
         // (speed 0) until the player chooses.
-        startPanel = LinearLayout(this).apply {
+        startPanel = StartDoor(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Style.ABYSS)
             gravity = Gravity.CENTER_VERTICAL
@@ -935,11 +1039,23 @@ class MainActivity : Activity() {
         })
         // The optic (GR.7). Last row, after the two fixed ones and the continue row, so the boot
         // gate's child indices stay put. It is a view, not a lever: it changes how the world is
-        // painted and nothing about what the world does.
-        opticRow = startChoice("", "") { toggleOptic() }
+        // painted and nothing about what the world does — which is why, since the owner asked for
+        // a switch here (2026-09-03), it wears one: the other rows are doors, and a door that
+        // comes back to the same screen with a different ground was never one.
+        opticRow = startSwitch { toggleOptic() }
         startPanel.addView(opticRow)
         refreshOptic()
-        root.addView(startPanel, FrameLayout.LayoutParams(MATCH, MATCH))
+        // The front door scrolls (owner request, 2026-09-03). It had been growing rows — the
+        // continue row, help, the optic — under a wordmark that takes 145 dp on its own, and at
+        // 320 dp wide the last of them fell off the bottom edge with nothing to say so. The look
+        // is unchanged wherever it still fits: `isFillViewport` stretches the panel to the
+        // viewport when the content is shorter, so its CENTER_VERTICAL still centres, and only
+        // a door too tall for the screen scrolls at all.
+        root.addView(ScrollView(this).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+            addView(startPanel, FrameLayout.LayoutParams(MATCH, WRAP))
+        }, FrameLayout.LayoutParams(MATCH, MATCH))
 
         // The ladder, as a screen: every experiment open, none gated behind another.
         expPanel = LinearLayout(this).apply {
@@ -1156,10 +1272,14 @@ class MainActivity : Activity() {
     private fun refreshOptic() {
         val light = world.lightField
         val title = getString(if (light) R.string.choice_view_light else R.string.choice_view_dark)
-        (opticRow.getChildAt(0) as TextView).text = title
-        (opticRow.getChildAt(1) as TextView).text =
+        opticTitle.text = title
+        opticSwatch.setRegime(light)
+        // The sentence the card used to show is now what it SAYS: the picture is not readable by
+        // a screen reader, so the words it replaced become the card's accessible name.
+        opticRow.contentDescription = "$title. " +
             getString(if (light) R.string.sub_view_light else R.string.sub_view_dark)
-        opticButton.text = title
+        Chrome.switchTrackState(this, opticTrack, light)
+        Chrome.switchState(this, opticSwitch, light, title)
     }
 
     private fun toast(s: String) =
@@ -1192,6 +1312,84 @@ class MainActivity : Activity() {
                 setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
             })
         }
+
+    /**
+     * The front door's optic row: the field of view on the left, the regime's name, the switch at
+     * the right edge. The whole card is one target, so the switch shows the state rather than
+     * being a second control.
+     *
+     * What used to sit here was a sentence describing the look ("glowing life on black water —
+     * tap for the light field"). It is gone for the reason [OpticSwatch] carries in full: a switch
+     * already states the side you are on, so a line naming the ACTION beside it is the ambiguity
+     * that makes a reader treat a switch as a command — and where the outcome is a look, the
+     * outcome itself beats prose about it. The sentence survives where it still earns its keep,
+     * as the card's contentDescription: a screen reader gets the words a sighted player now gets
+     * from the picture.
+     */
+    private fun startSwitch(onTap: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Style.touchable(this@MainActivity, Style.card(this@MainActivity))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                leftMargin = Style.dp(this@MainActivity, 24f)
+                rightMargin = Style.dp(this@MainActivity, 24f)
+                bottomMargin = Style.dp(this@MainActivity, 14f)
+            }
+            setPadding(Style.dp(this@MainActivity, 18f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f))
+            setOnClickListener { onTap() }
+            opticSwatch = OpticSwatch(this@MainActivity).apply {
+                show(swatchCast())
+                setRegime(world.lightField)
+                // The picture is the card's, not a thing of its own to land on: the card carries
+                // the whole meaning as its contentDescription.
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            addView(opticSwatch, LinearLayout.LayoutParams(
+                Style.dp(this@MainActivity, 52f), Style.dp(this@MainActivity, 52f)))
+            opticTitle = TextView(this@MainActivity).apply {
+                setTextColor(Style.BRIGHT)
+                textSize = 17f
+                typeface = Style.wordMedium(this@MainActivity)
+            }
+            addView(opticTitle, LinearLayout.LayoutParams(0, WRAP, 1f).apply {
+                marginStart = Style.dp(this@MainActivity, 16f)
+            })
+            opticTrack = Chrome.switchTrack(this@MainActivity)
+            addView(opticTrack, LinearLayout.LayoutParams(
+                Style.dp(this@MainActivity, 52f), Style.dp(this@MainActivity, 30f)).apply {
+                marginStart = Style.dp(this@MainActivity, 12f)
+            })
+        }
+
+    /**
+     * The four the preview shows, biggest first, at fixed spots in the field (position and radius
+     * as fractions of it, so the picture is the same at any size).
+     *
+     * Chosen by NAME rather than by index: the species table is the core's and may grow, and a
+     * creature this does not know about simply does not appear rather than turning the picture
+     * into something else. The colours are the core's own bucket table — the same call the drawer
+     * pills and the seed picker make, never a second palette here — read once, so flipping the
+     * optic repaints from cached data and never touches the core again.
+     */
+    private fun swatchCast(): List<OpticSwatch.Body> {
+        val spots = listOf(
+            Triple("Cilio", 0.36f to 0.41f, 0.21f),
+            Triple("Venator", 0.69f to 0.63f, 0.17f),
+            Triple("Drifta", 0.70f to 0.30f, 0.13f),
+            Triple("Solara", 0.33f to 0.73f, 0.10f),
+        )
+        val byName = live.associateBy { Native.traitText(it, 0) }
+        return spots.mapNotNull { (name, at, r) ->
+            val sp = byName[name] ?: return@mapNotNull null
+            OpticSwatch.Body(
+                intArrayOf(Native.specNum(sp, 0, 0, 0).toInt(), Native.specNum(sp, 0, 0, 1).toInt(),
+                    Native.specNum(sp, 0, 0, 2).toInt()),
+                at.first, at.second, r,
+            )
+        }
+    }
 
     /**
      * An experiment row: the level's captured moment beside its words. The picture comes from
@@ -1387,33 +1585,60 @@ class MainActivity : Activity() {
 
     private val pageTitles by lazy { resources.getStringArray(R.array.page_titles) }
 
-    /** Chart pages draw; Health and Events are text. Only one of the two is ever visible. */
+    /**
+     * Open the Data screen on [page]. One door, so the drawer's button and the page gate walk the
+     * same path — the same reason `Chrome.build` is the one place a row is constructed.
+     */
+    internal fun openData(page: Int) {
+        dataPage = page.coerceIn(0, Chrome.PAGES.size - 1)
+        world.dataOpen = true
+        dataPanel.visibility = ViewGroup.VISIBLE
+        dataInfo.visibility = ViewGroup.GONE
+        refreshData()
+    }
+
+    /** The page gate's handle on the ⓘ card, which no other still can reach. */
+    internal fun toggleDataInfoForTest() = toggleDataInfo()
+
+    /** The ⓘ: a page's own sentence, on request. Tapping it again — or the card — puts it away. */
+    private fun toggleDataInfo() {
+        val open = dataInfo.visibility != ViewGroup.VISIBLE
+        dataInfo.visibility = if (open) ViewGroup.VISIBLE else ViewGroup.GONE
+        dataInfoButton.imageTintList =
+            android.content.res.ColorStateList.valueOf(if (open) Style.BRIGHT else Style.TEXT)
+    }
+
+    /**
+     * Three page kinds, one body: the drawn pages, the vitals, the feed. Exactly one is visible.
+     *
+     * Called four times a second while the screen is open, so nothing here builds a view — the
+     * vitals panel re-binds in place and the feed re-spans one string.
+     */
     private fun refreshData() {
-        dataTitle.text = pageTitles[dataPage]
-        // The selected page reads as selected (U0.3): full strength and bold, the rest receded.
-        // Not amber — amber marks the player's hand on the world, and looking is not touching.
-        val row = Chrome.rowOf(pagesRow)
-        for (k in 0 until row.childCount) (row.getChildAt(k) as Button).apply {
-            if (k == dataPage) {
-                setTextColor(Style.BRIGHT)
-                typeface = Style.wordMedium(this@MainActivity)
-                background = Style.touchable(this@MainActivity, Style.selected(this@MainActivity))
-            } else {
-                setTextColor(Style.TEXT)
-                typeface = Style.word(this@MainActivity)
-                background = Style.touchable(this@MainActivity, Style.quiet(this@MainActivity))
-            }
-        }
+        // The selected page reads as selected (U0.3), and the strip scrolls it into view. Not
+        // amber — amber marks the player's hand on the world, and looking is not touching.
+        Chrome.tabSelect(this, pagesRow, dataPage)
+        dataInfo.text = pageTitles[dataPage]
+
         val chart = dataPage <= 2 || dataPage == DataView.PAGE_TRAITS
+        val vitals = dataPage == PAGE_HEALTH
         (dataView.parent as ViewGroup).visibility = if (chart) ViewGroup.VISIBLE else ViewGroup.GONE
-        (dataText.parent as ViewGroup).visibility = if (chart) ViewGroup.GONE else ViewGroup.VISIBLE
-        if (chart) {
-            dataView.page = dataPage
-            if (dataPage == DataView.PAGE_TRAITS)
-                dataView.submitTraits(world.traitBands, world.traitSeries, world.seriesN)
-            else world.series?.let { dataView.submit(it, world.seriesN, IntArray(7) { sp -> speciesColor(sp) }) }
-        } else {
-            dataText.text = if (dataPage == 3) world.healthText else world.eventsText
+        (healthPanel.parent as ViewGroup).visibility = if (vitals) ViewGroup.VISIBLE else ViewGroup.GONE
+        (dataText.parent as ViewGroup).visibility =
+            if (!chart && !vitals) ViewGroup.VISIBLE else ViewGroup.GONE
+        when {
+            chart -> {
+                dataView.page = dataPage
+                if (dataPage == DataView.PAGE_TRAITS)
+                    dataView.submitTraits(world.traitBands, world.traitSeries, world.seriesN)
+                else world.series?.let {
+                    dataView.submit(it, world.seriesN,
+                        IntArray(7) { sp -> speciesColor(sp) },
+                        Array(7) { sp -> Native.traitText(sp, 0) })
+                }
+            }
+            vitals -> healthPanel.bind(world.healthReport)
+            else -> dataText.text = DataPages.events(this, world.eventRows)
         }
     }
 
@@ -1430,8 +1655,11 @@ class MainActivity : Activity() {
         val now = System.currentTimeMillis()
         if (now - resetArmedAt > 2600) {
             resetArmedAt = now
-            resetButton.text = getString(R.string.btn_reset_sure)
-            resetButton.setTextColor(Color.parseColor("#F2B24A")) // the hand, about to act
+            // The glyph cannot say "sure?", so it goes amber — the hand, about to act — and the
+            // question is asked in words anyway, because a two-step guard whose first step is a
+            // colour change is a guard the player has to already know about.
+            armReset(Style.AMBER, getString(R.string.btn_reset_sure))
+            toast(getString(R.string.btn_reset_sure))
             ui.postDelayed({ if (System.currentTimeMillis() - resetArmedAt >= 2600) disarmReset() }, 2700)
             return
         }
@@ -1454,11 +1682,14 @@ class MainActivity : Activity() {
 
     private fun onFabTap() {
         when {
-            world.wallArmed || world.seedSpecies >= 0 || world.toolArmed != 0 -> {
+            world.wallArmed || world.seedSpecies >= 0 || world.toolArmed != 0 ||
+                world.placeSource != 0 || sunPanelOpen -> {
                 // armed: stand down, offer the dial
                 world.wallArmed = false
                 world.seedSpecies = -1
                 world.toolArmed = 0
+                world.placeSource = 0
+                sunPanelOpen = false
                 setDial(true)
             }
             dialOpen -> { setDial(false); world.intervene = false }
@@ -1473,14 +1704,40 @@ class MainActivity : Activity() {
      * deselects: an armed hand and an open specimen drawer were the round-3 overlap mess.
      */
     private fun onTool(k: Int) {
+        // An experiment may keep the sky to itself (levelAllows 2). The row is dimmed for it;
+        // refusing the tap here is what makes the dimming true rather than decorative.
+        if (k == 4 && !world.sourcesAllowed) return
         world.deselect()
         when (k) {
             0 -> { world.toolArmed = WorldView.TOOL_FEED; world.seedSpecies = -1; world.wallArmed = false }
             1 -> { world.toolArmed = WorldView.TOOL_KILL; world.seedSpecies = -1; world.wallArmed = false }
             2 -> { world.toolArmed = 0; seedPicker() } // arms on choice and closes the dial there
-            else -> { world.wallArmed = true; world.toolArmed = 0; world.seedSpecies = -1 }
+            3 -> { world.wallArmed = true; world.toolArmed = 0; world.seedSpecies = -1 }
+            else -> { // the sky: the sheet opens cold, with the scenarios and the placements
+                world.toolArmed = 0; world.seedSpecies = -1; world.wallArmed = false
+                sunPanelOpen = true
+            }
         }
         if (k != 2) setDial(false)
+    }
+
+    /** Remove the source in hand — never the last one, and never a sky a level locked (L7). */
+    private fun removeGrippedSource() {
+        val k = world.sunSel
+        if (k >= 0) world.post {
+            if (Native.sourceCount() > 1 && Native.levelAllowsSource(k) != 0) {
+                Native.ivPush(WorldView.IV_SOURCE_REMOVE)
+                Native.evSourceRemove(k)
+            }
+        }
+        world.sunSel = -1
+    }
+
+    /** Put the sun lever away: the grip, any armed placement, and the sheet itself. */
+    private fun closeSunPanel() {
+        world.sunSel = -1
+        world.placeSource = 0
+        sunPanelOpen = false
     }
 
     internal fun openDrawer() {
@@ -1505,8 +1762,15 @@ class MainActivity : Activity() {
 
     private fun disarmReset() {
         resetArmedAt = 0L
-        resetButton.text = Chrome.label(this, "reset")
-        resetButton.setTextColor(Style.TEXT)
+        armReset(Style.TEXT, Chrome.label(this, "reset"))
+    }
+
+    /** Paint the reset glyph and say what a tap does now — the tooltip and the screen reader's
+     *  word both follow the state, since the icon itself cannot. */
+    private fun armReset(tint: Int, desc: String) {
+        resetIcon.imageTintList = android.content.res.ColorStateList.valueOf(tint)
+        resetIcon.contentDescription = desc
+        resetIcon.tooltipText = desc
     }
 
     /**
@@ -1610,7 +1874,7 @@ class MainActivity : Activity() {
      *  Internal: the boot gate applies real layouts. */
     internal fun applyLayout(which: Int) {
         if (world.homeSunLocked) return // layouts rewrite the whole sky, the founded sun included (L7)
-        val layout = sourceLayouts[which]
+        val layout = Sky.LAYOUTS[which]
         world.post {
             if (Native.levelAllowsSource(0) == 0) return@post
             Native.ivPush(WorldView.IV_SOURCE_LAYOUT)
@@ -1716,6 +1980,7 @@ class MainActivity : Activity() {
             world.selSpecies >= 0 -> world.deselect()
             world.placeSource != 0 -> world.placeSource = 0
             world.sunSel >= 0 -> world.sunSel = -1
+            sunPanelOpen -> sunPanelOpen = false
             world.toolArmed != 0 -> world.toolArmed = 0
             world.wallArmed -> world.wallArmed = false
             world.intervene -> world.intervene = false
@@ -1787,6 +2052,27 @@ class MainActivity : Activity() {
      * horizontally scrollable child — the pages row itself scrolls since U0.1 — is left alone,
      * because that child owns sideways motion.
      */
+    /**
+     * The front door's panel, which lives inside a scroller and carries that scroller's
+     * visibility with it.
+     *
+     * The alternative was to toggle the wrapper at every one of the shell's `startPanel.visibility
+     * = …` sites — and at the boot gate's, which sets it too. That is a rule nobody can enforce:
+     * the first line that hides the panel and forgets the scroller leaves a full-screen invisible
+     * view over the pond, eating every touch. So the two are welded here instead, where there is
+     * exactly one place to get it right. Reopening the door also returns it to the top: a player
+     * who scrolled to the optic and left should not come back to a screen with no title on it.
+     */
+    private class StartDoor(ctx: Context) : LinearLayout(ctx) {
+        override fun setVisibility(v: Int) {
+            super.setVisibility(v)
+            (parent as? ScrollView)?.let {
+                it.visibility = v
+                if (v == VISIBLE) it.scrollTo(0, 0)
+            }
+        }
+    }
+
     private class SwipePanel(ctx: Context, val onSwipe: (Int) -> Unit) : LinearLayout(ctx) {
         private val slop = ViewConfiguration.get(ctx).scaledTouchSlop
         private var x0 = 0f

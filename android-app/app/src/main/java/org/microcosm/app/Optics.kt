@@ -30,6 +30,17 @@ import kotlin.math.roundToInt
  * The flag is written from the menu on the UI thread and read by the render thread. A toggle
  * mid-frame can only cost one frame painted half in each regime; the sprite bake behind it is
  * swapped atomically by the Renderer.
+ *
+ * Each rule comes in two forms, and the difference matters (2026-09-03). The one-argument form
+ * reads [lightField] and is what every painter of the WORLD calls: the world is in one regime at
+ * a time and the flag is where that lives. The form that takes the regime first is for a painter
+ * that must show a regime the world is not in yet — the front door's [OpticSwatch], which paints
+ * the microscope the player just asked for while the render thread is still a frame behind
+ * applying it. It exists so that painter does not have to reach over and flip the global (which
+ * would both race the renderer and, since the renderer's own switch is guarded by comparing
+ * against it, quietly cancel the real toggle) and does not have to keep a second copy of these
+ * rules (which would be the second definition of the look this project keeps learning not to
+ * build). The flag-reading forms delegate, so there is still exactly one recipe per rule.
  */
 object Optics {
 
@@ -55,16 +66,19 @@ object Optics {
     private const val FADE = 0.5
     private const val DEEP = 0.55
 
-    fun ground(): Int = if (lightField) GROUND_LIGHT else GROUND_DARK
+    fun ground(light: Boolean): Int = if (light) GROUND_LIGHT else GROUND_DARK
+    fun ground(): Int = ground(lightField)
 
     private fun a8(a: Float) = (a * 255f).roundToInt().coerceIn(0, 255)
 
     private fun fade(v: Int, k: Int) = (v + (k - v) * FADE).roundToInt()
 
     /** A fill: a field, an interior, a glow. */
-    fun wash(a: Float, r: Int, g: Int, b: Int): Int =
-        if (!lightField) Color.argb(a8(a), r, g, b)
+    fun wash(light: Boolean, a: Float, r: Int, g: Int, b: Int): Int =
+        if (!light) Color.argb(a8(a), r, g, b)
         else Color.argb(a8(a), fade(r, SLIDE_GREY[0]), fade(g, SLIDE_GREY[1]), fade(b, SLIDE_GREY[2]))
+
+    fun wash(a: Float, r: Int, g: Int, b: Int): Int = wash(lightField, a, r, g, b)
 
     /** The same fade as [wash], as a packed opaque colour — for the per-cell field pixels. */
     fun washRGB(r: Int, g: Int, b: Int): Int =
@@ -72,8 +86,8 @@ object Optics {
         else Color.rgb(fade(r, SLIDE_GREY[0]), fade(g, SLIDE_GREY[1]), fade(b, SLIDE_GREY[2]))
 
     /** A structure: membrane, rod, seam, filament — the faded hue, darkened. */
-    fun line(a: Float, r: Int, g: Int, b: Int): Int =
-        if (!lightField) Color.argb(a8(a), r, g, b)
+    fun line(light: Boolean, a: Float, r: Int, g: Int, b: Int): Int =
+        if (!light) Color.argb(a8(a), r, g, b)
         else Color.argb(
             a8(a),
             (fade(r, SLIDE_GREY[0]) * DEEP).roundToInt(),
@@ -81,10 +95,14 @@ object Optics {
             (fade(b, SLIDE_GREY[2]) * DEEP).roundToInt(),
         )
 
+    fun line(a: Float, r: Int, g: Int, b: Int): Int = line(lightField, a, r, g, b)
+
     /** The contrast ink: the call site's pale colour on black water, one charcoal on the lamp. */
-    fun ink(a: Float, r: Int, g: Int, b: Int): Int =
-        if (!lightField) Color.argb(a8(a), r, g, b)
+    fun ink(light: Boolean, a: Float, r: Int, g: Int, b: Int): Int =
+        if (!light) Color.argb(a8(a), r, g, b)
         else Color.argb(a8(a), INK_LIGHT[0], INK_LIGHT[1], INK_LIGHT[2])
+
+    fun ink(a: Float, r: Int, g: Int, b: Int): Int = ink(lightField, a, r, g, b)
 
     /**
      * The phase-contrast rim — light field only. A membrane in transmitted light throws a bright

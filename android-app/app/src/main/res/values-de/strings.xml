@@ -29,8 +29,8 @@
     <string name="start_sub_as_stands">dein Teich, wie er gerade ist</string>
     <string name="choice_continue_exp">Experiment fortsetzen</string>
     <string name="sub_continue_exp">E%1$d %2$s — wie du es verlassen hast</string>
-    <string name="choice_view_dark">Ansicht: Dunkelfeld</string>
-    <string name="choice_view_light">Ansicht: Hellfeld</string>
+    <string name="choice_view_dark">Dunkelfeld</string>
+    <string name="choice_view_light">Hellfeld</string>
     <string name="sub_view_dark">leuchtendes Leben auf schwarzem Wasser — tippe für das Hellfeld</string>
     <string name="sub_view_light">gefärbtes Leben auf hellem Grund — tippe für das Dunkelfeld</string>
 
@@ -112,7 +112,6 @@
     <string name="btn_begin">los</string>
     <string name="btn_skip">überspringen</string>
     <string name="btn_undo">rückgängig</string>
-    <string name="btn_experiments">Experimente</string>
     <string name="btn_reset_sure">sicher?</string>
 
     <!-- die Gesichter des Chrome-Inventars -->
@@ -121,7 +120,7 @@
     <string name="tool_kill">töten</string>
     <string name="tool_seed">ansiedeln</string>
     <string name="tool_wall">Wand</string>
-    <string name="sun_release">loslassen</string>
+    <string name="tool_sun">Sonne</string>
     <string name="page_pops">Arten</string>
     <string name="page_traits">Merkmale</string>
     <string name="page_chem">Chemie</string>
@@ -131,10 +130,12 @@
     <string name="util_reset">Reset</string>
     <string name="util_save">Speichern</string>
     <string name="util_data">Daten</string>
+    <string name="util_home">Start</string>
 
     <!-- das Menü -->
     <string name="section_pace">Tempo</string>
     <string name="section_species">Arten · Tippen blendet aus</string>
+    <string name="section_view">Ansicht</string>
 
     <!-- die Hinweise der Hand und die Sonne -->
     <string name="hint_wall_drag">übers Wasser ziehen</string>
@@ -162,6 +163,8 @@
     <string name="layout_isles">Archipel</string>
     <string name="layout_hot">heiße Sonne</string>
     <string name="layout_heater">Heizquelle</string>
+    <string name="sun_sky">Himmel</string>
+    <string name="sun_scenarios">Himmel-Szenarien</string>
 
     <!-- das Evolutions-Panel (EV) -->
     <string name="evo_title">Evolution</string>
@@ -261,18 +264,48 @@
     <!-- die Vitalwerte-Seite -->
     <string name="health_gathering">Geschichte wird gesammelt…</string>
     <string name="axis_now">jetzt</string>
-    <string name="health_variety">VIELFALT %1$.2f    P/R %2$.2f</string>
-    <string name="health_recycling">RECYCLING %1$s    GEBUNDEN %2$d%%</string>
     <string name="health_every">alle %1$d s</string>
-    <string name="health_adapt">ANPASSUNG %1$.2f</string>
-    <string name="health_vitals_header">VITALWERTE DER ARTEN</string>
-    <string name="vital_critical">kritisch</string>
-    <string name="vital_tense">angespannt</string>
-    <string name="vital_calm">ruhig</string>
-    <string name="health_row">%1$-9s Reserve %2$3d%% %3$s  Zahl x%4$.2f   %5$s</string>
-    <string name="health_venator">%1$-9s Reserve %2$3d%%    Beuteverluste %3$.1f/s</string>
+    <string name="health_vitals_header">Vitalwerte der Arten</string>
+    <!-- die Kacheln der Vitalwerte, in der Reihenfolge von HealthPanel -->
+    <string-array name="health_tiles">
+        <item>Vielfalt</item>
+        <item>Pflanzen je Fresser</item>
+        <item>Recycling</item>
+        <item>festgelegt</item>
+        <item>Anpassung</item>
+    </string-array>
+    <!-- der Zustand einer Art, nach Stufe: 0 ruhig, 1 angespannt, 2 kritisch -->
+    <string-array name="vital_states">
+        <item>ruhig</item>
+        <item>angespannt</item>
+        <item>kritisch</item>
+    </string-array>
+    <string name="health_factor">×%1$s</string>
+    <string name="health_prey">Beuteverluste %1$.1f/s</string>
     <string name="health_reference">Referenzbereiche gemessen an sechs gesunden archivierten Welten.</string>
     <string name="events_none">noch nichts zu berichten.</string>
+    <string name="events_yours">was du getan hast</string>
+    <string name="events_world">was die Welt getan hat</string>
+
+    <!-- der Daten-Bildschirm -->
+    <string name="data_title">Daten</string>
+    <string name="desc_page_info">was diese Seite zeigt</string>
+    <!-- die vier Adressen des Minerals, unterste Lage zuerst -->
+    <string-array name="chem_parts">
+        <item>in Lebewesen</item>
+        <item>in Toten</item>
+        <item>in Detritus</item>
+        <item>im Wasser gelöst</item>
+    </string-array>
+    <!-- was die Welt erzeugt, verbrennt und zurückholt -->
+    <string-array name="metab_parts">
+        <item>erzeugt</item>
+        <item>verbrannt</item>
+        <item>zurückgeholt</item>
+    </string-array>
+    <string name="metab_panel_flows">erzeugt und verbrannt</string>
+    <string name="metab_panel_recycle">zurückgeholt</string>
+    <string name="traits_alive">%1$d lebend</string>
 
     <!-- was die Ereignis-Seite jeden Eingriff nennt -->
     <string-array name="iv_labels">
