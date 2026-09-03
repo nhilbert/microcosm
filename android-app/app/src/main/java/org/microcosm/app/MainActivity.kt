@@ -124,8 +124,8 @@ class MainActivity : Activity() {
      *  One state, two ways to reach it; [refreshOptic] paints both from `world.lightField`. */
     internal lateinit var opticRow: LinearLayout // internal: the boot gate taps the switch
     private lateinit var opticTitle: TextView
-    private lateinit var opticSub: TextView
-    private lateinit var opticTrack: android.widget.FrameLayout
+    internal lateinit var opticSwatch: OpticSwatch // internal: the boot gate compares its grounds
+    internal lateinit var opticTrack: android.widget.FrameLayout // internal: the gate reads the thumb's side
     private lateinit var opticSwitch: LinearLayout
     internal lateinit var opticLabel: TextView // internal: the boot gate reads the drawer's word
     /** The front door's continue-the-experiment row — added after the fixed rows the boot gate walks. */
@@ -1157,7 +1157,11 @@ class MainActivity : Activity() {
         val light = world.lightField
         val title = getString(if (light) R.string.choice_view_light else R.string.choice_view_dark)
         opticTitle.text = title
-        opticSub.text = getString(if (light) R.string.sub_view_light else R.string.sub_view_dark)
+        opticSwatch.setRegime(light)
+        // The sentence the card used to show is now what it SAYS: the picture is not readable by
+        // a screen reader, so the words it replaced become the card's accessible name.
+        opticRow.contentDescription = "$title. " +
+            getString(if (light) R.string.sub_view_light else R.string.sub_view_dark)
         Chrome.switchTrackState(this, opticTrack, light)
         Chrome.switchState(this, opticSwitch, light, title)
     }
@@ -1194,9 +1198,17 @@ class MainActivity : Activity() {
         }
 
     /**
-     * The front door's optic row: a card in the same voice as [startChoice] — the regime in full
-     * strength, what it looks like underneath — with the switch itself at its right edge. The
-     * whole card is the target, so the switch is a picture of the state and not a second one.
+     * The front door's optic row: the field of view on the left, the regime's name, the switch at
+     * the right edge. The whole card is one target, so the switch shows the state rather than
+     * being a second control.
+     *
+     * What used to sit here was a sentence describing the look ("glowing life on black water —
+     * tap for the light field"). It is gone for the reason [OpticSwatch] carries in full: a switch
+     * already states the side you are on, so a line naming the ACTION beside it is the ambiguity
+     * that makes a reader treat a switch as a command — and where the outcome is a look, the
+     * outcome itself beats prose about it. The sentence survives where it still earns its keep,
+     * as the card's contentDescription: a screen reader gets the words a sighted player now gets
+     * from the picture.
      */
     private fun startSwitch(onTap: () -> Unit): LinearLayout =
         LinearLayout(this).apply {
@@ -1208,31 +1220,60 @@ class MainActivity : Activity() {
                 rightMargin = Style.dp(this@MainActivity, 24f)
                 bottomMargin = Style.dp(this@MainActivity, 14f)
             }
-            setPadding(Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f),
-                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f))
+            setPadding(Style.dp(this@MainActivity, 18f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f))
             setOnClickListener { onTap() }
+            opticSwatch = OpticSwatch(this@MainActivity).apply {
+                show(swatchCast())
+                setRegime(world.lightField)
+                // The picture is the card's, not a thing of its own to land on: the card carries
+                // the whole meaning as its contentDescription.
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            addView(opticSwatch, LinearLayout.LayoutParams(
+                Style.dp(this@MainActivity, 52f), Style.dp(this@MainActivity, 52f)))
             opticTitle = TextView(this@MainActivity).apply {
                 setTextColor(Style.BRIGHT)
                 textSize = 17f
                 typeface = Style.wordMedium(this@MainActivity)
             }
-            opticSub = TextView(this@MainActivity).apply {
-                setTextColor(Style.DIM)
-                textSize = 13f
-                typeface = Style.word(this@MainActivity)
-                setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
-            }
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                addView(opticTitle)
-                addView(opticSub)
-            }, LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(opticTitle, LinearLayout.LayoutParams(0, WRAP, 1f).apply {
+                marginStart = Style.dp(this@MainActivity, 16f)
+            })
             opticTrack = Chrome.switchTrack(this@MainActivity)
             addView(opticTrack, LinearLayout.LayoutParams(
                 Style.dp(this@MainActivity, 52f), Style.dp(this@MainActivity, 30f)).apply {
-                marginStart = Style.dp(this@MainActivity, 16f)
+                marginStart = Style.dp(this@MainActivity, 12f)
             })
         }
+
+    /**
+     * The four the preview shows, biggest first, at fixed spots in the field (position and radius
+     * as fractions of it, so the picture is the same at any size).
+     *
+     * Chosen by NAME rather than by index: the species table is the core's and may grow, and a
+     * creature this does not know about simply does not appear rather than turning the picture
+     * into something else. The colours are the core's own bucket table — the same call the drawer
+     * pills and the seed picker make, never a second palette here — read once, so flipping the
+     * optic repaints from cached data and never touches the core again.
+     */
+    private fun swatchCast(): List<OpticSwatch.Body> {
+        val spots = listOf(
+            Triple("Cilio", 0.36f to 0.41f, 0.21f),
+            Triple("Venator", 0.69f to 0.63f, 0.17f),
+            Triple("Drifta", 0.70f to 0.30f, 0.13f),
+            Triple("Solara", 0.33f to 0.73f, 0.10f),
+        )
+        val byName = live.associateBy { Native.traitText(it, 0) }
+        return spots.mapNotNull { (name, at, r) ->
+            val sp = byName[name] ?: return@mapNotNull null
+            OpticSwatch.Body(
+                intArrayOf(Native.specNum(sp, 0, 0, 0).toInt(), Native.specNum(sp, 0, 0, 1).toInt(),
+                    Native.specNum(sp, 0, 0, 2).toInt()),
+                at.first, at.second, r,
+            )
+        }
+    }
 
     /**
      * An experiment row: the level's captured moment beside its words. The picture comes from
