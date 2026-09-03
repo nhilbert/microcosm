@@ -26,11 +26,12 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     companion object {
         const val TICK_MS = 100.0
         /**
-         * How long a touched sun wears the standing-change badge. Far longer than the undo
-         * chip's 10 s: the notice outlives the offer to put the world back, which is the whole
-         * point of U2.3, and then it stops taking up the top of the screen.
+         * How long a touched sun wears the standing-change badge (owner, 2026-09-03: 30 s; it
+         * stood at 90 s before). Still three times the undo chip, so the notice outlives the
+         * offer to put the world back — which is the whole point of U2.3 — and then it stops
+         * taking up the top of the screen.
          */
-        const val SUN_BADGE_SHOW_NS = 90_000_000_000L
+        const val SUN_BADGE_SHOW_NS = 30_000_000_000L
         /** How long the undo chip stands after an intervention (owner, 2026-09-03). */
         const val UNDO_SHOW_NS = 10_000_000_000L
         // The core's KINDS table (impact.rs), by index. A press changes the regime; a pulse pokes it.

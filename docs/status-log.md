@@ -82,7 +82,8 @@ The project's meta-lesson, worth carrying into every future phase: the instrumen
   `SUN_BADGE_SHOW_NS` instead of the literal that sat in the frame loop, plus `world.undoShowNs`
   for the gate to shorten. One chip covers every lever (pour, seed, feed/kill, sun, walls): the
   freshness clock hangs off the core's `ivCount`, so this is a single number, not a sweep. The
-  browser build's chip was already 5 s and is untouched. The standing-sun badge stays at 90 s —
+  browser build's chip was already 5 s and is untouched. The standing-sun badge stayed at 90 s
+  in this change — cut to 30 s in the next one, same day —
   it is a notice that a change stands, not an offer to put it back, and §13's point was that it
   outlives the offer. Recorded cost, not smoothed over: an intervention whose consequence needs
   half a minute of sim time to show is now un-undoable by the time the player sees it; if that
@@ -90,3 +91,17 @@ The project's meta-lesson, worth carrying into every future phase: the instrumen
   `theArmedToolTouchesTheWorld` extended — a fresh intervention arms the chip and it retires on
   its own while the change still stands. Core untouched, conformance bit-identical. Record:
   app-ux-design-plan.md §14.
+
+- **The standing-sun badge goes after 30 s (owner instruction, 2026-09-03)**: straight after the
+  undo-chip cut, and against what that entry had argued for leaving alone. `SUN_BADGE_SHOW_NS`
+  90 s → 30 s. The argument survives the instruction: the badge is a notice that a change is
+  standing, not a button that puts anything back, and at 30 s against the chip's 10 s it still
+  outlives the offer three times over — U2.3's ordering holds, only the distance changed. What
+  goes is the long tail, the minute and a half in which the bar reported a change nobody was
+  still deciding about. Sharper cost, restated rather than buried: `putSunBack`, the one path
+  back to the *founding* sun, hangs off the badge's tap, so it is reachable for 30 s now instead
+  of 90; past that nothing on screen offers to put the sky back where it started. The answer, if
+  it bites, is the permanent restore row §13 already named, not a longer bar. Gate unchanged and
+  still honest — it drives the badge's whole life through `world.sunBadgeShowNs`, proving the
+  mechanism rather than pinning the number. Core untouched, conformance bit-identical. Record:
+  app-ux-design-plan.md §15.

@@ -411,14 +411,16 @@ not a monument") arriving one round later at the badge.
 
 Fix (`WorldView`, the badge block): the badge is now a **notice with a freshness window**. Any
 change to source 0's tuple (x, y, i, a, sigma) re-arms it for `SUN_BADGE_SHOW_NS` = 90 s of real
-time — far longer than the undo chip (45 s then, 10 s since §14), so the notice still outlives
-the offer to put the world back, which was U2.3's whole reason for existing — and then it goes. Nothing else re-arms it: an
+time (30 s since §15) — longer than the undo chip (45 s then, 10 s since §14), so the notice
+still outlives the offer to put the world back, which was U2.3's whole reason for existing —
+and then it goes. Nothing else re-arms it: an
 unrelated pour leaves it alone (the chip's `ivCount` freshness would not have). Founding a
 world, restarting a level and loading a save re-baseline the sky, so a restored change is
 history and wears no badge, exactly as restored interventions get no chip.
 
 What this costs, recorded rather than smoothed over: `putSunBack` — the one path back to the
-*founding* sun — hangs off the badge's tap, so after 90 s that path is gone and the player is
+*founding* sun — hangs off the badge's tap, so after the window (90 s then, 30 s since §15)
+that path is gone and the player is
 left with the sun card's sliders and the undo slot. And the outrun study's conviction (a sun
 press left standing five minutes outruns its undo) is now answered only while the notice is up;
 past that the world carries a standing change the chrome no longer mentions. Both are the
@@ -449,8 +451,30 @@ conclusion §13 reached about the founding sun.
 
 One thing this deliberately does not touch: the standing-sun badge stays at 90 s. It is a
 *notice* that a change is standing, not a button that puts anything back, and §13's whole point
-was that the notice should outlive the offer. It now outlives it by more.
+was that the notice should outlive the offer. It now outlives it by more. **Superseded one
+instruction later — §15 cuts the badge to 30 s.** The argument for keeping the two separate
+survives; only the distance between them changed.
 
 Gate: the boot gate's armed-tool test gains the chip's retirement — a fresh intervention arms
 it, and with the window shortened through `world.undoShowNs` it goes on its own while the world
 still carries the change. Core untouched, so conformance is bit-identical by construction.
+
+## 15. The standing-sun badge goes after 30 s (owner, 2026-09-03)
+
+Owner instruction, immediately after §14: the standing-sun badge goes after 30 s.
+`SUN_BADGE_SHOW_NS` = 30 s replaces 90 s. §14 had argued for leaving the badge alone — that it
+is a notice rather than an offer, and should outlive the chip. The instruction does not overturn
+that argument, it sets the distance: 30 s against the chip's 10 s still leaves the notice
+standing three times as long as the button, so U2.3's ordering holds. What goes is the long
+tail — the minute and a half in which the bar reported a change nobody was still deciding about.
+
+The cost §13 recorded gets sharper and is worth restating rather than burying: `putSunBack` —
+the one path back to the *founding* sun — hangs off the badge's tap, so it is now reachable for
+30 s after the last touch of the sun instead of 90. Past that the player has the sun card's
+sliders and nothing that says "put it back where it started". If that bites, the answer is the
+one §13 already named: a permanent restore row on the sun card, not a longer bar.
+
+Gate: unchanged and still honest. The badge block's boot gate drives the whole life —
+appears, clears on restore, leaves on its own while the change stands, re-arms on the next
+touch — through `world.sunBadgeShowNs`, so it proves the mechanism at any window rather than
+pinning the number. Core untouched; conformance bit-identical.
