@@ -344,17 +344,64 @@ fn main() {
         check_load("running core", &mut c, &mut fails);
     }
 
-    // 4. refusals: a snapshot must not half-load
-    let mut d = Sim::new();
-    let mut bad = bytes.clone();
-    bad[0] = b'X';
-    match d.load(&bad) {
-        Err(e) => println!("  {:<44} refused ({})", "corrupt magic", e),
-        Ok(()) => { println!("  {:<44} ACCEPTED — should have refused", "corrupt magic"); fails += 1; }
-    }
-    match d.load(&bytes[..bytes.len() / 2]) {
-        Err(e) => println!("  {:<44} refused ({})", "truncated file", e),
-        Ok(()) => { println!("  {:<44} ACCEPTED — should have refused", "truncated file"); fails += 1; }
+    // 4. refusals: a snapshot must not half-load. Refusing is half the claim — the OTHER half is
+    //    that the world the player was watching survives the refusal untouched. `mc_load` states
+    //    it as an invariant ("a refusal, never a half-loaded world"), so it is checked here on a
+    //    world with something to lose, not on a fresh core where nothing can be destroyed.
+    {
+        let mut d = Sim::new();
+        build(&mut d);
+        for _ in 0..600 {
+            d.step();
+        }
+        let before = (state_hash(&d), d.obs.count, d.obs.sys_events.len());
+        let survived = |label: &str, d: &Sim, before: &(String, usize, usize), fails: &mut i32| {
+            let now = (state_hash(d), d.obs.count, d.obs.sys_events.len());
+            if now == *before {
+                println!("  {:<44} identical", format!("{}: the live world survives", label));
+            } else {
+                println!(
+                    "  {:<44} DIFFERS\n    before:  {} (count {}, {} events)\n    after:   {} (count {}, {} events)",
+                    format!("{}: the live world survives", label),
+                    before.0, before.1, before.2, now.0, now.1, now.2
+                );
+                *fails += 1;
+            }
+        };
+
+        let mut bad = bytes.clone();
+        bad[0] = b'X';
+        match d.load(&bad) {
+            Err(e) => println!("  {:<44} refused ({})", "corrupt magic", e),
+            Ok(()) => { println!("  {:<44} ACCEPTED — should have refused", "corrupt magic"); fails += 1; }
+        }
+        survived("corrupt magic", &d, &before, &mut fails);
+
+        match d.load(&bytes[..bytes.len() / 2]) {
+            Err(e) => println!("  {:<44} refused ({})", "truncated file", e),
+            Ok(()) => { println!("  {:<44} ACCEPTED — should have refused", "truncated file"); fails += 1; }
+        }
+        survived("truncated file", &d, &before, &mut fails);
+
+        // Truncated one byte before the end: everything parses, the last read runs off. The
+        // failure that gets furthest into the stream, so the most of the world to lose.
+        match d.load(&bytes[..bytes.len() - 1]) {
+            Err(e) => println!("  {:<44} refused ({})", "truncated by one byte", e),
+            Ok(()) => { println!("  {:<44} ACCEPTED — should have refused", "truncated by one byte"); fails += 1; }
+        }
+        survived("truncated by one byte", &d, &before, &mut fails);
+
+        // And after all that, the live world still steps like one that was never touched.
+        let mut e = Sim::new();
+        build(&mut e);
+        for _ in 0..600 {
+            e.step();
+        }
+        for _ in 0..400 {
+            d.step();
+            e.step();
+        }
+        check("steps on after three refusals", &state_hash(&e), &state_hash(&d), &mut fails);
     }
 
     // Optional: write the snapshot out, so its on-disk and compressed size can be measured.
