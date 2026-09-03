@@ -113,7 +113,7 @@
     <string name="tool_kill">kill</string>
     <string name="tool_seed">seed</string>
     <string name="tool_wall">wall</string>
-    <string name="sun_release">release</string>
+    <string name="tool_sun">sun</string>
     <string name="page_pops">pops</string>
     <string name="page_traits">traits</string>
     <string name="page_chem">chem</string>
@@ -157,6 +157,8 @@
     <string name="layout_isles">archipelago</string>
     <string name="layout_hot">hot sun</string>
     <string name="layout_heater">heater</string>
+    <string name="sun_sky">sky</string>
+    <string name="sun_scenarios">sky scenarios</string>
 
     <!-- the Evolution panel (EV) -->
     <string name="evo_title">Evolution</string>

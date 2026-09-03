@@ -68,11 +68,11 @@ class ChromeLayoutTest {
             for ((name, row) in rows(c)) {
                 val w = when (name) {
                     in Chrome.IN_DRAWER -> Chrome.DRAWER_DP - 2 * Chrome.DRAWER_PAD_DP
-                    // The specimen actions live in the sheet, inside its padding, and share
-                    // that width with the creature's name. Measuring the cluster alone at the
-                    // sheet's inner width is the honest floor and no more: it proves the three
+                    // A sheet's rows live inside its padding, so they are measured at the
+                    // sheet's inner width. For the clusters that SHARE a header with a title
+                    // (specimen, sunhead) that is the honest floor and no more: it proves the
                     // targets fit and stay 48 dp, not that the name beside them still does.
-                    "specimen" -> prof.wDp - 2 * Chrome.SHEET_PAD_DP
+                    in Chrome.IN_SHEET -> prof.wDp - 2 * Chrome.SHEET_PAD_DP
                     else -> prof.wDp
                 }
                 for (v in LayoutGate.check(name, row, prof, w)) found[v.key] = v

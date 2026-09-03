@@ -36,13 +36,26 @@ object Chrome {
     /** The pace instrument's cells, in order. One segmented control, not four buttons. */
     val PACE = listOf("pause", "1×", "4×", "16×")
 
-    /** Intervene's levers, as icon tiles. `feed` and `kill` need a selection. */
-    val TOOLS = listOf("feed", "kill", "seed", "wall")
-    val TOOL_ICONS = listOf(R.drawable.ic_feed, R.drawable.ic_kill, R.drawable.ic_seed, R.drawable.ic_wall)
+    /**
+     * Intervene's levers, as icon tiles, in escalating reach: the individual under the finger,
+     * then a species, then the ground, then the sky.
+     *
+     * `sun` is the newest (owner, 2026-09-03: "I need to click a sun first to place a new one").
+     * Placing a source and reshaping the sky were reachable only THROUGH an already-placed sun's
+     * card — a lever whose entry point was the thing it creates. It is appended rather than
+     * slotted beside `seed` so the four older indices keep their meaning; the gates key on them.
+     */
+    val TOOLS = listOf("feed", "kill", "seed", "wall", "sun")
+    val TOOL_ICONS = listOf(R.drawable.ic_feed, R.drawable.ic_kill, R.drawable.ic_seed,
+        R.drawable.ic_wall, R.drawable.ic_sun)
 
-    /** The sun card's layout presets (EV — the browser's SOURCE_LAYOUTS, additive by the L.2
-     *  finding: the shipped sun stays what and where it is; extra sources are tight and far). */
+    /** The sun sheet's scenario names, in `Sky.LAYOUTS` order — labels and rows are one table. */
     val LAYOUTS = listOf("one", "twin", "dim", "isles", "hot", "heater")
+
+    /** The sun sheet's two placements, as icon tiles: the glyph the dial's sun lever wears, and
+     *  the heat waves for the source that carries warmth and no light. */
+    val PLACE = listOf("add_sun", "add_heater")
+    val PLACE_ICONS = listOf(R.drawable.ic_sun, R.drawable.ic_heat)
 
     /** The Evolution panel's presets (6.3): one intervention each. */
     val PRESETS = listOf("shipped", "settled", "wild", "frozen")
@@ -101,6 +114,10 @@ object Chrome {
             "kill" -> R.string.tool_kill
             "seed" -> R.string.tool_seed
             "wall" -> R.string.tool_wall
+            "sun" -> R.string.tool_sun
+            "add_sun" -> R.string.sun_add
+            "add_heater" -> R.string.heater_add
+            "remove" -> R.string.sun_remove
             "close" -> R.string.specimen_close
             "pops" -> R.string.page_pops
             "traits" -> R.string.page_traits
@@ -213,6 +230,69 @@ object Chrome {
         return row
     }
 
+    /**
+     * A tile: the glyph and the word side by side in one quiet box, 48 dp tall.
+     *
+     * The middle voice between [button] (a word alone) and [iconButton] (a glyph alone), for a
+     * control that wants both — the sun sheet's two placements, where "+ heater" as bare text
+     * wrapped onto a second line at a third of a 408 dp phone and the glyph says at a glance
+     * which of the two kinds of source this is.
+     */
+    fun tile(ctx: Context, iconRes: Int, label: String, onTap: () -> Unit = {}): LinearLayout {
+        val tile = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            background = Style.touchable(ctx, Style.quiet(ctx))
+            minimumHeight = Style.dp(ctx, 48f)
+            setPadding(Style.dp(ctx, 12f), Style.dp(ctx, 10f), Style.dp(ctx, 12f), Style.dp(ctx, 10f))
+            setOnClickListener { onTap() }
+        }
+        tile.addView(android.widget.ImageView(ctx).apply {
+            setImageResource(iconRes)
+            imageTintList = ColorStateList.valueOf(Style.TEXT)
+        }, LinearLayout.LayoutParams(Style.dp(ctx, 18f), Style.dp(ctx, 18f)))
+        tile.addView(TextView(ctx).apply {
+            text = label
+            textSize = TEXT_SP
+            typeface = Style.word(ctx)
+            setTextColor(Style.TEXT)
+            maxLines = 1
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = Style.dp(ctx, 9f) })
+        return tile
+    }
+
+    /** The sun sheet's placements: two tiles sharing the width. `onTap` gets 0 (sun) or 1 (heater). */
+    fun place(ctx: Context, onTap: (Int) -> Unit = {}): LinearLayout {
+        val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((k, key) in PLACE.withIndex()) {
+            val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            if (k > 0) lp.marginStart = Style.dp(ctx, 8f)
+            row.addView(tile(ctx, PLACE_ICONS[k], label(ctx, key)) { onTap(k) }, lp)
+        }
+        return row
+    }
+
+    /**
+     * The sun sheet's header cluster: remove the source in hand, then put the sheet away.
+     *
+     * Built like [specimenActions] and for the same reason — the dismiss is the same small cross
+     * in the same corner as the specimen sheet's, because a player learns one dismiss, not one
+     * per sheet (owner, 2026-09-03). The gap and the unboxed, dim treatment are that row's rule
+     * too: a destructive word must not sit shoulder to shoulder with the way out.
+     */
+    fun sunHeaderActions(ctx: Context, onTap: (Int) -> Unit = {}): LinearLayout {
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        row.addView(button(ctx, label(ctx, "remove")) { onTap(0) })
+        row.addView(iconButton(ctx, R.drawable.ic_close, label(ctx, "close"), Style.DIM, false) { onTap(1) },
+            LinearLayout.LayoutParams(Style.dp(ctx, 48f), Style.dp(ctx, 48f))
+                .apply { marginStart = Style.dp(ctx, 14f) })
+        return row
+    }
+
     /** One horizontal row of buttons, 8 dp apart. `onTap` receives the index into `labels`. */
     fun row(ctx: Context, labels: List<String>, onTap: (Int) -> Unit = {}): LinearLayout {
         val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
@@ -249,7 +329,12 @@ object Chrome {
         // The specimen card's action cluster — icons, so the list is what they SAY, not what
         // they show. It shares the header with the creature's name, so it is measured at the
         // width it actually competes for (Chrome.IN_SHEET).
-        "specimen" to listOf("feed", "kill", "close"))
+        "specimen" to listOf("feed", "kill", "close"),
+        // The sun sheet's two rows, both inside the sheet's padding like "specimen".
+        "place" to PLACE, "sunhead" to listOf("remove", "close"))
+
+    /** The rows that live inside a bottom sheet, and so at its inner width, not the screen's. */
+    val IN_SHEET = setOf("specimen", "place", "sunhead", "layouts")
 
     /**
      * The one place a row's shipped construct is decided. `MainActivity` builds through this and
@@ -264,9 +349,15 @@ object Chrome {
         "drawerNav" -> navRow(ctx, DRAWER_NAV, DRAWER_NAV_ICONS, onTap)
         // The fitting problem the old 2x2 utility grid was built to survive is gone with it: a
         // glyph is the same width in every language, and the two words left have a tile each.
+        // (The "utility" row itself retired in the same round — the drawer's head and foot are
+        // what the four words became, so main's branch for it went with the row.)
         "optic" -> switchRow(ctx, label(ctx, "optic")) { onTap(0) }
+        "place" -> place(ctx, onTap)
+        "sunhead" -> sunHeaderActions(ctx, onTap)
+        // Pictures, not six more words: the scenarios are spatial facts, so each card carries
+        // the sky it would make (Sky.scenarios).
+        "layouts" -> Sky.scenarios(ctx, onTap)
         "presets" -> grid(ctx, PRESETS, 2, onTap)
-        "layouts" -> grid(ctx, LAYOUTS, 2, onTap)
         in SCROLLS -> scrollRow(ctx, ROWS.getValue(name), onTap)
         else -> row(ctx, ROWS.getValue(name), onTap)
     }

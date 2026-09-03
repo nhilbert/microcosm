@@ -47,21 +47,26 @@ class MainActivity : Activity() {
     private lateinit var sunTitle: TextView
     private lateinit var sunRemoveBtn: Button
     private lateinit var sunLayoutsRow: android.view.View // hidden while the founded sky is locked (L7)
+    /** The rows that need a gripped source to mean anything; hidden when the sheet opens cold. */
+    private val sunTuneRows = ArrayList<View>()
+    /** The sheet's own dismiss — the specimen sheet's cross, in the same corner. The boot gate
+     *  closes the sheet through it. */
+    internal lateinit var sunCloseBtn: android.widget.ImageButton
+    /** "+ sun"; internal, the boot gate arms the placement through it. */
+    internal lateinit var sunAddBtn: View
     private val sunSliders = HashMap<String, android.widget.SeekBar>()
     private val sunValues = HashMap<String, TextView>()
     private var sunGripShown = -1
+    /**
+     * The sun lever, opened from the intervene dial with nothing gripped (owner, 2026-09-03).
+     *
+     * Until now the sheet was the SELECTED sun's card and nothing else, so placing a source or
+     * reshaping the sky meant finding a sun and tapping it first — the lever's entry point was
+     * the thing it makes. The sheet is now the sun lever: cold it offers the sky's scenarios and
+     * the two placements, and gripping a source deepens it with that source's own three sliders.
+     */
+    private var sunPanelOpen = false
     internal val evoPanel by lazy { EvolutionPanel(this, world) } // internal: the boot gate drives it
-
-    /** The browser's SOURCE_LAYOUTS (src/ui.jsx), verbatim: additive by the L.2 finding. */
-    private data class Src(val x: Double, val y: Double, val i: Double, val a: Double, val sigma: Double)
-    private val sourceLayouts = listOf(
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0)),
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 1.0, 0.0, 130.0)),
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 0.7, 0.0, 130.0)),
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 0.8, 0.0, 110.0), Src(0.0, 512.0, 0.8, 0.0, 110.0)),
-        listOf(Src(512.0, 512.0, 1.0, 8.0, 210.0)),
-        listOf(Src(512.0, 512.0, 1.0, 0.0, 210.0), Src(0.0, 0.0, 0.0, 10.0, 130.0)),
-    )
 
     // ---- the floating chrome (U2.R2, owner round 2). Internal pieces: the boot gate drives them. ----
     internal lateinit var interveneFab: android.widget.ImageButton
@@ -163,6 +168,7 @@ class MainActivity : Activity() {
             // wearing the armed tool's icon while one stands, × while the dial is open.
             val on = world.intervene
             val armedIcon = when {
+                world.placeSource != 0 -> R.drawable.ic_sun
                 world.wallArmed -> R.drawable.ic_wall
                 world.seedSpecies >= 0 -> R.drawable.ic_seed
                 world.toolArmed == WorldView.TOOL_FEED -> R.drawable.ic_feed
@@ -187,21 +193,37 @@ class MainActivity : Activity() {
                     0 -> world.toolArmed == WorldView.TOOL_FEED
                     1 -> world.toolArmed == WorldView.TOOL_KILL
                     2 -> world.seedSpecies >= 0
-                    else -> world.wallArmed
+                    3 -> world.wallArmed
+                    else -> sunPanelOpen || world.sunSel >= 0 || world.placeSource != 0
                 },
-                true) // round 3: no tool needs a selection any more
+                // Round 3: no tool needs a selection any more. The sun is the one exception a
+                // level can take away (levelAllows 2), and a lever that cannot act should look
+                // like it — dimmed here and refused in onTool, not silently swallowed by the core.
+                k != 4 || world.sourcesAllowed)
             Chrome.paceSelect(this@MainActivity, paceBox,
                 when { world.speed >= 16 -> 3; world.speed >= 4 -> 2; world.speed >= 1 -> 1; else -> 0 })
-            // The sun card (EV) follows the grip and outranks the specimen sheet at the bottom.
+            // The sun sheet (EV) follows the grip, or the dial's sun lever, and outranks the
+            // specimen sheet at the bottom. Closing the hand closes it: it is the hand's.
+            if (!on) sunPanelOpen = false
             val si = world.sunInfo
-            val sunOpen = on && world.sunSel >= 0 && si != null
+            val gripped = world.sunSel >= 0 && si != null
+            val sunOpen = on && (gripped || sunPanelOpen)
             sunSheet.visibility = if (sunOpen) ViewGroup.VISIBLE else ViewGroup.GONE
-            if (sunOpen && si != null) {
+            if (sunOpen) {
+                // Cold, the sheet is the sky's: scenarios and the two placements. The three
+                // sliders belong to one source, so they wait until one is in hand.
+                for (row in sunTuneRows) row.visibility = if (gripped) ViewGroup.VISIBLE else ViewGroup.GONE
+                // Remove acts on the source in hand, so cold it has nothing to act on. The cross
+                // beside it never changes its face — one dismiss glyph in one corner, whatever
+                // the sheet is showing.
+                sunRemoveBtn.visibility = if (gripped) ViewGroup.VISIBLE else ViewGroup.GONE
+                sunLayoutsRow.visibility = if (world.homeSunLocked) ViewGroup.GONE else ViewGroup.VISIBLE
+            }
+            if (sunOpen && si != null) { // non-null only while a source is gripped
                 sunTitle.text = "${sunKind(si[0], si[1])}  ·  ${world.sunSel + 1}/${si[3].toInt()}"
                 val last = si[3] <= 1.0
                 sunRemoveBtn.isEnabled = !last
                 sunRemoveBtn.alpha = if (last) 0.4f else 1f
-                sunLayoutsRow.visibility = if (world.homeSunLocked) ViewGroup.GONE else ViewGroup.VISIBLE
                 if (world.sunSel != sunGripShown) { // a fresh grip: sliders take the sun's values
                     sunGripShown = world.sunSel
                     sunSliders["i"]?.progress = Math.round(si[0] / 0.05).toInt()
@@ -211,7 +233,10 @@ class MainActivity : Activity() {
                     sunSliders["sigma"]?.progress = Math.round((si[2] - 90.0) / 10.0).toInt()
                     sunValues["sigma"]?.text = "%.0f".format(si[2])
                 }
-            } else sunGripShown = -1
+            } else {
+                sunGripShown = -1
+                if (sunOpen) sunTitle.text = getString(R.string.sun_sky) // cold: the sky's card
+            }
             undoChip.visibility =
                 if (world.undoKind != 0 && armedText.isEmpty()) ViewGroup.VISIBLE else ViewGroup.GONE
             undoChip.text = undoLabel(world.undoKind, world.undoSpecies)
@@ -588,9 +613,13 @@ class MainActivity : Activity() {
         specimenSheet.addView(specimenTiles)
         root.addView(specimenSheet, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
-        // The sun card (EV): the gripped ENERGY SOURCE's own sheet — light, warmth and spread as
-        // sliders (the browser's SourceCard ranges), the six additive layouts, add and remove.
-        // It replaces U2.R2's three-button sun bar: dimmer/brighter was a slider wearing buttons.
+        // The sun sheet (EV): the sun lever — light, warmth and spread as sliders (the browser's
+        // SourceCard ranges), the six additive layouts, add and remove. It replaces U2.R2's
+        // three-button sun bar: dimmer/brighter was a slider wearing buttons.
+        //
+        // Two states since 2026-09-03. Gripped, it is a source's card and shows everything.
+        // Cold — opened from the dial's sun lever — it is the SKY's card: scenarios and the two
+        // placements, without the three sliders that would have no source to act on.
         sunSheet = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = Style.sheet(this@MainActivity)
@@ -608,36 +637,36 @@ class MainActivity : Activity() {
             typeface = Style.wordMedium(this@MainActivity)
         }
         sunHeader.addView(sunTitle, LinearLayout.LayoutParams(0, WRAP, 1f))
-        sunHeader.addView(button(getString(R.string.sun_release)) { world.sunSel = -1; world.placeSource = 0 })
+        // Remove and the dismiss, built through Chrome so the layout gate measures the cluster
+        // that ships. The cross is the specimen sheet's, deliberately: one dismiss glyph, one
+        // corner, whatever the sheet (owner, 2026-09-03).
+        val sunActionsHead = Chrome.build(this, "sunhead") { k ->
+            if (k == 0) removeGrippedSource() else closeSunPanel()
+        } as LinearLayout
+        sunRemoveBtn = sunActionsHead.getChildAt(0) as Button
+        sunCloseBtn = sunActionsHead.getChildAt(1) as android.widget.ImageButton
+        sunHeader.addView(sunActionsHead)
+        sunHeader.minimumHeight = Style.dp(this, 48f)
         sunSheet.addView(sunHeader)
-        sunSheet.addView(sunSliderRow("i", getString(R.string.sun_light), 0.0, 1.5, 0.05) { v -> "%.2f".format(v) })
-        sunSheet.addView(sunSliderRow("a", getString(R.string.sun_warmth), -8.0, 15.0, 0.5) { v ->
-            (if (v > 0) "+" else "") + "%.1f°".format(v) })
-        sunSheet.addView(sunSliderRow("sigma", getString(R.string.sun_spread), 90.0, 300.0, 10.0) { v ->
-            "%.0f".format(v) })
-        sunLayoutsRow = Chrome.build(this, "layouts") { k -> applyLayout(k) }
-        sunSheet.addView(sunLayoutsRow,
-            LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = Style.dp(this@MainActivity, 10f) })
-        val sunActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        sunActions.addView(button(getString(R.string.sun_add)) { world.placeSource = 1 },
-            LinearLayout.LayoutParams(0, WRAP, 1f))
-        sunActions.addView(button(getString(R.string.heater_add)) { world.placeSource = 2 },
-            LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = Style.dp(this@MainActivity, 8f) })
-        sunRemoveBtn = button(getString(R.string.sun_remove)) {
-            val k = world.sunSel
-            if (k >= 0) world.post {
-                if (Native.sourceCount() > 1 && Native.levelAllowsSource(k) != 0) { // keep one source; a locked sky stays (L7)
-                    Native.ivPush(WorldView.IV_SOURCE_REMOVE)
-                    Native.evSourceRemove(k)
-                }
-            }
-            world.sunSel = -1
+        for (row in listOf(
+            sunSliderRow("i", getString(R.string.sun_light), 0.0, 1.5, 0.05) { v -> "%.2f".format(v) },
+            sunSliderRow("a", getString(R.string.sun_warmth), -8.0, 15.0, 0.5) { v ->
+                (if (v > 0) "+" else "") + "%.1f°".format(v) },
+            sunSliderRow("sigma", getString(R.string.sun_spread), 90.0, 300.0, 10.0) { v ->
+                "%.0f".format(v) })) {
+            sunTuneRows.add(row)
+            sunSheet.addView(row)
         }
-        sunActions.addView(sunRemoveBtn, LinearLayout.LayoutParams(0, WRAP, 1f).apply {
-            marginStart = Style.dp(this@MainActivity, 8f)
-        })
+        sunSheet.addView(sectionLabel(getString(R.string.sun_scenarios)))
+        sunLayoutsRow = Chrome.build(this, "layouts") { k -> applyLayout(k) }
+        sunSheet.addView(sunLayoutsRow, LinearLayout.LayoutParams(MATCH, WRAP))
+        // No section label over the placements: the two tiles say what they do, and the sheet is
+        // tall enough already. The scenarios need theirs — six pictures in a grid do not say what
+        // the grid IS.
+        val sunActions = Chrome.build(this, "place") { k -> world.placeSource = k + 1 } as LinearLayout
+        sunAddBtn = sunActions.getChildAt(0)
         sunSheet.addView(sunActions, LinearLayout.LayoutParams(MATCH, WRAP).apply {
-            topMargin = Style.dp(this@MainActivity, 8f)
+            topMargin = Style.dp(this@MainActivity, 10f)
         })
         root.addView(sunSheet, FrameLayout.LayoutParams(MATCH, WRAP).apply { gravity = Gravity.BOTTOM })
 
@@ -1458,11 +1487,14 @@ class MainActivity : Activity() {
 
     private fun onFabTap() {
         when {
-            world.wallArmed || world.seedSpecies >= 0 || world.toolArmed != 0 -> {
+            world.wallArmed || world.seedSpecies >= 0 || world.toolArmed != 0 ||
+                world.placeSource != 0 || sunPanelOpen -> {
                 // armed: stand down, offer the dial
                 world.wallArmed = false
                 world.seedSpecies = -1
                 world.toolArmed = 0
+                world.placeSource = 0
+                sunPanelOpen = false
                 setDial(true)
             }
             dialOpen -> { setDial(false); world.intervene = false }
@@ -1477,14 +1509,40 @@ class MainActivity : Activity() {
      * deselects: an armed hand and an open specimen drawer were the round-3 overlap mess.
      */
     private fun onTool(k: Int) {
+        // An experiment may keep the sky to itself (levelAllows 2). The row is dimmed for it;
+        // refusing the tap here is what makes the dimming true rather than decorative.
+        if (k == 4 && !world.sourcesAllowed) return
         world.deselect()
         when (k) {
             0 -> { world.toolArmed = WorldView.TOOL_FEED; world.seedSpecies = -1; world.wallArmed = false }
             1 -> { world.toolArmed = WorldView.TOOL_KILL; world.seedSpecies = -1; world.wallArmed = false }
             2 -> { world.toolArmed = 0; seedPicker() } // arms on choice and closes the dial there
-            else -> { world.wallArmed = true; world.toolArmed = 0; world.seedSpecies = -1 }
+            3 -> { world.wallArmed = true; world.toolArmed = 0; world.seedSpecies = -1 }
+            else -> { // the sky: the sheet opens cold, with the scenarios and the placements
+                world.toolArmed = 0; world.seedSpecies = -1; world.wallArmed = false
+                sunPanelOpen = true
+            }
         }
         if (k != 2) setDial(false)
+    }
+
+    /** Remove the source in hand — never the last one, and never a sky a level locked (L7). */
+    private fun removeGrippedSource() {
+        val k = world.sunSel
+        if (k >= 0) world.post {
+            if (Native.sourceCount() > 1 && Native.levelAllowsSource(k) != 0) {
+                Native.ivPush(WorldView.IV_SOURCE_REMOVE)
+                Native.evSourceRemove(k)
+            }
+        }
+        world.sunSel = -1
+    }
+
+    /** Put the sun lever away: the grip, any armed placement, and the sheet itself. */
+    private fun closeSunPanel() {
+        world.sunSel = -1
+        world.placeSource = 0
+        sunPanelOpen = false
     }
 
     internal fun openDrawer() {
@@ -1621,7 +1679,7 @@ class MainActivity : Activity() {
      *  Internal: the boot gate applies real layouts. */
     internal fun applyLayout(which: Int) {
         if (world.homeSunLocked) return // layouts rewrite the whole sky, the founded sun included (L7)
-        val layout = sourceLayouts[which]
+        val layout = Sky.LAYOUTS[which]
         world.post {
             if (Native.levelAllowsSource(0) == 0) return@post
             Native.ivPush(WorldView.IV_SOURCE_LAYOUT)
@@ -1726,6 +1784,7 @@ class MainActivity : Activity() {
             world.selSpecies >= 0 -> world.deselect()
             world.placeSource != 0 -> world.placeSource = 0
             world.sunSel >= 0 -> world.sunSel = -1
+            sunPanelOpen -> sunPanelOpen = false
             world.toolArmed != 0 -> world.toolArmed = 0
             world.wallArmed -> world.wallArmed = false
             world.intervene -> world.intervene = false

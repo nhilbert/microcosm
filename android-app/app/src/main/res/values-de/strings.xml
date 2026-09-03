@@ -108,7 +108,7 @@
     <string name="tool_kill">töten</string>
     <string name="tool_seed">ansiedeln</string>
     <string name="tool_wall">Wand</string>
-    <string name="sun_release">loslassen</string>
+    <string name="tool_sun">Sonne</string>
     <string name="page_pops">Arten</string>
     <string name="page_traits">Merkmale</string>
     <string name="page_chem">Chemie</string>
@@ -151,6 +151,8 @@
     <string name="layout_isles">Archipel</string>
     <string name="layout_hot">heiße Sonne</string>
     <string name="layout_heater">Heizquelle</string>
+    <string name="sun_sky">Himmel</string>
+    <string name="sun_scenarios">Himmel-Szenarien</string>
 
     <!-- das Evolutions-Panel (EV) -->
     <string name="evo_title">Evolution</string>
