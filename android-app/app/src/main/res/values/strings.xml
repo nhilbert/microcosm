@@ -257,18 +257,48 @@
     <!-- the Health page -->
     <string name="health_gathering">gathering history…</string>
     <string name="axis_now">now</string>
-    <string name="health_variety">VARIETY %1$.2f    P/R %2$.2f</string>
-    <string name="health_recycling">RECYCLING %1$s    LOCKED %2$d%%</string>
     <string name="health_every">every %1$d s</string>
-    <string name="health_adapt">ADAPTABILITY %1$.2f</string>
-    <string name="health_vitals_header">SPECIES VITALS</string>
-    <string name="vital_critical">critical</string>
-    <string name="vital_tense">tense</string>
-    <string name="vital_calm">calm</string>
-    <string name="health_row">%1$-9s reserve %2$3d%% %3$s  pop x%4$.2f   %5$s</string>
-    <string name="health_venator">%1$-9s reserve %2$3d%%    prey losses %3$.1f/s</string>
+    <string name="health_vitals_header">species vitals</string>
+    <!-- the vitals tiles, in the order HealthPanel binds them -->
+    <string-array name="health_tiles">
+        <item>variety</item>
+        <item>plants per grazer</item>
+        <item>recycling</item>
+        <item>locked away</item>
+        <item>adaptability</item>
+    </string-array>
+    <!-- a species\' state, by level: 0 calm, 1 tense, 2 critical -->
+    <string-array name="vital_states">
+        <item>calm</item>
+        <item>tense</item>
+        <item>critical</item>
+    </string-array>
+    <string name="health_factor">×%1$s</string>
+    <string name="health_prey">prey losses %1$.1f/s</string>
     <string name="health_reference">Reference ranges measured on six healthy archived worlds.</string>
     <string name="events_none">nothing to report yet.</string>
+    <string name="events_yours">what you did</string>
+    <string name="events_world">what the world did</string>
+
+    <!-- the Data screen -->
+    <string name="data_title">Data</string>
+    <string name="desc_page_info">what this page shows</string>
+    <!-- the mineral\'s four addresses, bottom of the stack first -->
+    <string-array name="chem_parts">
+        <item>in living bodies</item>
+        <item>in the dead</item>
+        <item>in detritus</item>
+        <item>dissolved in water</item>
+    </string-array>
+    <!-- what the world makes, burns and wins back -->
+    <string-array name="metab_parts">
+        <item>made</item>
+        <item>burned</item>
+        <item>won back</item>
+    </string-array>
+    <string name="metab_panel_flows">made and burned</string>
+    <string name="metab_panel_recycle">won back</string>
+    <string name="traits_alive">%1$d alive</string>
 
     <!-- what the Events page calls each intervention, by the core's KINDS index (impact.rs) -->
     <string-array name="iv_labels">

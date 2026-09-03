@@ -249,18 +249,48 @@
     <!-- die Vitalwerte-Seite -->
     <string name="health_gathering">Geschichte wird gesammelt…</string>
     <string name="axis_now">jetzt</string>
-    <string name="health_variety">VIELFALT %1$.2f    P/R %2$.2f</string>
-    <string name="health_recycling">RECYCLING %1$s    GEBUNDEN %2$d%%</string>
     <string name="health_every">alle %1$d s</string>
-    <string name="health_adapt">ANPASSUNG %1$.2f</string>
-    <string name="health_vitals_header">VITALWERTE DER ARTEN</string>
-    <string name="vital_critical">kritisch</string>
-    <string name="vital_tense">angespannt</string>
-    <string name="vital_calm">ruhig</string>
-    <string name="health_row">%1$-9s Reserve %2$3d%% %3$s  Zahl x%4$.2f   %5$s</string>
-    <string name="health_venator">%1$-9s Reserve %2$3d%%    Beuteverluste %3$.1f/s</string>
+    <string name="health_vitals_header">Vitalwerte der Arten</string>
+    <!-- die Kacheln der Vitalwerte, in der Reihenfolge von HealthPanel -->
+    <string-array name="health_tiles">
+        <item>Vielfalt</item>
+        <item>Pflanzen je Fresser</item>
+        <item>Recycling</item>
+        <item>festgelegt</item>
+        <item>Anpassung</item>
+    </string-array>
+    <!-- der Zustand einer Art, nach Stufe: 0 ruhig, 1 angespannt, 2 kritisch -->
+    <string-array name="vital_states">
+        <item>ruhig</item>
+        <item>angespannt</item>
+        <item>kritisch</item>
+    </string-array>
+    <string name="health_factor">×%1$s</string>
+    <string name="health_prey">Beuteverluste %1$.1f/s</string>
     <string name="health_reference">Referenzbereiche gemessen an sechs gesunden archivierten Welten.</string>
     <string name="events_none">noch nichts zu berichten.</string>
+    <string name="events_yours">was du getan hast</string>
+    <string name="events_world">was die Welt getan hat</string>
+
+    <!-- der Daten-Bildschirm -->
+    <string name="data_title">Daten</string>
+    <string name="desc_page_info">was diese Seite zeigt</string>
+    <!-- die vier Adressen des Minerals, unterste Lage zuerst -->
+    <string-array name="chem_parts">
+        <item>in Lebewesen</item>
+        <item>in Toten</item>
+        <item>in Detritus</item>
+        <item>im Wasser gelöst</item>
+    </string-array>
+    <!-- was die Welt erzeugt, verbrennt und zurückholt -->
+    <string-array name="metab_parts">
+        <item>erzeugt</item>
+        <item>verbrannt</item>
+        <item>zurückgeholt</item>
+    </string-array>
+    <string name="metab_panel_flows">erzeugt und verbrannt</string>
+    <string name="metab_panel_recycle">zurückgeholt</string>
+    <string name="traits_alive">%1$d lebend</string>
 
     <!-- was die Ereignis-Seite jeden Eingriff nennt -->
     <string-array name="iv_labels">

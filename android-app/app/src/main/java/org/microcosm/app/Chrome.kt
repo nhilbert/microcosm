@@ -212,6 +212,93 @@ object Chrome {
             addView(row(ctx, labels, onTap))
         }
 
+    /**
+     * The Data screen's tab strip (U3).
+     *
+     * What shipped before was `scrollRow`: six full buttons, each a 48 dp hairline box, stacked
+     * against a two-line page title. Together they took about a fifth of the phone and read as a
+     * row of actions — six things to DO — when they are a place to BE. The owner's word for it
+     * was "huge menu on top steals space", and that is the right reading of what a boxed button
+     * says.
+     *
+     * So the strip is a tab strip in the ordinary sense, and the ordinary sense is worth stating
+     * because it is the part that gets improvised: the tabs are text, not boxes; the selected tab
+     * is the only bright one and carries a 2.5 dp underline; the strip scrolls when the labels do
+     * not fit and [tabSelect] brings the selected one into view, so a tab off the edge is never a
+     * tab a player cannot find; and the page body still swipes, which moves the selection here.
+     * One state, three ways to reach it — tap, swipe, and the strip scrolling itself.
+     *
+     * The underline is slate, not amber. Rule 7 again, and the note the old row already carried:
+     * looking is not touching.
+     */
+    fun tabs(ctx: Context, keys: List<String>, onTap: (Int) -> Unit = {}): HorizontalScrollView {
+        val strip = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((k, key) in keys.withIndex()) strip.addView(TextView(ctx).apply {
+            text = label(ctx, key)
+            textSize = TEXT_SP
+            typeface = Style.word(ctx)
+            setTextColor(Style.DIM)
+            gravity = android.view.Gravity.CENTER
+            // the same 48 dp floor every other control is held to, height AND width
+            minHeight = Style.dp(ctx, 48f)
+            minimumHeight = Style.dp(ctx, 48f)
+            minWidth = Style.dp(ctx, 48f)
+            minimumWidth = Style.dp(ctx, 48f)
+            setPadding(Style.dp(ctx, 14f), 0, Style.dp(ctx, 14f), 0)
+            background = tabBackground(ctx, false)
+            setOnClickListener { onTap(k) }
+        })
+        return HorizontalScrollView(ctx).apply {
+            isHorizontalScrollBarEnabled = false
+            // The one thing a bare scroll row could never say (the U0.1 note admitted it): that it
+            // scrolls. A fading edge is the platform's own answer — the tab under the fade is
+            // visibly cut off rather than absent, so the swipe suggests itself.
+            isHorizontalFadingEdgeEnabled = true
+            setFadingEdgeLength(Style.dp(ctx, 28f))
+            addView(strip, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+    }
+
+    /** A tab's ground: the ripple, plus the selected tab's underline sitting on the bottom edge. */
+    private fun tabBackground(ctx: Context, selected: Boolean): android.graphics.drawable.Drawable {
+        val base: android.graphics.drawable.Drawable = if (!selected)
+            android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+        else android.graphics.drawable.LayerDrawable(arrayOf(
+            android.graphics.drawable.GradientDrawable().apply {
+                setColor(Style.BRIGHT)
+                cornerRadius = Style.dp(ctx, 1.5f).toFloat()
+            })).apply {
+            setLayerGravity(0, android.view.Gravity.BOTTOM)
+            setLayerHeight(0, Style.dp(ctx, 2.5f))
+            setLayerInsetLeft(0, Style.dp(ctx, 6f))
+            setLayerInsetRight(0, Style.dp(ctx, 6f))
+        }
+        return android.graphics.drawable.RippleDrawable(
+            ColorStateList.valueOf(Color.argb(31, 201, 215, 227)), base, null)
+    }
+
+    /** Paint the strip's selection and scroll it into view. `sel` indexes the keys [tabs] got. */
+    fun tabSelect(ctx: Context, view: View, sel: Int) {
+        val strip = rowOf(view)
+        for (k in 0 until strip.childCount) (strip.getChildAt(k) as TextView).apply {
+            setTextColor(if (k == sel) Style.BRIGHT else Style.DIM)
+            typeface = if (k == sel) Style.wordMedium(ctx) else Style.word(ctx)
+            background = tabBackground(ctx, k == sel)
+        }
+        val tab = strip.getChildAt(sel) ?: return
+        // post: on the first pass the strip has not been laid out, so left/right are still 0 and
+        // the scroll would land on nothing.
+        view.post {
+            val hs = view as HorizontalScrollView
+            val margin = Style.dp(ctx, 24f)
+            val want = tab.left - margin
+            val end = tab.right + margin
+            if (want < hs.scrollX) hs.smoothScrollTo(maxOf(0, want), 0)
+            else if (end > hs.scrollX + hs.width) hs.smoothScrollTo(end - hs.width, 0)
+        }
+    }
+
     /** The rows wide enough to need the scroll treatment. The rest fit or share width. */
     val SCROLLS = setOf("pages")
 
@@ -239,6 +326,8 @@ object Chrome {
         "utility" -> grid(ctx, UTILITY, 2, onTap)
         "presets" -> grid(ctx, PRESETS, 2, onTap)
         "layouts" -> grid(ctx, LAYOUTS, 2, onTap)
+        // The Data screen's pages are a place to be, not six actions — a tab strip, not buttons.
+        "pages" -> tabs(ctx, PAGES, onTap)
         in SCROLLS -> scrollRow(ctx, ROWS.getValue(name), onTap)
         else -> row(ctx, ROWS.getValue(name), onTap)
     }
