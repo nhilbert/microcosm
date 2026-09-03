@@ -100,7 +100,6 @@
     <string name="btn_begin">los</string>
     <string name="btn_skip">überspringen</string>
     <string name="btn_undo">rückgängig</string>
-    <string name="btn_experiments">Experimente</string>
     <string name="btn_reset_sure">sicher?</string>
 
     <!-- die Gesichter des Chrome-Inventars -->
@@ -119,10 +118,12 @@
     <string name="util_reset">Reset</string>
     <string name="util_save">Speichern</string>
     <string name="util_data">Daten</string>
+    <string name="util_home">Start</string>
 
     <!-- das Menü -->
     <string name="section_pace">Tempo</string>
     <string name="section_species">Arten · Tippen blendet aus</string>
+    <string name="section_view">Ansicht</string>
 
     <!-- die Hinweise der Hand und die Sonne -->
     <string name="hint_wall_drag">übers Wasser ziehen</string>

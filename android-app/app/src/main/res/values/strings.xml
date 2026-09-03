@@ -105,7 +105,6 @@
     <string name="btn_begin">begin</string>
     <string name="btn_skip">skip</string>
     <string name="btn_undo">undo</string>
-    <string name="btn_experiments">experiments</string>
     <string name="btn_reset_sure">sure?</string>
 
     <!-- the chrome inventory's faces (the keys stay English in Chrome.kt; the gates key on them) -->
@@ -125,10 +124,12 @@
     <string name="util_save">save</string>
     <string name="util_data">data</string>
     <string name="util_bench" translatable="false">bench</string>
+    <string name="util_home">home</string>
 
     <!-- the drawer -->
     <string name="section_pace">pace</string>
     <string name="section_species">species · tap to hide</string>
+    <string name="section_view">view</string>
 
     <!-- the hand's hints and the sun -->
     <string name="hint_wall_drag">drag on the water</string>

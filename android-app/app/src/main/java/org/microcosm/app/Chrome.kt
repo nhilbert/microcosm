@@ -50,8 +50,29 @@ object Chrome {
     /** Data mode's pages, in order. `traits` is the evolution window (EV). */
     val PAGES = listOf("pops", "chem", "metab", "health", "events", "traits")
 
-    /** The sheet's utility row. `bench` is dev-mode only at runtime. */
-    val UTILITY = listOf("reset", "save", "data", "bench")
+    /**
+     * The drawer's head (owner, 2026-09-03): the three controls that are about the SESSION rather
+     * than the pond — leave it, keep it, start it over — as glyphs, no words. They were four
+     * words in a 2x2 grid at the drawer's foot, which spent a third of the drawer's height on the
+     * two most-used controls in it and buried the way home entirely.
+     *
+     * Icons only is a real loss and is paid for, not waved away: the word each glyph replaced is
+     * its contentDescription and its long-press tooltip (see [iconButton]), so a screen reader
+     * still speaks it and a sighted player can still ask.
+     */
+    val DRAWER_TOP = listOf("home", "save", "reset")
+    val DRAWER_TOP_ICONS = listOf(R.drawable.ic_home, R.drawable.ic_save, R.drawable.ic_reset)
+
+    /**
+     * The drawer's foot: the two screens it leads to, icon AND word. A destination is not an
+     * action — a picture alone would be a guess about where a tap goes, and the two are the only
+     * places in the app where the drawer is a menu rather than a panel.
+     */
+    val DRAWER_NAV = listOf("data", "evolution")
+    val DRAWER_NAV_ICONS = listOf(R.drawable.ic_data, R.drawable.ic_evolution)
+
+    /** The bench, alone: dev-mode only, hidden at runtime until the census strip is long-pressed. */
+    val BENCH = listOf("bench")
 
     /** The menu drawer's width and padding — declared here so the layout gate measures the
      *  drawer's rows at the width they actually get. "Speichern" overflowed at 260 dp inner
@@ -61,7 +82,7 @@ object Chrome {
     const val DRAWER_PAD_DP = 20
 
     /** The rows that live inside the drawer, and so at its inner width, not the screen's. */
-    val IN_DRAWER = setOf("pace", "utility")
+    val IN_DRAWER = setOf("pace", "drawerTop", "drawerNav", "optic", "bench")
 
     /** The specimen sheet's own padding, so its header row is measured at the width it gets. */
     const val SHEET_PAD_DP = 20
@@ -87,6 +108,11 @@ object Chrome {
             "metab" -> R.string.page_metab
             "health" -> R.string.page_health
             "events" -> R.string.page_events
+            "home" -> R.string.util_home
+            "evolution" -> R.string.evo_title
+            // The optic switch says which microscope you are in, so its label IS a state. The
+            // dark field is the world's ground state and so the face the inventory carries.
+            "optic" -> R.string.choice_view_dark
             "reset" -> R.string.util_reset
             "save" -> R.string.util_save
             "data" -> R.string.util_data
@@ -218,7 +244,8 @@ object Chrome {
     /** Row names to their label lists — the inventory [build] and the gate walk together.
      *  (The old "sun" row — dimmer/brighter/release — retired with the sun card's sliders, EV.) */
     val ROWS = mapOf("pace" to PACE, "tools" to TOOLS, "pages" to PAGES,
-        "utility" to UTILITY, "presets" to PRESETS, "layouts" to LAYOUTS,
+        "drawerTop" to DRAWER_TOP, "drawerNav" to DRAWER_NAV, "optic" to listOf("optic"),
+        "bench" to BENCH, "presets" to PRESETS, "layouts" to LAYOUTS,
         // The specimen card's action cluster — icons, so the list is what they SAY, not what
         // they show. It shares the header with the creature's name, so it is measured at the
         // width it actually competes for (Chrome.IN_SHEET).
@@ -233,10 +260,11 @@ object Chrome {
         "pace" -> pace(ctx, onTap)
         "specimen" -> specimenActions(ctx, onTap)
         "tools" -> dial(ctx, onTap)
-        // 2x2, not 1x4 (owner round 3): four buttons sharing the drawer's ~260 dp gave each 65,
-        // which German ("Speichern") overflowed and even English only just survived. Two per row
-        // doubles the budget and stops fitting from depending on the language.
-        "utility" -> grid(ctx, UTILITY, 2, onTap)
+        "drawerTop" -> iconRow(ctx, DRAWER_TOP, DRAWER_TOP_ICONS, onTap)
+        "drawerNav" -> navRow(ctx, DRAWER_NAV, DRAWER_NAV_ICONS, onTap)
+        // The fitting problem the old 2x2 utility grid was built to survive is gone with it: a
+        // glyph is the same width in every language, and the two words left have a tile each.
+        "optic" -> switchRow(ctx, label(ctx, "optic")) { onTap(0) }
         "presets" -> grid(ctx, PRESETS, 2, onTap)
         "layouts" -> grid(ctx, LAYOUTS, 2, onTap)
         in SCROLLS -> scrollRow(ctx, ROWS.getValue(name), onTap)
@@ -382,17 +410,17 @@ object Chrome {
     }
 
     /**
-     * The mode switch (owner, from the canvas: a switch, not a segmented pair). The track and
-     * thumb are index 0 and its child; [switchState] repaints them. Amber when the hand is on.
+     * The switch's own two parts — track and thumb — without a label, for a place that already
+     * says in full what is being switched (the front door's optic card).
+     *
+     * `amber` is remembered on the track rather than passed to every repaint, because it is not
+     * a taste: amber marks the player's hand and nothing else (CLAUDE.md rule 7). A switch that
+     * arms the hand wears it; a switch that only changes what the world LOOKS like (GR.7's optic)
+     * must not, and gets the slate one.
      */
-    fun modeSwitch(ctx: Context, onTap: () -> Unit): LinearLayout {
-        val sw = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-            minimumHeight = Style.dp(ctx, 48f)
-            setOnClickListener { onTap() }
-        }
+    fun switchTrack(ctx: Context, amber: Boolean = false): android.widget.FrameLayout {
         val track = android.widget.FrameLayout(ctx).apply {
+            tag = amber
             layoutParams = LinearLayout.LayoutParams(Style.dp(ctx, 52f), Style.dp(ctx, 30f))
         }
         track.addView(View(ctx), android.widget.FrameLayout.LayoutParams(
@@ -400,9 +428,44 @@ object Chrome {
             // no topMargin: it fought CENTER_VERTICAL and pushed the thumb off-axis (owner note)
             leftMargin = Style.dp(ctx, 3f); rightMargin = Style.dp(ctx, 3f)
         })
-        sw.addView(track)
+        switchTrackState(ctx, track, false)
+        return track
+    }
+
+    /** Paint a track built by [switchTrack]. The slate "on" is a brighter slate than "off" — a
+     *  state that reads as less than the other state is not a state. */
+    fun switchTrackState(ctx: Context, track: android.widget.FrameLayout, on: Boolean) {
+        val amber = track.tag == true
+        val thumb = track.getChildAt(0)
+        track.background = android.graphics.drawable.GradientDrawable().apply {
+            setColor(if (!on) Color.argb(46, 148, 178, 204)
+                else if (amber) Style.AMBER_FILL else Color.argb(92, 148, 178, 204))
+            setStroke(Style.dp(ctx, 1f), if (on && amber) Style.AMBER_BORDER else Style.HAIRLINE)
+            cornerRadius = Style.dp(ctx, 15f).toFloat()
+        }
+        thumb.background = android.graphics.drawable.GradientDrawable().apply {
+            setColor(if (!on) Style.DIM else if (amber) Style.AMBER else Style.BRIGHT)
+            cornerRadius = Style.dp(ctx, 11f).toFloat()
+        }
+        (thumb.layoutParams as android.widget.FrameLayout.LayoutParams).gravity =
+            (if (on) android.view.Gravity.END else android.view.Gravity.START) or android.view.Gravity.CENTER_VERTICAL
+        thumb.requestLayout()
+    }
+
+    /**
+     * A switch with its word beside it (owner, from the canvas: a switch, not a segmented pair).
+     * The track is child 0 and the label child 1; [switchState] repaints both.
+     */
+    fun switchRow(ctx: Context, label: String, amber: Boolean = false, onTap: () -> Unit): LinearLayout {
+        val sw = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            minimumHeight = Style.dp(ctx, 48f)
+            setOnClickListener { onTap() }
+        }
+        sw.addView(switchTrack(ctx, amber))
         sw.addView(TextView(ctx).apply {
-            text = "intervene"
+            text = label
             textSize = 14f
             typeface = Style.word(ctx)
             setPadding(Style.dp(ctx, 10f), 0, 0, 0)
@@ -411,23 +474,84 @@ object Chrome {
         return sw
     }
 
-    fun switchState(ctx: Context, sw: LinearLayout, on: Boolean) {
+    /** The hand's own switch: amber when on, and the one switch in the app that is a lever. */
+    fun modeSwitch(ctx: Context, onTap: () -> Unit): LinearLayout =
+        switchRow(ctx, "intervene", amber = true, onTap = onTap)
+
+    /** The label of a switch built by [switchRow] — a caller whose label IS the state keeps it. */
+    fun switchLabel(sw: LinearLayout): TextView = sw.getChildAt(1) as TextView
+
+    /** Paint a switch built by [switchRow]. `label` replaces its word when the word is a state. */
+    fun switchState(ctx: Context, sw: LinearLayout, on: Boolean, label: String? = null) {
         val track = sw.getChildAt(0) as android.widget.FrameLayout
-        val thumb = track.getChildAt(0)
-        val label = sw.getChildAt(1) as TextView
-        track.background = android.graphics.drawable.GradientDrawable().apply {
-            setColor(if (on) Style.AMBER_FILL else Color.argb(46, 148, 178, 204))
-            setStroke(Style.dp(ctx, 1f), if (on) Style.AMBER_BORDER else Style.HAIRLINE)
-            cornerRadius = Style.dp(ctx, 15f).toFloat()
+        switchTrackState(ctx, track, on)
+        val word = sw.getChildAt(1) as TextView
+        if (label != null) word.text = label
+        // The amber switch dims when it is off, because an unarmed hand is not doing anything.
+        // The slate one does not: both of the optic's states are a microscope you are looking
+        // through, and dimming one of them would say the other is the real world.
+        word.setTextColor(if (track.tag == true) (if (on) Style.AMBER else Style.DIM)
+            else if (on) Style.BRIGHT else Style.TEXT)
+    }
+
+    /**
+     * A row of icon buttons, 48 dp each, 8 dp apart — the drawer's head. `onTap` gets the index
+     * into `keys`, and each glyph carries the word it replaced (see [iconButton]).
+     */
+    fun iconRow(ctx: Context, keys: List<String>, icons: List<Int>, onTap: (Int) -> Unit = {}): LinearLayout {
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        thumb.background = android.graphics.drawable.GradientDrawable().apply {
-            setColor(if (on) Style.AMBER else Style.DIM)
-            cornerRadius = Style.dp(ctx, 11f).toFloat()
+        for ((k, key) in keys.withIndex()) {
+            val lp = LinearLayout.LayoutParams(Style.dp(ctx, 48f), Style.dp(ctx, 48f))
+            if (k > 0) lp.marginStart = Style.dp(ctx, 8f)
+            row.addView(iconButton(ctx, icons[k], label(ctx, key)) { onTap(k) }, lp)
         }
-        (thumb.layoutParams as android.widget.FrameLayout.LayoutParams).gravity =
-            (if (on) android.view.Gravity.END else android.view.Gravity.START) or android.view.Gravity.CENTER_VERTICAL
-        thumb.requestLayout()
-        label.setTextColor(if (on) Style.AMBER else Style.DIM)
+        return row
+    }
+
+    /**
+     * A destination tile: the glyph over its word, the bottom-navigation idiom. Stacked rather
+     * than side by side for a reason that is arithmetic and not taste — inside the drawer each
+     * tile gets about 126 dp, and an icon beside "Evolution" at 14 sp does not fit there in
+     * either language, which is exactly how "Speichern" overflowed once already.
+     */
+    fun navTile(ctx: Context, iconRes: Int, label: String, onTap: () -> Unit = {}): LinearLayout =
+        LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
+            minimumHeight = Style.dp(ctx, 58f)
+            background = Style.touchable(ctx, Style.quiet(ctx))
+            setPadding(Style.dp(ctx, 8f), Style.dp(ctx, 10f), Style.dp(ctx, 8f), Style.dp(ctx, 10f))
+            setOnClickListener { onTap() }
+            addView(android.widget.ImageView(ctx).apply {
+                setImageResource(iconRes)
+                imageTintList = ColorStateList.valueOf(Style.TEXT)
+            }, LinearLayout.LayoutParams(Style.dp(ctx, 18f), Style.dp(ctx, 18f)))
+            addView(TextView(ctx).apply {
+                text = label
+                textSize = 13f
+                typeface = Style.word(ctx)
+                setTextColor(Style.TEXT)
+                maxLines = 1
+                // A vertical LinearLayout hands a child MATCH_PARENT width by default, so the
+                // container's CENTER does not centre the WORD — it centres a full-width view
+                // whose text still starts at the left. Measured in the drawer photograph.
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, Style.dp(ctx, 5f), 0, 0)
+            })
+        }
+
+    /** The drawer's foot: [navTile]s sharing the width equally. */
+    fun navRow(ctx: Context, keys: List<String>, icons: List<Int>, onTap: (Int) -> Unit = {}): LinearLayout {
+        val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((k, key) in keys.withIndex()) {
+            val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            if (k > 0) lp.marginStart = Style.dp(ctx, 8f)
+            row.addView(navTile(ctx, icons[k], label(ctx, key)) { onTap(k) }, lp)
+        }
+        return row
     }
 
     /** The button row inside a construct built by [row], [scrollRow] or [build]. */

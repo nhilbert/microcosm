@@ -482,16 +482,16 @@ class BootTest {
         // GR.7: the optic switch. It is a view, so the test's whole claim is that a tap flips the
         // state both switches read, that the world hears it, and that the label follows — whether
         // the light field LOOKS right is WorldCameraTest's photograph and the owner's device.
-        val darkLabel = activity.opticButton.text.toString()
+        val darkLabel = activity.opticLabel.text.toString()
         activity.opticRow.performClick()
         assertTrue("tapping the optic should put the world in the light field", activity.world.lightField)
         assertTrue("the drawer's switch must say the same thing as the front door's",
-            activity.opticButton.text.toString() != darkLabel)
+            activity.opticLabel.text.toString() != darkLabel)
         photograph(activity.startPanel, "frontdoor@light")
         activity.opticRow.performClick()
         assertTrue("tapping it again should return the dark field", !activity.world.lightField)
         assertTrue("the label must come back with it",
-            activity.opticButton.text.toString() == darkLabel)
+            activity.opticLabel.text.toString() == darkLabel)
         activity.startPanel.getChildAt(2).performClick() // sandbox
         assertTrue("choosing sandbox should close the front door",
             activity.startPanel.visibility != android.view.View.VISIBLE)
@@ -530,8 +530,22 @@ class BootTest {
         looper.idleFor(Duration.ofMillis(50))
         relayout()
         photograph(decor, "app@drawer")
+        // The drawer's head and foot (owner, 2026-09-03): home | save | reset as glyphs above the
+        // scroll, data | Evolution as tiles below it. What this can claim is that both rows ship
+        // and that home really goes home; whether they FIT is the layout gate's question, and it
+        // measures the very same constructs at the drawer's own width.
+        val head = activity.drawer.getChildAt(0) as android.widget.LinearLayout
+        assertTrue("the drawer should open with three glyphs at its head", head.childCount == 3)
+        val foot = activity.drawer.getChildAt(2) as android.widget.LinearLayout
+        assertTrue("the drawer should end with two destinations", foot.childCount == 2)
         activity.onBackPressed()
         assertTrue("back should close the menu", activity.drawer.visibility != android.view.View.VISIBLE)
+        activity.menuFab.performClick()
+        head.getChildAt(0).performClick() // home
+        assertTrue("home should close the menu", activity.drawer.visibility != android.view.View.VISIBLE)
+        assertTrue("home should go to the front door",
+            activity.startPanel.visibility == android.view.View.VISIBLE)
+        activity.startPanel.getChildAt(2).performClick() // back into the sandbox
 
         controller.pause()   // U0.6's autosave path
         controller.resume()

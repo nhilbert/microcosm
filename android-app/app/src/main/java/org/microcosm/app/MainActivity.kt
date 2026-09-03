@@ -38,7 +38,7 @@ class MainActivity : Activity() {
     private lateinit var hud: TextView
     private lateinit var reportView: TextView
     private lateinit var undoChip: Button
-    private lateinit var resetButton: Button
+    private lateinit var resetIcon: android.widget.ImageButton
     private lateinit var benchButton: Button
     private var resetArmedAt = 0L
 
@@ -120,9 +120,14 @@ class MainActivity : Activity() {
     private lateinit var sunBadgeView: TextView
     private lateinit var verdict: TextView
     internal lateinit var startPanel: LinearLayout // internal: the boot gate walks the front door
-    /** GR.7: the two rows that say which microscope the world is in — front door and drawer. */
+    /** GR.7: the two switches that say which microscope the world is in — front door and drawer.
+     *  One state, two ways to reach it; [refreshOptic] paints both from `world.lightField`. */
     internal lateinit var opticRow: LinearLayout // internal: the boot gate taps the switch
-    internal lateinit var opticButton: android.widget.Button
+    private lateinit var opticTitle: TextView
+    private lateinit var opticSub: TextView
+    private lateinit var opticTrack: android.widget.FrameLayout
+    private lateinit var opticSwitch: LinearLayout
+    internal lateinit var opticLabel: TextView // internal: the boot gate reads the drawer's word
     /** The front door's continue-the-experiment row — added after the fixed rows the boot gate walks. */
     internal lateinit var continueRow: LinearLayout
     internal lateinit var expPanel: LinearLayout
@@ -713,19 +718,42 @@ class MainActivity : Activity() {
             val pad = Style.dp(this@MainActivity, Chrome.DRAWER_PAD_DP.toFloat())
             setPadding(pad, pad, pad, pad)
         }
-        val drawerBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        drawerBody.addView(TextView(this).apply {
-            text = "Microcosm"
-            setTextColor(Style.BRIGHT)
-            textSize = 20f
-            typeface = Style.wordBold(this@MainActivity)
-            setPadding(0, 0, 0, Style.dp(this@MainActivity, 8f))
+        // The drawer's head (owner, 2026-09-03): home, save and reset as glyphs, pinned above
+        // the scroll. They are the session's own three — leave the pond, keep it, start it over —
+        // and they take one 48 dp line instead of the 2x2 word grid that used to sit at the foot.
+        // The wordmark went with it: the way home is now a button rather than a title, and the
+        // front door carries the name in full the moment it is tapped.
+        val drawerTop = Chrome.build(this, "drawerTop") { k ->
+            when (Chrome.DRAWER_TOP[k]) {
+                "home" -> {
+                    // The same path back-at-top-level takes: the pond is saved to its own file
+                    // first, so leaving through the drawer costs exactly nothing.
+                    closeDrawer()
+                    autosave()
+                    showStart(getString(if (running != null) R.string.start_sub_behind_experiment
+                                        else R.string.start_sub_as_stands))
+                }
+                "save" -> { closeDrawer(); saveOrLoad() }
+                else -> resetTapped()
+            }
+        } as LinearLayout
+        resetIcon = drawerTop.getChildAt(2) as android.widget.ImageButton
+        drawer.addView(drawerTop, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            bottomMargin = Style.dp(this@MainActivity, 6f)
         })
+        val drawerBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         drawerBody.addView(sectionLabel(getString(R.string.section_pace)))
         paceBox = Chrome.build(this, "pace") { k ->
             world.speed = when (k) { 0 -> 0.0; 1 -> 1.0; 2 -> 4.0; else -> 16.0 }
         } as LinearLayout
         drawerBody.addView(paceBox, LinearLayout.LayoutParams(MATCH, WRAP))
+        // The same switch as the front door's, where a player already stands looking at the pond:
+        // the point of a second optic is the comparison, and the comparison needs the world in
+        // sight. One state, two ways to reach it.
+        drawerBody.addView(sectionLabel(getString(R.string.section_view)))
+        opticSwitch = Chrome.build(this, "optic") { toggleOptic() } as LinearLayout
+        drawerBody.addView(opticSwitch, LinearLayout.LayoutParams(MATCH, WRAP))
+        opticLabel = Chrome.switchLabel(opticSwitch)
         drawerBody.addView(sectionLabel(getString(R.string.section_species)))
         for (sp in live) {
             val pill = LinearLayout(this).apply {
@@ -753,45 +781,35 @@ class MainActivity : Activity() {
                 bottomMargin = Style.dp(this@MainActivity, 8f)
             })
         }
-        drawerBody.addView(sectionLabel(""))
-        val utility = Chrome.build(this, "utility") { k ->
-            when (Chrome.UTILITY[k]) {
-                "reset" -> resetTapped()
-                "save" -> { closeDrawer(); saveOrLoad() }
-                "data" -> {
-                    closeDrawer()
-                    world.dataOpen = true
-                    dataPanel.visibility = ViewGroup.VISIBLE
-                    refreshData()
-                }
-                else -> {
-                    closeDrawer()
-                    reportView.visibility = ViewGroup.GONE
-                    world.speed = 0.0
-                    world.benchmark()
-                }
-            }
-        } as LinearLayout
-        resetButton = Chrome.at(utility, Chrome.UTILITY, "reset")
-        benchButton = Chrome.at(utility, Chrome.UTILITY, "bench").apply { visibility = ViewGroup.GONE }
-        drawerBody.addView(utility, LinearLayout.LayoutParams(MATCH, WRAP))
-        drawerBody.addView(sectionLabel(""))
-        drawerBody.addView(button(getString(R.string.btn_experiments)) { closeDrawer(); expPanel.visibility = ViewGroup.VISIBLE },
-            LinearLayout.LayoutParams(MATCH, WRAP))
-        drawerBody.addView(button(getString(R.string.evo_title)) {
-            if (!world.evolutionAllowed) { toast(getString(R.string.evo_locked)); return@button }
+        // The bench is dev-mode only and stays a word: nobody who has not long-pressed the census
+        // strip will ever see it, and a glyph for it would be a picture of a stopwatch nobody
+        // asked for. The experiments button left the drawer with this round — the ladder is the
+        // front door's second row, and a menu entry that duplicates the door is a second door.
+        val benchRow = Chrome.build(this, "bench") {
             closeDrawer()
-            evoPanel.open()
-        }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = Style.dp(this@MainActivity, 8f) })
-        // The same switch as the front door's, where a player already stands looking at the pond:
-        // the point of a second optic is the comparison, and the comparison needs the world in
-        // sight. One state, two ways to reach it.
-        opticButton = button("") { toggleOptic() }
-        drawerBody.addView(opticButton, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            reportView.visibility = ViewGroup.GONE
+            world.speed = 0.0
+            world.benchmark()
+        } as LinearLayout
+        benchButton = Chrome.at(benchRow, Chrome.BENCH, "bench").apply { visibility = ViewGroup.GONE }
+        drawerBody.addView(benchRow, LinearLayout.LayoutParams(MATCH, WRAP).apply {
             topMargin = Style.dp(this@MainActivity, 8f)
         })
         drawer.addView(ScrollView(this).apply { addView(drawerBody) },
-            LinearLayout.LayoutParams(MATCH, MATCH))
+            LinearLayout.LayoutParams(MATCH, 0, 1f))
+        // The drawer's foot: the two screens it leads to, pinned under the scroll so they are in
+        // the same place whatever the species list is doing above them.
+        drawer.addView(Chrome.build(this, "drawerNav") { k ->
+            if (Chrome.DRAWER_NAV[k] == "data") {
+                closeDrawer()
+                world.dataOpen = true
+                dataPanel.visibility = ViewGroup.VISIBLE
+                refreshData()
+            } else if (!world.evolutionAllowed) toast(getString(R.string.evo_locked))
+            else { closeDrawer(); evoPanel.open() }
+        }, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            topMargin = Style.dp(this@MainActivity, 10f)
+        })
         root.addView(drawer, FrameLayout.LayoutParams(
             Style.dp(this, Chrome.DRAWER_DP.toFloat()), MATCH).apply {
             gravity = Gravity.START
@@ -932,8 +950,10 @@ class MainActivity : Activity() {
         })
         // The optic (GR.7). Last row, after the two fixed ones and the continue row, so the boot
         // gate's child indices stay put. It is a view, not a lever: it changes how the world is
-        // painted and nothing about what the world does.
-        opticRow = startChoice("", "") { toggleOptic() }
+        // painted and nothing about what the world does — which is why, since the owner asked for
+        // a switch here (2026-09-03), it wears one: the other rows are doors, and a door that
+        // comes back to the same screen with a different ground was never one.
+        opticRow = startSwitch { toggleOptic() }
         startPanel.addView(opticRow)
         refreshOptic()
         root.addView(startPanel, FrameLayout.LayoutParams(MATCH, MATCH))
@@ -1126,10 +1146,10 @@ class MainActivity : Activity() {
     private fun refreshOptic() {
         val light = world.lightField
         val title = getString(if (light) R.string.choice_view_light else R.string.choice_view_dark)
-        (opticRow.getChildAt(0) as TextView).text = title
-        (opticRow.getChildAt(1) as TextView).text =
-            getString(if (light) R.string.sub_view_light else R.string.sub_view_dark)
-        opticButton.text = title
+        opticTitle.text = title
+        opticSub.text = getString(if (light) R.string.sub_view_light else R.string.sub_view_dark)
+        Chrome.switchTrackState(this, opticTrack, light)
+        Chrome.switchState(this, opticSwitch, light, title)
     }
 
     private fun toast(s: String) =
@@ -1160,6 +1180,47 @@ class MainActivity : Activity() {
                 textSize = 13f
                 typeface = Style.word(this@MainActivity)
                 setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
+            })
+        }
+
+    /**
+     * The front door's optic row: a card in the same voice as [startChoice] — the regime in full
+     * strength, what it looks like underneath — with the switch itself at its right edge. The
+     * whole card is the target, so the switch is a picture of the state and not a second one.
+     */
+    private fun startSwitch(onTap: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Style.touchable(this@MainActivity, Style.card(this@MainActivity))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                leftMargin = Style.dp(this@MainActivity, 24f)
+                rightMargin = Style.dp(this@MainActivity, 24f)
+                bottomMargin = Style.dp(this@MainActivity, 14f)
+            }
+            setPadding(Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 20f))
+            setOnClickListener { onTap() }
+            opticTitle = TextView(this@MainActivity).apply {
+                setTextColor(Style.BRIGHT)
+                textSize = 17f
+                typeface = Style.wordMedium(this@MainActivity)
+            }
+            opticSub = TextView(this@MainActivity).apply {
+                setTextColor(Style.DIM)
+                textSize = 13f
+                typeface = Style.word(this@MainActivity)
+                setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
+            }
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(opticTitle)
+                addView(opticSub)
+            }, LinearLayout.LayoutParams(0, WRAP, 1f))
+            opticTrack = Chrome.switchTrack(this@MainActivity)
+            addView(opticTrack, LinearLayout.LayoutParams(
+                Style.dp(this@MainActivity, 52f), Style.dp(this@MainActivity, 30f)).apply {
+                marginStart = Style.dp(this@MainActivity, 16f)
             })
         }
 
@@ -1319,8 +1380,11 @@ class MainActivity : Activity() {
         val now = System.currentTimeMillis()
         if (now - resetArmedAt > 2600) {
             resetArmedAt = now
-            resetButton.text = getString(R.string.btn_reset_sure)
-            resetButton.setTextColor(Color.parseColor("#F2B24A")) // the hand, about to act
+            // The glyph cannot say "sure?", so it goes amber — the hand, about to act — and the
+            // question is asked in words anyway, because a two-step guard whose first step is a
+            // colour change is a guard the player has to already know about.
+            armReset(Style.AMBER, getString(R.string.btn_reset_sure))
+            toast(getString(R.string.btn_reset_sure))
             ui.postDelayed({ if (System.currentTimeMillis() - resetArmedAt >= 2600) disarmReset() }, 2700)
             return
         }
@@ -1394,8 +1458,15 @@ class MainActivity : Activity() {
 
     private fun disarmReset() {
         resetArmedAt = 0L
-        resetButton.text = Chrome.label(this, "reset")
-        resetButton.setTextColor(Style.TEXT)
+        armReset(Style.TEXT, Chrome.label(this, "reset"))
+    }
+
+    /** Paint the reset glyph and say what a tap does now — the tooltip and the screen reader's
+     *  word both follow the state, since the icon itself cannot. */
+    private fun armReset(tint: Int, desc: String) {
+        resetIcon.imageTintList = android.content.res.ColorStateList.valueOf(tint)
+        resetIcon.contentDescription = desc
+        resetIcon.tooltipText = desc
     }
 
     /**
