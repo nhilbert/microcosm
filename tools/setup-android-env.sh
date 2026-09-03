@@ -83,6 +83,90 @@ cat > /root/.android/repositories.cfg <<'CFG'
 ### User Sources for Android SDK Manager
 CFG
 
+# ---------------------------------------------------------------- Maven Central, mirrored
+# Measured 2026-09-03, not assumed: repo.maven.apache.org answered 429 (Too Many Requests) to a
+# cold Gradle resolve, and repo1.maven.org failed three Robolectric fetches in the same session —
+# then both answered 200 minutes later. Central rate-limits this container's SHARED egress IP in
+# bursts, and a cold resolve asks it for hundreds of artifacts at once.
+#
+# So both Maven clients are pointed at Central's official Google Cloud Storage mirror: same
+# coordinates, same artifacts, a backend that does not throttle us. Two clients, because
+# Robolectric fetches its android-all jar with its OWN Maven client rather than Gradle's — that
+# is why three tests can fail on a build whose dependency resolution succeeded.
+#
+# With the caches warmed below this is a fallback, not the main road. It is written to
+# /root/.gradle/init.d, so it applies to every Gradle build in the environment; the header says so
+# in the file itself, since a silent global redirect is the kind of thing that should be findable.
+log "pointing Gradle and Robolectric at Central's GCS mirror"
+mkdir -p /root/.gradle/init.d
+cat > /root/.gradle/init.d/central-mirror.gradle <<'INIT'
+// Written by tools/setup-android-env.sh. ENVIRONMENT ONLY — never a repository build setting.
+// Maven Central rate-limits this container's shared egress IP in bursts, so Central is served
+// from its official Google Cloud Storage mirror instead. Same coordinates, same artifacts.
+def central = "https://maven-central.storage-download.googleapis.com/maven2"
+beforeSettings { settings ->
+    settings.pluginManagement.repositories {
+        maven { url central }
+        google()
+        gradlePluginPortal()
+    }
+    settings.dependencyResolutionManagement.repositories {
+        maven { url central }
+        google()
+    }
+}
+allprojects {
+    // Robolectric's android-all jars come through its own Maven client, which never sees the
+    // repositories above (verified: org/robolectric/MavenRoboSettings reads these two properties,
+    // and defaults to repo1.maven.org).
+    tasks.withType(Test).configureEach {
+        systemProperty "robolectric.dependency.repo.id", "central-gcs-mirror"
+        systemProperty "robolectric.dependency.repo.url", central
+    }
+}
+INIT
+
+# ---------------------------------------------------------------- the Rust side
+# `npm run wasm`, `npm run test:port` and every MC_CORE harness need the wasm target; without it
+# the build stops with "the wasm32-unknown-unknown target may not be installed". One line, and it
+# rides into the snapshot.
+log "adding the wasm target and fetching the crates"
+rustup target add wasm32-unknown-unknown >/dev/null 2>&1 || true
+
+# ---------------------------------------------------------------- warm the caches
+# The point of the whole script: a session should start warm. Measured on a cold session,
+# 2026-09-03 — ~835 MB of Gradle cache and ~350 MB of Robolectric android-all jars, with the first
+# three gradle invocations costing 1m37s (failed: 429), 2m16s (three tests failed fetching the
+# jar) and 38s (clean). Bandwidth was never the problem (34 MB/s through the proxy); cold caches
+# and Central's throttle were. All of this lands in the snapshot, so it is paid once per
+# environment rather than once per session.
+#
+# The checkout may or may not exist when this runs, so it is looked for rather than assumed, and
+# everything below is skipped without it.
+REPO=""
+for d in /home/user/microcosm /workspace/microcosm /root/microcosm "$PWD"; do
+  [ -f "$d/android-app/settings.gradle" ] && REPO="$d" && break
+done
+[ -n "$REPO" ] || REPO="$(dirname "$(dirname "$(find / -maxdepth 5 -path '*/android-app/settings.gradle' -print -quit 2>/dev/null)")")"
+
+if [ -n "$REPO" ] && [ -f "$REPO/android-app/settings.gradle" ]; then
+  log "warming caches from the checkout at $REPO"
+  ( cd "$REPO" && cargo fetch --manifest-path rust/microcosm-core/Cargo.toml ) >/dev/null 2>&1 || true
+  ( cd "$REPO" && cargo fetch --manifest-path rust/microcosm-android/Cargo.toml ) >/dev/null 2>&1 || true
+  # The host JNI library the boot gate loads. Also warms the cargo registry and target dir.
+  ( cd "$REPO" && cargo build --release --manifest-path rust/microcosm-android/Cargo.toml ) >/dev/null 2>&1 || true
+  # npm's cache survives the fresh clone even though node_modules does not, so the per-session
+  # `npm install` drops from a download to about a second.
+  ( cd "$REPO" && npm install --no-audit --no-fund ) >/dev/null 2>&1 || true
+  # One real test run: it resolves every Gradle dependency, compiles the Kotlin AND pulls both
+  # Robolectric android-all jars, which no cheaper task does.
+  ( cd "$REPO" && gradle -p android-app testReleaseUnitTest --no-daemon ) >/dev/null 2>&1 || true
+  log "gradle cache: $(du -sh /root/.gradle/caches 2>/dev/null | cut -f1)   android-all jars: $(du -sh /root/.m2/repository/org/robolectric 2>/dev/null | cut -f1)"
+else
+  log "no checkout found at setup time — caches stay cold; the first gradle run in a session"
+  log "will download about 1.2 GB once. Everything else above still applies."
+fi
+
 # ---------------------------------------------------------------- report
 log "--- what this environment now has ---"
 log "java:    $("$JAVA_17/bin/java" -version 2>&1 | head -1)"
@@ -90,7 +174,8 @@ log "gradle:  $(gradle --version 2>/dev/null | awk '/^Gradle/{print $2}')"
 log "node:    $(node -v 2>/dev/null)   (the JS oracle is pinned to 22.x)"
 log "cargo:   $(cargo --version 2>/dev/null)"
 log "sdk:     $(ls "$ANDROID_HOME/platforms" 2>/dev/null | tr '\n' ' ')"
-log "done. First 'gradle test' in a session still downloads Robolectric's"
-log "android-all jar (~100 MB) once; that is expected."
+log "wasm target: $(rustup target list --installed 2>/dev/null | tr '\n' ' ')"
+log "done. If the cache warm-up above found the checkout, the first 'gradle test' in a"
+log "session is warm; if it did not, it downloads about 1.2 GB once."
 
 exit 0

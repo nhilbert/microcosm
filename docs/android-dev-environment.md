@@ -1,7 +1,13 @@
 # Setting up a Claude Code cloud environment that can build Android
 
-**Why this exists.** The environment this app was written in has no Android SDK, and its egress
-proxy refuses `dl.google.com`, so one cannot be fetched — that was tried, not assumed. CI is
+> **Status, 2026-09-03.** This worked: the cloud environment now HAS the SDK, gradle and a JDK 17,
+> and the whole app suite runs locally — 20 tests, boot gate included. Two things were still cold
+> or missing on a fresh session, both measured and both now handled by the setup script; §8 has the
+> numbers. If you read the paragraph below as a description of today, it is not: it is why the
+> document was written.
+
+**Why this exists.** The environment this app was written in had no Android SDK, and its egress
+proxy refused `dl.google.com`, so one could not be fetched — that was tried, not assumed. CI is
 therefore the only compiler the Kotlin has ever met, at roughly two minutes per iteration. All the
 work ahead (the UI repairs and the redesign) is Kotlin, which is the worst possible fit for that.
 
@@ -133,3 +139,53 @@ That remains the only test that has ever settled anything about this app.
 - **The U.0 repairs are not done.** Research was taken first, by decision.
 - Rule 11 still governs everything under `rust/microcosm-core/`: that crate *is* the simulation, and
   `src/sim/` plus `src/observatory/` are the frozen oracle. None of the UI work touches either.
+
+## 8. What a cold session still cost, and what was done about it (2026-09-03)
+
+The environment above works. What it did not do was start *warm* — and the two costs are worth
+writing down, because both were invisible until a session actually ran the Android suite here.
+
+**Measured on one cold session:**
+
+| | measured |
+|---|---|
+| Gradle cache downloaded | ~835 MB |
+| Robolectric `android-all` jars | ~350 MB (two, sdk 34 and sdk 35) |
+| first `gradle test` | 1m37s, **failed** — Maven Central answered 429 to the cold resolve |
+| second | 2m16s, **three tests failed** fetching the android-all jar |
+| third | 38s, clean |
+| bandwidth through the proxy | 34 MB/s — so none of the above was bandwidth |
+
+**The throttle.** `repo.maven.apache.org` answered 429 (Too Many Requests) to a cold Gradle
+resolve, and `repo1.maven.org` failed three Robolectric fetches in the same session; minutes later
+both answered 200. Central rate-limits this container's SHARED egress IP in bursts, and a cold
+resolve asks it for hundreds of artifacts at once. Nothing is broken and nothing is being blocked —
+it is a burst limit, and retrying eventually works.
+
+**Two clients, not one.** Gradle resolves through its repositories; Robolectric fetches its
+`android-all` jar with its OWN Maven client, which never sees them. That is why a build whose
+dependency resolution succeeded can still fail three tests on a download. The two properties its
+client reads are `robolectric.dependency.repo.url` and `robolectric.dependency.repo.id` (read out
+of `org/robolectric/MavenRoboSettings` in the shipped jar, then verified by deleting the cached jar
+and watching it come back from the mirror).
+
+**What the setup script now does about it**, all of it inside the five-minute budget:
+
+1. Writes `/root/.gradle/init.d/central-mirror.gradle`, pointing **both** Maven clients at
+   Central's official Google Cloud Storage mirror (`maven-central.storage-download.googleapis.com`)
+   — same coordinates, same artifacts, a backend that does not throttle us.
+2. `rustup target add wasm32-unknown-unknown`, without which `npm run wasm`, `npm run test:port`
+   and every `MC_CORE` harness stop at "the wasm32-unknown-unknown target may not be installed".
+3. **Warms the caches**, which is the part that actually matters: `cargo fetch` for both crates, a
+   host build of the JNI adapter (the boot gate loads it), `npm install`, and one real
+   `gradle -p android-app testReleaseUnitTest` — the only task that pulls the Gradle cache, compiles
+   the Kotlin AND fetches both android-all jars. All of it lands in the environment snapshot, so it
+   is paid once per environment instead of once per session.
+
+The checkout may or may not exist when a setup script runs, so the script looks for it rather than
+assuming; without one it skips the warm-up, says so, and everything else still applies.
+
+**If the environment's network access is set to Custom**, add
+`maven-central.storage-download.googleapis.com` to the allowed domains. It resolved fine in the
+session this was written in, so the current list already permits it — adding it explicitly is
+insurance against a tightening, not a fix for a failure.
