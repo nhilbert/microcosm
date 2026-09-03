@@ -156,6 +156,17 @@ object Native {
     /** which: 0 the event type, 1 the narration text. */
     external fun sysEventText(i: Int, which: Int): String
 
+    // ---- the sandbox start worlds (Phase 9) ----
+    /** The whole start table as JSON — keys and the numbers each start composes. */
+    external fun startsJson(): String
+    external fun startCount(): Int
+
+    /**
+     * Found start world `idx` on `seed`. The reset is part of the call, so this REPLACES the
+     * `resetWorld` + `initWorld` pair; start 0 composes nothing and is that pair exactly.
+     */
+    external fun startWorld(idx: Int, seed: Int)
+
     // ---- the learning levels (A.5) ----
     /** The whole level table as JSON — the same bytes src/observatory/levels.json carries. */
     external fun levelsJson(): String

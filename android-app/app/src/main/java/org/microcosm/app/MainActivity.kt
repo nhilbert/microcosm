@@ -143,8 +143,15 @@ class MainActivity : Activity() {
     /** The front door's continue-the-experiment row — added after the fixed rows the boot gate walks. */
     internal lateinit var continueRow: LinearLayout
     internal lateinit var expPanel: LinearLayout
+    /** The water chooser (Phase 9) — internal: the boot gate picks water through it. */
+    internal lateinit var startsPanel: LinearLayout
+    /** Its first row: the pond you already have. Hidden until there is one. */
+    internal lateinit var keptPondRow: LinearLayout
     internal lateinit var helpPanel: LinearLayout // internal: the boot gate opens the help page
     private val levels by lazy { Level.all(this) }
+    private val starts by lazy { Start.all() }
+    /** Whether this session has a sandbox pond to go back to (a kept one, or one already entered). */
+    private var sandboxSeen = false
     private var running: Level? = null
     private var lastVerdict = 0
     private val chips = ArrayList<TextView>()
@@ -318,6 +325,11 @@ class MainActivity : Activity() {
 
         val root = FrameLayout(this)
         world = WorldView(this)
+        // Which water the sandbox is standing in, remembered across launches: a resumed pond is a
+        // world, not a recipe, so without this the reset button would re-found the shipped pond
+        // under someone who chose two suns.
+        world.startIdx = prefs().getInt(KEY_START, 0)
+        sandboxSeen = autosaveFile().baseFile.exists()
         world.lightField = Optics.lightField
         // The autosaved pond, restored before the render thread founds anything (U0.6). One pond
         // you keep: backgrounding the app no longer costs the world. A running experiment
@@ -999,23 +1011,14 @@ class MainActivity : Activity() {
             gravity = Gravity.START
             setPadding(Style.dp(this@MainActivity, 32f), 0, Style.dp(this@MainActivity, 32f), Style.dp(this@MainActivity, 40f))
         })
-        val hasAutosave = autosaveFile().baseFile.exists()
+        // The sandbox row opens the WATER CHOOSER (Phase 9). Before it there was one opening —
+        // the shipped pond on a random seed — and one opening teaches one lesson. The kept pond
+        // is still one row away, at the top of the chooser.
         startPanel.addView(startChoice(getString(R.string.choice_sandbox),
-            getString(if (hasAutosave) R.string.sub_sandbox_resume else R.string.sub_sandbox_fresh)) {
-            // Choosing the sandbox while an experiment is live is leaving the experiment: the
-            // pond that comes back is the one the subtitle promises — the kept sandbox from its
-            // own autosave file — never the experiment's world wearing sandbox clothes.
-            if (running != null) {
-                world.stopLevel()
-                experimentFile().delete()
-                val pond = try { autosaveFile().readFully() } catch (e: Exception) { null }
-                if (pond != null) world.load(pond) {} else world.resetWorld(kotlin.random.Random.nextInt(1, 100000))
-            }
-            running = null
-            lastVerdict = 0
-            refreshContinueRow(0)
-            startPanel.visibility = ViewGroup.GONE
-            world.speed = 1.0
+            getString(R.string.sub_sandbox_choose)) {
+            keptPondRow.visibility =
+                if (sandboxSeen || autosaveFile().baseFile.exists()) ViewGroup.VISIBLE else ViewGroup.GONE
+            startsPanel.visibility = ViewGroup.VISIBLE
         })
         startPanel.addView(startChoice(getString(R.string.choice_experiments), getString(R.string.sub_experiments)) {
             expPanel.visibility = ViewGroup.VISIBLE
@@ -1079,6 +1082,32 @@ class MainActivity : Activity() {
         expPanel.addView(button(getString(R.string.btn_back)) { expPanel.visibility = ViewGroup.GONE })
         root.addView(expPanel, FrameLayout.LayoutParams(MATCH, MATCH))
 
+        // The water chooser: the kept pond first when there is one, then every start world the
+        // core carries, in the core's own order — the index a row founds is the core's index.
+        startsPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Style.ABYSS)
+            visibility = ViewGroup.GONE
+            isClickable = true
+        }
+        startsPanel.addView(TextView(this).apply {
+            text = getString(R.string.starts_title)
+            setTextColor(Style.BRIGHT)
+            textSize = 20f
+            typeface = Style.wordBold(this@MainActivity)
+            setPadding(Style.dp(this@MainActivity, 24f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 24f), Style.dp(this@MainActivity, 12f))
+        })
+        val startsList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        keptPondRow = startChoice(getString(R.string.choice_continue_pond),
+            getString(R.string.sub_sandbox_resume)) { enterSandbox(-1) }
+        startsList.addView(keptPondRow)
+        for (st in starts) startsList.addView(startWorldChoice(st) { enterSandbox(st.idx) })
+        startsPanel.addView(ScrollView(this).apply { addView(startsList) },
+            LinearLayout.LayoutParams(MATCH, 0, 1f))
+        startsPanel.addView(button(getString(R.string.btn_back)) { startsPanel.visibility = ViewGroup.GONE })
+        root.addView(startsPanel, FrameLayout.LayoutParams(MATCH, MATCH))
+
         helpPanel = Help.page(this) { helpPanel.visibility = ViewGroup.GONE }
         root.addView(helpPanel, FrameLayout.LayoutParams(MATCH, MATCH))
 
@@ -1107,6 +1136,7 @@ class MainActivity : Activity() {
             dataPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             startPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             expPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
+            startsPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             helpPanel.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             insets
         }
@@ -1403,6 +1433,87 @@ class MainActivity : Activity() {
                 })
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
+
+    /**
+     * A start-world row: a photograph of that world beside its words — the experiment rows'
+     * shape, for the same reason. The picture comes from assets/starts/<key>.jpg (shot by
+     * StartThumbsTest through this app's own renderer); a start without one gets the words
+     * alone, the portraits' missing-art contract.
+     */
+    private fun startWorldChoice(st: Start, onTap: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Style.touchable(this@MainActivity, Style.card(this@MainActivity))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                leftMargin = Style.dp(this@MainActivity, 24f)
+                rightMargin = Style.dp(this@MainActivity, 24f)
+                bottomMargin = Style.dp(this@MainActivity, 14f)
+            }
+            setPadding(Style.dp(this@MainActivity, 16f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f))
+            setOnClickListener { onTap() }
+            Profiles.startThumb(this@MainActivity, st.key)?.let { bm ->
+                addView(PortraitView(this@MainActivity).apply { show(bm) },
+                    LinearLayout.LayoutParams(Style.dp(this@MainActivity, 56f),
+                        Style.dp(this@MainActivity, 56f)).apply {
+                        rightMargin = Style.dp(this@MainActivity, 14f)
+                    })
+            }
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(this@MainActivity).apply {
+                    text = st.title(this@MainActivity)
+                    setTextColor(Style.BRIGHT)
+                    textSize = 17f
+                    typeface = Style.wordMedium(this@MainActivity)
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = st.subtitle(this@MainActivity)
+                    setTextColor(Style.DIM)
+                    textSize = 13f
+                    typeface = Style.word(this@MainActivity)
+                    setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+
+    /**
+     * Enter the sandbox — either back into the pond that is already there (`idx < 0`) or into a
+     * start world, founded fresh on a new seed. UI-side randomness for the seed is legal
+     * (CLAUDE.md rule 5); which start it founds is remembered, so the reset button re-founds THIS
+     * water rather than the shipped pond.
+     *
+     * Leaving a live experiment for the sandbox means the experiment's world does not follow: the
+     * pond that comes back is the kept one, from its own autosave file.
+     */
+    private fun enterSandbox(idx: Int) {
+        val wasExperiment = running != null
+        if (wasExperiment) {
+            world.stopLevel()
+            experimentFile().delete()
+        }
+        running = null
+        lastVerdict = 0
+        verdict.visibility = ViewGroup.GONE
+        refreshContinueRow(0)
+        if (idx < 0) {
+            // The kept pond. Mid-session it is already in the core — reloading it would throw
+            // away everything since the last autosave — so only an experiment's exit reloads.
+            if (wasExperiment) {
+                val pond = try { autosaveFile().readFully() } catch (e: Exception) { null }
+                if (pond != null) world.load(pond) {}
+                else world.resetWorld(kotlin.random.Random.nextInt(1, 100000))
+            }
+        } else {
+            world.resetWorld(kotlin.random.Random.nextInt(1, 100000), idx)
+            prefs().edit().putInt(KEY_START, idx).apply()
+        }
+        sandboxSeen = true
+        startsPanel.visibility = ViewGroup.GONE
+        startPanel.visibility = ViewGroup.GONE
+        world.speed = 1.0
+    }
 
     /** Show the front door mid-session: the pond pauses, saved, and the subtitle tells the truth. */
     private fun showStart(sub: String) {
@@ -1854,6 +1965,7 @@ class MainActivity : Activity() {
         when {
             helpPanel.visibility == ViewGroup.VISIBLE -> helpPanel.visibility = ViewGroup.GONE
             expPanel.visibility == ViewGroup.VISIBLE -> expPanel.visibility = ViewGroup.GONE
+            startsPanel.visibility == ViewGroup.VISIBLE -> startsPanel.visibility = ViewGroup.GONE
             // On the front door, back leaves the app — the pond was saved on the way here, so
             // the exit costs nothing. (The old back-exit saved-then-finished because the
             // pause-time autosave lost the surface-teardown race, measured on the owner's
@@ -1925,9 +2037,10 @@ class MainActivity : Activity() {
     private companion object {
         val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
-        /** The app's only preferences file, and the one key in it (GR.7). */
+        /** The app's only preferences file: the microscope (GR.7) and the water (Phase 9). */
         const val PREFS = "microcosm"
         const val KEY_OPTIC = "light_field"
+        const val KEY_START = "start_world"
     }
 
     /**

@@ -55,6 +55,23 @@ object Profiles {
         return b
     }
 
+    private val startCache = HashMap<String, Bitmap?>()
+
+    /**
+     * A start world's chooser thumbnail: a moment of that world, photographed from the app's own
+     * renderer by `StartThumbsTest` (`gradle -Pthumbs`) into assets/starts/<key>.jpg — the same
+     * committed home and bundling path as the portraits and the level pictures. Null when a start
+     * has no picture; the row then shows the words alone, never a placeholder.
+     */
+    fun startThumb(ctx: Context, key: String): Bitmap? {
+        if (startCache.containsKey(key)) return startCache[key]
+        val b = try {
+            ctx.assets.open("starts/$key.jpg").use { BitmapFactory.decodeStream(it) }
+        } catch (e: Exception) { null }
+        startCache[key] = b
+        return b
+    }
+
     /** What this species does, one line. 0 = no profile written for this species. */
     fun role(species: String) = when (species.lowercase()) {
         "solara" -> R.string.spec_role_solara

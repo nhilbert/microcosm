@@ -73,6 +73,11 @@ android {
                 def nativeDir = "${rootDir}/../rust/microcosm-android/target/release"
                 systemProperty "microcosm.native.dir", nativeDir
                 systemProperty "java.library.path", nativeDir
+                // The start-world thumbnailer (StartThumbsTest) writes committed pictures into
+                // assets/starts, so it is OFF unless asked for: -Pthumbs regenerates them.
+                // Everything else in this source set is a gate and always runs.
+                systemProperty "microcosm.thumbs", project.hasProperty("thumbs") ? "1" : ""
+                systemProperty "microcosm.repo.root", "${rootDir}/.."
             }
         }
     }
