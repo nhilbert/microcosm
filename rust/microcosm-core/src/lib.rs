@@ -31,6 +31,7 @@ pub mod probe;
 pub mod rng;
 pub mod snapshot;
 pub mod species_gen;
+pub mod starts;
 pub mod step;
 pub mod traits;
 pub mod wasm;

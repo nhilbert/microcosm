@@ -292,6 +292,21 @@ function indicators(){
 }
 
 
+// ---------- the sandbox start worlds (Phase 9) ----------
+// The table crosses once as JSON, exactly like the levels'. `startWorld` founds one through the
+// crate's own composer, so what a harness measures here is what the app founds — not a JavaScript
+// re-composition of it. harness/starts.js proves the two agree anyway.
+const STARTS = JSON.parse(DEC.decode(
+  new Uint8Array(MEM.buffer, X.mc_starts_json_ptr(), X.mc_starts_json_len())));
+function startIdx(def){
+  if (typeof def === "number") return def|0;
+  const key = typeof def === "string" ? def : (def && def.key);
+  const i = STARTS.findIndex(S => S.key === key);
+  if (i < 0) throw new Error(`wasm core: unknown start ${JSON.stringify(key)}`);
+  return i;
+}
+function startWorld(def, seed){ X.mc_start_apply(startIdx(def), seed|0); sync(); }
+
 // ---------- the level API (Phase 8) ----------
 // Definitions cross once, as the JSON the crate carries verbatim from src/observatory/levels.json;
 // the runtime itself is Rust (levels.rs), reached through calls. A verdict here is therefore the
@@ -466,6 +481,7 @@ module.exports = {
   resetWorld, initWorld, step, queueEvent, applyEvent, computeLight, computeTemp,
   wrap, wd, cellOf, mulberry32,
   indicators, impact, ivPush, ivCount, ivClear, IV_KINDS,
+  STARTS, startWorld,
   LEVELS, LEVEL_ROWS: LEVELS, LVL, levelStart, levelRestart, levelStop, levelCheck, levelMeter,
   levelAllows, levelAllowsSource, levelPourOk, levelNotePour, levelNarration, levelScript,
   markPrev, makeGrammar, bucketSpec, frameOf, TINT_BINS: 7, LOD_Z, pickRadius, pickCandidates,

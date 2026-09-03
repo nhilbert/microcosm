@@ -574,6 +574,43 @@ pub extern "system" fn Java_org_microcosm_app_Native_sysEventText(
 }
 
 // ---------------------------------------------------------------------------
+// The sandbox start worlds (Phase 9). Same shape as the level table: the definitions cross once
+// as JSON (the shell wants the keys, its player text is its own), founding crosses as one call.
+// Render thread only — it touches the core.
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_startsJson(
+    env: JNIEnv,
+    _this: JObject,
+) -> jni::sys::jstring {
+    let ptr = abi::mc_starts_json_ptr() as *const u8;
+    let len = abi::mc_starts_json_len() as usize;
+    // SAFETY: the crate owns this string for the life of the process.
+    let text = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(ptr, len)) };
+    match env.new_string(text) {
+        Ok(v) => v.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_startCount(_env: JNIEnv, _this: JObject) -> jint {
+    abi::mc_start_count() as jint
+}
+
+/// `startWorld(idx, seed)` — found start world `idx`. Reset is part of the call, so this replaces
+/// the `resetWorld` + `initWorld` pair rather than following it.
+#[no_mangle]
+pub extern "system" fn Java_org_microcosm_app_Native_startWorld(
+    _env: JNIEnv,
+    _this: JObject,
+    idx: jint,
+    seed: jint,
+) {
+    abi::mc_start_apply(idx, seed);
+}
+
+// ---------------------------------------------------------------------------
 // The learning levels (A.5). The table crosses once as JSON — the player text is the bulk of a
 // level and marshalling it field by field would buy nothing — and everything the runtime decides
 // crosses as numbers. All of it touches the core: render thread only.

@@ -71,6 +71,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - run: npm install --no-audit --no-fund
       - name: 8-seed ecology harness
         run: npm run tune
@@ -80,6 +83,12 @@ jobs:
         run: npm run gate5
       - name: Corridor certification (rails + evolution as the fuzzer)
         run: npm run build && node harness/corridor.js --rails --fuzz
+
+      # The start worlds are calibrated or they do not ship: every one of them, over the same
+      # eight seeds and the same horizon, held to the criterion its own row declares. The start
+      # table lives in the Rust core, so this job builds it (the others here drive dist/core.js).
+      - name: Start-world acceptance (5 worlds x 8 seeds x 18,000 ticks)
+        run: npm run wasm && npm run starts
 
   port:
     name: Rust core — bit-exactness against the JavaScript core
@@ -162,3 +171,12 @@ jobs:
       # level still fails untouched, passes on its lesson, and fails on the wrong lever.
       - name: The levels gate must pass on the ported core
         run: MC_CORE=$PWD/rust/wasm/core.js node harness/levels.js
+
+      # The sandbox start worlds (Phase 9). The identity gates are what license the rest: `pond`
+      # composes nothing, so founding it must still be the shipped world bit for bit, and every
+      # start the crate founds must equal the same start composed out of ordinary events. The
+      # `still` gates hold the empty pond to its own criterion — it stays empty, its mineral stays
+      # flat, the Observatory survives it, and a scripted player can settle it. The 8-seed x
+      # 18,000-tick acceptance run lives in the nightly ecology job, not here.
+      - name: The start worlds must be the worlds they claim to be
+        run: npm run --silent starts:check

@@ -727,6 +727,47 @@ pub extern "C" fn mc_compute_temp() {
 }
 
 // ---------------------------------------------------------------------------
+// The sandbox start worlds (Phase 9). The table travels as JSON for the same reason the level
+// table does — the shell wants keys, a harness wants the numbers, and marshalling a start field
+// by field would buy nothing. Founding a start crosses as one call.
+
+static mut STARTS_JSON: Option<String> = None;
+
+#[allow(static_mut_refs)]
+fn starts_json() -> &'static str {
+    unsafe {
+        if STARTS_JSON.is_none() {
+            STARTS_JSON = Some(crate::starts::starts_json());
+        }
+        STARTS_JSON.as_deref().unwrap()
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mc_starts_json_ptr() -> usize {
+    starts_json().as_ptr() as usize
+}
+
+#[no_mangle]
+pub extern "C" fn mc_starts_json_len() -> u32 {
+    starts_json().len() as u32
+}
+
+#[no_mangle]
+pub extern "C" fn mc_start_count() -> u32 {
+    crate::starts::STARTS.len() as u32
+}
+
+/// `startWorld(idx, seed)` — found start world `idx` on `seed`. Out-of-range does nothing, so a
+/// shell that has drifted from the table leaves the world it had rather than an empty one.
+#[no_mangle]
+pub extern "C" fn mc_start_apply(idx: i32, seed: i32) {
+    if idx >= 0 {
+        crate::starts::start_apply(s(), idx as usize, seed);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // The level API (Phase 8). Definitions travel as JSON — one string, parsed once by the shim —
 // because the player text is the bulk of a level and marshalling it field by field would buy
 // nothing. Everything the runtime decides (state, meters, the pour budget) crosses as numbers.
