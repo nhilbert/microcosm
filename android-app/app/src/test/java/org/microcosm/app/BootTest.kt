@@ -441,6 +441,19 @@ class BootTest {
             activity.startPanel.visibility == android.view.View.VISIBLE)
         assertTrue("the pond must wait behind the front door", activity.world.speed == 0.0)
         photograph(activity.startPanel, "frontdoor@boot")
+        // The front door scrolls (owner request, 2026-09-03). Before it did, the panel was
+        // clamped to the screen and centred inside it, so on a small phone its first row was laid
+        // out above the top edge and its last — the optic — below the bottom one, with nothing on
+        // screen to say either existed. The claim here is that every row is inside the door it
+        // belongs to; how much of the door the screen shows at once is the scroller's business.
+        val door = activity.startPanel
+        assertTrue("the front door should live in a scroller",
+            door.parent is android.widget.ScrollView)
+        assertTrue("the front door's first row must start inside it",
+            door.getChildAt(0).top >= 0)
+        val lastRow = door.getChildAt(door.childCount - 1)
+        assertTrue("the front door's last row must end inside it, not past its edge",
+            lastRow.bottom in 1..door.height)
         activity.expPanel.visibility = android.view.View.VISIBLE
         photograph(activity.expPanel, "experiments@boot")
         // The menu thumbnails (tools/level-thumbs.js): SP's lesson is that a picture must take

@@ -883,7 +883,7 @@ class MainActivity : Activity() {
         // screen over the world, not a dialog behind a bar button — the ladder was the most
         // carefully built thing in the app and the least reachable. The world waits underneath
         // (speed 0) until the player chooses.
-        startPanel = LinearLayout(this).apply {
+        startPanel = StartDoor(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Style.ABYSS)
             gravity = Gravity.CENTER_VERTICAL
@@ -956,7 +956,17 @@ class MainActivity : Activity() {
         opticRow = startSwitch { toggleOptic() }
         startPanel.addView(opticRow)
         refreshOptic()
-        root.addView(startPanel, FrameLayout.LayoutParams(MATCH, MATCH))
+        // The front door scrolls (owner request, 2026-09-03). It had been growing rows — the
+        // continue row, help, the optic — under a wordmark that takes 145 dp on its own, and at
+        // 320 dp wide the last of them fell off the bottom edge with nothing to say so. The look
+        // is unchanged wherever it still fits: `isFillViewport` stretches the panel to the
+        // viewport when the content is shorter, so its CENTER_VERTICAL still centres, and only
+        // a door too tall for the screen scrolls at all.
+        root.addView(ScrollView(this).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+            addView(startPanel, FrameLayout.LayoutParams(MATCH, WRAP))
+        }, FrameLayout.LayoutParams(MATCH, MATCH))
 
         // The ladder, as a screen: every experiment open, none gated behind another.
         expPanel = LinearLayout(this).apply {
@@ -1745,6 +1755,27 @@ class MainActivity : Activity() {
      * horizontally scrollable child — the pages row itself scrolls since U0.1 — is left alone,
      * because that child owns sideways motion.
      */
+    /**
+     * The front door's panel, which lives inside a scroller and carries that scroller's
+     * visibility with it.
+     *
+     * The alternative was to toggle the wrapper at every one of the shell's `startPanel.visibility
+     * = …` sites — and at the boot gate's, which sets it too. That is a rule nobody can enforce:
+     * the first line that hides the panel and forgets the scroller leaves a full-screen invisible
+     * view over the pond, eating every touch. So the two are welded here instead, where there is
+     * exactly one place to get it right. Reopening the door also returns it to the top: a player
+     * who scrolled to the optic and left should not come back to a screen with no title on it.
+     */
+    private class StartDoor(ctx: Context) : LinearLayout(ctx) {
+        override fun setVisibility(v: Int) {
+            super.setVisibility(v)
+            (parent as? ScrollView)?.let {
+                it.visibility = v
+                if (v == VISIBLE) it.scrollTo(0, 0)
+            }
+        }
+    }
+
     private class SwipePanel(ctx: Context, val onSwipe: (Int) -> Unit) : LinearLayout(ctx) {
         private val slop = ViewConfiguration.get(ctx).scaledTouchSlop
         private var x0 = 0f
