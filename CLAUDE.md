@@ -15,6 +15,7 @@ A mobile-first ecosystem sandbox in which artificial organisms live, eat, reprod
 - `harness/lib.js` — shared primitives every harness and experiment builds on (`pops`, `auditM`, `locusStats`, `start`, `pin`, `coreCollapsed`, cycle estimators). `MC_CORE=<path>` points it at another build (historical cores, ports). `harness/selftest.js` checks the estimators on synthetic series — it runs inside `npm test`, and it caught a period estimator that returned a quarter period.
 - `harness/fingerprint-frame.js` — the M5.1 frame gate: the visual grammar (sprite bucket table, display list, pixel fields, glow and wall lists) compared bit for bit between `src/ui-render.js` and the Rust frame builder; inside `port:check`. `harness/render-smoke.js` — the painting path driven against a canvas stub (runs, and touches the canvas); in `npm test` and CI. Neither can say the frame *looks* right: no screen exists in CI.
 - `harness/levels.js` — the Phase 8 honesty gate (`npm run levels`, in `test:full`): every shipped level must FAIL untouched, PASS on its taught strategy, and FAIL on a plausible wrong lever. A level that cannot clear all three is a demonstration, not a challenge, and does not ship. Takes `MC_CORE`, so it runs on the ported core too (`npm run port:levels`, in `test:port` and CI). `harness/fingerprint-levels.js` covers what the gate cannot: the apparatus gates, pour budget, meters, narration and restart — inside `port:check`.
+- `android-app/.../DataView.kt` (the drawn Data pages), `DataPages.kt` (Vitals and Events as built views and styled text), `DataPageTest.kt` (the page gate: six pages, two languages, photographed on a real world). The Data screen's design pass is U3 in docs/status-log.md; the chart tokens live in `Style.kt`.
 - `harness/playthrough.js` — the §6-step-6 instrument, promoted (2026-09-01): scripted full-speed level runs through the REAL browser UI (start screen → prediction → gestures → verdict → retry), `npm run play`. Needs a Chromium + playwright-core, so it is a bench instrument outside npm test/CI; run it before a level ships and after UI surgery. Its first run convicted the reset→chips crash no other gate could see. Levels earn scripted paths as they ship (PLAYS table).
 - `harness/yoshida-baseline.json` — seed-22 cycle metrics written by `npm run yoshida:capture`; `gate5` reproduces them bit-exactly. Recapture with every declared evolving change, same discipline as the conformance baseline.
 - `harness/conform-baseline.json` — the certified fingerprint plus the `coreHash` it is bound to. Never hand-edit; only `npm run conform:capture` writes it.
@@ -76,6 +77,17 @@ obeys `docs/phase8-language-style.md` and, in German,
 `harness/prose-app.js` in `npm test` and in CI. The one exception is the help
 page: `help_*` keys run in the **reference register** — the science may be
 named, the clause caps still hold (style guide §11 / de §9).
+
+**The Data screen was redesigned (U3, 2026-09-03).** A header with an ⓘ and a ✕
+over a real tab strip; charts that measure themselves instead of eating the view;
+a legend on every chart (the world's palette cannot be re-stepped — rule 7 — so
+identity arrives through names, a value column and direct end-labels); metabolism
+split into two panels because it had been a dual-axis chart; and the two written
+pages rebuilt as `DataPages.kt` (stat tiles and meters for Vitals, a styled feed
+for Events) off numbers `WorldView` publishes instead of padded strings.
+`DataPageTest` photographs all six pages in both languages — the first gate in
+this repository that LOOKS at them. Details and the measured colour numbers are
+in docs/status-log.md's last entry.
 
 **The help page** (`Help.kt`, reached from the front door) is the app's one
 piece of teaching text: a beginner's overview, a drawn diagram of the mineral's

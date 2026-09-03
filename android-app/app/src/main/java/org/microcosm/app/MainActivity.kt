@@ -113,12 +113,19 @@ class MainActivity : Activity() {
     /** The gesture-pill inset, recorded by the insets listener for the lift arithmetic. */
     private var insetBottom = 0
     private val speciesPills = ArrayList<LinearLayout>()
-    private lateinit var dataPanel: LinearLayout
+    internal lateinit var dataPanel: LinearLayout // internal: the data-page gate photographs it
     private lateinit var pagesRow: View
     private lateinit var dataView: DataView
     private lateinit var dataText: TextView
     private lateinit var dataTitle: TextView
+    /** The Vitals page (U3): built once, re-bound four times a second. */
+    private lateinit var healthPanel: DataPages.HealthPanel
+    /** The ⓘ card carrying the current page's one sentence, and the icon that opens it. */
+    private lateinit var dataInfo: TextView
+    private lateinit var dataInfoButton: android.widget.ImageButton
     private var dataPage = 0
+    /** The two written pages' indices into [Chrome.PAGES] — named, so `dataPage == 3` stops. */
+    private val PAGE_HEALTH = 3
     private lateinit var levelChip: TextView
     private lateinit var strip: LinearLayout
     private lateinit var clockView: TextView
@@ -787,12 +794,7 @@ class MainActivity : Activity() {
             when (Chrome.UTILITY[k]) {
                 "reset" -> resetTapped()
                 "save" -> { closeDrawer(); saveOrLoad() }
-                "data" -> {
-                    closeDrawer()
-                    world.dataOpen = true
-                    dataPanel.visibility = ViewGroup.VISIBLE
-                    refreshData()
-                }
+                "data" -> { closeDrawer(); openData(dataPage) }
                 else -> {
                     closeDrawer()
                     reportView.visibility = ViewGroup.GONE
@@ -836,32 +838,84 @@ class MainActivity : Activity() {
             setBackgroundColor(Style.SURFACE_SCRIM)
             visibility = ViewGroup.GONE
         }
-        dataTitle = TextView(this).apply {
-            setTextColor(Style.BRIGHT)
-            textSize = 14f
-            typeface = Style.wordMedium(this@MainActivity)
-            setPadding(24, 20, 24, 8)
+        // The header (U3): the screen says what it is, and the two things a player does with a
+        // screen — find out what it means, and leave — sit at the far end as icons. The full-width
+        // "close" button that used to hold the bottom of this panel is gone: it was a whole row of
+        // phone spent on the one action the back gesture already performs.
+        val dataHead = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(Style.dp(this@MainActivity, 18f), Style.dp(this@MainActivity, 10f),
+                Style.dp(this@MainActivity, 10f), Style.dp(this@MainActivity, 2f))
         }
-        dataPanel.addView(dataTitle)
+        dataTitle = TextView(this).apply {
+            text = getString(R.string.data_title)
+            setTextColor(Style.BRIGHT)
+            textSize = Style.PAGE_TITLE_SP
+            typeface = Style.wordBold(this@MainActivity)
+        }
+        dataHead.addView(dataTitle, LinearLayout.LayoutParams(0, WRAP, 1f))
+        dataInfoButton = Chrome.iconButton(this, R.drawable.ic_info,
+            getString(R.string.desc_page_info), Style.TEXT, bordered = false) { toggleDataInfo() }
+        dataHead.addView(dataInfoButton)
+        dataHead.addView(Chrome.iconButton(this, R.drawable.ic_close, getString(R.string.btn_close),
+            Style.TEXT, bordered = false) { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE })
+        dataPanel.addView(dataHead)
+
         pagesRow = Chrome.build(this, "pages") { k -> dataPage = k; refreshData() }
-            .apply { setPadding(12, 0, 12, 0) }
+            .apply { setPadding(Style.dp(this@MainActivity, 10f), 0, Style.dp(this@MainActivity, 10f), 0) }
         dataPanel.addView(pagesRow)
+        // the strip's own baseline, so the selected tab's underline sits ON something
+        dataPanel.addView(View(this).apply { setBackgroundColor(Style.HAIRLINE_FAINT) },
+            LinearLayout.LayoutParams(MATCH, Style.dp(this@MainActivity, 1f)))
+
+        // One body, three tenants: the drawn pages, the vitals, the feed. Exactly one is visible.
+        val dataBody = FrameLayout(this)
         dataView = DataView(this)
-        // In a scroll container since EV: the Traits page is taller than any screen (160 dp per
-        // (species, locus) band, eleven bands); fillViewport keeps the chart pages full-height.
-        dataPanel.addView(ScrollView(this).apply {
+        // In a scroll container since EV: the Traits page is taller than any screen (172 dp per
+        // (species, locus) band, eleven bands); fillViewport keeps the chart pages full-height,
+        // and since U3 the chart pages decline the extra rather than stretching into it.
+        dataBody.addView(ScrollView(this).apply {
             isFillViewport = true
             addView(dataView, ViewGroup.LayoutParams(MATCH, WRAP))
-        }, LinearLayout.LayoutParams(MATCH, 0, 1f))
+        }, FrameLayout.LayoutParams(MATCH, MATCH))
+
+        healthPanel = DataPages.HealthPanel(this)
+        dataBody.addView(DataPages.scroller(this, healthPanel), FrameLayout.LayoutParams(MATCH, MATCH))
+
         dataText = TextView(this).apply {
-            setTextColor(Color.parseColor("#C9D7E3"))
-            textSize = 11f
-            typeface = Style.mono(this@MainActivity)
-            setPadding(24, 12, 24, 24)
+            setTextColor(Style.TEXT)
+            typeface = Style.word(this@MainActivity)
+            setLineSpacing(0f, 1.15f)
+            setPadding(Style.dp(this@MainActivity, 18f), Style.dp(this@MainActivity, 14f),
+                Style.dp(this@MainActivity, 18f), Style.dp(this@MainActivity, 28f))
         }
-        dataPanel.addView(ScrollView(this).apply { addView(dataText) },
-            LinearLayout.LayoutParams(MATCH, 0, 1f))
-        dataPanel.addView(button(getString(R.string.btn_close)) { world.dataOpen = false; dataPanel.visibility = ViewGroup.GONE })
+        dataBody.addView(DataPages.scroller(this, dataText), FrameLayout.LayoutParams(MATCH, MATCH))
+
+        // The explanation, behind the header's ⓘ (owner: "short explanation ... behind a small
+        // help icon"). A page's own sentence, shown only when it is asked for, dismissed by a tap
+        // anywhere on it — so the charts get the room the subtitle used to take permanently.
+        dataInfo = TextView(this).apply {
+            setTextColor(Style.TEXT)
+            textSize = Style.CHART_LEGEND_SP
+            typeface = Style.word(this@MainActivity)
+            background = Style.solidCard(this@MainActivity)
+            setLineSpacing(0f, 1.3f)
+            setPadding(Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f))
+            elevation = Style.dp(this@MainActivity, 8f).toFloat()
+            visibility = ViewGroup.GONE
+            isClickable = true
+            setOnClickListener { toggleDataInfo() }
+        }
+        dataBody.addView(dataInfo, FrameLayout.LayoutParams(MATCH, WRAP).apply {
+            gravity = Gravity.TOP
+            leftMargin = Style.dp(this@MainActivity, 14f)
+            rightMargin = Style.dp(this@MainActivity, 14f)
+            topMargin = Style.dp(this@MainActivity, 10f)
+        })
+
+        dataPanel.addView(dataBody, LinearLayout.LayoutParams(MATCH, 0, 1f))
         root.addView(dataPanel, FrameLayout.LayoutParams(MATCH, MATCH))
         root.addView(evoPanel.view, FrameLayout.LayoutParams(MATCH, MATCH))
 
@@ -1305,33 +1359,60 @@ class MainActivity : Activity() {
 
     private val pageTitles by lazy { resources.getStringArray(R.array.page_titles) }
 
-    /** Chart pages draw; Health and Events are text. Only one of the two is ever visible. */
+    /**
+     * Open the Data screen on [page]. One door, so the drawer's button and the page gate walk the
+     * same path — the same reason `Chrome.build` is the one place a row is constructed.
+     */
+    internal fun openData(page: Int) {
+        dataPage = page.coerceIn(0, Chrome.PAGES.size - 1)
+        world.dataOpen = true
+        dataPanel.visibility = ViewGroup.VISIBLE
+        dataInfo.visibility = ViewGroup.GONE
+        refreshData()
+    }
+
+    /** The page gate's handle on the ⓘ card, which no other still can reach. */
+    internal fun toggleDataInfoForTest() = toggleDataInfo()
+
+    /** The ⓘ: a page's own sentence, on request. Tapping it again — or the card — puts it away. */
+    private fun toggleDataInfo() {
+        val open = dataInfo.visibility != ViewGroup.VISIBLE
+        dataInfo.visibility = if (open) ViewGroup.VISIBLE else ViewGroup.GONE
+        dataInfoButton.imageTintList =
+            android.content.res.ColorStateList.valueOf(if (open) Style.BRIGHT else Style.TEXT)
+    }
+
+    /**
+     * Three page kinds, one body: the drawn pages, the vitals, the feed. Exactly one is visible.
+     *
+     * Called four times a second while the screen is open, so nothing here builds a view — the
+     * vitals panel re-binds in place and the feed re-spans one string.
+     */
     private fun refreshData() {
-        dataTitle.text = pageTitles[dataPage]
-        // The selected page reads as selected (U0.3): full strength and bold, the rest receded.
-        // Not amber — amber marks the player's hand on the world, and looking is not touching.
-        val row = Chrome.rowOf(pagesRow)
-        for (k in 0 until row.childCount) (row.getChildAt(k) as Button).apply {
-            if (k == dataPage) {
-                setTextColor(Style.BRIGHT)
-                typeface = Style.wordMedium(this@MainActivity)
-                background = Style.touchable(this@MainActivity, Style.selected(this@MainActivity))
-            } else {
-                setTextColor(Style.TEXT)
-                typeface = Style.word(this@MainActivity)
-                background = Style.touchable(this@MainActivity, Style.quiet(this@MainActivity))
-            }
-        }
+        // The selected page reads as selected (U0.3), and the strip scrolls it into view. Not
+        // amber — amber marks the player's hand on the world, and looking is not touching.
+        Chrome.tabSelect(this, pagesRow, dataPage)
+        dataInfo.text = pageTitles[dataPage]
+
         val chart = dataPage <= 2 || dataPage == DataView.PAGE_TRAITS
+        val vitals = dataPage == PAGE_HEALTH
         (dataView.parent as ViewGroup).visibility = if (chart) ViewGroup.VISIBLE else ViewGroup.GONE
-        (dataText.parent as ViewGroup).visibility = if (chart) ViewGroup.GONE else ViewGroup.VISIBLE
-        if (chart) {
-            dataView.page = dataPage
-            if (dataPage == DataView.PAGE_TRAITS)
-                dataView.submitTraits(world.traitBands, world.traitSeries, world.seriesN)
-            else world.series?.let { dataView.submit(it, world.seriesN, IntArray(7) { sp -> speciesColor(sp) }) }
-        } else {
-            dataText.text = if (dataPage == 3) world.healthText else world.eventsText
+        (healthPanel.parent as ViewGroup).visibility = if (vitals) ViewGroup.VISIBLE else ViewGroup.GONE
+        (dataText.parent as ViewGroup).visibility =
+            if (!chart && !vitals) ViewGroup.VISIBLE else ViewGroup.GONE
+        when {
+            chart -> {
+                dataView.page = dataPage
+                if (dataPage == DataView.PAGE_TRAITS)
+                    dataView.submitTraits(world.traitBands, world.traitSeries, world.seriesN)
+                else world.series?.let {
+                    dataView.submit(it, world.seriesN,
+                        IntArray(7) { sp -> speciesColor(sp) },
+                        Array(7) { sp -> Native.traitText(sp, 0) })
+                }
+            }
+            vitals -> healthPanel.bind(world.healthReport)
+            else -> dataText.text = DataPages.events(this, world.eventRows)
         }
     }
 

@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="18dp" android:height="18dp"
+    android:viewportWidth="18" android:viewportHeight="18">
+  <!-- The Data screen's ⓘ: what this page shows. Drawn in the same 1.6-stroke hand as ic_close,
+       so the two icons that share the header read as one pair. -->
+  <group>
+    <path android:strokeColor="#C9D7E3" android:strokeWidth="1.6" android:fillColor="#00000000"
+        android:pathData="M9,1.9a7.1,7.1 0 1,0 0.01,0z"/>
+    <path android:strokeColor="#C9D7E3" android:strokeWidth="1.7" android:strokeLineCap="round"
+        android:fillColor="#00000000" android:pathData="M9,8.1l0,4.7"/>
+    <path android:strokeColor="#C9D7E3" android:strokeWidth="1.8" android:strokeLineCap="round"
+        android:fillColor="#00000000" android:pathData="M9,5.3l0,0.01"/>
+  </group>
+</vector>

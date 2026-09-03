@@ -38,6 +38,40 @@ object Style {
     val AMBER_BORDER = Color.argb(140, 242, 178, 74)
     val AMBER_FILL = Color.argb(26, 242, 178, 74)
 
+    // ---- the Data screen (U3, the data-viz pass) ----
+    //
+    // The charts had no tokens at all: every size was a bare number inside DataView's draw code,
+    // which is how the axis labels ended up at 22 device-pixels-times-density — twice a caption,
+    // on a chart with no room to spare. They live here now, in sp, so the type scale of the data
+    // pages is one decision and the accessibility font scale reaches them.
+    /** Axis ticks and the time labels — the smallest type the pages use. */
+    const val CHART_AXIS_SP = 11f
+    /** Legend rows, the one place a colour is given a name. */
+    const val CHART_LEGEND_SP = 13.5f
+    /** A page's own name in the header. */
+    const val PAGE_TITLE_SP = 20f
+    /** A stat tile's value; the vitals rows' numbers. */
+    const val FIGURE_SP = 22f
+
+    /** Chart ink: axis text and captions, one step brighter than [DIM] (7.2:1 on the abyss).
+     *  [DIM] is 3.8:1 — fine for a resting caption, thin for a number a player must read. */
+    val CHART_INK = Color.parseColor("#8FA3B5")
+    /** Gridlines and axis rules: a solid hairline one step off the surface, never dashed. */
+    val CHART_GRID = Color.argb(38, 148, 178, 204)
+    val CHART_AXIS = Color.argb(64, 148, 178, 204)
+
+    /**
+     * Status, for the vitals rows — reserved meaning, never reused as a series colour, and always
+     * shipped beside the word it means (calm / tense / critical), never as colour alone.
+     *
+     * Amber is deliberately NOT here. Rule 7 gives amber to the player's hand exclusively, and a
+     * strained species is the world's own news, not something the player just did — so the ladder
+     * runs slate → bright → rose instead of the usual green → amber → red.
+     */
+    val STATUS_CALM = DIM
+    val STATUS_TENSE = BRIGHT
+    val STATUS_CRIT = Color.parseColor("#E4736B")
+
     // ---- type ----
     private var ui: Typeface? = null
     private var uiMedium: Typeface? = null
@@ -60,6 +94,14 @@ object Style {
 
     // ---- surfaces ----
     fun dp(ctx: Context, v: Float): Int = (v * ctx.resources.displayMetrics.density + 0.5f).toInt()
+
+    /**
+     * sp → px. A `TextView` gets this for free; text painted straight onto a Canvas does not, and
+     * DataView paints all of its. Sizing chart text in raw density was the old bug in both
+     * directions at once: too big at 22, and deaf to the player's font-size setting either way.
+     */
+    fun sp(ctx: Context, v: Float): Float = android.util.TypedValue.applyDimension(
+        android.util.TypedValue.COMPLEX_UNIT_SP, v, ctx.resources.displayMetrics)
 
     private fun rounded(ctx: Context, fill: Int, stroke: Int, radiusDp: Float): GradientDrawable =
         GradientDrawable().apply {
@@ -98,6 +140,9 @@ object Style {
 
     /** A floating card (verdict, report, the front door's rows): surface on a faint hairline. */
     fun card(ctx: Context) = rounded(ctx, Color.argb(235, 16, 27, 40), HAIRLINE, 16f)
+
+    /** The same card, OPAQUE — for one that lands on a chart, where 92 % lets the lines through. */
+    fun solidCard(ctx: Context) = rounded(ctx, SURFACE, HAIRLINE, 16f)
 
     /** Touch feedback on any of the above, kept subtle. */
     fun touchable(ctx: Context, content: GradientDrawable): RippleDrawable =

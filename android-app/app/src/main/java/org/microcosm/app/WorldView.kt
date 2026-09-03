@@ -297,9 +297,11 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         private set
     @Volatile var seriesN = 0
         private set
-    @Volatile var healthText: String = ""
+    /** The Vitals page's readings — numbers, for [DataPages.HealthPanel] to lay out. */
+    @Volatile var healthReport: DataPages.Report = DataPages.Report(false)
         private set
-    @Volatile var eventsText: String = ""
+    /** The Events feed, newest first, the player's own doings ahead of the world's. */
+    @Volatile var eventRows: List<DataPages.Event> = emptyList()
         private set
     // ---- the Traits page (EV) ----
     @Volatile var traitBands: Array<DataView.Band> = emptyArray()
@@ -828,7 +830,16 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
         levelNarration = if (nk >= 0) L10n.narrate(Native.sysEventText(nk, 1)) else ""
     }
 
-    /** Copy the channels the charts need, and write out the two text pages. Render thread only. */
+    /** Venator's row in the species table — the one species with a reading of its own. */
+    private val SP_VENATOR = 6
+
+    /** The species' own colour, from the core's bucket table — never a second palette here. */
+    internal fun speciesColor(sp: Int) = android.graphics.Color.rgb(
+        Native.specNum(sp, 0, 0, 0).toInt(),
+        Native.specNum(sp, 0, 0, 1).toInt(),
+        Native.specNum(sp, 0, 0, 2).toInt())
+
+    /** Copy the channels the charts need, and publish the two written pages. Render thread only. */
     private fun publishData() {
         val rec = recBuf ?: Native.recBuffer().order(java.nio.ByteOrder.nativeOrder())
             .asFloatBuffer().also { recBuf = it }
@@ -845,50 +856,50 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
 
         publishTraits(rec, head, n)
 
-        val sb = StringBuilder()
-        if (Native.indOk() == 0) sb.append(s(R.string.health_gathering))
-        else {
-            sb.append(s(R.string.health_variety, Native.indNum(1), Native.indNum(2))).append('\n')
-            val rec2 = Native.indNum(3)
-            sb.append(s(R.string.health_recycling,
-                if (rec2.isNaN()) "–" else s(R.string.health_every, (rec2 * 60).roundToInt()),
-                Native.indNum(4).toInt())).append('\n')
-            val ad = Native.indNum(0)
-            if (!ad.isNaN()) sb.append(s(R.string.health_adapt, ad)).append('\n')
-            sb.append('\n').append(s(R.string.health_vitals_header)).append('\n')
+        // The two written pages are published as NUMBERS and ROWS, not as a pre-formatted string
+        // (U3). What the page does with them — tiles, meters, a feed — is the display layer's
+        // business; assembling `%-9s` columns here was the render thread doing typesetting, and it
+        // is why those pages read as a console print.
+        healthReport = if (Native.indOk() == 0) DataPages.Report(false) else {
+            val vitals = ArrayList<DataPages.Vital>()
             for (sp in 0 until 7) {
                 if (Native.indStrain(sp, 0) == 0.0) continue
-                val lvl = Native.indStrain(sp, 1).toInt()
-                val word = s(if (lvl == 2) R.string.vital_critical
-                             else if (lvl == 1) R.string.vital_tense else R.string.vital_calm)
-                val trend = Native.indStrain(sp, 3)
-                val arrow = if (trend < -0.03) "↓" else if (trend > 0.03) "↑" else "→"
-                sb.append(s(R.string.health_row,
-                    renderer.speciesName[sp], (Native.indStrain(sp, 2) * 100).toInt(), arrow,
-                    Native.indStrain(sp, 4), word)).append('\n')
+                vitals.add(DataPages.Vital(
+                    renderer.speciesName[sp], speciesColor(sp),
+                    Native.indStrain(sp, 2).toFloat(), Native.indStrain(sp, 3).toFloat(),
+                    Native.indStrain(sp, 4).toFloat(), Native.indStrain(sp, 1).toInt(),
+                ))
             }
-            if (Native.indVenator(0) != 0.0)
-                sb.append(s(R.string.health_venator,
-                    "Venator", (Native.indVenator(1) * 100).toInt(), Native.indVenator(2))).append('\n')
-            sb.append('\n').append(s(R.string.health_reference))
+            // The hunter keeps its own row. An apex species has no measured reference band, so the
+            // observatory returns no strain for it (`indicators`: apex → None) and it would drop
+            // off this page entirely — it has its own read-out instead, and `level = -1` says the
+            // honest thing: a reserve and a loss rate, and no verdict on either.
+            if (Native.indVenator(0) != 0.0) vitals.add(DataPages.Vital(
+                renderer.speciesName[SP_VENATOR], speciesColor(SP_VENATOR),
+                Native.indVenator(1).toFloat(), Float.NaN, Float.NaN, -1,
+                Native.indVenator(2).toFloat()))
+            val rec2 = Native.indNum(3)
+            DataPages.Report(
+                true,
+                Native.indNum(1).toFloat(), Native.indNum(2).toFloat(),
+                if (rec2.isNaN()) Float.NaN else (rec2 * 60).roundToInt().toFloat(),
+                Native.indNum(4).toInt(), Native.indNum(0).toFloat(), vitals,
+            )
         }
-        healthText = sb.toString()
 
         // The player's own hands first, each with its card. Rule 6: "since", never "because".
-        val ev = StringBuilder()
+        val rows = ArrayList<DataPages.Event>()
         val ivs = Native.ivCount()
         for (i in ivs - 1 downTo maxOf(0, ivs - 8)) {
-            ev.append("t %-6d %s\n".format(Native.ivAt(i, 0).toLong(), ivLabel[Native.ivAt(i, 1).toInt()]))
-            ev.append("        ").append(impactLine(i)).append('\n')
+            rows.add(DataPages.Event(Native.ivAt(i, 0).toLong(),
+                ivLabel[Native.ivAt(i, 1).toInt()], impactLine(i), true))
         }
-        if (ivs > 0) ev.append('\n')
         val count = Native.sysEventCount()
         for (i in count - 1 downTo maxOf(0, count - 40)) {
-            ev.append("t %-6d %s\n".format(Native.sysEventNum(i, 0).toLong(),
-                L10n.narrate(Native.sysEventText(i, 1))))
+            rows.add(DataPages.Event(Native.sysEventNum(i, 0).toLong(),
+                L10n.narrate(Native.sysEventText(i, 1)), null, false))
         }
-        if (count == 0) ev.append(s(R.string.events_none))
-        eventsText = ev.toString()
+        eventRows = rows
     }
 
     /**
@@ -934,8 +945,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
             val mean = if (n > 0) series[(b * 2) * n + n - 1] else 0f
             val sd = if (n > 0) series[(b * 2 + 1) * n + n - 1] else 0f
             DataView.Band(
-                android.graphics.Color.rgb(Native.specNum(sp, 0, 0, 0).toInt(),
-                    Native.specNum(sp, 0, 0, 1).toInt(), Native.specNum(sp, 0, 0, 2).toInt()),
+                speciesColor(sp),
                 Native.traitText(sp, 0) + " · " + L10n.trait(Native.traitText(sp, 10 + d[1])).lowercase(),
                 s(R.string.trait_stats, mean, sd),
                 Native.locusGet(sp, d[1], 16).toFloat(),
