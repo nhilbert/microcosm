@@ -558,10 +558,27 @@ class BootTest {
         assertTrue("and the switch must come back with it", !thumbAtEnd(activity.opticTrack))
         assertTrue("the label must come back with it",
             activity.opticLabel.text.toString() == darkLabel)
+        // Phase 9: the sandbox row opens the water chooser, and a start world founds from there.
         activity.startPanel.getChildAt(2).performClick() // sandbox
-        assertTrue("choosing sandbox should close the front door",
+        assertTrue("choosing sandbox should open the water chooser",
+            activity.startsPanel.visibility == android.view.View.VISIBLE)
+        assertTrue("a first launch has no kept pond to continue",
+            activity.keptPondRow.visibility != android.view.View.VISIBLE)
+        photograph(activity.startsPanel, "starts")
+        // the chooser is [title][scrolling list][back]; the list is [kept pond][every start world]
+        val startsList = ((activity.startsPanel.getChildAt(1) as android.widget.ScrollView)
+            .getChildAt(0) as android.widget.LinearLayout)
+        assertTrue("every start world the core carries must have a row",
+            startsList.childCount == Native.startCount() + 1)
+        startsList.getChildAt(3).performClick() // the third start world: two suns
+        assertTrue("choosing water should close the chooser",
+            activity.startsPanel.visibility != android.view.View.VISIBLE)
+        assertTrue("choosing water should close the front door",
             activity.startPanel.visibility != android.view.View.VISIBLE)
-        assertTrue("choosing sandbox should start the pond", activity.world.speed == 1.0)
+        assertTrue("choosing water should start the pond", activity.world.speed == 1.0)
+        // The founding itself is queued for the render thread (this test has no surface, so it
+        // never runs here) — what the shell owes is the choice: StartsTest founds the worlds.
+        assertTrue("the chosen start is the one the world stands in", activity.world.startIdx == 2)
         // eight HUD rounds at 250 ms — the window in which the phone died
         repeat(8) { looper.idleFor(Duration.ofMillis(250)) }
 

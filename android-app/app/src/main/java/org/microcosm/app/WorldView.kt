@@ -269,22 +269,36 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     fun stopLevel() = post { Native.levelStop(); levelState = 0; levelHud = "" }
 
     /**
+     * Which start world the sandbox is standing in (Phase 9). The reset button re-founds THIS
+     * one, so a player who chose two suns gets two suns back, on new water.
+     */
+    @Volatile var startIdx = 0
+
+    /**
      * A fresh pond on a new seed (U0.2 — the reset the review found did not exist). UI-side
      * randomness for reset seeds is legal (CLAUDE.md rule 5); the world itself stays deterministic
      * from the seed it is given. Everything the old world was holding — selection, grip, armed
-     * tool, the undo slot — is let go, because all of it names things that no longer exist.
+     * tool, the undo slot — is let go, since all of it names things that no longer exist.
+     *
+     * `start` names the start world to found; it defaults to the one already standing. Start 0
+     * composes nothing at all, so the default path is the shipped `resetWorld` + `initWorld`
+     * pair, bit for bit (harness/starts.js --check).
      */
-    fun resetWorld(seed: Int) = post {
-        Native.resetWorld()
-        Native.initWorld(seed)
-        Native.undoClear()
-        selI = -1
-        sunSel = -1
-        wallArmed = false
-        seedSpecies = -1
-        Native.markPrev()
-        renderer.onTilesChanged()
-        captureSunBaseline()
+    fun resetWorld(seed: Int, start: Int = startIdx) {
+        // The field is the UI's answer to "which water am I in", so it lands before the post;
+        // only the core work belongs on the render thread.
+        startIdx = start
+        post {
+            Native.startWorld(start, seed)
+            Native.undoClear()
+            selI = -1
+            sunSel = -1
+            wallArmed = false
+            seedSpecies = -1
+            Native.markPrev()
+            renderer.onTilesChanged()
+            captureSunBaseline()
+        }
     }
 
     // ---- Data mode (A.4) ----
