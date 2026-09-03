@@ -805,6 +805,13 @@ impl Sim {
             }
         }
 
+        // The observer's memory. It watched the world this one replaces, so none of it carries:
+        // the ring would splice two ponds into one chart, `count` would claim a history the loaded
+        // world never had, and the detectors would narrate the seam ("X is crashing") or stay
+        // silent about the loaded world because the old one already tripped their latches. See
+        // `Observatory::reset_at` for why a plain `reset()` is the wrong half of this.
+        self.obs.reset_at(&self.w.flows);
+
         // Derived state, rebuilt exactly as init_world builds it.
         compile_walls(&mut self.w);
         compute_light(&mut self.w, &self.p);
