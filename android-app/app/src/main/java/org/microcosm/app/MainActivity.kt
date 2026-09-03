@@ -986,8 +986,7 @@ class MainActivity : Activity() {
         keptPondRow = startChoice(getString(R.string.choice_continue_pond),
             getString(R.string.sub_sandbox_resume)) { enterSandbox(-1) }
         startsList.addView(keptPondRow)
-        for (st in starts) startsList.addView(
-            startChoice(st.title(this), st.subtitle(this)) { enterSandbox(st.idx) })
+        for (st in starts) startsList.addView(startWorldChoice(st) { enterSandbox(st.idx) })
         startsPanel.addView(ScrollView(this).apply { addView(startsList) },
             LinearLayout.LayoutParams(MATCH, 0, 1f))
         startsPanel.addView(button(getString(R.string.btn_back)) { startsPanel.visibility = ViewGroup.GONE })
@@ -1229,6 +1228,50 @@ class MainActivity : Activity() {
                 })
                 addView(TextView(this@MainActivity).apply {
                     text = l.science
+                    setTextColor(Style.DIM)
+                    textSize = 13f
+                    typeface = Style.word(this@MainActivity)
+                    setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+
+    /**
+     * A start-world row: a photograph of that world beside its words — the experiment rows'
+     * shape, for the same reason. The picture comes from assets/starts/<key>.jpg (shot by
+     * StartThumbsTest through this app's own renderer); a start without one gets the words
+     * alone, the portraits' missing-art contract.
+     */
+    private fun startWorldChoice(st: Start, onTap: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Style.touchable(this@MainActivity, Style.card(this@MainActivity))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                leftMargin = Style.dp(this@MainActivity, 24f)
+                rightMargin = Style.dp(this@MainActivity, 24f)
+                bottomMargin = Style.dp(this@MainActivity, 14f)
+            }
+            setPadding(Style.dp(this@MainActivity, 16f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f))
+            setOnClickListener { onTap() }
+            Profiles.startThumb(this@MainActivity, st.key)?.let { bm ->
+                addView(PortraitView(this@MainActivity).apply { show(bm) },
+                    LinearLayout.LayoutParams(Style.dp(this@MainActivity, 56f),
+                        Style.dp(this@MainActivity, 56f)).apply {
+                        rightMargin = Style.dp(this@MainActivity, 14f)
+                    })
+            }
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(this@MainActivity).apply {
+                    text = st.title(this@MainActivity)
+                    setTextColor(Style.BRIGHT)
+                    textSize = 17f
+                    typeface = Style.wordMedium(this@MainActivity)
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = st.subtitle(this@MainActivity)
                     setTextColor(Style.DIM)
                     textSize = 13f
                     typeface = Style.word(this@MainActivity)

@@ -85,6 +85,18 @@ class StartsTest {
     }
 
     @Test
+    fun everyStartHasAPicture() {
+        requireNativeLib()
+        Native.boot()
+        val ctx = RuntimeEnvironment.getApplication()
+        // Not a rule that every start MUST have one — the row degrades to words, deliberately —
+        // but a picture that has stopped loading is a silent loss, so the count is asserted.
+        val shown = Start.all().count { Profiles.startThumb(ctx, it.key) != null }
+        println("START THUMBS: $shown of ${Start.all().size} start worlds carry a picture")
+        assertTrue("no start world's thumbnail loaded", shown == Start.all().size)
+    }
+
+    @Test
     fun everyStartHasWords() {
         requireNativeLib()
         Native.boot()

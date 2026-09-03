@@ -193,7 +193,48 @@ spring is deferred, with a re-entry condition:
 > machinery is already there — `Scenario.found` — so this is a calibration job,
 > not a feature.
 
-## 7. Where the numbers are reproduced
+## 7. The pictures
+
+Each start world's chooser row carries a photograph of that world, the way each experiment
+row carries one. The tool is `StartThumbsTest` — a curation tool living in the app's test
+source set, because that is the only place the real renderer runs without a phone:
+
+    gradle -p android-app testReleaseUnitTest --tests '*StartThumbsTest*' -Pthumbs
+
+It founds each start on seed 11, steps it headlessly to a fixed tick, and paints one frame
+through `Renderer.draw` — the very painter that will display the result. Off without
+`-Pthumbs`, since it writes committed files. Two differences from `tools/level-thumbs.js`,
+both deliberate:
+
+* **Reproducible.** The level pictures ride the browser's live render loop, so two captures
+  of the same spec differ by a few ticks. These are driven headlessly from a fixed seed and
+  a fixed tick count, so the same shot list gives the same jpg every time.
+* **The app's own painter, not the browser's.** These pictures sit inside the app, beside
+  the frame they are a picture of.
+
+The shot list, which is the record of what each picture means:
+
+| key | tick | camera | zoom | what it shows |
+|---|---|---|---|---|
+| `pond` | 1,200 | 512, 560 | 1.30 | the mat under the sun |
+| `still` | 200 | 512, 512 | 0.50 | the whole lit pool, and nobody in it |
+| `twosuns` | 1,500 | 512, 512 | 0.42 | both pools and the strait between them |
+| `refuge` | 1,500 | 416, 608 | 1.55 | the mesh pen on the sun's flank |
+| `shallows` | 1,500 | 512, 560 | 1.30 | the pond's framing, over thinner water |
+
+`z` is backing pixels per world unit, so a 320-px frame shows `320/z` units of a
+1024-wide torus. **`twosuns` is the one shot no phone could frame**: the app clamps
+zoom-out at roughly 460 units and its suns stand 512 apart. It is a picture OF the world
+rather than a screenshot of a session, and the tool says so where the number is set rather
+than leaving it implied. `shallows` deliberately repeats `pond`'s framing, so the thinner
+water is legible by comparison rather than by caption.
+
+Two gates keep them honest: the tool asserts that every picture painted something over the
+abyss (a thumbnail of nothing would otherwise ship silently), and `StartsTest` asserts that
+every start the core carries still loads its picture — a file that stops loading is a
+silent loss.
+
+## 8. Where the numbers are reproduced
 
     npm run starts          # 5 worlds x 8 seeds x 18,000 ticks — the acceptance run
     npm run starts:check    # the identity gates + the `still` criterion (fast)

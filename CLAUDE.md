@@ -79,6 +79,13 @@ thermotaxis, walls with four independent properties. Levers: sun card, mineral
 pour, armed feed/kill tools, species seeding, walls, the Evolution panel — all
 logged, undoable, impact-carded. Six Data pages including Traits.
 
+Each start world's chooser row carries a photograph of that world
+(`assets/starts/<key>.jpg`), shot through the APP's own renderer by `StartThumbsTest`
+(`gradle -p android-app testReleaseUnitTest --tests '*StartThumbsTest*' -Pthumbs`) — the
+level pictures' rule, with the app's painter instead of the browser's, and reproducible
+because the drive is headless. The shot list is in the tool; what each picture means is in
+docs/phase9-starts.md §7.
+
 **Phase 8's ladder is complete.** L1–L9, L11 and L12 ship; L10 is folded with a
 re-entry condition. Levels are calibrated ON the level machinery, never on raw
 streams — the gate convicted raw-stream pins twice, and that is now the standing
