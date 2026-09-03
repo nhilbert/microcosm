@@ -38,7 +38,7 @@ class MainActivity : Activity() {
     private lateinit var hud: TextView
     private lateinit var reportView: TextView
     private lateinit var undoChip: Button
-    private lateinit var resetButton: Button
+    private lateinit var resetIcon: android.widget.ImageButton
     private lateinit var benchButton: Button
     private var resetArmedAt = 0L
 
@@ -132,9 +132,14 @@ class MainActivity : Activity() {
     private lateinit var sunBadgeView: TextView
     private lateinit var verdict: TextView
     internal lateinit var startPanel: LinearLayout // internal: the boot gate walks the front door
-    /** GR.7: the two rows that say which microscope the world is in — front door and drawer. */
+    /** GR.7: the two switches that say which microscope the world is in — front door and drawer.
+     *  One state, two ways to reach it; [refreshOptic] paints both from `world.lightField`. */
     internal lateinit var opticRow: LinearLayout // internal: the boot gate taps the switch
-    internal lateinit var opticButton: android.widget.Button
+    private lateinit var opticTitle: TextView
+    internal lateinit var opticSwatch: OpticSwatch // internal: the boot gate compares its grounds
+    internal lateinit var opticTrack: android.widget.FrameLayout // internal: the gate reads the thumb's side
+    private lateinit var opticSwitch: LinearLayout
+    internal lateinit var opticLabel: TextView // internal: the boot gate reads the drawer's word
     /** The front door's continue-the-experiment row — added after the fixed rows the boot gate walks. */
     internal lateinit var continueRow: LinearLayout
     internal lateinit var expPanel: LinearLayout
@@ -749,19 +754,42 @@ class MainActivity : Activity() {
             val pad = Style.dp(this@MainActivity, Chrome.DRAWER_PAD_DP.toFloat())
             setPadding(pad, pad, pad, pad)
         }
-        val drawerBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        drawerBody.addView(TextView(this).apply {
-            text = "Microcosm"
-            setTextColor(Style.BRIGHT)
-            textSize = 20f
-            typeface = Style.wordBold(this@MainActivity)
-            setPadding(0, 0, 0, Style.dp(this@MainActivity, 8f))
+        // The drawer's head (owner, 2026-09-03): home, save and reset as glyphs, pinned above
+        // the scroll. They are the session's own three — leave the pond, keep it, start it over —
+        // and they take one 48 dp line instead of the 2x2 word grid that used to sit at the foot.
+        // The wordmark went with it: the way home is now a button rather than a title, and the
+        // front door carries the name in full the moment it is tapped.
+        val drawerTop = Chrome.build(this, "drawerTop") { k ->
+            when (Chrome.DRAWER_TOP[k]) {
+                "home" -> {
+                    // The same path back-at-top-level takes: the pond is saved to its own file
+                    // first, so leaving through the drawer costs exactly nothing.
+                    closeDrawer()
+                    autosave()
+                    showStart(getString(if (running != null) R.string.start_sub_behind_experiment
+                                        else R.string.start_sub_as_stands))
+                }
+                "save" -> { closeDrawer(); saveOrLoad() }
+                else -> resetTapped()
+            }
+        } as LinearLayout
+        resetIcon = drawerTop.getChildAt(2) as android.widget.ImageButton
+        drawer.addView(drawerTop, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            bottomMargin = Style.dp(this@MainActivity, 6f)
         })
+        val drawerBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         drawerBody.addView(sectionLabel(getString(R.string.section_pace)))
         paceBox = Chrome.build(this, "pace") { k ->
             world.speed = when (k) { 0 -> 0.0; 1 -> 1.0; 2 -> 4.0; else -> 16.0 }
         } as LinearLayout
         drawerBody.addView(paceBox, LinearLayout.LayoutParams(MATCH, WRAP))
+        // The same switch as the front door's, where a player already stands looking at the pond:
+        // the point of a second optic is the comparison, and the comparison needs the world in
+        // sight. One state, two ways to reach it.
+        drawerBody.addView(sectionLabel(getString(R.string.section_view)))
+        opticSwitch = Chrome.build(this, "optic") { toggleOptic() } as LinearLayout
+        drawerBody.addView(opticSwitch, LinearLayout.LayoutParams(MATCH, WRAP))
+        opticLabel = Chrome.switchLabel(opticSwitch)
         drawerBody.addView(sectionLabel(getString(R.string.section_species)))
         for (sp in live) {
             val pill = LinearLayout(this).apply {
@@ -789,40 +817,33 @@ class MainActivity : Activity() {
                 bottomMargin = Style.dp(this@MainActivity, 8f)
             })
         }
-        drawerBody.addView(sectionLabel(""))
-        val utility = Chrome.build(this, "utility") { k ->
-            when (Chrome.UTILITY[k]) {
-                "reset" -> resetTapped()
-                "save" -> { closeDrawer(); saveOrLoad() }
-                "data" -> { closeDrawer(); openData(dataPage) }
-                else -> {
-                    closeDrawer()
-                    reportView.visibility = ViewGroup.GONE
-                    world.speed = 0.0
-                    world.benchmark()
-                }
-            }
-        } as LinearLayout
-        resetButton = Chrome.at(utility, Chrome.UTILITY, "reset")
-        benchButton = Chrome.at(utility, Chrome.UTILITY, "bench").apply { visibility = ViewGroup.GONE }
-        drawerBody.addView(utility, LinearLayout.LayoutParams(MATCH, WRAP))
-        drawerBody.addView(sectionLabel(""))
-        drawerBody.addView(button(getString(R.string.btn_experiments)) { closeDrawer(); expPanel.visibility = ViewGroup.VISIBLE },
-            LinearLayout.LayoutParams(MATCH, WRAP))
-        drawerBody.addView(button(getString(R.string.evo_title)) {
-            if (!world.evolutionAllowed) { toast(getString(R.string.evo_locked)); return@button }
+        // The bench is dev-mode only and stays a word: nobody who has not long-pressed the census
+        // strip will ever see it, and a glyph for it would be a picture of a stopwatch nobody
+        // asked for. The experiments button left the drawer with this round — the ladder is the
+        // front door's second row, and a menu entry that duplicates the door is a second door.
+        val benchRow = Chrome.build(this, "bench") {
             closeDrawer()
-            evoPanel.open()
-        }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = Style.dp(this@MainActivity, 8f) })
-        // The same switch as the front door's, where a player already stands looking at the pond:
-        // the point of a second optic is the comparison, and the comparison needs the world in
-        // sight. One state, two ways to reach it.
-        opticButton = button("") { toggleOptic() }
-        drawerBody.addView(opticButton, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            reportView.visibility = ViewGroup.GONE
+            world.speed = 0.0
+            world.benchmark()
+        } as LinearLayout
+        benchButton = Chrome.at(benchRow, Chrome.BENCH, "bench").apply { visibility = ViewGroup.GONE }
+        drawerBody.addView(benchRow, LinearLayout.LayoutParams(MATCH, WRAP).apply {
             topMargin = Style.dp(this@MainActivity, 8f)
         })
         drawer.addView(ScrollView(this).apply { addView(drawerBody) },
-            LinearLayout.LayoutParams(MATCH, MATCH))
+            LinearLayout.LayoutParams(MATCH, 0, 1f))
+        // The drawer's foot: the two screens it leads to, pinned under the scroll so they are in
+        // the same place whatever the species list is doing above them.
+        drawer.addView(Chrome.build(this, "drawerNav") { k ->
+            if (Chrome.DRAWER_NAV[k] == "data") {
+                closeDrawer()
+                openData(dataPage)
+            } else if (!world.evolutionAllowed) toast(getString(R.string.evo_locked))
+            else { closeDrawer(); evoPanel.open() }
+        }, LinearLayout.LayoutParams(MATCH, WRAP).apply {
+            topMargin = Style.dp(this@MainActivity, 10f)
+        })
         root.addView(drawer, FrameLayout.LayoutParams(
             Style.dp(this, Chrome.DRAWER_DP.toFloat()), MATCH).apply {
             gravity = Gravity.START
@@ -948,7 +969,7 @@ class MainActivity : Activity() {
         // screen over the world, not a dialog behind a bar button — the ladder was the most
         // carefully built thing in the app and the least reachable. The world waits underneath
         // (speed 0) until the player chooses.
-        startPanel = LinearLayout(this).apply {
+        startPanel = StartDoor(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Style.ABYSS)
             gravity = Gravity.CENTER_VERTICAL
@@ -1015,11 +1036,23 @@ class MainActivity : Activity() {
         })
         // The optic (GR.7). Last row, after the two fixed ones and the continue row, so the boot
         // gate's child indices stay put. It is a view, not a lever: it changes how the world is
-        // painted and nothing about what the world does.
-        opticRow = startChoice("", "") { toggleOptic() }
+        // painted and nothing about what the world does — which is why, since the owner asked for
+        // a switch here (2026-09-03), it wears one: the other rows are doors, and a door that
+        // comes back to the same screen with a different ground was never one.
+        opticRow = startSwitch { toggleOptic() }
         startPanel.addView(opticRow)
         refreshOptic()
-        root.addView(startPanel, FrameLayout.LayoutParams(MATCH, MATCH))
+        // The front door scrolls (owner request, 2026-09-03). It had been growing rows — the
+        // continue row, help, the optic — under a wordmark that takes 145 dp on its own, and at
+        // 320 dp wide the last of them fell off the bottom edge with nothing to say so. The look
+        // is unchanged wherever it still fits: `isFillViewport` stretches the panel to the
+        // viewport when the content is shorter, so its CENTER_VERTICAL still centres, and only
+        // a door too tall for the screen scrolls at all.
+        root.addView(ScrollView(this).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+            addView(startPanel, FrameLayout.LayoutParams(MATCH, WRAP))
+        }, FrameLayout.LayoutParams(MATCH, MATCH))
 
         // The ladder, as a screen: every experiment open, none gated behind another.
         expPanel = LinearLayout(this).apply {
@@ -1209,10 +1242,14 @@ class MainActivity : Activity() {
     private fun refreshOptic() {
         val light = world.lightField
         val title = getString(if (light) R.string.choice_view_light else R.string.choice_view_dark)
-        (opticRow.getChildAt(0) as TextView).text = title
-        (opticRow.getChildAt(1) as TextView).text =
+        opticTitle.text = title
+        opticSwatch.setRegime(light)
+        // The sentence the card used to show is now what it SAYS: the picture is not readable by
+        // a screen reader, so the words it replaced become the card's accessible name.
+        opticRow.contentDescription = "$title. " +
             getString(if (light) R.string.sub_view_light else R.string.sub_view_dark)
-        opticButton.text = title
+        Chrome.switchTrackState(this, opticTrack, light)
+        Chrome.switchState(this, opticSwitch, light, title)
     }
 
     private fun toast(s: String) =
@@ -1245,6 +1282,84 @@ class MainActivity : Activity() {
                 setPadding(0, Style.dp(this@MainActivity, 3f), 0, 0)
             })
         }
+
+    /**
+     * The front door's optic row: the field of view on the left, the regime's name, the switch at
+     * the right edge. The whole card is one target, so the switch shows the state rather than
+     * being a second control.
+     *
+     * What used to sit here was a sentence describing the look ("glowing life on black water —
+     * tap for the light field"). It is gone for the reason [OpticSwatch] carries in full: a switch
+     * already states the side you are on, so a line naming the ACTION beside it is the ambiguity
+     * that makes a reader treat a switch as a command — and where the outcome is a look, the
+     * outcome itself beats prose about it. The sentence survives where it still earns its keep,
+     * as the card's contentDescription: a screen reader gets the words a sighted player now gets
+     * from the picture.
+     */
+    private fun startSwitch(onTap: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Style.touchable(this@MainActivity, Style.card(this@MainActivity))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                leftMargin = Style.dp(this@MainActivity, 24f)
+                rightMargin = Style.dp(this@MainActivity, 24f)
+                bottomMargin = Style.dp(this@MainActivity, 14f)
+            }
+            setPadding(Style.dp(this@MainActivity, 18f), Style.dp(this@MainActivity, 16f),
+                Style.dp(this@MainActivity, 20f), Style.dp(this@MainActivity, 16f))
+            setOnClickListener { onTap() }
+            opticSwatch = OpticSwatch(this@MainActivity).apply {
+                show(swatchCast())
+                setRegime(world.lightField)
+                // The picture is the card's, not a thing of its own to land on: the card carries
+                // the whole meaning as its contentDescription.
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            addView(opticSwatch, LinearLayout.LayoutParams(
+                Style.dp(this@MainActivity, 52f), Style.dp(this@MainActivity, 52f)))
+            opticTitle = TextView(this@MainActivity).apply {
+                setTextColor(Style.BRIGHT)
+                textSize = 17f
+                typeface = Style.wordMedium(this@MainActivity)
+            }
+            addView(opticTitle, LinearLayout.LayoutParams(0, WRAP, 1f).apply {
+                marginStart = Style.dp(this@MainActivity, 16f)
+            })
+            opticTrack = Chrome.switchTrack(this@MainActivity)
+            addView(opticTrack, LinearLayout.LayoutParams(
+                Style.dp(this@MainActivity, 52f), Style.dp(this@MainActivity, 30f)).apply {
+                marginStart = Style.dp(this@MainActivity, 12f)
+            })
+        }
+
+    /**
+     * The four the preview shows, biggest first, at fixed spots in the field (position and radius
+     * as fractions of it, so the picture is the same at any size).
+     *
+     * Chosen by NAME rather than by index: the species table is the core's and may grow, and a
+     * creature this does not know about simply does not appear rather than turning the picture
+     * into something else. The colours are the core's own bucket table — the same call the drawer
+     * pills and the seed picker make, never a second palette here — read once, so flipping the
+     * optic repaints from cached data and never touches the core again.
+     */
+    private fun swatchCast(): List<OpticSwatch.Body> {
+        val spots = listOf(
+            Triple("Cilio", 0.36f to 0.41f, 0.21f),
+            Triple("Venator", 0.69f to 0.63f, 0.17f),
+            Triple("Drifta", 0.70f to 0.30f, 0.13f),
+            Triple("Solara", 0.33f to 0.73f, 0.10f),
+        )
+        val byName = live.associateBy { Native.traitText(it, 0) }
+        return spots.mapNotNull { (name, at, r) ->
+            val sp = byName[name] ?: return@mapNotNull null
+            OpticSwatch.Body(
+                intArrayOf(Native.specNum(sp, 0, 0, 0).toInt(), Native.specNum(sp, 0, 0, 1).toInt(),
+                    Native.specNum(sp, 0, 0, 2).toInt()),
+                at.first, at.second, r,
+            )
+        }
+    }
 
     /**
      * An experiment row: the level's captured moment beside its words. The picture comes from
@@ -1429,8 +1544,11 @@ class MainActivity : Activity() {
         val now = System.currentTimeMillis()
         if (now - resetArmedAt > 2600) {
             resetArmedAt = now
-            resetButton.text = getString(R.string.btn_reset_sure)
-            resetButton.setTextColor(Color.parseColor("#F2B24A")) // the hand, about to act
+            // The glyph cannot say "sure?", so it goes amber — the hand, about to act — and the
+            // question is asked in words anyway, because a two-step guard whose first step is a
+            // colour change is a guard the player has to already know about.
+            armReset(Style.AMBER, getString(R.string.btn_reset_sure))
+            toast(getString(R.string.btn_reset_sure))
             ui.postDelayed({ if (System.currentTimeMillis() - resetArmedAt >= 2600) disarmReset() }, 2700)
             return
         }
@@ -1533,8 +1651,15 @@ class MainActivity : Activity() {
 
     private fun disarmReset() {
         resetArmedAt = 0L
-        resetButton.text = Chrome.label(this, "reset")
-        resetButton.setTextColor(Style.TEXT)
+        armReset(Style.TEXT, Chrome.label(this, "reset"))
+    }
+
+    /** Paint the reset glyph and say what a tap does now — the tooltip and the screen reader's
+     *  word both follow the state, since the icon itself cannot. */
+    private fun armReset(tint: Int, desc: String) {
+        resetIcon.imageTintList = android.content.res.ColorStateList.valueOf(tint)
+        resetIcon.contentDescription = desc
+        resetIcon.tooltipText = desc
     }
 
     /**
@@ -1814,6 +1939,27 @@ class MainActivity : Activity() {
      * horizontally scrollable child — the pages row itself scrolls since U0.1 — is left alone,
      * because that child owns sideways motion.
      */
+    /**
+     * The front door's panel, which lives inside a scroller and carries that scroller's
+     * visibility with it.
+     *
+     * The alternative was to toggle the wrapper at every one of the shell's `startPanel.visibility
+     * = …` sites — and at the boot gate's, which sets it too. That is a rule nobody can enforce:
+     * the first line that hides the panel and forgets the scroller leaves a full-screen invisible
+     * view over the pond, eating every touch. So the two are welded here instead, where there is
+     * exactly one place to get it right. Reopening the door also returns it to the top: a player
+     * who scrolled to the optic and left should not come back to a screen with no title on it.
+     */
+    private class StartDoor(ctx: Context) : LinearLayout(ctx) {
+        override fun setVisibility(v: Int) {
+            super.setVisibility(v)
+            (parent as? ScrollView)?.let {
+                it.visibility = v
+                if (v == VISIBLE) it.scrollTo(0, 0)
+            }
+        }
+    }
+
     private class SwipePanel(ctx: Context, val onSwipe: (Int) -> Unit) : LinearLayout(ctx) {
         private val slop = ViewConfiguration.get(ctx).scaledTouchSlop
         private var x0 = 0f

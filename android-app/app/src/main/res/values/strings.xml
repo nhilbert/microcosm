@@ -22,8 +22,8 @@
     <string name="start_sub_as_stands">your pond, as it stands</string>
     <string name="choice_continue_exp">continue the experiment</string>
     <string name="sub_continue_exp">E%1$d %2$s — as you left it</string>
-    <string name="choice_view_dark">view: dark field</string>
-    <string name="choice_view_light">view: light field</string>
+    <string name="choice_view_dark">dark field</string>
+    <string name="choice_view_light">light field</string>
     <string name="sub_view_dark">glowing life on black water — tap for the light field</string>
     <string name="sub_view_light">stained life on a lit ground — tap for the dark field</string>
 
@@ -105,7 +105,6 @@
     <string name="btn_begin">begin</string>
     <string name="btn_skip">skip</string>
     <string name="btn_undo">undo</string>
-    <string name="btn_experiments">experiments</string>
     <string name="btn_reset_sure">sure?</string>
 
     <!-- the chrome inventory's faces (the keys stay English in Chrome.kt; the gates key on them) -->
@@ -125,10 +124,12 @@
     <string name="util_save">save</string>
     <string name="util_data">data</string>
     <string name="util_bench" translatable="false">bench</string>
+    <string name="util_home">home</string>
 
     <!-- the drawer -->
     <string name="section_pace">pace</string>
     <string name="section_species">species · tap to hide</string>
+    <string name="section_view">view</string>
 
     <!-- the hand's hints and the sun -->
     <string name="hint_wall_drag">drag on the water</string>
