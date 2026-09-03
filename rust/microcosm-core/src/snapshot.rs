@@ -25,7 +25,8 @@
 use crate::events::{Event, LocusKey, LoggedEvent};
 use crate::fields::{compile_walls, compute_light, compute_temp, make_wall, WallSpec};
 use crate::params::*;
-use crate::world::Source;
+use crate::traits::Species;
+use crate::world::{Source, World};
 use crate::Sim;
 
 const MAGIC: &[u8; 4] = b"MCSM";
@@ -562,248 +563,35 @@ impl Sim {
 
     /// Restore a world saved by [`Sim::save`]. Rebuilds every derived field afterwards, so the
     /// loaded world is byte-for-byte the saved one and steps on identically.
+    ///
+    /// Parsed into scratch and committed only once the whole stream has been read. Reading straight
+    /// into `self` could not keep the promise `mc_load` makes — "a refusal, never a half-loaded
+    /// world" — because a file that truncates LATE has already overwritten most of the live pond by
+    /// the time the last read runs off the end: the player would get a polite refusal message on
+    /// top of a world replaced by a stranger's, with a foreign population and a foreign PRNG state,
+    /// and it would step on as that stranger. (The refusals that fire EARLY — bad magic, an unknown
+    /// version, a differently-shaped build — were always safe, which is exactly why this was easy
+    /// to miss.) The cost is one `World` allocation per load, on a rare, deliberate, player-
+    /// initiated act.
     pub fn load(&mut self, bytes: &[u8]) -> Result<(), LoadError> {
-        let mut r = Rd::new(bytes);
-        if r.take(4)? != MAGIC {
-            return Err(LoadError("not a Microcosm snapshot (bad magic)".into()));
-        }
-        let ver = r.u32()?;
-        if ver < 1 || ver > VERSION {
-            return Err(LoadError(format!(
-                "format version {}, this build reads 1..={}",
-                ver, VERSION
-            )));
-        }
-        let (maxn, grid, maxloci, nsp) = (r.u32()?, r.u32()?, r.u32()?, r.u32()?);
-        if maxn as usize != MAXN || grid as usize != GRID || maxloci as usize != MAXLOCI {
-            return Err(LoadError(format!(
-                "world shape MAXN={} GRID={} MAXLOCI={} does not match this build ({}, {}, {})",
-                maxn, grid, maxloci, MAXN, GRID, MAXLOCI
-            )));
-        }
-        if nsp as usize != self.tr.len() {
-            return Err(LoadError(format!(
-                "{} species in the snapshot, {} in this build",
-                nsp,
-                self.tr.len()
-            )));
-        }
+        let mut w = World::new(&self.p);
+        let mut p = self.p.clone();
+        let mut tr = self.tr.clone();
+        let mut lvl = crate::levels::Lvl::default();
+        parse(bytes, &mut w, &mut p, &mut tr, &mut lvl)?;
 
-        self.w.seed = r.i32()?;
-        self.w.tick = r.i64()?;
-        self.w.rng.state = r.i32()?;
-        self.w.n = r.u32()? as usize;
-        self.w.c_n = r.u32()? as usize;
-        self.w.added_m = r.f64()?;
-        self.w.initialized = r.u8()? != 0;
+        // Past here nothing can fail, so the world can be replaced.
+        self.w = w;
+        self.p = p;
+        self.tr = tr;
+        self.lvl = lvl;
 
-        self.p.mutation = r.u8()? != 0;
-        self.p.spawn_decomposers = r.u8()? != 0;
-        self.p.light_mul = r.f64()?;
-        self.p.temp_amb = r.f64()?;
-        self.p.seed = r.i32()?;
-
-        let nt = r.u32()? as usize;
-        if nt != self.tr.len() {
-            return Err(LoadError("locus table length mismatch".into()));
-        }
-        for sp in 0..nt {
-            let nl = r.u32()? as usize;
-            if nl != self.tr[sp].loci.len() {
-                return Err(LoadError(format!(
-                    "species {} has {} loci in the snapshot, {} in this build",
-                    sp,
-                    nl,
-                    self.tr[sp].loci.len()
-                )));
-            }
-            for k in 0..nl {
-                let l = &mut self.tr[sp].loci[k];
-                l.g0 = r.f64()?;
-                l.sigma = r.f64()?;
-                l.curve = r.f64()?;
-                l.esc_slope = r.f64()?;
-                l.kp_slope = r.f64()?;
-                l.catch_slope = r.f64()?;
-                l.kb_slope = r.f64()?;
-                l.light_slope = r.f64()?;
-                l.rate_slope = r.f64()?;
-                l.eff_slope = r.f64()?;
-                l.warm_slope = r.f64()?;
-                l.warm_gain_slope = r.f64()?;
-                l.tpref_span = r.f64()?;
-                l.damp_span = r.f64()?;
-                l.pc_speed_slope = r.f64()?;
-                l.pc_turn_slope = r.f64()?;
-                l.tumble_slope = r.f64()?;
-            }
-            self.tr[sp].thermo = r.f64()?;
-            self.tr[sp].topt = r.f64()?;
-            self.tr[sp].ctmax = r.f64()?;
-        }
-
-        {
-            let s = &mut self.w;
-            r.f32s_into(&mut s.x, "x")?;
-            r.f32s_into(&mut s.y, "y")?;
-            r.f32s_into(&mut s.px, "px")?;
-            r.f32s_into(&mut s.py, "py")?;
-            r.f32s_into(&mut s.vx, "vx")?;
-            r.f32s_into(&mut s.vy, "vy")?;
-            r.f32s_into(&mut s.en, "en")?;
-            r.f32s_into(&mut s.sz, "sz")?;
-            r.f64s_into(&mut s.sz_pow, "szPow")?;
-            r.u8s_into(&mut s.sp, "sp")?;
-            r.u8s_into(&mut s.alive, "alive")?;
-            r.u8s_into(&mut s.cy, "cy")?;
-            r.f32s_into(&mut s.hd, "hd")?;
-            r.f32s_into(&mut s.mn, "mn")?;
-            r.f32s_into(&mut s.pr, "pr")?;
-            r.f32s_into(&mut s.mem, "mem")?;
-            r.i16s_into(&mut s.handle, "handle")?;
-            r.i16s_into(&mut s.cd, "cd")?;
-            r.i16s_into(&mut s.gr, "gr")?;
-            r.i16s_into(&mut s.flee, "flee")?;
-            r.i16s_into(&mut s.bst, "bst")?;
-            r.i16s_into(&mut s.pc, "pc")?;
-            r.f32s_into(&mut s.g, "g")?;
-            r.u16s_into(&mut s.lg, "lg")?;
-            r.u16s_into(&mut s.gen, "gen")?;
-            r.i32s_into(&mut s.birth, "birth")?;
-            s.free_list = r.usizes()?;
-
-            r.f32s_into(&mut s.m, "M")?;
-            r.f32s_into(&mut s.d_e, "dE")?;
-            r.f32s_into(&mut s.d_p, "dP")?;
-            r.f32s_into(&mut s.d_m, "dM")?;
-            r.f32s_into(&mut s.sc, "sc")?;
-            r.f32s_into(&mut s.al, "al")?;
-
-            r.u8s_into(&mut s.c_alive, "cAlive")?;
-            r.u8s_into(&mut s.c_sp, "cSp")?;
-            r.f32s_into(&mut s.c_x, "cX")?;
-            r.f32s_into(&mut s.c_y, "cY")?;
-            r.f32s_into(&mut s.c_e, "cE")?;
-            r.f32s_into(&mut s.c_p, "cP")?;
-            r.f32s_into(&mut s.c_m, "cM")?;
-            r.f32s_into(&mut s.c_sz, "cSz")?;
-            s.c_free = r.usizes()?;
-
-            let ns = r.u32()? as usize;
-            s.sources.clear();
-            for _ in 0..ns {
-                s.sources.push(Source {
-                    x: r.f64()?,
-                    y: r.f64()?,
-                    i: r.f64()?,
-                    a: r.f64()?,
-                    sigma: r.f64()?,
-                });
-            }
-            let nw = r.u32()? as usize;
-            s.walls.clear();
-            for _ in 0..nw {
-                let spec = WallSpec {
-                    x0: r.f64()?,
-                    y0: r.f64()?,
-                    dx: r.f64()?,
-                    dy: r.f64()?,
-                    lt: r.f64()?,
-                    ht: r.f64()?,
-                    fl: r.f64()?,
-                    pass: r.i32()?,
-                };
-                // The stored stroke is already corner-snapped, so re-rasterizing reproduces the
-                // same staircase — the face planes are derived, never stored.
-                if let Some(wl) = make_wall(&spec) {
-                    s.walls.push(wl);
-                }
-            }
-
-            let f = &mut s.flows;
-            f.uptake = r.f64()?;
-            f.release = r.f64()?;
-            f.excrete = r.f64()?;
-            f.transfer = r.f64()?;
-            f.egest_e = r.f64()?;
-            f.egest_p = r.f64()?;
-            f.leach_m = r.f64()?;
-            f.corpse_to_det = r.f64()?;
-            f.bac_release = r.f64()?;
-            f.gpp = r.f64()?;
-            f.resp = r.f64()?;
-            f.deaths = r.f64()?;
-            for i in 0..7 {
-                f.deaths_by[i] = r.f64()?;
-            }
-
-            let nlog = r.u32()? as usize;
-            s.event_log.clear();
-            for _ in 0..nlog {
-                let t = r.i64()?;
-                let ev = read_event(&mut r)?;
-                s.event_log.push(LoggedEvent { t, ev });
-            }
-            s.events.clear();
-        }
-
-        // The running experiment (version 2). Whatever level THIS session was in ends here: its
-        // verdicts would judge the loaded world against a run it never had. A version-1 file, or
-        // one saved outside a level, therefore loads into the sandbox.
-        self.lvl = crate::levels::Lvl::default();
-        if ver >= 2 && r.u8()? != 0 {
-            use crate::levels::{collect_regions, Lvl, LvlState, MAX_LATCH};
-            let key = String::from_utf8_lossy(&r.bytes_vec()?).into_owned();
-            let state = match r.u8()? {
-                1 => LvlState::Running,
-                2 => LvlState::Passed,
-                3 => LvlState::Failed,
-                t => return Err(LoadError(format!("level: unknown state {}", t))),
-            };
-            let run = r.i32()?;
-            let seen_s = r.i64()?;
-            let predicted = r.i32()?;
-            let pour_left = r.i32()?;
-            let mut mem = [0u8; MAX_LATCH];
-            for b in mem.iter_mut() {
-                *b = r.u8()?;
-            }
-            let fired = r.u32()? as usize;
-            let src0 = r.u32()? as usize;
-            let fail_code = r.i32()?;
-            let rg_s = r.i64()?;
-            let rg = r.f64s_vec()?;
-            // Resolve against the shipped table. A key this build does not carry, or a census
-            // ring whose shape no longer matches the definition, means the level itself has
-            // changed since the save: the world is still whole and loads; the experiment cannot
-            // honestly continue and is dropped rather than misjudged.
-            let idx = crate::levels_gen::LEVELS.iter().position(|d| d.key == key);
-            if let Some(idx) = idx {
-                let def = &crate::levels_gen::LEVELS[idx];
-                let rg_def = collect_regions(def);
-                if rg.len() == crate::params::REC_N * rg_def.len() && fired <= def.script.len() {
-                    self.lvl = Lvl {
-                        def: idx as i32,
-                        state,
-                        run,
-                        seen_s,
-                        fail_why: match fail_code {
-                            -1 => "",
-                            -2 => def.timeout_why,
-                            k => def.fail_now.get(k as usize).map_or(def.timeout_why, |f| f.why),
-                        },
-                        predicted,
-                        pour_left,
-                        mem,
-                        fired,
-                        src0,
-                        rg_def,
-                        rg,
-                        rg_s,
-                    };
-                }
-            }
-        }
+        // The observer's memory. It watched the world this one replaces, so none of it carries:
+        // the ring would splice two ponds into one chart, `count` would claim a history the loaded
+        // world never had, and the detectors would narrate the seam ("X is crashing") or stay
+        // silent about the loaded world because the old one already tripped their latches. See
+        // `Observatory::reset_at` for why a plain `reset()` is the wrong half of this.
+        self.obs.reset_at(&self.w.flows);
 
         // Derived state, rebuilt exactly as init_world builds it.
         compile_walls(&mut self.w);
@@ -811,4 +599,257 @@ impl Sim {
         compute_temp(&mut self.w, &self.p);
         Ok(())
     }
+}
+
+/// The reader half of [`Sim::load`], writing into scratch its caller commits. It touches no `Sim`,
+/// which is the point: nothing it writes is visible until it has returned `Ok`.
+fn parse(
+    bytes: &[u8],
+    w: &mut World,
+    p: &mut Params,
+    tr: &mut [Species],
+    lvl: &mut crate::levels::Lvl,
+) -> Result<(), LoadError> {
+    let mut r = Rd::new(bytes);
+    if r.take(4)? != MAGIC {
+        return Err(LoadError("not a Microcosm snapshot (bad magic)".into()));
+    }
+    let ver = r.u32()?;
+    if ver < 1 || ver > VERSION {
+        return Err(LoadError(format!(
+            "format version {}, this build reads 1..={}",
+            ver, VERSION
+        )));
+    }
+    let (maxn, grid, maxloci, nsp) = (r.u32()?, r.u32()?, r.u32()?, r.u32()?);
+    if maxn as usize != MAXN || grid as usize != GRID || maxloci as usize != MAXLOCI {
+        return Err(LoadError(format!(
+            "world shape MAXN={} GRID={} MAXLOCI={} does not match this build ({}, {}, {})",
+            maxn, grid, maxloci, MAXN, GRID, MAXLOCI
+        )));
+    }
+    if nsp as usize != tr.len() {
+        return Err(LoadError(format!(
+            "{} species in the snapshot, {} in this build",
+            nsp,
+            tr.len()
+        )));
+    }
+
+    w.seed = r.i32()?;
+    w.tick = r.i64()?;
+    w.rng.state = r.i32()?;
+    w.n = r.u32()? as usize;
+    w.c_n = r.u32()? as usize;
+    w.added_m = r.f64()?;
+    w.initialized = r.u8()? != 0;
+
+    p.mutation = r.u8()? != 0;
+    p.spawn_decomposers = r.u8()? != 0;
+    p.light_mul = r.f64()?;
+    p.temp_amb = r.f64()?;
+    p.seed = r.i32()?;
+
+    let nt = r.u32()? as usize;
+    if nt != tr.len() {
+        return Err(LoadError("locus table length mismatch".into()));
+    }
+    for sp in 0..nt {
+        let nl = r.u32()? as usize;
+        if nl != tr[sp].loci.len() {
+            return Err(LoadError(format!(
+                "species {} has {} loci in the snapshot, {} in this build",
+                sp,
+                nl,
+                tr[sp].loci.len()
+            )));
+        }
+        for k in 0..nl {
+            let l = &mut tr[sp].loci[k];
+            l.g0 = r.f64()?;
+            l.sigma = r.f64()?;
+            l.curve = r.f64()?;
+            l.esc_slope = r.f64()?;
+            l.kp_slope = r.f64()?;
+            l.catch_slope = r.f64()?;
+            l.kb_slope = r.f64()?;
+            l.light_slope = r.f64()?;
+            l.rate_slope = r.f64()?;
+            l.eff_slope = r.f64()?;
+            l.warm_slope = r.f64()?;
+            l.warm_gain_slope = r.f64()?;
+            l.tpref_span = r.f64()?;
+            l.damp_span = r.f64()?;
+            l.pc_speed_slope = r.f64()?;
+            l.pc_turn_slope = r.f64()?;
+            l.tumble_slope = r.f64()?;
+        }
+        tr[sp].thermo = r.f64()?;
+        tr[sp].topt = r.f64()?;
+        tr[sp].ctmax = r.f64()?;
+    }
+
+    {
+        let s = &mut *w;
+        r.f32s_into(&mut s.x, "x")?;
+        r.f32s_into(&mut s.y, "y")?;
+        r.f32s_into(&mut s.px, "px")?;
+        r.f32s_into(&mut s.py, "py")?;
+        r.f32s_into(&mut s.vx, "vx")?;
+        r.f32s_into(&mut s.vy, "vy")?;
+        r.f32s_into(&mut s.en, "en")?;
+        r.f32s_into(&mut s.sz, "sz")?;
+        r.f64s_into(&mut s.sz_pow, "szPow")?;
+        r.u8s_into(&mut s.sp, "sp")?;
+        r.u8s_into(&mut s.alive, "alive")?;
+        r.u8s_into(&mut s.cy, "cy")?;
+        r.f32s_into(&mut s.hd, "hd")?;
+        r.f32s_into(&mut s.mn, "mn")?;
+        r.f32s_into(&mut s.pr, "pr")?;
+        r.f32s_into(&mut s.mem, "mem")?;
+        r.i16s_into(&mut s.handle, "handle")?;
+        r.i16s_into(&mut s.cd, "cd")?;
+        r.i16s_into(&mut s.gr, "gr")?;
+        r.i16s_into(&mut s.flee, "flee")?;
+        r.i16s_into(&mut s.bst, "bst")?;
+        r.i16s_into(&mut s.pc, "pc")?;
+        r.f32s_into(&mut s.g, "g")?;
+        r.u16s_into(&mut s.lg, "lg")?;
+        r.u16s_into(&mut s.gen, "gen")?;
+        r.i32s_into(&mut s.birth, "birth")?;
+        s.free_list = r.usizes()?;
+
+        r.f32s_into(&mut s.m, "M")?;
+        r.f32s_into(&mut s.d_e, "dE")?;
+        r.f32s_into(&mut s.d_p, "dP")?;
+        r.f32s_into(&mut s.d_m, "dM")?;
+        r.f32s_into(&mut s.sc, "sc")?;
+        r.f32s_into(&mut s.al, "al")?;
+
+        r.u8s_into(&mut s.c_alive, "cAlive")?;
+        r.u8s_into(&mut s.c_sp, "cSp")?;
+        r.f32s_into(&mut s.c_x, "cX")?;
+        r.f32s_into(&mut s.c_y, "cY")?;
+        r.f32s_into(&mut s.c_e, "cE")?;
+        r.f32s_into(&mut s.c_p, "cP")?;
+        r.f32s_into(&mut s.c_m, "cM")?;
+        r.f32s_into(&mut s.c_sz, "cSz")?;
+        s.c_free = r.usizes()?;
+
+        let ns = r.u32()? as usize;
+        s.sources.clear();
+        for _ in 0..ns {
+            s.sources.push(Source {
+                x: r.f64()?,
+                y: r.f64()?,
+                i: r.f64()?,
+                a: r.f64()?,
+                sigma: r.f64()?,
+            });
+        }
+        let nw = r.u32()? as usize;
+        s.walls.clear();
+        for _ in 0..nw {
+            let spec = WallSpec {
+                x0: r.f64()?,
+                y0: r.f64()?,
+                dx: r.f64()?,
+                dy: r.f64()?,
+                lt: r.f64()?,
+                ht: r.f64()?,
+                fl: r.f64()?,
+                pass: r.i32()?,
+            };
+            // The stored stroke is already corner-snapped, so re-rasterizing reproduces the
+            // same staircase — the face planes are derived, never stored.
+            if let Some(wl) = make_wall(&spec) {
+                s.walls.push(wl);
+            }
+        }
+
+        let f = &mut s.flows;
+        f.uptake = r.f64()?;
+        f.release = r.f64()?;
+        f.excrete = r.f64()?;
+        f.transfer = r.f64()?;
+        f.egest_e = r.f64()?;
+        f.egest_p = r.f64()?;
+        f.leach_m = r.f64()?;
+        f.corpse_to_det = r.f64()?;
+        f.bac_release = r.f64()?;
+        f.gpp = r.f64()?;
+        f.resp = r.f64()?;
+        f.deaths = r.f64()?;
+        for i in 0..7 {
+            f.deaths_by[i] = r.f64()?;
+        }
+
+        let nlog = r.u32()? as usize;
+        s.event_log.clear();
+        for _ in 0..nlog {
+            let t = r.i64()?;
+            let ev = read_event(&mut r)?;
+            s.event_log.push(LoggedEvent { t, ev });
+        }
+        s.events.clear();
+    }
+
+    // The running experiment (version 2). Whatever level THIS session was in ends here: its
+    // verdicts would judge the loaded world against a run it never had. A version-1 file, or
+    // one saved outside a level, therefore loads into the sandbox.
+    *lvl = crate::levels::Lvl::default();
+    if ver >= 2 && r.u8()? != 0 {
+        use crate::levels::{collect_regions, Lvl, LvlState, MAX_LATCH};
+        let key = String::from_utf8_lossy(&r.bytes_vec()?).into_owned();
+        let state = match r.u8()? {
+            1 => LvlState::Running,
+            2 => LvlState::Passed,
+            3 => LvlState::Failed,
+            t => return Err(LoadError(format!("level: unknown state {}", t))),
+        };
+        let run = r.i32()?;
+        let seen_s = r.i64()?;
+        let predicted = r.i32()?;
+        let pour_left = r.i32()?;
+        let mut mem = [0u8; MAX_LATCH];
+        for b in mem.iter_mut() {
+            *b = r.u8()?;
+        }
+        let fired = r.u32()? as usize;
+        let src0 = r.u32()? as usize;
+        let fail_code = r.i32()?;
+        let rg_s = r.i64()?;
+        let rg = r.f64s_vec()?;
+        // Resolve against the shipped table. A key this build does not carry, or a census
+        // ring whose shape no longer matches the definition, means the level itself has
+        // changed since the save: the world is still whole and loads; the experiment cannot
+        // honestly continue and is dropped rather than misjudged.
+        let idx = crate::levels_gen::LEVELS.iter().position(|d| d.key == key);
+        if let Some(idx) = idx {
+            let def = &crate::levels_gen::LEVELS[idx];
+            let rg_def = collect_regions(def);
+            if rg.len() == crate::params::REC_N * rg_def.len() && fired <= def.script.len() {
+                *lvl = Lvl {
+                    def: idx as i32,
+                    state,
+                    run,
+                    seen_s,
+                    fail_why: match fail_code {
+                        -1 => "",
+                        -2 => def.timeout_why,
+                        k => def.fail_now.get(k as usize).map_or(def.timeout_why, |f| f.why),
+                    },
+                    predicted,
+                    pour_left,
+                    mem,
+                    fired,
+                    src0,
+                    rg_def,
+                    rg,
+                    rg_s,
+                };
+            }
+        }
+    }
+    Ok(())
 }

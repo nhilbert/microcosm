@@ -18,7 +18,7 @@ use crate::fields::js_round;
 use crate::math;
 use crate::params::*;
 use crate::traits::{Movement, Registry, Species};
-use crate::world::{cell_at, wd, World};
+use crate::world::{cell_at, wd, Flows, World};
 
 /// Establishment thresholds per species.
 const DET_ESTAB: [f64; 7] = [40.0, 40.0, 20.0, 80.0, 10.0, 4.0, 4.0];
@@ -182,6 +182,34 @@ impl Observatory {
         self.mv.ok.iter_mut().for_each(|v| *v = 0);
         self.mv.tick = -1;
         self.prev = RecPrev::default();
+    }
+
+    /// Cleared by `Sim::load`, for a world that arrived rather than was founded.
+    ///
+    /// Everything the observer remembers belongs to the world it watched, and after a load that is
+    /// a DIFFERENT world: the ring's samples, `count`, the detector latches, the movement memory
+    /// and `prev` are all about a pond that is gone. So this clears the lot, exactly as `reset`
+    /// does — and then does the one thing `reset` must not.
+    ///
+    /// `init_world` can leave `prev` at zero because it zeroes `w.flows` in the same breath. A load
+    /// cannot: it has just restored `flows` to the LOADED world's LIFETIME totals, and the delta
+    /// channels are `flows - prev`. A zeroed `prev` would therefore make the first post-load sample
+    /// the whole lifetime total dressed as a per-sample rate — a spike that dominates the axis and
+    /// flattens every honest sample after it. Seeding `prev` from the flows the load just restored
+    /// makes that first sample measure from the load point, which is the only thing it can honestly
+    /// claim to know.
+    pub fn reset_at(&mut self, f: &Flows) {
+        self.reset();
+        self.prev = RecPrev {
+            uptake: f.uptake,
+            gpp: f.gpp,
+            resp: f.resp,
+            bac_release: f.bac_release,
+            corpse_to_det: f.corpse_to_det,
+            egest_e: f.egest_e,
+            deaths: f.deaths,
+            deaths_by: f.deaths_by,
+        };
     }
 
     #[inline]
