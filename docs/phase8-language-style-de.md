@@ -74,11 +74,12 @@ Ein Ding, ein Name — in jedem Satz derselbe. Die Sitzung vom 2026-09-01 hat en
 
 | englisch (Kern) | deutsch | Anmerkung |
 |---|---|---|
-| mat | die **Algenmatte**, danach kurz „die Matte" | Erstnennung pro Level voll; solo eingeführt klang „die Matte" nach Turnhalle. L1–L3-Register |
-| meadow | die Wiese | Solaras zweites Bild, L4–L6-Register (die ausgebreitete, gesunde Form) |
-| bloom | die Blüte | |
+| mat | der **Algenteppich**, immer voll | Owner-Entscheid 2026-09-05: löst „die Algenmatte / die Matte" ab. Kein Kurzwort — solo klänge „der Teppich" nach Fußboden, wie „die Matte" nach Turnhalle klang. L1–L3-Register |
+| meadow | **der Algenteppich** (kein zweites Bild mehr) | Bis 2026-09-05 „die Wiese" (L4–L6). Der Owner las die Wiese als Plankton — zwei Namen für ein Ding sind eine Falle, nicht ein Register. Englisch behält „meadow" vorerst |
+| bloom | die **Planktonblüte** | Fachwort (Plankton-/Algenblüte); solo „die Blüte" liest sich als Pflanzenblüte. Nicht „Schwarm": Schwärme bilden Tiere, Drifta ist eine Alge (Owner, 2026-09-05) |
 | plankton | das Plankton | |
 | poor water | mageres Wasser | nie „armes Wasser" (klingt nach Mitleid) |
+| decomposer / recycler | der **Zersetzer** | nie „Recycler" (2026-09-05: stand dreimal neben „Zersetzer" für denselben Job) |
 | richer (Leben) | voller / ein vollerer Teich | „reich" bleibt Stofflichem vorbehalten |
 | energy income | die Energiequelle | die englische Konto-Metapher (income/earn/spend) stirbt im Deutschen: verbrauchen / bekommen / „Energie kommt aus dem Licht" |
 | grazer / eater | der **Planktonfresser** | nie „Fresser" solo (klingt grob), nie „Räuber" (kollidiert mit dem Jäger — L6 braucht zwei klar getrennte Stufen) |
@@ -223,7 +224,7 @@ dieser Abweisungen war berechtigt.
 - **„schaue"**: Die Langform-Regel macht aus „schau zu" ein „schaue zu" — das klingt
   m. E. gespreizt. Angewendet wie entschieden; ein Wort vom Owner dreht es zurück.
 - **narration.xml**: Die 19 Narrations-Templates und das Merkmals-Vokabular sind noch
-  nicht gegen §2b/§3 durchgesehen (dort könnte „Matte" solo oder ein Kalk stehen) —
+  nicht gegen §2b/§3 durchgesehen (dort könnte noch „Matte" oder ein Kalk stehen) —
   eigener Durchgang, mit GermanTest als Netz.
 - **Titel-/Untertitel-Budgets**: §4 (EN) verlangt Titel 2–4 Wörter, Untertitel ≤ 5 —
   ungeprüft in beiden Sprachen, und die *englische* L6 („A Head Full of Hunters", 5) und

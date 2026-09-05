@@ -15,6 +15,7 @@ A mobile-first ecosystem sandbox in which artificial organisms live, eat, reprod
 - `harness/lib.js` — shared primitives every harness and experiment builds on (`pops`, `auditM`, `locusStats`, `start`, `pin`, `coreCollapsed`, cycle estimators). `MC_CORE=<path>` points it at another build (historical cores, ports). `harness/selftest.js` checks the estimators on synthetic series — it runs inside `npm test`, and it caught a period estimator that returned a quarter period.
 - `harness/fingerprint-frame.js` — the M5.1 frame gate: the visual grammar (sprite bucket table, display list, pixel fields, glow and wall lists) compared bit for bit between `src/ui-render.js` and the Rust frame builder; inside `port:check`. `harness/render-smoke.js` — the painting path driven against a canvas stub (runs, and touches the canvas); in `npm test` and CI. Neither can say the frame *looks* right: no screen exists in CI.
 - `harness/starts.js` — the Phase 9 start-world instrument and gate. `npm run starts` is the acceptance run (every start world, 8 seeds x 18,000 ticks, held to the criterion its row declares); `npm run starts:check` is the fast pair that ships in `test:port` and CI — the identity gates (`pond` composes nothing, so it must still be the shipped world bit for bit; every start the crate founds must equal the same start composed out of ordinary events) plus the `still` criterion. `npm run starts:sweep <key>` is the calibration instrument. Record and the sweeps behind every number: docs/phase9-starts.md.
+- `harness/nulls.js` — the null-run truth table (`npm run levels:nulls`, 2026-09-05): every level's meters over the untouched run, printed beside its briefing. Not a gate — the instrument to read BEFORE writing or translating any text that describes what happens when the player does nothing (L1 said "starves" over a run its own table recorded as 14/21/55).
 - `harness/levels.js` — the Phase 8 honesty gate (`npm run levels`, in `test:full`): every shipped level must FAIL untouched, PASS on its taught strategy, and FAIL on a plausible wrong lever. A level that cannot clear all three is a demonstration, not a challenge, and does not ship. Takes `MC_CORE`, so it runs on the ported core too (`npm run port:levels`, in `test:port` and CI). `harness/fingerprint-levels.js` covers what the gate cannot: the apparatus gates, pour budget, meters, narration and restart — inside `port:check`.
 - `android-app/.../DataView.kt` (the drawn Data pages), `DataPages.kt` (Vitals and Events as built views and styled text), `DataPageTest.kt` (the page gate: six pages, two languages, photographed on a real world). The Data screen's design pass is U3 in docs/status-log.md; the chart tokens live in `Style.kt`.
 - `harness/playthrough.js` — the §6-step-6 instrument, promoted (2026-09-01): scripted full-speed level runs through the REAL browser UI (start screen → prediction → gestures → verdict → retry), `npm run play`. Needs a Chromium + playwright-core, so it is a bench instrument outside npm test/CI; run it before a level ships and after UI surgery. Its first run convicted the reset→chips crash no other gate could see. Levels earn scripted paths as they ship (PLAYS table).
@@ -93,7 +94,12 @@ streams — the gate convicted raw-stream pins twice, and that is now the standi
 rule. Experiments save (snapshot v2 carries the level runtime). Player text
 obeys `docs/phase8-language-style.md` and, in German,
 `docs/phase8-language-style-de.md`; both are enforced by `harness/prose.js` and
-`harness/prose-app.js` in `npm test` and in CI. The one exception is the help
+`harness/prose-app.js` in `npm test` and in CI. Two things no gate reads (learned
+2026-09-05, L1): whether the prose matches the null run's measured trajectory, and
+whether the taught move is reachable through the level's own apparatus in the APP —
+`apparatus.sources:false` hid the app's only sun lever inside L1 while the gate, which
+injects `lightMul` straight into the core, stayed green. Check both by hand until the
+queued harness exists (status log, last entry). The one exception is the help
 page: `help_*` keys run in the **reference register** — the science may be
 named, the clause caps still hold (style guide §11 / de §9).
 
