@@ -130,3 +130,39 @@ The project's meta-lesson, worth carrying into every future phase: the instrumen
   **The gate, and the counterproof that made it worth having.** `bin/snapshot.rs` grew two sections. Section 7 checks both load paths — into a fresh core and over a running 4,000-tick world — with the strongest bar available: since the world state after a load is already proved bit-identical, the first post-load delta sample must EQUAL the uninterrupted run's sample at the same tick, to the bit; beside it the plainer claim, that a 20-tick stride is not a quarter of a 1,200-tick world's lifetime total and no cumulative counter runs backwards, plus an empty ring, `count` and `sys_events`, and a net-step channel silent across the seam and back on the next sample. Section 4 (refusals) grew the other half of its own claim: the live world survives, unchanged to the state hash, through a corrupt magic, a half file and a file truncated by ONE byte — the failure that gets furthest into the stream — and still steps identically to a world that was never touched. Both failure modes were run against the gate before it was trusted: with no fix it convicts twelve delta channels on both paths, the un-cleared ring (count=200, 13 events) and the negative net step; with `obs.reset()` alone the ring and net-step rows go GREEN while the same twelve delta channels stay wrong — the reassuring half-fix, caught. Two honesties about the gate itself: the ring and net-step rows are vacuous on the fresh-core path (a new `Sim` has an empty observer anyway), and nothing here can say the app's chart LOOKS right.
   Battery: `npm test` PASS (conformance bit-identical — `dist/core.js` is untouched; the frozen oracle has no save/load to fork from, rule 11); `npm run test:port` PASS end to end, including the extended snapshot gate, `port:check`, the K6 gate and the levels gate on the WASM core; app suite 20/20. `conform:core` printed the expected NOTE — source hash `d44a6ee` -> `516dafb`, all four fingerprints identical — and was recaptured on that declared reason: the observer's memory after a load changed, the world did not. Recaptured a **second** time on the merge into main, for the same declared reason plus main's own `starts.rs`: the merged tree is a hash (`991b346`) that neither side carried, and the four fingerprints are identical across both changes together — the sum of two behaviour-neutral edits is still behaviour-neutral, but only a measurement may say so.
   One gate-hygiene note for later, not fixed here: `SpriteSheetTest` does not skip when the host `libmicrocosm.so` is missing, it fails with `UnsatisfiedLinkError`, while its eight neighbours skip with a build instruction.
+
+- **The app has an icon (2026-09-05, owner choice)**: Microcosm shipped for its whole life with
+  the stock Android robot — the manifest declared no `android:icon` at all, and nothing in this
+  repository had ever looked at the home screen. It has an adaptive icon now, drawn as vector XML
+  (no bitmaps: minSdk is 26, so every device takes the adaptive one and the whole icon costs the
+  APK a few hundred bytes).
+  **What it is.** THE ROUND: one circle broken into three unequal arcs in the colours the core's
+  bucket table gives the three hands matter passes through — Solara green takes the mineral up,
+  Cilio purple eats the alga, Bacillus olive releases it again — with a pale grain sitting in the
+  widest gap, mid-flight from the decomposer back to the alga. The gaps are the handovers. It
+  states the world's deepest rule (nothing is created, nothing is lost) rather than picturing a
+  creature, and it carries no amber: rule 7 gives amber to the player's hand, so it may not appear
+  in the world's own imagery. The ground is the lit pool, its colours read off the app's own
+  photograph of the `still` start world, one step quieter than the photograph because the ring in
+  front of it has to carry the icon alone.
+  **How it was chosen.** Three rounds, all decided by looking. The first drew the app's actual
+  bodies (Sprites' teardrop, the fringe, the food vacuoles) and was rejected as too literal; the
+  second abstracted them; the third, run through the `logo-designer` skill the owner pointed at
+  (five concepts, then five refinements of the chosen one, each a parallel agent, previewed
+  masked at 96/64/48 px), produced the mark that shipped: the bare round plus the speck the
+  bold-and-bare variant had dropped. The record — five concepts, five iterations, and the
+  reasoning — is docs/icon-concepts/.
+  **Three failure modes the pictures convicted**, none of which reasoning had predicted: the
+  FACE (a pale curve under two bright dots is a smile at 48 px — the app's own oral groove and
+  its two vacuoles produced one on three proposals in a row), the EYE (a ring around a single
+  centred mark; it caught the fringe concept, the first themed layer, and a whole iteration), and
+  the GEAR (evenly spaced bristles of equal length; unevenness and a curve along the beat fix it).
+  **The gate.** `IconTest` is the home screen's, in the shape the other picture gates take. It
+  photographs the icon at 432/192/96/48 px and the themed layer into `build/reports/screens/` so a
+  human can judge it, and asserts the two things an eye is bad at: every opaque foreground pixel
+  stays inside the 66 dp safe circle (measured — the ring's outer edge stands at 30.5 of 33), and
+  the `monochrome` layer exists and covers a silhouette's share of the canvas rather than a tile's.
+  A missing themed layer is otherwise silent — the phone just keeps showing the colour icon. It
+  runs inside `testReleaseUnitTest`, so CI already carries it.
+  Core untouched; `npm test` unaffected. What no gate here can say is whether the icon looks right
+  on the owner's home screen among its neighbours.

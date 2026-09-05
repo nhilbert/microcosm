@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The themed-icon layer (Android 13+): the same round, minus the one thing the system throws away.
+  It tints the alpha in the wallpaper's colour, so the three hands stop being three species and
+  become three strokes — which is why the speck stays: without it the mark is just a broken ring,
+  and the grain in the gap is what says something is being passed.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+
+  <path android:strokeColor="#FFFFFFFF" android:strokeWidth="10" android:strokeLineCap="round" android:fillColor="#00000000"
+      android:pathData="M75.14,39.74A25.5,25.5 0 0 1 61.03,78.51"/>
+  <path android:strokeColor="#FFFFFFFF" android:strokeWidth="9.2" android:strokeLineCap="round" android:fillColor="#00000000"
+      android:pathData="M46.12,78.25A25.5,25.5 0 0 1 28.64,51.33"/>
+  <path android:strokeColor="#FFFFFFFF" android:strokeWidth="8.4" android:strokeLineCap="round" android:fillColor="#00000000"
+      android:pathData="M36.29,35.66A25.5,25.5 0 0 1 56.67,28.64"/>
+
+  <path android:fillColor="#FFFFFFFF" android:pathData="M65.77,31.38m-3.35,0a3.35,3.35 0 1 0 6.7,0a3.35,3.35 0 1 0 -6.7,0z"/>
+</vector>

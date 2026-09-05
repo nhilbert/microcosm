@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- The membrane of one tilted cell is the closed round of matter: three arcs — alga green, grazer purple, decomposer olive — with a single cyan grain of mineral inside, off centre. -->
+  <defs>
+    <radialGradient id="litPool" cx="46%" cy="42%" r="62%">
+      <stop offset="0%"   stop-color="#3F5D7B"/>
+      <stop offset="38%"  stop-color="#24415C"/>
+      <stop offset="70%"  stop-color="#16273A"/>
+      <stop offset="100%" stop-color="#0B131E"/>
+    </radialGradient>
+    <radialGradient id="cellBody" cx="42%" cy="38%" r="70%">
+      <stop offset="0%"   stop-color="#24415C"/>
+      <stop offset="100%" stop-color="#101B28"/>
+    </radialGradient>
+  </defs>
+
+  <g id="icon">
+    <!-- ground: abyss, then the lit pool -->
+    <rect x="0" y="0" width="512" height="512" fill="#0B131E"/>
+    <rect x="0" y="0" width="512" height="512" fill="url(#litPool)"/>
+
+    <!-- the cell: a circle of r=128 squashed and tilted about the centre -->
+    <g transform="translate(256,256) rotate(-20) scale(1,0.68)">
+      <circle cx="0" cy="0" r="128" fill="url(#cellBody)" opacity="0.85"/>
+      <g fill="none" stroke-width="30" stroke-linecap="butt">
+        <!-- alga: mineral taken up -->
+        <path d="M 128 0 A 128 128 0 0 1 -35.28 123.04" stroke="#46D68C"/>
+        <!-- grazer: mineral eaten on -->
+        <path d="M -64 110.85 A 128 128 0 0 1 -88.92 -92.08" stroke="#D7A6E8"/>
+        <!-- decomposer: mineral returned -->
+        <path d="M -64 -110.85 A 128 128 0 0 1 124.20 -30.97" stroke="#9EA868"/>
+      </g>
+    </g>
+
+    <!-- the one grain of mineral in transit, off centre -->
+    <circle cx="297" cy="241" r="27" fill="#5BC8E8"/>
+  </g>
+</svg>
