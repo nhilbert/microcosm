@@ -12,6 +12,10 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
   const actionsRef = useRef({});
   const speedRef = useRef(1); // 0 = paused, 1, 4, 16
   const fabLong = useRef(null);
+  // The sun slider's drag: the value it started from, and the quiet timer that decides the drag
+  // is over. One Events entry and one undo per drag, measured from where the hand began — the
+  // per-step `prev` it compared against before could never differ by more than one step.
+  const sunDrag = useRef({ start: undefined, timer: null });
   const dragRef = useRef(null);
   const [hidden, setHidden] = useState([false,false,false,false,false,false,false,false,false,false]); // per-species show/hide (view only); 7 = debris, 8 = light layer, 9 = heat layer
   const hiddenRef = useRef(hidden); hiddenRef.current = hidden;
@@ -312,7 +316,9 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
         const [a,b]=[...pointers.values()];
         a.moved = b.moved = true;
         for (const q of [a,b]){ if (q.lt){ clearTimeout(q.lt); q.lt = null; } q.louping = false; }
-        loupe = null; wallDrag = null; // a second finger means pinch, not a wall stroke
+        // a second finger means pinch: not a wall stroke, and not a sun drag either — the first
+        // finger's grip used to survive here and log "moved the sun" on the pinch's last release
+        loupe = null; wallDrag = null; srcDrag = null;
         pinch = { d: Math.hypot(a.x-b.x, a.y-b.y), z: cam.z };
       } };
     const onMove = e => {
@@ -668,12 +674,16 @@ function Microcosm({ onExit, onLevel }){ // app shell (start screen, level flow)
           <input type="range" min="0.4" max="1.6" step="0.05" value={ui.lightMul}
             onChange={e => { const v = +e.target.value;
               setUi(u2 => ({ ...u2, lightMul: v }));
-              queueEvent({ type:"lightMul", v, done: s => {
-                if (Math.abs(s.prev - v) > 0.24) W.evLog.push({ tick: W.tick, type: "sunlight" });
-                if (Math.abs(s.prev - v) > 0.24)
-                  actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt("Changed the sun · Undo",
-                    () => queueEvent({ type:"lightMul", v: s.prev }));
-              }});
+              const d = sunDrag.current;
+              if (d.start === undefined) d.start = P.lightMul;
+              queueEvent({ type:"lightMul", v });
+              clearTimeout(d.timer);
+              d.timer = setTimeout(() => { const prev = d.start; d.start = undefined;
+                if (prev === undefined || Math.abs(prev - v) < 1e-9) return;
+                W.evLog.push({ tick: W.tick, type: "sunlight" });
+                actionsRef.current.pushUndoExt && actionsRef.current.pushUndoExt("Changed the sun · Undo",
+                  () => queueEvent({ type:"lightMul", v: prev }));
+              }, 700);
             }}
             style={{ width: 130, accentColor: "#F2B24A" }} />
           </div>

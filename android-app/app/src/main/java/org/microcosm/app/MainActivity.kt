@@ -1498,7 +1498,9 @@ class MainActivity : Activity() {
             // away everything since the last autosave — so only an experiment's exit reloads.
             if (wasExperiment) {
                 val pond = try { autosaveFile().readFully() } catch (e: Exception) { null }
-                if (pond != null) world.load(pond) {}
+                // A refused pond (the file is corrupt) must not leave the player "in the sandbox"
+                // on the stopped experiment's world, which the next pause would autosave over it.
+                if (pond != null) world.load(pond) { ok -> if (!ok) world.resetWorld(kotlin.random.Random.nextInt(1, 100000)) }
                 else world.resetWorld(kotlin.random.Random.nextInt(1, 100000))
             }
         } else {
