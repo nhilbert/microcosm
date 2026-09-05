@@ -131,9 +131,9 @@ object Help {
         // the list itself, so the citations stand together and not only under their own card
         for ((k, key) in ORDER.withIndex()) {
             val src = sources.getOrNull(k) ?: continue
-            val sp = (0 until 7).firstOrNull { Native.traitText(it, 0).lowercase() == key }
+            val sp = (0 until 7).firstOrNull { Species.name(it).lowercase() == key }
             body.addView(TextView(ctx).apply {
-                text = "${if (sp != null) Native.traitText(sp, 0) else key}  ·  $src"
+                text = "${if (sp != null) Species.name(sp) else key}  ·  $src"
                 setTextColor(Style.TEXT)
                 textSize = 12f
                 typeface = Style.mono(ctx)
@@ -192,21 +192,13 @@ object Help {
      * A species' IDENTITY colour: the middle bucket of both dials, which is the genotype the
      * world was founded with. Bucket (0,0) is a RAIL of the tint dial, not the species — asking
      * for it paints Bacillus's olive as rust, which is what the first draft of the diagram did.
-     * The dials are genotype; only their middle is identity.
+     * The rule now lives in `Species`, where the rest of the chrome reads it too.
      */
-    private fun identity(sp: Int): Int {
-        val tb = (Native.grammarNum(sp, 4).toInt().coerceAtLeast(1)) / 2
-        val mb = (Native.grammarNum(sp, 5).toInt().coerceAtLeast(1)) / 2
-        return Color.rgb(
-            Native.specNum(sp, tb, mb, 0).toInt(),
-            Native.specNum(sp, tb, mb, 1).toInt(),
-            Native.specNum(sp, tb, mb, 2).toInt(),
-        )
-    }
+    private fun identity(sp: Int): Int = Species.colour(sp)
 
     private fun speciesCard(ctx: Context, key: String, real: String?, source: String?): View {
-        val sp = (0 until 7).firstOrNull { Native.traitText(it, 0).lowercase() == key }
-        val name = if (sp != null) Native.traitText(sp, 0) else key
+        val sp = (0 until 7).firstOrNull { Species.name(it).lowercase() == key }
+        val name = if (sp != null) Species.name(sp) else key
         val colour = if (sp != null) identity(sp) else Style.DIM
 
         return LinearLayout(ctx).apply {
@@ -333,7 +325,7 @@ object Help {
         private fun speciesColour(sp: Int) = identity(sp)
 
         private fun idOf(name: String) =
-            (0 until 7).firstOrNull { Native.traitText(it, 0).lowercase() == name }
+            (0 until 7).firstOrNull { Species.name(it).lowercase() == name }
 
         override fun onDraw(c: Canvas) {
             val w = width.toFloat()
@@ -388,7 +380,7 @@ object Help {
             // the return leg's walker, set outside its own arc and nowhere near a station
             val la = Math.PI * 1.25 // the midpoint of the remains -> water quarter
             small.color = crew
-            c.drawText(idOf("bacillus")?.let { Native.traitText(it, 0) } ?: "",
+            c.drawText(idOf("bacillus")?.let { Species.name(it) } ?: "",
                 cx + (cos(la) * (r + 22f * dp)).toFloat(),
                 cy + (sin(la) * (r + 22f * dp)).toFloat() + 4f * dp, small)
         }

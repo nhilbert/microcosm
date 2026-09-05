@@ -586,6 +586,17 @@ impl Sim {
         self.tr = tr;
         self.lvl = lvl;
 
+        // The player's hand belongs to the world it touched. The undo slot names an organism by
+        // (slot, generation) or a corpse by slot in the OLD pool — applied here it would revive a
+        // stranger, and `Undo::Kill` would spend a draw the loaded stream never spent. The
+        // intervention log's ticks belong to the old clock, so the impact cards would judge this
+        // world against moves nobody made in it. The pick candidates index the old pool too.
+        // `start_apply` clears the first two for the same reason (starts.rs); `initWorld` in the
+        // JS shell clears `W.evLog` on every founding.
+        self.undo = crate::events::Undo::None;
+        self.iv_log.clear();
+        self.frame.cand.clear();
+
         // The observer's memory. It watched the world this one replaces, so none of it carries:
         // the ring would splice two ponds into one chart, `count` would claim a history the loaded
         // world never had, and the detectors would narrate the seam ("X is crashing") or stay

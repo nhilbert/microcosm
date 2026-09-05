@@ -520,6 +520,13 @@ impl Sim {
             rg,
             rg_s: 0,
         };
+        // The level's founding is not the player's last move: the light it set above is the
+        // world's starting sun, not a lever to put back (an undo here would hand L1 full sun),
+        // and whatever the player did in the pond before opening the ladder stays in the pond.
+        // Same reasoning, same two lines, as `start_apply` (starts.rs) and `Sim::load`.
+        self.undo = crate::events::Undo::None;
+        self.iv_log.clear();
+        self.frame.cand.clear();
     }
 
     pub fn level_restart(&mut self) {

@@ -158,7 +158,7 @@ class MainActivity : Activity() {
     private val ui = Handler(Looper.getMainLooper())
 
     /** The species actually in play, asked of the core rather than listed here. */
-    private val live by lazy { (0 until 7).filter { Native.speciesFlag(it, 0) != 0 } }
+    private val live: List<Int> get() = Species.live
 
     /** Developer instrumentation on the player's screen? Off unless asked for (U0.7). */
     private var devMode = false
@@ -273,7 +273,7 @@ class MainActivity : Activity() {
                 dialWrap.requestLayout(); menuFab.requestLayout(); centerChips.requestLayout()
             }
             if (snap != null) {
-                specimenName.text = Native.traitText(snap.sp, 0) +
+                specimenName.text = Species.name(snap.sp) +
                     if (snap.dormant) "  · " + getString(R.string.specimen_dormant) else ""
                 (specimenDot.background as android.graphics.drawable.GradientDrawable)
                     .setColor(speciesColor(snap.sp))
@@ -318,6 +318,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Native.boot() // before anything asks the core for a name or a flag
+        Species.load() // the names, flags and colours: read once, here, before the render thread exists
         L10n.init(this) // the display language, before anything shows the core's words (DE.4)
         // GR.7: the microscope the player last chose, read BEFORE the render thread bakes its
         // first bodies — the bake depends on the ground they will land on.
@@ -818,7 +819,7 @@ class MainActivity : Activity() {
                 }, LinearLayout.LayoutParams(Style.dp(this@MainActivity, 8f), Style.dp(this@MainActivity, 8f))
                     .apply { rightMargin = Style.dp(this@MainActivity, 7f) })
                 addView(TextView(this@MainActivity).apply {
-                    text = Native.traitText(sp, 0)
+                    text = Species.name(sp)
                     textSize = 13f
                     typeface = Style.word(this@MainActivity)
                     setTextColor(Style.TEXT)
@@ -1146,13 +1147,9 @@ class MainActivity : Activity() {
     }
 
     /** The species' own colour, from the core's bucket table — never a second palette here. */
-    private fun speciesColor(sp: Int) = Color.rgb(
-        Native.specNum(sp, 0, 0, 0).toInt(),
-        Native.specNum(sp, 0, 0, 1).toInt(),
-        Native.specNum(sp, 0, 0, 2).toInt(),
-    )
+    private fun speciesColor(sp: Int) = Species.colour(sp)
 
-    private fun shortName(sp: Int) = Native.traitText(sp, 0).take(3)
+    private fun shortName(sp: Int) = Species.name(sp).take(3)
 
     /**
      * Save and load — the feature the whole port was for.
@@ -1380,12 +1377,11 @@ class MainActivity : Activity() {
             Triple("Drifta", 0.70f to 0.30f, 0.13f),
             Triple("Solara", 0.33f to 0.73f, 0.10f),
         )
-        val byName = live.associateBy { Native.traitText(it, 0) }
+        val byName = live.associateBy { Species.name(it) }
         return spots.mapNotNull { (name, at, r) ->
             val sp = byName[name] ?: return@mapNotNull null
             OpticSwatch.Body(
-                intArrayOf(Native.specNum(sp, 0, 0, 0).toInt(), Native.specNum(sp, 0, 0, 1).toInt(),
-                    Native.specNum(sp, 0, 0, 2).toInt()),
+                Species.colour(sp).let { intArrayOf(Color.red(it), Color.green(it), Color.blue(it)) },
                 at.first, at.second, r,
             )
         }
@@ -1634,7 +1630,7 @@ class MainActivity : Activity() {
                 else world.series?.let {
                     dataView.submit(it, world.seriesN,
                         IntArray(7) { sp -> speciesColor(sp) },
-                        Array(7) { sp -> Native.traitText(sp, 0) })
+                        Array(7) { sp -> Species.name(sp) })
                 }
             }
             vitals -> healthPanel.bind(world.healthReport)
@@ -1797,7 +1793,7 @@ class MainActivity : Activity() {
                     }, LinearLayout.LayoutParams(Style.dp(this@MainActivity, 12f),
                         Style.dp(this@MainActivity, 12f)).apply { marginEnd = Style.dp(this@MainActivity, 12f) })
                     addView(TextView(this@MainActivity).apply {
-                        text = Native.traitText(sp, 0)
+                        text = Species.name(sp)
                         textSize = 15f
                         typeface = Style.word(this@MainActivity)
                         setTextColor(Style.TEXT)
@@ -1902,7 +1898,7 @@ class MainActivity : Activity() {
     /** Names the thing that would be put back, in the world's own words. Kinds 1–3 take a name. */
     private fun undoLabel(kind: Int, sp: Int): String {
         val t = undoLabels.getOrElse(kind) { undoLabels[0] }
-        return if (kind in 1..3) t.format(if (sp >= 0) Native.traitText(sp, 0) else "") else t
+        return if (kind in 1..3) t.format(if (sp >= 0) Species.name(sp) else "") else t
     }
 
     private fun button(label: String, onTap: () -> Unit) = Chrome.button(this, label, onTap)
@@ -1920,7 +1916,7 @@ class MainActivity : Activity() {
      * has no art or no words — docs/species-profiles.md's contract.
      */
     private fun populateProfile(snap: WorldView.Specimen) {
-        val name = Native.traitText(snap.sp, 0)
+        val name = Species.name(snap.sp)
         val art = Profiles.portrait(this, name)
         profilePortrait.show(art)
         fun put(view: TextView, res: Int, wrap: (String) -> String = { it }) {
