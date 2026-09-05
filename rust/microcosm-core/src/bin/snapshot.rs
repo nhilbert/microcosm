@@ -7,7 +7,7 @@
 
 use microcosm_core::events::Event;
 use microcosm_core::fields::WallSpec;
-use microcosm_core::params::{MAXN, NCELL, REC_CH, REC_N, REC_STRIDE};
+use microcosm_core::params::{MAXCORPSE, MAXN, NCELL, REC_CH, REC_N, REC_STRIDE};
 use microcosm_core::Sim;
 
 fn state_hash(sim: &Sim) -> String {
@@ -391,6 +391,50 @@ fn main() {
         }
         survived("truncated by one byte", &d, &before, &mut fails);
 
+        // 4b. Well-formed and wrong. Every column has the right length and the magic is right; a
+        //     VALUE names a slot the pool does not have, a species this build does not carry, or
+        //     a sky with no sun. Such a file used to load — and abort on the next tick, after the
+        //     shell had committed it, so a corrupted autosave crashed every boot. Each case is a
+        //     consistent world made inconsistent in one place and saved through the real writer,
+        //     so no byte offset is guessed.
+        let corrupt = |label: &str, twist: &dyn Fn(&mut Sim)| -> Vec<u8> {
+            let mut m = Sim::new();
+            m.load(&bytes).unwrap_or_else(|e| panic!("{}: the good file must load ({})", label, e));
+            twist(&mut m);
+            m.save()
+        };
+        let live_slot = (0..MAXN).find(|&i| d.w.alive[i] != 0).expect("a live organism at t=600");
+        let live_corpse = (0..d.w.c_n).find(|&k| d.w.c_alive[k] != 0);
+        let mut cases: Vec<(&str, Vec<u8>)> = vec![
+            ("corpse count past the pool", corrupt("corpse count", &|m| m.w.c_n = MAXCORPSE + 1)),
+            ("free slot outside the pool", corrupt("free slot", &|m| m.w.free_list.push(MAXN + 7))),
+            ("free slot that is alive", corrupt("free alive", &|m| m.w.free_list.push(live_slot))),
+            ("corpse free slot outside the pool", corrupt("corpse free", &|m| m.w.c_free.push(MAXCORPSE))),
+            ("a live organism of an unknown species", corrupt("unknown species", &|m| m.w.sp[live_slot] = 7)),
+            ("no sun at all", corrupt("no sun", &|m| m.w.sources.clear())),
+        ];
+        if let Some(k) = live_corpse {
+            cases.push(("a corpse of an unknown species", corrupt("corpse species", &|m| m.w.c_sp[k] = 7)));
+        } else {
+            println!("  {:<44} (no corpse at t=600; case not exercised)", "a corpse of an unknown species");
+        }
+        // A length prefix pointing past the end of the file. The free list's length field is the
+        // first byte that differs between a save and the same world with one more free slot.
+        {
+            let one_more = corrupt("one more free slot", &|m| m.w.free_list.push(MAXN - 1));
+            let off = bytes.iter().zip(one_more.iter()).position(|(a, b)| a != b).expect("the free list length field");
+            let mut huge = bytes.clone();
+            huge[off..off + 4].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF]);
+            cases.push(("a length field past the end of the file", huge));
+        }
+        for (label, bad) in &cases {
+            match d.load(bad) {
+                Err(e) => println!("  {:<44} refused ({})", label, e),
+                Ok(()) => { println!("  {:<44} ACCEPTED — should have refused", label); fails += 1; }
+            }
+            survived(label, &d, &before, &mut fails);
+        }
+
         // And after all that, the live world still steps like one that was never touched.
         let mut e = Sim::new();
         build(&mut e);
@@ -401,7 +445,7 @@ fn main() {
             d.step();
             e.step();
         }
-        check("steps on after three refusals", &state_hash(&e), &state_hash(&d), &mut fails);
+        check("steps on after every refusal", &state_hash(&e), &state_hash(&d), &mut fails);
     }
 
     // Optional: write the snapshot out, so its on-disk and compressed size can be measured.

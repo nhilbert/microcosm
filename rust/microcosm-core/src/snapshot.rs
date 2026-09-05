@@ -213,8 +213,24 @@ impl<'a> Rd<'a> {
         }
         Ok(())
     }
+    /// A length prefix is a claim about the bytes that follow; check it against them BEFORE
+    /// reserving, or a flipped length field turns into a 32 GB reservation (an abort) instead of
+    /// the refusal every other truncation gets. Division keeps the product from overflowing usize
+    /// on wasm32.
+    fn claim(&self, n: usize, each: usize, what: &str) -> R<()> {
+        if n > (self.b.len() - self.p) / each {
+            return Err(LoadError(format!(
+                "truncated: {} claims {} entries, file has {} bytes left",
+                what,
+                n,
+                self.b.len() - self.p
+            )));
+        }
+        Ok(())
+    }
     fn usizes(&mut self) -> R<Vec<usize>> {
         let n = self.u32()? as usize;
+        self.claim(n, 4, "index list")?;
         let mut v = Vec::with_capacity(n);
         for _ in 0..n {
             v.push(self.u32()? as usize);
@@ -227,6 +243,7 @@ impl<'a> Rd<'a> {
     }
     fn f64s_vec(&mut self) -> R<Vec<f64>> {
         let n = self.u32()? as usize;
+        self.claim(n, 8, "f64 list")?;
         let mut v = Vec::with_capacity(n);
         for _ in 0..n {
             v.push(self.f64()?);
@@ -803,6 +820,50 @@ fn parse(
             s.event_log.push(LoggedEvent { t, ev });
         }
         s.events.clear();
+    }
+
+    // The values the tick indexes with. Shape and column lengths are checked above; these are
+    // the NUMBERS that pick a slot or a row, and a wrong one is a panic on the next step — after
+    // `load` has returned Ok and the shell has committed the file, which makes a corrupted
+    // autosave a crash at every boot. Corrupt is refused exactly like malformed (decision 2 of
+    // the 2026-09-05 review: a snapshot is hostile input, whoever wrote it). `w.n` is deliberately
+    // not bounded: it legitimately passes MAXN once the pool is full (see `World::n_slots`).
+    {
+        let s = &*w;
+        let nsp = tr.len();
+        if s.c_n > crate::params::MAXCORPSE {
+            return Err(LoadError(format!(
+                "corpse count {} exceeds the pool of {}",
+                s.c_n,
+                crate::params::MAXCORPSE
+            )));
+        }
+        for &i in &s.free_list {
+            if i >= MAXN || s.alive[i] != 0 {
+                return Err(LoadError(format!("free list names slot {}, which is {}", i, if i >= MAXN { "outside the pool" } else { "alive" })));
+            }
+        }
+        for &k in &s.c_free {
+            if k >= crate::params::MAXCORPSE || s.c_alive[k] != 0 {
+                return Err(LoadError(format!("corpse free list names slot {}, which is {}", k, if k >= crate::params::MAXCORPSE { "outside the pool" } else { "occupied" })));
+            }
+        }
+        for i in 0..s.n_slots() {
+            if s.alive[i] != 0 && s.sp[i] as usize >= nsp {
+                return Err(LoadError(format!("slot {} is alive as species {}, this build has {}", i, s.sp[i], nsp)));
+            }
+        }
+        for k in 0..s.c_n {
+            if s.c_alive[k] != 0 && s.c_sp[k] as usize >= nsp {
+                return Err(LoadError(format!("corpse {} is of species {}, this build has {}", k, s.c_sp[k], nsp)));
+            }
+        }
+        if s.sources.is_empty() || s.sources.len() > p.max_sources {
+            return Err(LoadError(format!("{} light sources, this build keeps 1..={}", s.sources.len(), p.max_sources)));
+        }
+        if s.walls.len() > p.max_walls {
+            return Err(LoadError(format!("{} walls, this build keeps at most {}", s.walls.len(), p.max_walls)));
+        }
     }
 
     // The running experiment (version 2). Whatever level THIS session was in ends here: its
