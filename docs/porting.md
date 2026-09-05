@@ -24,8 +24,10 @@ later), the host triple (native CLI and headless experiments), `aarch64-linux-an
 
 ## 2. The frozen oracle
 
-`dist/core.js` is frozen at sha256 `6c15a2c8fd3d9dc1`, the build that `harness/conform-baseline.json`
-certifies, on **Node 22 / V8 12.4**. It is kept, not built on: it is the thing the Rust core was
+`dist/core.js` is frozen at sha256 `fb4cd13972272831`, the build that `harness/conform-baseline.json`
+certifies, on **Node 22 / V8 12.4** (rebound from `6c15a2c8fd3d9dc1` at the level-table extraction of
+2026-08-31 — a behaviour-preserving move of a definition into shared data; the fingerprint it
+certifies did not change). It is kept, not built on: it is the thing the Rust core was
 proved against, and the only reason to run it again is to re-check that proof.
 
 It has to stay pinned to Node 22 because the engine moved under it: Node ≥ 23 (V8 ≥ 13.2) silently

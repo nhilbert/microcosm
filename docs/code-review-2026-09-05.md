@@ -351,3 +351,33 @@ says prefixes.
 4. C-1, C-2, C-4, C-5 — small harness edits; C-3 as a declared decision.
 5. A-5 (move the static reads off the UI thread), E-1/E-2, B-3.
 6. Record D-1 next to the Mycora/Necro re-entry conditions; M-2 doc drift in one pass.
+
+---
+
+## Disposition (same day)
+
+Decided by the owner in chat: **1a** (the crate is the ecology acceptance authority;
+the frozen oracle is not re-measured), **2 hostile** (a snapshot is refused when corrupt,
+not only when malformed), **3 record only** (the cooldown rule stays; the finding goes
+beside the Mycora/Necro re-entry conditions), and all six tiers of the suggested order.
+
+What landed, one commit per tier, each proved before the next:
+
+| Tier | Findings | Proof |
+|---|---|---|
+| 1 | A-1, A-2, A-6, M-1 | conform:core identical (rebound), port:check, port:snapshot, port:levels; clippy runs, 0 errors |
+| 2 | B-1, B-2 (crate + app), A-5's UI-thread reads | the same, plus `fingerprint-undo`/`-impact` inside port:check and the Android tests photographing the pages |
+| 3 | A-3, A-4 (+8 refusal cases in `bin/snapshot`) | port:snapshot; every start world and level saved and reloaded |
+| 4 | C-1 … C-7, decision 1a | light gate 8/8 + silent on both cores; tune on the crate 8/8, drift −0.007…−0.011 %; corridor on the crate (see the status log); levels gate with L3's two wrong levers on both cores; `npm test` and `conform:core` refuse a stale hash (exit 3) |
+| 5 | E-1, E-2, B-3 | `npm test`, Android unit tests |
+| 6 | M-2, D-1 recorded | the record |
+
+Not done, deliberately: A-7 (NaN guards; reachable only through a shell bug), A-8 (the
+`IPIO2` table; unreachable from the tick), A-9 (`f64::ln` in the entropy channels; needs
+a vendored log), A-10 (the shim's corpse view), B-4/B-5 nits, D-2/D-3 (undo semantics —
+an event-semantics change with a `fingerprint-undo` recapture, for its own increment),
+E-3, M-3. Each keeps its line above.
+
+One correction to the method section: this container does carry an Android SDK and a
+warmed Gradle cache, so the Kotlin was compiled and its unit tests run here for tiers 2,
+3 and 5; the first draft's claim that only CI could compile it was wrong.

@@ -6,9 +6,9 @@
 # Requires the Android NDK (ANDROID_NDK_HOME or ANDROID_NDK_LATEST_HOME) and cargo-ndk:
 #   cargo install cargo-ndk && rustup target add aarch64-linux-android
 #
-# The same crate the probe uses (rust/microcosm-android): one .so carries both JNI surfaces — the
-# diagnostics one under org.microcosm.probe and the app's under org.microcosm.app. Generated, not
-# committed; see android-app/.gitignore.
+# The JNI crate is rust/microcosm-android: one .so carrying the app's surface under
+# org.microcosm.app (the diagnostics probe's surface retired with the probe, 2026-09-02).
+# Generated, not committed; see android-app/.gitignore.
 set -euo pipefail
 
 ABI="${1:-arm64-v8a}"
