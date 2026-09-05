@@ -67,28 +67,52 @@ jobs:
           name: microcosm-app-apk
           path: microcosm-app.apk
 
+      # The body below is meant to stay true across builds: it says what the app is and how the
+      # release works, never which increment it is on. What the app can and cannot do today is
+      # in docs/status-log.md, and the body points there instead of repeating it.
       - name: Update the rolling app-latest release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: app-latest
-          name: Microcosm native app (latest)
+          name: Microcosm app (latest build)
           prerelease: true
           files: microcosm-app.apk
           body: |
-            The **native app**: the Rust core running on the phone, painting the shared frame
-            builder's display list on a SurfaceView.
+            **Microcosm** is a pond you can hold in your hand: artificial organisms photosynthesise,
+            graze, hunt, starve, reproduce and rot inside a world where matter is strictly
+            conserved, and the app can tell you where every unit of it went. It is a toy, not a
+            model of anything real. The point is to poke a complicated living system and find out
+            what happens.
 
-            Open this page on the phone, download `microcosm-app.apk` and install it. It installs
-            alongside the sandbox app and the probe (three different applicationIds), so it cannot
-            disturb either.
+            This is the native app: the Rust core (`rust/microcosm-core`) running on the phone,
+            painting the shared frame builder's display list on a SurfaceView. The browser build in
+            the repository is the reference the renderer is proved against, not the product.
+            Background: `docs/android-app-plan.md`.
 
-            This is increment **A.1** of docs/android-app-plan.md — the world renders and the
-            clock runs, and that is all. There are no gestures, no levers, no panels yet.
+            **Install.** Open this page on the phone, download `microcosm-app.apk` and open it.
+            Android will ask you to allow installs from your browser, since the app is not on any
+            store. Every build carries the same signing identity, so a new one installs over the old
+            one and keeps your saved worlds. It needs Android 8.0 or newer on a 64-bit ARM phone,
+            which is nearly every phone sold since 2017.
 
-            - **pause / 1x / 4x / 16x** set the speed.
-            - **benchmark** pauses, runs the world to t=3,000, then paints 60 frames at each of
-              five zoom levels and reports milliseconds per frame, split into the core's frame
-              builder and the Canvas paint. Tap the report to dismiss it.
+            **What is in it.**
+            - The sandbox, with five openings: the pond, still water, two suns, the pen, lean water.
+            - Levers: drag or dim the sun, pour minerals, feed or kill an individual, seed a species,
+              draw walls, set the Evolution dials. Every intervention is an event: logged, undoable,
+              and reported on by an impact card that says *since*, never *because*.
+            - Experiments: a ladder of levels, each a prediction to make and a lever to find.
+            - Data: six pages of instruments, from populations and chemistry to traits and an
+              event feed of what you did and what the world did.
+            - Help: how the mineral goes round, and one card per creature beside its real model.
+            - Save and load. English and German.
 
-            The number to look for: M5.0 measured the core at 0.400 ms/tick (250x real time)
-            against a UI that used to cap at 16x. This says what the renderer's real budget is.
+            **What this release is.** A rolling build, marked pre-release because that is what it
+            is. CI rebuilds it and replaces the file on every push that touches the app or the
+            core, on main and on working branches alike, so this file can be ahead of main. The
+            build number inside the app is the CI run number. What the app can and cannot do at
+            any given moment is written down in `docs/status-log.md`, not here; this text is meant
+            to stay true.
+
+            The signing key is committed on purpose and guards nothing (`keystore/README.md`).
+            It exists so that updates install in place. It proves nothing about who built the file,
+            so download from this page and nowhere else.
