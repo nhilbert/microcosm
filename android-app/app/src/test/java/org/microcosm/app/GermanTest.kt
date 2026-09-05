@@ -127,7 +127,7 @@ class GermanTest {
         // The expected text follows the overlay (the DE.6 sweep replaced the tension dash);
         // stale before 2026-09-01 — the sweep updated the asset but not this expectation.
         assertEquals(
-            "Die letzte Solara ist gestorben. Die Matte hat das Licht nie eingefangen.",
+            "Die letzte Solara ist gestorben. Der Algenteppich hat das Licht nie eingefangen.",
             L10n.why("The last Solara died — the mat never caught the light."),
         )
         println("GERMAN GATE: ${levels.size} levels wear the overlay; fail reasons registered")

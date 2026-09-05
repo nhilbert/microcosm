@@ -74,7 +74,7 @@ Ein Ding, ein Name — in jedem Satz derselbe. Die Sitzung vom 2026-09-01 hat en
 
 | englisch (Kern) | deutsch | Anmerkung |
 |---|---|---|
-| mat | die **Algenmatte**, danach kurz „die Matte" | Erstnennung pro Level voll; solo eingeführt klang „die Matte" nach Turnhalle. L1–L3-Register |
+| mat | der **Algenteppich**, immer voll | Owner-Entscheid 2026-09-05: löst „die Algenmatte / die Matte" ab. Kein Kurzwort — solo klänge „der Teppich" nach Fußboden, wie „die Matte" nach Turnhalle klang. L1–L3-Register |
 | meadow | die Wiese | Solaras zweites Bild, L4–L6-Register (die ausgebreitete, gesunde Form) |
 | bloom | die Blüte | |
 | plankton | das Plankton | |
@@ -223,7 +223,7 @@ dieser Abweisungen war berechtigt.
 - **„schaue"**: Die Langform-Regel macht aus „schau zu" ein „schaue zu" — das klingt
   m. E. gespreizt. Angewendet wie entschieden; ein Wort vom Owner dreht es zurück.
 - **narration.xml**: Die 19 Narrations-Templates und das Merkmals-Vokabular sind noch
-  nicht gegen §2b/§3 durchgesehen (dort könnte „Matte" solo oder ein Kalk stehen) —
+  nicht gegen §2b/§3 durchgesehen (dort könnte noch „Matte" oder ein Kalk stehen) —
   eigener Durchgang, mit GermanTest als Netz.
 - **Titel-/Untertitel-Budgets**: §4 (EN) verlangt Titel 2–4 Wörter, Untertitel ≤ 5 —
   ungeprüft in beiden Sprachen, und die *englische* L6 („A Head Full of Hunters", 5) und

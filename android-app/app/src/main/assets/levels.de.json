@@ -4,24 +4,24 @@
     "title": "Erstes Licht",
     "science": "Photosynthese · Tragfähigkeit",
     "question": "Warum wächst in einem trüben Teich nichts?",
-    "briefing": "Zwanzig Gründer von Solara treiben unter einer schwachen Sonne auf einen Siedlungsgrund. Lässt du sie allein, verhungert ihre Algenmatte, egal wie groß sie wird. Licht ist die einzige Energiequelle dieser Welt. Dein Instrument ist der ☀-Hebel im Eingreifen-Modus.",
-    "goalText": "Baue die Matte auf und halte 400 Solara",
+    "briefing": "Zwanzig Gründer von Solara treiben unter einer schwachen Sonne auf einen Siedlungsgrund. Lässt du sie allein, verhungert ihr Algenteppich, egal wie groß er wird. Licht ist die einzige Energiequelle dieser Welt. Dein Instrument ist der ☀-Hebel im Eingreifen-Modus.",
+    "goalText": "Baue den Algenteppich auf und halte 400 Solara",
     "predict": {
       "prompt": "Zwanzig Gründer unter schwacher Sonne. Was passiert, wenn du nur zuschaust?",
       "options": [
-        "Die Matte wächst langsam, aber sie schafft es",
-        "Sie verhungert, denn Licht ist die einzige Energiequelle",
-        "Sie wächst, bis das Mineral im Wasser ausgeht"
+        "Der Algenteppich wächst langsam, aber er schafft es",
+        "Er verhungert, denn Licht ist die einzige Energiequelle",
+        "Er wächst, bis das Mineral im Wasser ausgeht"
       ],
       "reflect": [
-        "Geduld hilft hier nicht. Ist das Licht zu schwach, verliert die Matte Energie, egal wie groß sie ist. Warten macht sie nur kleiner.",
+        "Geduld hilft hier nicht. Ist das Licht zu schwach, verliert der Algenteppich Energie, egal wie groß er ist. Warten macht ihn nur kleiner.",
         "Genau das zeigten die Energiebalken. Jede Solara verbraucht hier mehr Energie, als das Licht ihr gibt.",
         "Das Wasser war nie das Problem. Die Energie ging zuerst aus, und Energie kommt hier nur aus dem Licht."
       ]
     },
     "debrief": {
-      "pass": "Licht ist die einzige Energiequelle dieses Teichs. Unter einer trüben Sonne verbraucht die Matte mehr Energie, als das Licht ihr gibt. Also schrumpft sie, egal wie groß sie ist. Mit genug Licht wächst sie schnell, dann flacht sie ab. Sie beschattet sich selbst, und der Grund wird knapp. Diese Grenze heißt Tragfähigkeit: der Punkt, an dem Zuwachs und Verbrauch sich treffen.",
-      "fail": "Die Matte brauchte mehr Energie, und Energie kommt hier nur aus dem Licht. Tippe eine Solara an und schaue auf ihre Karte: Der Energiebalken füllt sich nie. Der ☀-Hebel hebt, was der ganze Teich bekommt. Alles andere schiebt die Energie nur herum."
+      "pass": "Licht ist die einzige Energiequelle dieses Teichs. Unter einer trüben Sonne verbraucht der Algenteppich mehr Energie, als das Licht ihm gibt. Also schrumpft er, egal wie groß er ist. Mit genug Licht wächst er schnell, dann flacht er ab. Er beschattet sich selbst, und der Grund wird knapp. Diese Grenze heißt Tragfähigkeit: der Punkt, an dem Zuwachs und Verbrauch sich treffen.",
+      "fail": "Der Algenteppich brauchte mehr Energie, und Energie kommt hier nur aus dem Licht. Tippe eine Solara an und schaue auf ihre Karte: Der Energiebalken füllt sich nie. Der ☀-Hebel hebt, was der ganze Teich bekommt. Alles andere schiebt die Energie nur herum."
     },
     "meter": [
       {
@@ -30,32 +30,32 @@
       }
     ],
     "whys": {
-      "The last Solara died — the mat never caught the light.": "Die letzte Solara ist gestorben. Die Matte hat das Licht nie eingefangen.",
-      "The mat never took hold. Under this sun, every Solara spends more than it earns — at any number.": "Die Matte hat nie Fuß gefasst. Unter dieser Sonne verbraucht jede Solara mehr Energie, als das Licht ihr gibt. Das gilt bei jeder Zahl."
+      "The last Solara died — the mat never caught the light.": "Die letzte Solara ist gestorben. Der Algenteppich hat das Licht nie eingefangen.",
+      "The mat never took hold. Under this sun, every Solara spends more than it earns — at any number.": "Der Algenteppich hat nie Fuß gefasst. Unter dieser Sonne verbraucht jede Solara mehr Energie, als das Licht ihr gibt. Das gilt bei jeder Zahl."
     }
   },
   "mineral": {
     "title": "Das magere Wasser",
     "science": "Liebigs Minimumgesetz",
-    "question": "Die Sonne steht schon am Anschlag. Warum stockt die Algenmatte trotzdem?",
-    "briefing": "Der ☀-Hebel startet auf Maximum, aber das Wasser ist mager. Die Matte wächst, dann stockt sie: Mehr Licht bringt nichts mehr. Du hast zehn Gaben Mineral dabei. Tippe offenes Wasser an, um eine zu gießen, und wähle die Stelle mit Bedacht.",
-    "goalText": "Bringe die Matte mit zehn Gaben über 600",
+    "question": "Die Sonne steht schon am Anschlag. Warum stockt der Algenteppich trotzdem?",
+    "briefing": "Der ☀-Hebel startet auf Maximum, aber das Wasser ist mager. Der Algenteppich wächst, dann stockt er: Mehr Licht bringt nichts mehr. Du hast zehn Gaben Mineral dabei. Tippe offenes Wasser an, um eine zu gießen, und wähle die Stelle mit Bedacht.",
+    "goalText": "Bringe den Algenteppich mit zehn Gaben über 600",
     "predict": {
       "prompt": "Die Sonne ist am Anschlag. Was bringen zehn Gaben Mineral?",
       "options": [
         "Die Stelle ist egal, die Durchmischung verteilt sie sowieso",
-        "Sie helfen nur dort, wo die Matte zuerst trinkt",
+        "Sie helfen nur dort, wo der Algenteppich zuerst trinkt",
         "Nichts, das Licht muss trotzdem das Problem sein"
       ],
       "reflect": [
         "Die Durchmischung verteilt sie, aber viel zu langsam. Gaben am dunklen Ufer kamen zu spät, und die Uhr lief ab.",
-        "Richtig: Mineral wandert langsam, und die Matte trinkt, was neben ihr landet.",
+        "Richtig: Mineral wandert langsam, und der Algenteppich trinkt, was neben ihm landet.",
         "Der Hebel stand die ganze Zeit am Anschlag. Die knappste Zutat gab den Ausschlag, und das war nicht das Licht."
       ]
     },
     "debrief": {
-      "pass": "Die knappste Zutat setzt den Deckel, nicht die reichlichste. Die Sonne hatte nichts mehr zu geben; die Grenze war das Mineral. Und es half nur dort, wo die Matte es trinken konnte, bevor die langsame Durchmischung es verdünnte. Schaue auf den M-Balken: Alles, was du gegossen hast, ist noch irgendwo. In Körpern, im Wasser oder in den Toten. Materie geht nie verloren, sie zieht nur um.",
-      "fail": "Die Karten haben es gezeigt: mineralbegrenzt, unter einer Sonne am Anschlag. Gaben am dunklen Rand füttern meist nur leeres Wasser, die Durchmischung ist langsam. Gieße früh, und gieße dorthin, wo die Matte lebt."
+      "pass": "Die knappste Zutat setzt den Deckel, nicht die reichlichste. Die Sonne hatte nichts mehr zu geben; die Grenze war das Mineral. Und es half nur dort, wo der Algenteppich es trinken konnte, bevor die langsame Durchmischung es verdünnte. Schaue auf den M-Balken: Alles, was du gegossen hast, ist noch irgendwo. In Körpern, im Wasser oder in den Toten. Materie geht nie verloren, sie zieht nur um.",
+      "fail": "Die Karten haben es gezeigt: mineralbegrenzt, unter einer Sonne am Anschlag. Gaben am dunklen Rand füttern meist nur leeres Wasser, die Durchmischung ist langsam. Gieße früh, und gieße dorthin, wo der Algenteppich lebt."
     },
     "meter": [
       {
@@ -64,22 +64,22 @@
       }
     ],
     "whys": {
-      "The mat has died out.": "Die Matte ist ausgestorben.",
-      "The mat stalled below 600. Light was maxed out the whole time — the scarcest ingredient set the ceiling.": "Die Matte blieb unter 600 stecken. Das Licht war die ganze Zeit am Anschlag. Den Deckel setzte die knappste Zutat."
+      "The mat has died out.": "Der Algenteppich ist ausgestorben.",
+      "The mat stalled below 600. Light was maxed out the whole time — the scarcest ingredient set the ceiling.": "Der Algenteppich blieb unter 600 stecken. Das Licht war die ganze Zeit am Anschlag. Den Deckel setzte die knappste Zutat."
     }
   },
   "cycle": {
     "title": "Alles fließt",
     "science": "Zersetzung · der Mineralkreislauf",
-    "question": "Der Algenmatte geht es prächtig. Warum leert sich trotzdem das Wasser?",
-    "briefing": "Derselbe Teich wie in deinem ersten Experiment, unter voller Sonne. Die Matte wuchert, und trotzdem versickert das freie Mineral. Alles, was stirbt, nimmt sein Mineral mit in den Schlamm, und nichts bringt es zurück. Drücke offenes Wasser lange, um eine Art anzusiedeln, und wähle gut.",
-    "goalText": "Hole das Mineral zurück: Recycler rein, Matte 1.000",
+    "question": "Dem Algenteppich geht es prächtig. Warum leert sich trotzdem das Wasser?",
+    "briefing": "Derselbe Teich wie in deinem ersten Experiment, unter voller Sonne. Der Algenteppich wuchert, und trotzdem versickert das freie Mineral. Alles, was stirbt, nimmt sein Mineral mit in den Schlamm, und nichts bringt es zurück. Drücke offenes Wasser lange, um eine Art anzusiedeln, und wähle gut.",
+    "goalText": "Hole das Mineral zurück: Recycler rein, Algenteppich 1.000",
     "predict": {
-      "prompt": "Der Matte geht es prächtig. Wohin verschwindet das freie Mineral?",
+      "prompt": "Dem Algenteppich geht es prächtig. Wohin verschwindet das freie Mineral?",
       "options": [
         "Nirgendwohin, in einem gesunden Teich läuft alles im Kreis",
         "In die Toten, und dort bleibt es",
-        "Die lebende Matte hortet alles"
+        "Der lebende Algenteppich hortet alles"
       ],
       "reflect": [
         "Der Kreislauf ist Arbeit, und niemand in dieser Welt hat sie erledigt. Materie floss bergab in den Schlamm und blieb liegen.",
@@ -89,7 +89,7 @@
     },
     "debrief": {
       "pass": "Bacillus frisst die Toten und gibt ihr Mineral ans Wasser zurück. Lebewesen mit diesem Job heißen Zersetzer: Sie schließen den Kreis. Dieselbe Materie wandert jetzt im Kreis, statt sich im Schlamm zu stapeln. Das ist die tiefste Regel dieser Welt: Materie läuft im Kreis, Energie fließt durch wie ein Fluss. Ein Teich ohne seine Recycler kippt langsam um.",
-      "fail": "Nur ein Zersetzer holt gebundenes Mineral zurück ins Wasser. Planktonfresser und Jäger bewegen Materie nur zwischen Körpern. Ihre Opfer binden zugleich noch mehr Mineral im Schlamm. Siedle Bacillus nahe der Matte an: Dort liegen die Toten."
+      "fail": "Nur ein Zersetzer holt gebundenes Mineral zurück ins Wasser. Fresser und Jäger schieben Materie nur von Körper zu Körper. Ihre Opfer binden dazu noch mehr Mineral im Schlamm. Siedle Bacillus nahe am Algenteppich an: Dort liegen die Toten."
     },
     "meter": [
       {
@@ -102,7 +102,7 @@
       }
     ],
     "whys": {
-      "The producers are gone — without the mat, nothing eats and nothing returns.": "Die Erzeuger sind fort. Ohne die Matte frisst nichts, und nichts kehrt zurück.",
+      "The producers are gone — without the mat, nothing eats and nothing returns.": "Die Erzeuger sind fort. Ohne den Algenteppich frisst nichts, und nichts kehrt zurück.",
       "The dead kept their mineral. Over 40% of the world's matter ended up locked in corpses and mud, and the water kept emptying.": "Die Toten behielten ihr Mineral. Über 40 % der Materie steckten am Ende in toten Körpern und im Schlamm fest. Das Wasser leerte sich weiter."
     }
   },
@@ -232,7 +232,7 @@
     "science": "Ausbreitungsgrenzen · Kolonisation",
     "question": "Über dunklem Wasser geht eine zweite Sonne auf. Was wächst dort?",
     "briefing": "Ein lebendiger Teich unter einer Sonne — und bald geht eine zweite auf, weit über dunklem Wasser. Hell, warm, leer. Du kannst Arten aussetzen und gießen. Die alte Sonne gehört zum Versuch: Sie bleibt gesperrt.",
-    "goalText": "Besiedle die neue Sonne — Matte und Plankton",
+    "goalText": "Besiedle die neue Sonne — Algenteppich und Plankton",
     "predict": {
       "prompt": "Eine helle neue Sonne über leerem Wasser. Was passiert?",
       "options": [
@@ -241,14 +241,14 @@
         "Die neue Sonne zehrt die alte aus"
       ],
       "reflect": [
-        "Treiben ist langsam. Das Plankton hat das dunkle Wasser nie überquert — und die Matte kroch viel zu spät heran.",
+        "Treiben ist langsam. Das Plankton hat das dunkle Wasser nie überquert — und der Algenteppich kroch viel zu spät heran.",
         "Richtig. Licht hat nie gefehlt. Ein Reisender hat gefehlt.",
         "Die alte Sonne behielt ihren ganzen Teich. Eine zweite Sonne ist nur eine zweite Bühne — und die stand leer."
       ]
     },
     "debrief": {
-      "pass": "Du hast Leben über das Dunkel getragen, und die neue Sonne hält jetzt einen lebendigen Teich. Diese Reise war das ganze Geheimnis. Das Wasser brauchte nie bessere Bedingungen — es brauchte einen Reisenden. Das Plankton kann dunkles Wasser nicht überqueren; die Matte kriecht, aber viel zu langsam. Dass Leben so an neue Orte kommt, nennt man Besiedlung. Und jetzt beobachte deinen Außenposten: Die Blüte bedrängt schon die junge Matte.",
-      "fail": "Die neue Sonne war nie das Problem — der Weg dorthin war es. Gießen füttert Wasser, nicht Entfernung, und nichts, was treibt, überlebt die dunkle Strecke. Setz die Matte und das Plankton unter der neuen Sonne aus. Beides: Die Matte allein ernährt niemanden, und die Blüte allein sperrt die Matte aus."
+      "pass": "Du hast Leben über das Dunkel getragen, und die neue Sonne hält jetzt einen lebendigen Teich. Diese Reise war das ganze Geheimnis. Das Wasser brauchte nie bessere Bedingungen — es brauchte einen Reisenden. Das Plankton kann dunkles Wasser nicht überqueren; der Algenteppich kriecht, aber viel zu langsam. Dass Leben so an neue Orte kommt, nennt man Besiedlung. Und jetzt beobachte deinen Außenposten: Die Blüte bedrängt schon den jungen Algenteppich.",
+      "fail": "Die neue Sonne war nie das Problem — der Weg dorthin war es. Gießen füttert Wasser, nicht Entfernung, und nichts, was treibt, überlebt die dunkle Strecke. Setz den Algenteppich und das Plankton unter der neuen Sonne aus. Beides: Der Algenteppich allein ernährt niemanden, und die Blüte allein sperrt den Algenteppich aus."
     },
     "meter": [
       { "label": "Solara · Sonne 2", "unit": "" },
@@ -257,7 +257,7 @@
     "whys": {
       "The last Solara died. Nothing is left to carry to the new sun.": "Die letzte Solara ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
       "The last Drifta died. Nothing is left to carry to the new sun.": "Die letzte Drifta ist gestorben. Nichts ist übrig, das du zur neuen Sonne tragen könntest.",
-      "The new sun still has no working pond. Life had to be carried there — the mat and its plankton both.": "Die neue Sonne hat noch immer keinen lebendigen Teich. Leben musste dorthin getragen werden — die Matte und ihr Plankton."
+      "The new sun still has no working pond. Life had to be carried there — the mat and its plankton both.": "Die neue Sonne hat noch immer keinen lebendigen Teich. Leben musste dorthin getragen werden — der Algenteppich und sein Plankton."
     }
   },
   "warmyear": {
@@ -276,7 +276,7 @@
       "reflect": [
         "Verkocht ist niemand. Wärme tötet über die Rechnung, nicht über die Glut — und kleine Körper haben kleine Haushalte.",
         "Richtig. Wärme treibt den Unterhalt schneller als den Fang, und die Spitze lebt am dichtesten an ihrer Grenze.",
-        "Der Boden hat kaum etwas gemerkt. Matte und Schlamm wurden fetter, während die Spitze hungerte. Wärme spaltet die Pyramide."
+        "Der Boden hat kaum etwas gemerkt. Algenteppich und Schlamm wurden fetter, während die Spitze hungerte. Wärme spaltet die Pyramide."
       ]
     },
     "debrief": {
