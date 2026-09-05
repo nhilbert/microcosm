@@ -27,6 +27,22 @@ Three separate failure modes, all found by looking rather than by reasoning:
 - **The gear.** Evenly spaced bristles of equal length around an ellipse are a gear rim or a sun.
   Uneven lengths and a curve along the beat fix it.
 
+## The refine round, and what shipped
+
+The owner chose `concept-2`, the round, and asked for five refinements of it. They are in
+`iterations/`: `iteration-1` true taper, `iteration-2` three stepping radii, `iteration-3` bodies
+with trails, `iteration-4` bold and bare, `iteration-5` the round tilted into the water. The
+problem every one of them was attacking is the same: a ring of equal coloured arcs reads as a
+donut chart or a loading spinner.
+
+`iteration-4` won on the only test that matters for an icon — it is still legible and still
+composed at 48 px, where the taper went thin, the trails vanished and the tilt flattened into an
+ellipse. Its cost, stated at the time and accepted: with no speck, "conserved matter" is gone and
+the mark only says "three parts of one whole". So the shipped icon is `iteration-4` **plus the
+mineral speck put back off centre**, sitting in the widest gap — the decomposer's handover to the
+alga — where a grain in transit actually is. Off centre, not in the middle, because a coloured
+ring around a centred mark is the eye this round already learned to avoid.
+
 ## Where the shipped icon lives
 
 `android-app/app/src/main/res/drawable/ic_launcher_*.xml` plus the adaptive icon in

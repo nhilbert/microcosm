@@ -1,26 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The themed-icon layer (Android 13+): the same ciliate as a silhouette, since the system throws
-  away every colour here and paints the alpha in the wallpaper's. What survives is the shape that
-  carries the icon — a bristled ellipse with its two organelles punched out of it (evenOdd) and
-  the two motes kept as dots. One hole would have read as a pupil, and the icon as an eye; two
-  read as a cell.
+  The themed-icon layer (Android 13+): the same round, minus the one thing the system throws away.
+  It tints the alpha in the wallpaper's colour, so the three hands stop being three species and
+  become three strokes — which is why the speck stays: without it the mark is just a broken ring,
+  and the grain in the gap is what says something is being passed.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
 
-  <group android:pivotX="54" android:pivotY="54" android:rotation="-20">
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.4" android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M72.3,55.3Q75.2,55.9 75.8,58.1 M71.7,57.8Q74.6,59.2 74.7,61.7 M70.5,60.1Q72.4,61.7 72.1,63.5 M68.7,62.3Q70.8,64.8 69.8,67.3 M66.5,64.2Q67.8,66.7 66.7,68.6 M63.7,65.8Q64.6,68.3 63.3,69.9 M60.7,66.9Q61.3,70.2 59.2,71.9 M57.4,67.7Q57.5,70.2 55.9,71.2 M54,67.9Q53.7,70.9 51.5,71.9 M50.6,67.7Q49.8,70.6 47.5,71.3 M47.3,66.9Q46.3,69.3 44.5,69.5 M44.3,65.8Q42.5,68.6 39.9,68.5 M41.5,64.2Q39.8,66.3 37.7,65.9 M39.3,62.3Q37.1,64.1 35,63.3 M37.5,60.1Q34.6,61.6 32.4,60.2 M36.3,57.8Q33.9,58.4 32.6,57 M35.7,55.3Q32.5,55.3 31.2,53.1 M35.7,52.7Q32.8,52.1 32.2,49.9 M36.3,50.2Q33.9,49.1 33.8,47.1 M37.5,47.9Q34.9,45.7 35.4,43.1 M39.3,45.7Q37.6,43.7 38.3,41.8 M41.5,43.8Q40.1,41.2 41.3,39.2 M44.3,42.2Q43.2,39.2 44.9,37.3 M47.3,41.1Q46.9,38.6 48.3,37.4 M50.6,40.3Q50.5,37.1 52.7,35.7 M54,40.1Q54.3,37.3 56.3,36.5 M57.4,40.3Q58.1,37.7 60.1,37.1 M60.7,41.1Q62,38 64.6,37.7 M63.7,42.2Q65.1,40.1 66.9,40.1 M66.5,43.8Q68.5,41.4 70.9,41.9 M68.7,45.7Q71.1,43.8 73.3,44.7 M70.5,47.9Q72.8,46.7 74.4,47.8 M71.7,50.2Q74.9,49.4 76.8,51.4 M72.3,52.7Q75,52.7 76,54.4"/>
+  <path android:strokeColor="#FFFFFFFF" android:strokeWidth="10" android:strokeLineCap="round" android:fillColor="#00000000"
+      android:pathData="M75.14,39.74A25.5,25.5 0 0 1 61.03,78.51"/>
+  <path android:strokeColor="#FFFFFFFF" android:strokeWidth="9.2" android:strokeLineCap="round" android:fillColor="#00000000"
+      android:pathData="M46.12,78.25A25.5,25.5 0 0 1 28.64,51.33"/>
+  <path android:strokeColor="#FFFFFFFF" android:strokeWidth="8.4" android:strokeLineCap="round" android:fillColor="#00000000"
+      android:pathData="M36.29,35.66A25.5,25.5 0 0 1 56.67,28.64"/>
 
-    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
-        android:pathData="M35,54a19,14.5 0 1 0 38,0a19,14.5 0 1 0 -38,0z M47.5,58.5m-4.2,0a4.2,4.2 0 1 0 8.4,0a4.2,4.2 0 1 0 -8.4,0z M59.5,49.5m-4.8,0a4.8,3.9 0 1 0 9.6,0a4.8,3.9 0 1 0 -9.6,0z"/>
-  </group>
-
-  <path android:fillColor="#FFFFFFFF"
-      android:pathData="M67,33m-4,0a4,4 0 1 0 8,0a4,4 0 1 0 -8,0z"/>
-  <path android:fillColor="#FFFFFFFF"
-      android:pathData="M39,75m-3,0a3,3 0 1 0 6,0a3,3 0 1 0 -6,0z"/>
+  <path android:fillColor="#FFFFFFFF" android:pathData="M65.77,31.38m-3.35,0a3.35,3.35 0 1 0 6.7,0a3.35,3.35 0 1 0 -6.7,0z"/>
 </vector>

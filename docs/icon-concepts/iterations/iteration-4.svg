@@ -1,0 +1,18 @@
+<!-- THE ROUND, BARE: one circle of matter broken into three unequal hands - alga (green), grazer (purple), decomposer (olive); the gaps are the handovers. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="litPool" cx="50%" cy="46%" r="62%">
+      <stop offset="0%" stop-color="#2E4A63"/><stop offset="42%" stop-color="#1B3048"/>
+      <stop offset="78%" stop-color="#0C1724"/><stop offset="100%" stop-color="#0B131E"/>
+    </radialGradient>
+  </defs>
+  <g id="icon">
+    <rect x="0" y="0" width="512" height="512" fill="#0B131E"/>
+    <rect x="0" y="0" width="512" height="512" fill="url(#litPool)"/>
+    <g fill="none" stroke-linecap="round">
+      <path d="M 356.9 177.2 A 128 128 0 0 1 291.3 379.0" stroke="#46D68C" stroke-width="50"/>
+      <path d="M 216.5 377.7 A 128 128 0 0 1 128.7 242.6" stroke="#D7A6E8" stroke-width="46"/>
+      <path d="M 167.1 163.9 A 128 128 0 0 1 269.4 128.7" stroke="#9EA868" stroke-width="42"/>
+    </g>
+  </g>
+</svg>
