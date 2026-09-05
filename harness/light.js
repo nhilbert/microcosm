@@ -135,7 +135,16 @@ if (flag("--gate")){
   const ct = gate(null, false);
   for (const r of ct) console.log(`seed ${r.seed}: adapt ${r.ad.length} | channels 56/57 peak ${r.peak56} ${r.peak57}`);
   const c1 = ev.filter(r => r.ad.length).length, c2 = ct.every(r => r.ad.length === 0 && r.peak56 === 0 && r.peak57 === 0);
-  console.log(`\n1. adaptation narrated on ${c1}/8 seeded-twin seeds`);
+  // The criteria adopted at L.3 (docs/phase7-light-plan.md §11.4): (1) adaptation narrated on at
+  // least 5/8 seeded-twin seeds, (2) the one-sun control silent with channels 56/57 exactly 0 on
+  // 8/8. Until 2026-09-05 both were printed and neither was judged — this file had no exit code,
+  // so `npm run light:gate` could not fail. Measured on that day: 8/8 and silent, on both cores.
+  const NEED = 5;
+  const c3 = !ev.some(r => r.collapsed);
+  console.log(`\n1. adaptation narrated on ${c1}/8 seeded-twin seeds (need ${NEED}): ${c1 >= NEED ? "PASS" : "FAIL"}`);
   console.log(`2. control silent, channels exactly 0: ${c2 ? "PASS" : "FAIL"}`);
+  if (!c3) console.log(`   (a seeded-twin seed COLLAPSED — the gate does not pass over a dead pond)`);
+  console.log(c1 >= NEED && c2 && c3 ? "LIGHT GATE: PASS" : "LIGHT GATE: FAIL");
+  process.exit(c1 >= NEED && c2 && c3 ? 0 : 1);
 }
 if (!flag("--viability") && !flag("--patches") && !flag("--gate")) console.log("usage: node harness/light.js --viability | --patches | --gate [--at 3000] [--seed] [--layouts a,b] [--silent]");

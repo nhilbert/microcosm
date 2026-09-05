@@ -31,7 +31,10 @@ if (!fs.existsSync(WASM)) {
 
 const run = (script, args, core) => execFileSync(process.execPath, [path.join(ROOT, "harness", script), ...args], {
   cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28,
-  env: core ? { ...process.env, MC_CORE: SHIM } : { ...process.env, MC_CORE: "" },
+  // The JS side is named explicitly. `MC_CORE: ""` used to select it only because every harness
+  // falls back to dist/core.js on an empty value — the day that default flips to the crate, an empty
+  // string would silently make this Rust-vs-Rust and the gate would prove nothing.
+  env: { ...process.env, MC_CORE: core ? SHIM : path.join(ROOT, "dist", "core.js") },
 });
 
 let fails = 0;

@@ -19,9 +19,11 @@ const coreHash = crypto.createHash("sha256").update(fs.readFileSync(CORE)).diges
 // sin/cos/exp/atan2 to LLVM-libc's correctly-rounded routines — so a newer engine is a DIFFERENT
 // oracle, not a better one, and would fail below for a reason that has nothing to do with the sim.
 // On fdlibm-era V8, Math.pow(10,-5) !== 1e-5. (docs/android-port-plan.md M0)
-if (Math.pow(10, -5) === 1e-5)
-  console.log("WARNING: this engine's Math.pow is not the fdlibm one the baseline was captured on ("
-    + process.version + "). A DIFFERS below is the engine, not the core — run on Node 22.");
+if (Math.pow(10, -5) === 1e-5){
+  console.log("REFUSED: this engine's Math.pow is not the fdlibm one the baseline was captured on ("
+    + process.version + "). Any DIFFERS would be the engine, not the core — run on Node 22.");
+  process.exit(2);
+}
 const C = require(CORE);
 const { W, P } = C;
 function fingerprint(seed, mutation){
@@ -47,8 +49,10 @@ if (process.argv.includes("--capture")){
   const base = JSON.parse(fs.readFileSync(BASELINE));
   if (base.coreHash === undefined || !base.silent)
     console.log("WARNING: baseline predates the current format — recapture required");
-  else if (base.coreHash !== coreHash)
+  let stale = false;
+  if (base.coreHash !== undefined && base.silent && base.coreHash !== coreHash){ stale = true;
     console.log("NOTE: core file differs from the one this baseline certifies (hash " + base.coreHash + " vs " + coreHash + ") — a changed fingerprint below means an undeclared behavior change; an identical fingerprint means the edit was behavior-neutral");
+  }
   let ok = true;
   for (const mode of ["silent","evolving"]) for (const seed of ["11","88"]){
     const same = base[mode] && JSON.stringify(base[mode][seed]) === JSON.stringify(result[mode][seed]);
@@ -57,4 +61,9 @@ if (process.argv.includes("--capture")){
   }
   console.log(ok ? "CONFORMANCE PASS (bit-identical to baseline)" : "CONFORMANCE FAIL");
   if (!ok) process.exit(1);
+  // A stale hash is not a pass, even on identical fingerprints: the baseline no longer certifies
+  // the file that produces them (CLAUDE.md rule 2). CI used to grep for the NOTE while `npm test`
+  // let it through; since 2026-09-05 the script itself refuses, so both agree. Rebinding stays a
+  // visible act — `npm run conform:capture` with the reason in the commit.
+  if (stale){ console.log("STALE BASELINE: identical fingerprints, so the edit was behaviour-neutral — rebind it with a declared reason (npm run conform:capture)"); process.exit(3); }
 }

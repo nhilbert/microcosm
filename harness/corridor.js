@@ -20,6 +20,7 @@ const argv = process.argv.slice(2);
 const has = f => argv.includes(f), after = f => { const i = argv.indexOf(f); return i >= 0 && argv[i+1] && !argv[i+1].startsWith("--") ? +argv[i+1] : null; };
 const PAIRS = []; LOCI.forEach(sp => TRAITS[sp].loci.forEach((Lc, k) => PAIRS.push({ sp, k, L: Lc })));
 const sigma0 = PAIRS.map(p => p.L.sigma);
+const AUDIT_BAND = 0.05; // percent of M0, per HORIZON ticks (scaled per run below)
 
 // ---- worker: one run per process, result as one JSON line on stdout ----
 // job: { kind:"pinned", seed, corner, ticks } | { kind:"fuzz", seed, kf, ticks }
@@ -84,6 +85,14 @@ runPool(__filename, jobs, (r, idx) => {
   if (idx % SEEDS.length === 0) console.log(`\n=== ${cfg.label}${cfg.kind === "fuzz" ? "" : ", mutation off"} ===`);
   if (r.workerError){ console.log(`seed ${SEEDS[idx % SEEDS.length]}: WORKER ERROR ${r.workerError} ${r.raw || ""}`); anyFail = true; return; }
   if (r.collapsedAt >= 0){ console.log(`seed ${r.seed}: ECOSYSTEM COLLAPSE at t=${r.collapsedAt} pops=${r.last}`); anyFail = true; return; }
+  // "the mineral audit stays flat" is half the criterion above; judged, not just printed, since
+  // 2026-09-05. The band scales with the run's horizon: the world's own drift is float
+  // accumulation, linear in ticks (measured on the crate that day: -0.007%..-0.011% at 18,000 ticks
+  // on every rail, -0.041%..-0.054% on the 54,000-tick fuzz runs), so a flat 0.05% would have
+  // failed two healthy fuzz seeds. 0.05% per 18,000 ticks keeps the world an order of magnitude
+  // inside the band at every horizon and a leak an order of magnitude outside it.
+  const band = AUDIT_BAND * jobs[idx].ticks / HORIZON;
+  if (Math.abs(r.audit) > band){ console.log(`seed ${r.seed}: MINERAL AUDIT DRIFTED ${r.audit.toFixed(4)}% (band ±${band.toFixed(3)}% over ${jobs[idx].ticks} ticks)`); anyFail = true; }
   const last = r.last;
   if (cfg.kind === "fuzz")
     console.log(`seed ${r.seed}: OK | S=${last[0]} D=${last[1]} C=${last[2]} B=${last[3]} V=${last[6]} | ${r.g} | audit ${r.audit.toFixed(4)}%`);

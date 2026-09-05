@@ -27,6 +27,8 @@ for (let k = 0; k < 10; k++){ const t = 600 + k * 300;
 }
 const dimPours = {}; for (let k = 0; k < 10; k++) dimPours[600 + k * 300] = nearPours[600 + k * 300];
 const matPours = {}; for (let k = 0; k < 8; k++) matPours[800 + k * 400] = pour(512 + ((k % 3) - 1) * 80, 512 + (((k / 3) | 0) % 3 - 1) * 80);
+const soup3 = {}; for (let k = 0; k < 30; k++)
+  soup3[1000 + k * 300] = pour(512 + ((k % 3) - 1) * 60, 512 + (((k / 3) | 0) % 3 - 1) * 60);
 const graze = t => ({ [t]: () => C.applyEvent({ type: "spawnPack", sp: 2, x: 512, y: 480 }) });
 const grazeL5 = { 3000: () => C.applyEvent({ type: "spawnPack", sp: 2, x: 512, y: 470 }) };
 const grazeL5x3 = { 3000: () => { for (const [x, y] of [[470, 512], [554, 512], [512, 470]])
@@ -96,6 +98,11 @@ const CASES = [
   ["cycle",   "null: let the mud keep it all",       null,                                             "failed"],
   ["cycle",   "strategy: seed Bacillus at t=6000",   { 6000: () => C.applyEvent({ type: "spawnPack", sp: 3, x: 512, y: 470 }) }, "passed"],
   ["cycle",   "strategy: seed Bacillus early (t=1000)", { 1000: () => C.applyEvent({ type: "spawnPack", sp: 3, x: 512, y: 470 }) }, "passed"],
+  // The wrong levers L3 lacked until 2026-09-05: an eater that is not a decomposer only moves
+  // matter between bodies, and soup feeds the water, not the mud. Both fail at the deadline on
+  // both cores (measured on the level machinery, as the standing rule requires).
+  ["cycle",   "wrong: seed the grazer instead (t=6000)", { 6000: () => C.applyEvent({ type: "spawnPack", sp: 2, x: 512, y: 470 }) }, "failed"],
+  ["cycle",   "wrong: thirty pours, nobody eats the dead", soup3,                                          "failed"],
   ["garden",  "null: let the bloom keep the water",  null,       "failed"],
   ["garden",  "strategy: seed the grazer at t=4000", graze(4000), "passed"],
   ["garden",  "strategy: a late grazer (t=7000)",    graze(7000), "passed"],
@@ -141,6 +148,14 @@ const CASES = [
 void packs9; void feedHi9;
 
 let ok = true;
+// Every shipped level needs all three kinds of case, or it is not gated: a level with no wrong
+// lever is a demonstration. This check exists because L3 shipped without one (review 2026-09-05).
+for (const def of LEVELS){
+  const kinds = new Set(CASES.filter(c => c[0] === def.key).map(c => c[1].split(":")[0]));
+  for (const k of ["null", "strategy", "wrong"]) if (!kinds.has(k)){
+    ok = false; console.log(`  FAIL  L${def.n} ${def.key.padEnd(8)} has no "${k}" case in this gate`);
+  }
+}
 for (const [key, label, actions, expect] of CASES){
   const def = by(key);
   const r = drive(def, actions);

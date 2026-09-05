@@ -30,7 +30,10 @@ const TICKS = "3000";
 function sourceHash() {
   const files = [];
   (function walk(dir) {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    // Sorted by code unit, not by locale: `localeCompare` is ICU collation, which puts `_` before
+    // `.` (levels_gen.rs ahead of levels.rs) and can differ between Node builds — and the order is
+    // part of the hash.
+    for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
       const p = path.join(dir, e.name);
       if (e.isDirectory()) {
         if (e.name === "bin") continue;
@@ -101,7 +104,8 @@ if (!sameTargets) {
 }
 
 // 2/3. the baseline, and the hash that binds it
-if (base.coreHash !== coreHash)
+const stale = base.coreHash !== coreHash;
+if (stale)
   console.log(`NOTE: the core sources differ from the ones this baseline certifies (hash ${base.coreHash} vs ${coreHash}) — a changed fingerprint below means an undeclared behavior change; identical fingerprints mean the edit was behavior-neutral`);
 for (let i = 0; i < Math.max(base.fingerprints.length, result.fingerprints.length); i++) {
   const want = base.fingerprints[i], got = result.fingerprints[i];
@@ -112,4 +116,9 @@ for (let i = 0; i < Math.max(base.fingerprints.length, result.fingerprints.lengt
 }
 
 console.log(ok ? "CORE CONFORMANCE PASS (bit-identical to baseline, native and wasm agree)" : "CORE CONFORMANCE FAIL");
-process.exit(ok ? 0 : 1);
+if (!ok) process.exit(1);
+// A stale hash is not a pass (CLAUDE.md rule 2): identical fingerprints prove the edit was
+// behaviour-neutral, and that is exactly the case that gets rebound — deliberately, with the reason
+// in the commit. The script refuses so that `npm run test:port` and CI agree.
+if (stale){ console.log("STALE BASELINE: identical fingerprints, so the edit was behaviour-neutral — rebind it with a declared reason (npm run conform:core:capture)"); process.exit(3); }
+process.exit(0);

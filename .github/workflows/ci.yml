@@ -36,14 +36,10 @@ jobs:
       - name: Harness self-test (estimators on synthetic series)
         run: npm run selftest
 
+      # A stale hash (the NOTE) exits 3 from the script itself since 2026-09-05, so `npm test` and
+      # this step agree; nothing here has to grep for it.
       - name: Conformance (must be bit-identical)
-        run: |
-          out=$(npm run --silent conform)
-          echo "$out"
-          if echo "$out" | grep -q "NOTE:"; then
-            echo "::error::conform.js printed a NOTE — the baseline no longer certifies core.js. Rebind it deliberately; see CONTRIBUTING.md."
-            exit 1
-          fi
+        run: npm run --silent conform
 
       # Both are in `npm test`; CI runs the steps individually, so they need naming here too.
       - name: Player-language gate
@@ -75,20 +71,24 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - run: npm install --no-audit --no-fund
+      # The acceptance authority is the crate (rule 11; decided 2026-09-05): every ecology run below
+      # drives rust/wasm/core.js. The frozen JavaScript oracle is not re-measured here — it cannot
+      # change, and `port:check` in the port job is what proves the crate still reproduces it.
+      - name: Build the core for WASM
+        run: npm run build && npm run wasm
       - name: 8-seed ecology harness
-        run: npm run tune
+        run: MC_CORE=$PWD/rust/wasm/core.js node harness/tune2.js
       - name: K6 observatory gate (reference world)
-        run: npm run gate
+        run: MC_CORE=$PWD/rust/wasm/core.js node harness/k6gate.js
       - name: Phase 5 gate (the Observatory narrates the evolution)
-        run: npm run gate5
+        run: MC_CORE=$PWD/rust/wasm/core.js node harness/gate5.js
       - name: Corridor certification (rails + evolution as the fuzzer)
-        run: npm run build && node harness/corridor.js --rails --fuzz
+        run: MC_CORE=$PWD/rust/wasm/core.js node harness/corridor.js --rails --fuzz
 
       # The start worlds are calibrated or they do not ship: every one of them, over the same
-      # eight seeds and the same horizon, held to the criterion its own row declares. The start
-      # table lives in the Rust core, so this job builds it (the others here drive dist/core.js).
+      # eight seeds and the same horizon, held to the criterion its own row declares.
       - name: Start-world acceptance (5 worlds x 8 seeds x 18,000 ticks)
-        run: npm run wasm && npm run starts
+        run: npm run starts
 
   port:
     name: Rust core — bit-exactness against the JavaScript core
@@ -147,14 +147,10 @@ jobs:
       # The certifying harness for the core after the M4 handover: the fingerprint, the hash of
       # the Rust sources that binds it, and native-vs-WASM identity (two targets disagreeing means
       # the core stopped being deterministic across platforms).
+      # A stale hash (the NOTE) exits 3 from the script itself since 2026-09-05; see docs/porting.md
+      # for the rebind ritual.
       - name: Core conformance (and native == wasm)
-        run: |
-          out=$(npm run --silent conform:core)
-          echo "$out"
-          if echo "$out" | grep -q "NOTE:"; then
-            echo "::error::conform-core.js printed a NOTE — the core baseline no longer certifies the sources that produce it. Rebind it deliberately; see docs/porting.md."
-            exit 1
-          fi
+        run: npm run --silent conform:core
 
       # Still the strongest check here, and expected to fail at the first declared ecology change
       # in Rust — at which point it retires into the record (docs/porting.md §7).
