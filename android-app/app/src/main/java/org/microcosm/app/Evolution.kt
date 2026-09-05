@@ -90,16 +90,15 @@ class EvolutionPanel(private val a: MainActivity, private val world: WorldView) 
     private fun refresh() {
         world.post {
             val got = ArrayList<Row>()
-            for (sp in 0 until 7) for (k in 0 until Native.locusCount(sp)) {
+            for (sp in 0 until 7) for (k in 0 until Species.locusCount(sp)) {
                 val prices = HashMap<Int, Double>()
                 for (key in PRICE_KEYS) {
                     val v = Native.locusGet(sp, k, key)
                     if (!v.isNaN() && v != 0.0) prices[key] = v
                 }
-                got.add(Row(sp, k, Native.traitText(sp, 0),
-                    L10n.trait(Native.traitText(sp, 10 + k)).lowercase(),
-                    android.graphics.Color.rgb(Native.specNum(sp, 0, 0, 0).toInt(),
-                        Native.specNum(sp, 0, 0, 1).toInt(), Native.specNum(sp, 0, 0, 2).toInt()),
+                got.add(Row(sp, k, Species.name(sp),
+                    L10n.trait(Species.locusText(sp, k, 0)).lowercase(),
+                    Species.colour(sp),
                     Native.locusGet(sp, k, KEY_SIGMA), Native.locusGet(sp, k, KEY_CURVE), prices))
             }
             val mut = Native.scalar(50) != 0.0
@@ -296,7 +295,7 @@ class EvolutionPanel(private val a: MainActivity, private val world: WorldView) 
             Native.ivPush(WorldView.IV_PRESET)
             val wantMutation = which != 3 // frozen is the only mutation-off preset
             if ((Native.scalar(50) != 0.0) != wantMutation) Native.evMutation(if (wantMutation) 1 else 0)
-            for (sp in 0 until 7) for (k in 0 until Native.locusCount(sp)) {
+            for (sp in 0 until 7) for (k in 0 until Species.locusCount(sp)) {
                 val s0 = world.shippedSigma[sp * 4 + k] ?: Native.locusGet(sp, k, KEY_SIGMA)
                 val targets: Map<Int, Double> = when (which) {
                     0 -> mapOf(KEY_SIGMA to s0, KEY_CURVE to 0.0)                       // shipped

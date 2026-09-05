@@ -37,6 +37,7 @@ const jobIdx = argv.indexOf("--job");
 if (jobIdx >= 0){ const job = JSON.parse(argv[jobIdx+1]); console.log(JSON.stringify(runSeed(job.seed, job.mutation))); process.exit(0); }
 
 const mutation = !argv.includes("--silent");
+const AUDIT_BAND = 0.05; // percent of M0; the world's own drift is an order of magnitude inside it
 console.log(`[${mutation ? "evolving world, P.mutation=true" : "reference world, P.mutation=false"}]`);
 const t0 = Date.now(); let anyFail = false;
 const { runPool } = require("./pool.js");
@@ -46,6 +47,13 @@ runPool(__filename, SEEDS.map(seed => ({ seed, mutation })), r => {
     console.log(`seed ${r.seed}: ECOSYSTEM COLLAPSE at t=${r.collapsedAt} pops=${r.last}`);
     console.log(`  (audit drift at abort: ${r.drift.toFixed(4)}%)`);
     anyFail = true; return;
+  }
+  // The audit is the second half of the criterion, and until 2026-09-05 it was printed and never
+  // judged. Band as in harness/starts.js: the certified pond drifts -0.007%..-0.011% over the
+  // horizon (float accumulation), so 0.05% is generous for the world and tight for a leak.
+  if (Math.abs(r.drift) > AUDIT_BAND){
+    console.log(`seed ${r.seed}: MINERAL AUDIT DRIFTED ${r.drift.toFixed(4)}% (band ±${AUDIT_BAND}%)`);
+    anyFail = true;
   }
   const apex = !r.vSeen ? "never established" : r.vLostT < 0 ? `held (${r.last[6]})` : `lost at t=${r.vLostT}`;
   console.log(`seed ${r.seed}: OK apex ${apex} | final S=${r.last[0]} D=${r.last[1]} C=${r.last[2]} B=${r.last[3]} My=${r.last[4]} V=${r.last[6]} | min ${r.minP.join('/')} | M-audit drift ${r.drift.toFixed(4)}% | M-starved producers @t9000: ${r.mStarv} | uptake ${r.uptake.toFixed(0)} release ${r.release.toFixed(0)} | corpses=${r.corpses} | detritus E=${r.dE.toFixed(0)} P=${r.dP.toFixed(0)} egested E=${r.egestE.toFixed(0)} | bacRelease M=${r.bacRelease.toFixed(0)}`);

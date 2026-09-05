@@ -169,14 +169,13 @@ impl Sim {
         // Note: `mutation` is a harness-level switch (like spawn_decomposers) and is deliberately
         // NOT reset here — the UI reset restores it.
 
-        // Restore the shipped evolution settings. Only sigma and curve are restored, matching the
-        // JS exactly: harness price sweeps (heat.js --thermal) set slopes BEFORE start() and depend
-        // on them surviving init. Documented in docs/android-port-plan.md; do not "fix" one side.
+        // Restore the shipped evolution settings — ALL locus fields, matching the JS (2026-09-01):
+        // the price sliders edit slopes through the same locus event, and a partial restore leaked
+        // them across resets. (Until then only sigma and curve were restored, for the harness price
+        // sweeps that set slopes before start(); those sweeps set them again after.)
         for sp in 0..self.tr.len() {
             for k in 0..self.tr[sp].loci.len() {
-                // ALL locus fields, matching the JS (2026-09-01): the price sliders edit slopes
-                // through the same locus event, and a partial restore leaked them across resets.
-                self.tr[sp].loci[k] = self.locus_shipped[sp][k].clone();
+                self.tr[sp].loci[k] = self.locus_shipped[sp][k];
             }
         }
 

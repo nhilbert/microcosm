@@ -389,7 +389,7 @@ impl Sim {
         };
         let off = plane * crate::params::MAXN;
         let (mut n, mut m) = (0.0f64, 0.0f64);
-        for i in 0..self.w.n {
+        for i in 0..self.w.n_slots() {
             if self.w.alive[i] == 0 || self.w.sp[i] as usize != sp {
                 continue;
             }
@@ -417,7 +417,7 @@ impl Sim {
         let hw = crate::params::WORLD / 2.0;
         let world = crate::params::WORLD;
         let mut n = 0.0;
-        for i in 0..self.w.n {
+        for i in 0..self.w.n_slots() {
             if self.w.alive[i] == 0 || self.w.sp[i] as usize != g_sp {
                 continue;
             }
@@ -520,6 +520,13 @@ impl Sim {
             rg,
             rg_s: 0,
         };
+        // The level's founding is not the player's last move: the light it set above is the
+        // world's starting sun, not a lever to put back (an undo here would hand L1 full sun),
+        // and whatever the player did in the pond before opening the ladder stays in the pond.
+        // Same reasoning, same two lines, as `start_apply` (starts.rs) and `Sim::load`.
+        self.undo = crate::events::Undo::None;
+        self.iv_log.clear();
+        self.frame.cand.clear();
     }
 
     pub fn level_restart(&mut self) {

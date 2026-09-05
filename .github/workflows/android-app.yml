@@ -6,8 +6,8 @@ name: Android app
 #
 # The only Android workflow since the diagnostics probe and the WebView wrapper retired.
 #
-# This workflow is also the only compiler the Kotlin ever sees: the development container has no
-# Android SDK, so a red build here is the first signal that something does not compile.
+# This workflow is the Kotlin's compiler of record: not every development container carries an
+# Android SDK, so a red build here is the signal that something does not compile.
 
 on:
   workflow_dispatch:
@@ -16,6 +16,10 @@ on:
     paths:
       - "rust/**"
       - "android-app/**"
+      # build.gradle mounts the repo-root assets into the APK, and the tests assert on them
+      # (StartsTest, HelpPageTest, BootTest); the keystore signs the release.
+      - "assets/**"
+      - "keystore/**"
       - "tools/build-app.sh"
       - ".github/workflows/android-app.yml"
 

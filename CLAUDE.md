@@ -7,8 +7,8 @@ A mobile-first ecosystem sandbox in which artificial organisms live, eat, reprod
 - `src/sim/` — the simulation: `params.js` (PRNG + constants), `species.json` (**the species table — row order is the species index, part of the RNG contract**; inlined by build.py; schema + design notes in docs/species-schema.md), `traits.js` (defaults, loader, locus guardrail, `SPECIES` registry — use it instead of literal species indices), `world.js` (SoA state, spawn/kill), `events.js` (the only legal outside mutation), `fields.js` (diffusion, light, spatial hash), `step.js` (**the RNG-order contract + the tick**), `init.js` (setup + Node exports). Pure, deterministic, UI-free — and since the M4 handover, the FROZEN historical oracle: `rust/microcosm-core` is the living simulation, and this is what it was proved against (rule 11).
 - `src/observatory/` — `recorder.js`, `analysis.js`, `impact.js`, `levels.json` + `levels.js` (Phase 8 learning levels: **the table is data, predicates included** — inlined by build.py as `LEVEL_ROWS`, generated into `rust/microcosm-core/src/levels_gen.rs`; `levels.js` is the evaluator plus pure-observer verdicts; setup composes only initWorld scenarios and events). Pure observers: **zero PRNG draws**, no mutation of dynamic state. Free to rewrite in a port; the sim is not.
 - `src/header.jsx`, `src/ui-render.js` (palette, sprites, tint, **the whole frame pipeline**: layers, organisms, corpses, affordances — the visual grammar lives here), `src/ui-layout.js`, `src/ui-data.jsx`, `src/ui-reset.jsx`, `src/ui.jsx` (component, gestures, selection, actions, panels), `src/ui-levels.jsx` (the app shell: start screen, experiment HUD, verdicts, session badges — the default export since Phase 8) — UI layers; `tools/build.py` concatenates all into `dist/microcosm.jsx`, the deliverable artifact. Generated and committed; never hand-edit, CI enforces that it matches `src/`.
-- `harness/tune2.js` — 8-seed × 18,000-tick ecology harness (seeds 11,22,33,44,55,66,77,88). The acceptance authority. Exits non-zero if any seed aborts.
-- `harness/conform.js` — fast conformance check (seeds 11+88, t=3,000 fingerprint). **Hash-bound**: the baseline stores a sha256 of the built `dist/core.js`; a hash mismatch with identical fingerprint = behavior-neutral edit, changed fingerprint = undeclared behavior change. `--capture` recaptures (only with a declared reason).
+- `harness/tune2.js` — 8-seed × 18,000-tick ecology harness (seeds 11,22,33,44,55,66,77,88). The acceptance authority; since 2026-09-05 `npm run tune` (and every ecology script in package.json) drives the CRATE through `rust/wasm/core.js`, and the mineral audit is gated at ±0.05 %, not just printed. Exits non-zero if any seed aborts or drifts.
+- `harness/conform.js` — fast conformance check (seeds 11+88, t=3,000 fingerprint). **Hash-bound**: the baseline stores a sha256 of the built `dist/core.js`; a hash mismatch with identical fingerprint = behavior-neutral edit, changed fingerprint = undeclared behavior change. `--capture` recaptures (only with a declared reason). A stale hash exits 3 (since 2026-09-05), so `npm test` and CI agree on it.
 - `harness/k6gate.js` — Phase 4 gate script (the Observatory must narrate the decomposers-off collapse unprompted; healthy control silent). Exits non-zero if the gate fails.
 - `docs/porting.md` — **the core contract** (rewritten at the M4 handover): where the simulation lives now, what must be bit-exact, what may be rewritten, how a change is proved, and what the migration measured. Read it before touching anything the tick reaches.
 - `harness/light.js` — Phase 7 L measurement and gate (`--viability`, `--patches [--seed]`, `--gate`); `npm run light`, `npm run light:gate`.
@@ -22,7 +22,7 @@ A mobile-first ecosystem sandbox in which artificial organisms live, eat, reprod
 - `harness/conform-baseline.json` — the certified fingerprint plus the `coreHash` it is bound to. Never hand-edit; only `npm run conform:capture` writes it.
 - `rust/microcosm-core/` — **the Rust port of the core** (sim + observatory), bit-exact to the JS reference: `math/` (self-contained, matched to V8 12.4 — never call `f64::sin` here), `step.rs` (carries the RNG-order banner verbatim), `observatory.rs`, `snapshot.rs` (save/load), `wasm.rs` (the C ABI). `rust/wasm/core.js` presents it as `dist/core.js`, so `MC_CORE=rust/wasm/core.js` points any harness at the ported core. `species_gen.rs` and `levels_gen.rs` are GENERATED from the built JS core by `tools/gen-species-rs.js` / `tools/gen-levels-rs.js` — never hand-edit, CI enforces it. `starts.rs` is the sandbox start-world table — data, calibrated in `harness/starts.js`, reaching the app as JSON exactly as the level table does; `levels.rs` is the level runtime, gate-proved against the oracle (`npm run port:levels`); `frame.rs` is the **visual grammar** shared by every platform's renderer (M5.1 A.0) — display list, sprite bucket table, per-cell pixel fields, glow and wall lists — proved against `src/ui-render.js` by `harness/fingerprint-frame.js`. Proof commands: `npm run port:check` (world + events + scenario), `npm run port:math` (needs a trace from `dev/xcheck/gen.js`), `npm run port:snapshot`, `npm run port:levels` (the honesty gate on the ported core); `npm run test:port` runs the lot. Plan and measured status: docs/android-port-plan.md; the app is `android-app/`, planned and recorded in docs/android-app-plan.md (A.0–A.6 shipped: frame builder, render thread, gestures, levers with undo and impact cards, Data pages, the experiment ladder, save/load).
 - `LICENSE` (GPL-3.0-or-later, code) and `LICENSE-docs` (CC BY-SA 4.0, everything in `docs/`). The GPL notice lives at the top of `src/header.jsx` so the built artifact carries it once; the sim sources deliberately carry no per-file header, to keep the core hash stable.
-- `docs/status-log.md` — **the running record**, 41 dated entries from phase 1 to now, verbatim. Moved out of this file on 2026-09-02. Read the entries for whatever system you are about to touch; the Current status section below is only a summary.
+- `docs/status-log.md` — **the running record**, dated entries from phase 1 to now, verbatim. Moved out of this file on 2026-09-02. Read the entries for whatever system you are about to touch; the Current status section below is only a summary.
 - `docs/` — concept, phase plans, architecture review, observatory design, genetics research. Closure records and calibration histories live there; read them before touching related systems.
 
 ## Non-negotiable working rules (all earned the hard way)
@@ -46,7 +46,7 @@ Small increments, each confirmed before the next. State contradictions and trade
 
 ## Current status
 
-The full running record — 48 entries, phases 1 through 8 — is in
+The full running record — phases 1 through 9 — is in
 **docs/status-log.md**. Read it when you need the history of a system you are
 about to touch; the phase records in `docs/` carry the numbers. What follows is
 only where things stand.
@@ -131,7 +131,8 @@ defaults, diet fold, loci flattening and `warmGated` derivation land in Rust by
 construction — so removing the JS core would leave `species_gen.rs` and
 `levels_gen.rs` unregenerable and would delete the browser build with it. The
 order is: decide where normalization lives once the oracle is gone, then flip
-the harness default core from `dist/core.js` to `rust/wasm/core.js` (note the
-trap: `tools/port-check.js` distinguishes the two cores by setting `MC_CORE=""`,
-which would silently become Rust-vs-Rust), then tag `oracle/js-final` and delete
-only after `port:check` has retired on its own.
+the harness default core from `dist/core.js` to `rust/wasm/core.js` (the
+`MC_CORE=""` trap in `tools/port-check.js` was defused on 2026-09-05: it now names
+`dist/core.js` explicitly for the JS side; the npm ecology scripts already drive the
+crate), then tag `oracle/js-final` and delete only after `port:check` has retired on
+its own.

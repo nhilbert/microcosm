@@ -848,10 +848,7 @@ class WorldView(context: Context) : SurfaceView(context), SurfaceHolder.Callback
     private val SP_VENATOR = 6
 
     /** The species' own colour, from the core's bucket table — never a second palette here. */
-    internal fun speciesColor(sp: Int) = android.graphics.Color.rgb(
-        Native.specNum(sp, 0, 0, 0).toInt(),
-        Native.specNum(sp, 0, 0, 1).toInt(),
-        Native.specNum(sp, 0, 0, 2).toInt())
+    internal fun speciesColor(sp: Int) = Species.colour(sp)
 
     /** Copy the channels the charts need, and publish the two written pages. Render thread only. */
     private fun publishData() {

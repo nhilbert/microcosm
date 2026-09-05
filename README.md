@@ -80,7 +80,7 @@ To build the artifact from the layers in `src/`:
 
 ```bash
 npm run build   # src/ -> dist/microcosm.jsx
-npm test        # build + syntax check + conformance
+npm test        # build + syntax + estimator self-test + conformance + both prose gates + render smoke
 ```
 
 Nothing in `dev/` ships. It exists so a browser has something to load; the
@@ -161,7 +161,8 @@ confident theory that lost an argument with the data.
 
 ## Status
 
-Phases 1–7 are closed and Phase 8 (the learning levels) is in progress. The port
+Phases 1–9 are closed: the learning ladder ships L1–L9, L11 and L12 (L10 is folded
+with a re-entry condition) and the sandbox opens on five calibrated start worlds. The port
 is **done**: `rust/microcosm-core` is the simulation, and `src/sim/` plus
 `src/observatory/` are the frozen oracle it was proved against
 (`docs/porting.md`). The native Android app is the product; the browser build is
@@ -198,7 +199,7 @@ The ecology numbers below are from the last full acceptance run, 2026-08-31:
 - **`corridor.js` — CERTIFIED 200/200**: every one of the eleven loci may
   evolve anywhere in its corridor without breaking the ecosystem, rails and
   evolution-as-fuzzer alike.
-- **`levels.js` — 21 of 21 cases pass** the honesty gate, on both cores: every
+- **`levels.js` — every case passes** the honesty gate, on both cores: every
   shipped level fails untouched, passes on its lesson, and fails on a plausible
   wrong lever.
 

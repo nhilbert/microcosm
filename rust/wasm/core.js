@@ -26,7 +26,9 @@ const X = instance.exports;
 const MEM = X.memory;
 X.mc_boot();
 
-// ---------- constants (mirrored from src/sim/params.js; asserted against Rust below) ----------
+// ---------- constants (mirrored BY HAND from src/sim/params.js and rust/microcosm-core/src/params.rs;
+// nothing here asserts them against the crate — the positional tables below (COLS, LOCUS_KEYS,
+// IV_KINDS, SC, APPARATUS, LVL_STATE) must be kept in step with wasm.rs by reading both) ----------
 const MAXN = 6000, MAXLOCI = 4, GRID = 64, WORLD = 1024, CELL = WORLD / GRID;
 const NCELL = GRID * GRID, MAXCORPSE = 1500;
 const REC = { N: 900, STRIDE: 20, CH: 141 };

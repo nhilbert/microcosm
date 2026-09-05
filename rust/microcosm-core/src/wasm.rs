@@ -1428,9 +1428,11 @@ pub extern "C" fn mc_iv_clear() {
 
 static mut IMPACT: Option<crate::impact::Impact> = None;
 
+/// The parked card, or the default (status rolled, every number 0) when nothing has been
+/// parked yet — a shell that reads a field before its first `mc_impact` gets zeros, not an abort.
 #[allow(static_mut_refs)]
 fn imp() -> &'static crate::impact::Impact {
-    unsafe { IMPACT.as_ref().unwrap() }
+    unsafe { IMPACT.get_or_insert_with(Default::default) }
 }
 
 /// Compute the card for intervention `i` and park it. Returns the status: 0 rolled, 1 watching,

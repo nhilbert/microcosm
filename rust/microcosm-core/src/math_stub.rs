@@ -33,3 +33,7 @@ pub fn hypot(x: f64, y: f64) -> f64 {
 pub fn sqrt(x: f64) -> f64 {
     x.sqrt()
 }
+#[inline]
+pub fn floor(x: f64) -> f64 {
+    x.floor()
+}
