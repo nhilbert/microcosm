@@ -71,23 +71,52 @@ jobs:
           name: microcosm-app-apk
           path: microcosm-app.apk
 
+      # The body below is meant to stay true across builds: it says what the app is and how the
+      # release works, never which increment it is on. What the app can and cannot do today is
+      # in docs/status-log.md, and the body points there instead of repeating it.
       - name: Update the rolling app-latest release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: app-latest
-          name: Microcosm native app (latest)
+          name: Microcosm app (latest build)
           prerelease: true
           files: microcosm-app.apk
           body: |
-            The **native app**: the Rust core running on the phone, painting the shared frame
-            builder's display list on a SurfaceView.
+            **Microcosm** is a pond you can hold in your hand: artificial organisms photosynthesise,
+            graze, hunt, starve, reproduce and rot inside a world where matter is strictly
+            conserved, and the app can tell you where every unit of it went. It is a toy, not a
+            model of anything real. The point is to poke a complicated living system and find out
+            what happens.
 
-            Open this page on the phone, download `microcosm-app.apk` and install it. Consecutive
-            builds carry the same signature, so a new one installs over the old.
+            This is the native app: the Rust core (`rust/microcosm-core`) running on the phone,
+            painting the shared frame builder's display list on a SurfaceView. The browser build in
+            the repository is the reference the renderer is proved against, not the product.
+            Background: `docs/android-app-plan.md`.
 
-            What is in it (A.0–A.6 of docs/android-app-plan.md, plus Phases 8 and 9): the world
-            with its gestures (pan, pinch, tap to inspect, long-press to seed); the levers, each
-            logged, undoable and impact-carded (the sun card, mineral pours, the armed feed and
-            kill tools, species seeding, walls, the Evolution panel); six Data pages; the
-            experiment ladder (L1–L9, L11, L12) with prediction and debrief; five sandbox start
-            worlds; save and load; a help page; English and German.
+            **Install.** Open this page on the phone, download `microcosm-app.apk` and open it.
+            Android will ask you to allow installs from your browser, since the app is not on any
+            store. Every build carries the same signing identity, so a new one installs over the old
+            one and keeps your saved worlds. It needs Android 8.0 or newer on a 64-bit ARM phone,
+            which is nearly every phone sold since 2017.
+
+            **What is in it.**
+            - The sandbox, with five openings: the pond, still water, two suns, the pen, lean water.
+            - Levers: drag or dim the sun, pour minerals, feed or kill an individual, seed a species,
+              draw walls, set the Evolution dials. Every intervention is an event: logged, undoable,
+              and reported on by an impact card that says *since*, never *because*.
+            - Experiments: a ladder of levels, each a prediction to make and a lever to find.
+            - Data: six pages of instruments, from populations and chemistry to traits and an
+              event feed of what you did and what the world did.
+            - Help: how the mineral goes round, and one card per creature beside its real model.
+            - Save and load. English and German.
+
+            **What this release is.** A rolling build, marked pre-release because that is what it
+            is. CI rebuilds it and replaces the file on every push that touches the app or the
+            core, on main and on working branches alike, so this file can be ahead of main. The
+            build number inside the app is the CI run number. What the app can and cannot do at
+            any given moment is written down in `docs/status-log.md`, not here; this text is meant
+            to stay true.
+
+            The signing key is committed on purpose and guards nothing (`keystore/README.md`).
+            It exists so that updates install in place. It proves nothing about who built the file,
+            so download from this page and nowhere else.

@@ -1,0 +1,69 @@
+<!-- THE ROUND: three living bodies - alga, grazer, decomposer - carrying one mineral clockwise around a closed circle, each trailing the path it just travelled. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="litPool" cx="50%" cy="46%" r="62%">
+      <stop offset="0%" stop-color="#2E4A63"/><stop offset="42%" stop-color="#1B3048"/>
+      <stop offset="78%" stop-color="#0C1724"/><stop offset="100%" stop-color="#0B131E"/>
+    </radialGradient>
+    <radialGradient id="glowAlga" cx="50%" cy="50%" r="50%">
+      <stop offset="52%" stop-color="#46D68C" stop-opacity="0.55"/>
+      <stop offset="76%" stop-color="#46D68C" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#46D68C" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowGrazer" cx="50%" cy="50%" r="50%">
+      <stop offset="52%" stop-color="#D7A6E8" stop-opacity="0.52"/>
+      <stop offset="76%" stop-color="#D7A6E8" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#D7A6E8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowDecomp" cx="50%" cy="50%" r="50%">
+      <stop offset="52%" stop-color="#9EA868" stop-opacity="0.50"/>
+      <stop offset="76%" stop-color="#9EA868" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#9EA868" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowMineral" cx="50%" cy="50%" r="50%">
+      <stop offset="45%" stop-color="#C9D7E3" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#C9D7E3" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g id="icon">
+    <rect x="0" y="0" width="512" height="512" fill="#0B131E"/>
+    <rect x="0" y="0" width="512" height="512" fill="url(#litPool)"/>
+
+    <!-- alga: trail from tail to head, thickening and firming as it nears the body -->
+    <g fill="none" stroke="#46D68C" stroke-linecap="butt">
+      <path d="M 144.07 252.09 A 112 112 0 0 1 153.68 210.45" stroke-width="14" stroke-opacity="0.38" stroke-linecap="round"/>
+      <path d="M 153.68 210.45 A 112 112 0 0 1 178.20 175.43" stroke-width="18" stroke-opacity="0.53"/>
+      <path d="M 178.20 175.43 A 112 112 0 0 1 214.04 152.16" stroke-width="22" stroke-opacity="0.71"/>
+      <path d="M 214.04 152.16 A 112 112 0 0 1 256.00 144.00" stroke-width="26" stroke-opacity="0.92"/>
+    </g>
+
+    <!-- grazer -->
+    <g fill="none" stroke="#D7A6E8" stroke-linecap="butt">
+      <path d="M 315.35 161.02 A 112 112 0 0 1 346.61 190.17" stroke-width="13" stroke-opacity="0.36" stroke-linecap="round"/>
+      <path d="M 346.61 190.17 A 112 112 0 0 1 364.67 228.90" stroke-width="16" stroke-opacity="0.51"/>
+      <path d="M 364.67 228.90 A 112 112 0 0 1 366.91 271.59" stroke-width="20" stroke-opacity="0.69"/>
+      <path d="M 366.91 271.59 A 112 112 0 0 1 352.99 312.00" stroke-width="23" stroke-opacity="0.90"/>
+    </g>
+
+    <!-- decomposer -->
+    <g fill="none" stroke="#9EA868" stroke-linecap="butt">
+      <path d="M 308.58 354.89 A 112 112 0 0 1 267.71 367.39" stroke-width="12" stroke-opacity="0.36" stroke-linecap="round"/>
+      <path d="M 267.71 367.39 A 112 112 0 0 1 225.13 363.66" stroke-width="15" stroke-opacity="0.50"/>
+      <path d="M 225.13 363.66 A 112 112 0 0 1 187.05 344.26" stroke-width="18" stroke-opacity="0.68"/>
+      <path d="M 187.05 344.26 A 112 112 0 0 1 159.01 312.00" stroke-width="21" stroke-opacity="0.90"/>
+    </g>
+
+    <!-- the three bodies, each at the leading end of its own trail -->
+    <circle cx="256.00" cy="144.00" r="42" fill="url(#glowAlga)"/>
+    <circle cx="352.99" cy="312.00" r="39" fill="url(#glowGrazer)"/>
+    <circle cx="159.01" cy="312.00" r="37" fill="url(#glowDecomp)"/>
+
+    <circle cx="256.00" cy="144.00" r="28" fill="#46D68C"/>
+    <circle cx="352.99" cy="312.00" r="25" fill="#D7A6E8"/>
+    <circle cx="159.01" cy="312.00" r="23" fill="#9EA868"/>
+
+    <!-- the one mineral they pass between them -->
+    <circle cx="256" cy="256" r="30" fill="url(#glowMineral)"/>
+    <circle cx="256" cy="256" r="12" fill="#C9D7E3"/>
+  </g>
+</svg>

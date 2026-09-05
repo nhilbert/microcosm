@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The launcher icon: THE ROUND — the world's one conserved quantity, drawn.
+
+  Microcosm's deepest rule is that matter is never created and never lost here; it only changes
+  hands. So the mark is one circle broken into three unequal arcs, in the colours the core's
+  bucket table gives the three hands it passes through (frame.rs SPECIES_RGB):
+
+      alga        Solara   #46D68C   the mineral taken up
+      grazer      Cilio    #D7A6E8   the alga eaten
+      decomposer  Bacillus #9EA868   the mineral released again
+
+  The gaps are the handovers, and the pale speck sitting in the widest of them is the mineral
+  itself, mid-flight from the decomposer back to the alga. It is deliberately NOT at the centre:
+  a coloured ring around a centred mark reads as an eye, which cost this design three rounds
+  (docs/icon-concepts/README.md).
+
+  No amber anywhere. Rule 7 gives amber to the player's hand alone, so it may not appear in the
+  world's own imagery — which is what this icon is.
+
+  Geometry, in the adaptive icon's 108-unit canvas: ring radius 25.5 about (54,54), stroke
+  weights 10/9.2/8.4 so the outer edge stands at 30.5 of the 33-unit safe circle, with the
+  spans carried over from the chosen concept (docs/icon-concepts/chosen.svg). IconTest measures
+  that reach on every build rather than trusting this comment.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+
+  <path android:strokeColor="#FF46D68C" android:strokeWidth="10" android:strokeLineCap="round" android:fillColor="#00000000"
+      android:pathData="M75.14,39.74A25.5,25.5 0 0 1 61.03,78.51"/>
+  <path android:strokeColor="#FFD7A6E8" android:strokeWidth="9.2" android:strokeLineCap="round" android:fillColor="#00000000"
+      android:pathData="M46.12,78.25A25.5,25.5 0 0 1 28.64,51.33"/>
+  <path android:strokeColor="#FF9EA868" android:strokeWidth="8.4" android:strokeLineCap="round" android:fillColor="#00000000"
+      android:pathData="M36.29,35.66A25.5,25.5 0 0 1 56.67,28.64"/>
+
+  <path android:pathData="M65.77,31.38m-7.5,0a7.5,7.5 0 1 0 15,0a7.5,7.5 0 1 0 -15,0z">
+    <aapt:attr name="android:fillColor">
+      <gradient android:type="radial" android:centerX="65.77" android:centerY="31.38"
+          android:gradientRadius="7.5">
+        <item android:offset="0"    android:color="#59E8F1F8"/>
+        <item android:offset="0.38" android:color="#26C9D7E3"/>
+        <item android:offset="1"    android:color="#00C9D7E3"/>
+      </gradient>
+    </aapt:attr>
+  </path>
+  <path android:fillColor="#FFE8F1F8" android:pathData="M65.77,31.38m-2.9,0a2.9,2.9 0 1 0 5.8,0a2.9,2.9 0 1 0 -5.8,0z"/>
+</vector>
