@@ -332,7 +332,10 @@ pub fn apply_event(sim: &mut Sim, ev: Event) {
             sim.w.light_dirty = true;
         }
         Event::Feed { i, gen, frac } => {
-            if !(sim.w.alive[i] != 0 && sim.w.gen[i] == gen) {
+            // The slot id comes from the caller. The JS read `W.alive[i]` as `undefined` for an
+            // id outside the pool and treated the event as a logged no-op; here the same id
+            // would index out of bounds, so the range check is the oracle's shrug, made explicit.
+            if i >= MAXN || !(sim.w.alive[i] != 0 && sim.w.gen[i] == gen) {
                 return;
             }
             let cap = sim.p.cap_mul * sim.w.sz[i] as f64;
@@ -347,7 +350,7 @@ pub fn apply_event(sim: &mut Sim, ev: Event) {
             sim.undo = Undo::Feed { i, gen, delta: sim.w.en[i] as f64 - before };
         }
         Event::Kill { i, gen } => {
-            if !(sim.w.alive[i] != 0 && sim.w.gen[i] == gen) {
+            if i >= MAXN || !(sim.w.alive[i] != 0 && sim.w.gen[i] == gen) {
                 return;
             }
             let snap = OrgSnap {

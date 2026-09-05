@@ -389,7 +389,7 @@ impl Sim {
         };
         let off = plane * crate::params::MAXN;
         let (mut n, mut m) = (0.0f64, 0.0f64);
-        for i in 0..self.w.n {
+        for i in 0..self.w.n_slots() {
             if self.w.alive[i] == 0 || self.w.sp[i] as usize != sp {
                 continue;
             }
@@ -417,7 +417,7 @@ impl Sim {
         let hw = crate::params::WORLD / 2.0;
         let world = crate::params::WORLD;
         let mut n = 0.0;
-        for i in 0..self.w.n {
+        for i in 0..self.w.n_slots() {
             if self.w.alive[i] == 0 || self.w.sp[i] as usize != g_sp {
                 continue;
             }
