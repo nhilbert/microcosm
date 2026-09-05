@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The launcher icon's water: the lit pool, exactly the light the world paints.
+
+  The colours are read off the app's own photograph of the `still` start world
+  (assets/starts/still.jpg, shot through Renderer.draw): a cool slate-blue lens around the sun,
+  #3A5570 near it, #172F47 at the rim, sitting on the abyss. Light in this world is white-blue,
+  never warm — amber belongs to the player's hand alone (CLAUDE.md rule 7), so it appears nowhere
+  in the icon.
+
+  Adaptive-icon background: full-bleed 108x108, every mask crops it safely.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+
+  <path android:fillColor="#0B131E" android:pathData="M0,0h108v108h-108z"/>
+
+  <path android:pathData="M0,0h108v108h-108z">
+    <aapt:attr name="android:fillColor">
+      <gradient android:type="radial"
+          android:centerX="54" android:centerY="46" android:gradientRadius="64">
+        <item android:offset="0"    android:color="#FF3F5D7B"/>
+        <item android:offset="0.42" android:color="#FF24415C"/>
+        <item android:offset="0.78" android:color="#FF16273A"/>
+        <item android:offset="1"    android:color="#FF0D1826"/>
+      </gradient>
+    </aapt:attr>
+  </path>
+</vector>

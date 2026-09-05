@@ -1,0 +1,44 @@
+<!-- THE ROUND: one circle of matter carried in three hands - alga (green) to grazer (purple) to decomposer (olive) - tapering forward around a single mineral speck that is never spent. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Microcosm">
+  <defs>
+    <radialGradient id="litPool" cx="50%" cy="46%" r="62%">
+      <stop offset="0%"   stop-color="#2E4A63"/>
+      <stop offset="42%"  stop-color="#1B3048"/>
+      <stop offset="78%"  stop-color="#0C1724"/>
+      <stop offset="100%" stop-color="#0B131E"/>
+    </radialGradient>
+    <radialGradient id="speckHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#C9D7E3" stop-opacity="0.34"/>
+      <stop offset="55%"  stop-color="#C9D7E3" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#C9D7E3" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <g id="icon">
+    <!-- water -->
+    <rect x="0" y="0" width="512" height="512" fill="#0B131E"/>
+    <rect x="0" y="0" width="512" height="512" fill="url(#litPool)"/>
+
+    <!-- the ring's own faint wake in the water -->
+    <circle cx="256" cy="256" r="118" fill="none" stroke="#2E4A63" stroke-width="46" opacity="0.10"/>
+
+    <!-- 1. alga: mineral taken up (leading arc - longest, widest, brightest) -->
+    <path d="M 186.6 160.5 A 118 118 0 0 1 373.7 247.8"
+          fill="none" stroke="#46D68C" stroke-width="36" stroke-linecap="butt"/>
+    <path d="M 391.7 246.5 L 383.4 267.2 L 363.7 265.4 L 355.8 249.0 Z" fill="#46D68C"/>
+
+    <!-- 2. grazer: the alga eaten -->
+    <path d="M 372.2 276.5 A 118 118 0 0 1 215.6 366.9"
+          fill="none" stroke="#D7A6E8" stroke-width="32" stroke-linecap="butt"/>
+    <path d="M 210.2 381.9 L 194.5 366.9 L 203.1 351.5 L 221.1 351.9 Z" fill="#D7A6E8"/>
+
+    <!-- 3. decomposer: the mineral released again -->
+    <path d="M 180.2 346.4 A 118 118 0 0 1 153.8 197.0"
+          fill="none" stroke="#9EA868" stroke-width="30" stroke-linecap="butt"/>
+    <path d="M 140.8 189.5 L 157.9 176.6 L 170.7 186.9 L 166.8 204.5 Z" fill="#9EA868"/>
+
+    <!-- the mineral itself: the one thing the round conserves -->
+    <circle cx="256" cy="256" r="46" fill="url(#speckHalo)"/>
+    <circle cx="256" cy="256" r="13" fill="#C9D7E3"/>
+  </g>
+</svg>
