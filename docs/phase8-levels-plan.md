@@ -91,6 +91,57 @@ chosen deliberately so the first level's fail state is a stall the player can st
 rescue, not a fait accompli. The wrong-lever case is the Liebig contrast run backward:
 mineral cannot buy growth when light is the binding limit.
 
+**Correction, 2026-09-05 (owner report from the German build).** Two defects, both in
+what the level *said*, neither in what the core did:
+
+1. *The claim.* The briefing, the "right" prediction chip, both fail verdicts and the
+   pass debrief said the mat "starves at any size" under the dim sun. The table above
+   said otherwise from the day it was written: seed 101 goes 20 → 10 → 55 by the
+   deadline and on to ~86 by t=17,000 (re-measured today, identical on both cores).
+   The owner watched exactly that curve on the Data page while the verdict called it
+   starvation. Reworded in both languages: under this sun the mat creeps to a few
+   dozen and stops — light sets the ceiling. The science line (carrying capacity) was
+   right all along; the prose contradicted it. Not recalibrated to a seed that does
+   starve (202/303): the deliberate choice above stands, and "starves at any size"
+   would still be false as a mechanism — it is a stall, not a negative balance.
+2. *The lever.* `apparatus.sources: false` was written when the ☀ lever was the
+   browser's lightMul slider, which no apparatus gate touches. In the app the sun lever
+   IS the source sheet (EV, 2026-09-01), and since 2026-09-03 that sheet is dimmed and
+   refused wherever `levelAllows(2)` is false — so L1 in the app offered no sun at all
+   while its briefing named the ☀ lever as the instrument. Unwinnable, and the honesty
+   gate green: the gate injects `lightMul` straight into the core (an event no app
+   control emits) and never asked whether the taught move is reachable through the
+   level's own apparatus. Fix: `sources: true`, and the gate now proves the taught move
+   through both levers the product offers.
+
+Measured today on the level machinery (seed 101; both cores identical):
+
+| run | t=4000 | t=8000 | verdict |
+|---|---|---|---|
+| null | 21 | 55 | FAIL at the deadline — 86 at t=17,000 if you keep watching |
+| browser lever: lightMul ×1.2 at t=2000 | 894 | 1,451 | PASS ~t=3,000 |
+| app lever: the sun's light 1.5 at t=2000 (= ×0.75) | 319 | 661 | PASS ~t=5,100 |
+| app lever 1.5 at t=3000 / 4000 / 5000 | | | PASS t=5,840 / 6,700 / 7,120 |
+| app lever 1.5 at t=6000 | | 395 | FAIL — the window closes around t=5,000 |
+| app lever 1.3 / 1.2 / 1.1 at t=2000 | | 386 / 253 / 131 | FAIL — the slider has to go all the way up |
+| wrong: ten pours, still dim | 21 | 55 | FAIL |
+| wrong: warmth +8 at t=2000 (light untouched) | 1 | 0 | FAIL — extinct at t=4,720 (+15: extinct in 60 ticks) |
+| wrong: spread 300 / cold −8 at t=2000 | | 42 / 135 | FAIL |
+
+The app's lever is weaker than the browser's (the core caps a source at 1.5, so
+1.5 × 0.5 = ×0.75 against the slider's ×1.2), which makes the app's L1 the slower,
+tighter reading of the same level: full slider, before t≈5,000. Goal and deadline hold
+on both platforms, so nothing was recalibrated. Founding the level's sun at 0.5 with
+lightMul 1.0 would put both levers on one scale; deferred — it changes what the
+browser's slider shows at start and needs its own gate pass. The extinction verdict is
+now worded for the way it actually happens (warmth, or the light pulled down), and the
+warmth run is the level's second wrong-lever case.
+
+The rule this earned: **a level's taught move must be reachable through its own
+apparatus on every platform.** The gate proves the event; the apparatus table decides
+the lever; nothing checked that they agree. A mechanical check (gate-case event types
+against apparatus rows) is queued in the status log.
+
 ### Level 2 · The Hungry Water — Liebig's law of the minimum
 World: 20 Solara founders, seed 202, **M0 0.4, sun lever pinned at ×1.6 from t=0**.
 Goal: 600 on a budget of ten pours, by t=9000.
@@ -116,6 +167,12 @@ At lever ×1.6, M0 0.4, seed 202 (10 pours of 40, t=600..3300):
 The near/far split is the Phase 2 transport lesson in reverse: mixing does move
 edge-poured mineral inward eventually (far pours beat null), but too slowly to make
 the deadline — placement is the challenge.
+
+*2026-09-05:* the null run does not stall — 419 at t=4,000, 530 at t=9,000 — so the
+briefing now says the mat "slows to a crawl", and it no longer names a ☀ lever the app
+does not show inside this level (sources stay locked here on purpose: the app's slider
+would offer 1.5 × 1.6 and turn "more light won't help" into a testable, possibly false
+claim). The truth-pass table for all eleven null runs is in the status log entry.
 
 ### Level 3 · Everything Flows — decomposition, the mineral cycle (K6 as a level)
 World: the same founding as level 1 (20 Solara, seed 101) under the full sun, M0
@@ -207,6 +264,11 @@ intended; both recorded here per rule 6):
 Misconception targeted: "more resources always mean more growth" — the pond was never
 hungry, it was unfinished. Harness: 4 cases, gate 17/17 ALL PASS. Prediction chips
 map to pour/structure/both with reflections carrying the measured numbers.
+
+*2026-09-05:* the briefing and goal text promised "1,300" and "everyone alive"; the
+predicate has been Solara ≥ 1,250 AND Cilio ≥ 20 since shipping, and Bacillus dies out
+in the null run by t≈4,000 with nothing in the predicate minding. Text corrected to the
+predicate in both languages ("1,250 Solara, 20 Cilio, held").
 
 ### Level 6 · A Head Full of Hunters — the energy pyramid (shipped 2026-08-31)
 

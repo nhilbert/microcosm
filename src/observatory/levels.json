@@ -5,19 +5,19 @@
     "title": "First Light",
     "science": "Photosynthesis · carrying capacity",
     "question": "Why does nothing grow in a dim pond?",
-    "briefing": "Twenty founders of Solara drift onto a settling ground under a weak sun. Left alone, the mat starves at any size — light is this world's only income. Your instrument is the ☀ lever in Intervene mode.",
+    "briefing": "Twenty founders of Solara drift onto a settling ground under a weak sun. Left alone, the mat barely grows — a few dozen, far below what this ground could carry. Light is this world's only income. Your instrument is the sun: grip it in Intervene mode and raise its light.",
     "goalText": "Establish the mat — 400 Solara, held",
     "predict": {
       "prompt": "Twenty founders under a weak sun. If you only watch, what happens?",
       "options": [
         "The mat grows slowly, but it gets there",
-        "It starves at any size — light is the income",
+        "It barely grows — a few dozen, no more",
         "It grows until the water's mineral runs out"
       ],
       "reflect": [
-        "Patience can't fix this pond. Below a certain light the mat loses energy at every size — waiting only makes it smaller.",
-        "That's what the energy bars showed. Under this sun, every Solara burns more than it earns.",
-        "The water never got to matter. The energy ran out first — light is the income here."
+        "Slowly, yes — but never there. Under this sun the mat crept to a few dozen and stopped, a long way from 400.",
+        "That's what the census showed: a few dozen Solara, and no more. Light sets the ceiling here.",
+        "The water never got to matter. This sun carried a few dozen Solara, and the mineral was still there."
       ]
     },
     "world": {
@@ -34,7 +34,7 @@
     "apparatus": {
       "pours": true,
       "seed": false,
-      "sources": false,
+      "sources": true,
       "walls": false,
       "evolution": false
     },
@@ -58,10 +58,10 @@
             "v": 0
           }
         ],
-        "why": "The last Solara died — the mat never caught the light."
+        "why": "The last Solara died. What it needed was light — warmth only made it spend faster."
       }
     ],
-    "timeoutWhy": "The mat never took hold. Under this sun, every Solara spends more than it earns — at any number.",
+    "timeoutWhy": "The mat stayed below 400. This sun carries a few dozen Solara — no more, however long you wait.",
     "meter": [
       {
         "label": "Solara",
@@ -71,8 +71,8 @@
       }
     ],
     "debrief": {
-      "pass": "Light is the pond's only income. Under a dim sun the mat spends more than it earns, so it shrinks at any size. With enough light it grows fast, then flattens — the mat shades itself and runs out of ground. That ceiling is the carrying capacity: not a quota, just income meeting cost.",
-      "fail": "The mat needed more income, and only light is income here. Tap a Solara and watch its card: the energy bar never fills. The ☀ lever raises what the whole pond earns — everything else just moves it around."
+      "pass": "Light is the pond's only income. Under the dim sun the mat crept to a few dozen and stopped — that was all the light could carry. With more light it grew fast, then flattened: the mat shades itself and runs out of ground. That ceiling is the carrying capacity — not a quota, just income meeting cost. Move the light, and the ceiling moves with it.",
+      "fail": "The mat needed more income, and only light is income here. Tap a Solara and watch its card: the energy bar barely fills. Grip the sun and push its light all the way up — early. Everything else in the sky just moves the cost around."
     }
   },
   {
@@ -80,8 +80,8 @@
     "n": 2,
     "title": "The Hungry Water",
     "science": "Liebig's law of the minimum",
-    "question": "The sun is already at its fiercest — why does the mat stall anyway?",
-    "briefing": "The ☀ lever starts pinned at its maximum — but the water is poor. The mat rises, then stalls; more light has nothing left to give. You carry ten doses of mineral: tap open water to pour one, and choose the spot with care.",
+    "question": "The sun is already at its fiercest — why does the mat stop short anyway?",
+    "briefing": "The sun starts pinned at its maximum — no more light to be had — but the water is poor. The mat rises, then slows to a crawl; light has nothing left to give. You carry ten doses of mineral: tap open water to pour one, and choose the spot with care.",
     "goalText": "Grow the mat past 600 on ten pours",
     "predict": {
       "prompt": "The sun is maxed out. What will ten doses of mineral do?",
@@ -252,7 +252,7 @@
     "title": "The Gardener",
     "science": "Competitive exclusion · keystone grazing",
     "question": "The water is poor and the bloom owns it. Can the meadow be saved?",
-    "briefing": "Poor water, and the quick plankton owns it: Drifta drinks faster, and the meadow starves under a bright sun. You carry eight doses of mineral, and the seeding bench is open. Choose your instrument.",
+    "briefing": "Poor water, and the quick plankton owns it: Drifta drinks faster, and the meadow barely grows under a bright sun. You carry eight doses of mineral, and the seeding bench is open. Choose your instrument.",
     "goalText": "Rescue the mat — 250 Solara, held",
     "predict": {
       "prompt": "What could save the mat?",
@@ -350,8 +350,8 @@
     "title": "The Richer Pond",
     "science": "Top-down structure · bottom-up inputs",
     "question": "This pond is stable and full of plankton. Can you make it richer?",
-    "briefing": "A bloom, a mat, decomposers — and nobody eating anybody. Mineral is unlimited this time, and the seeding bench is open. The goal is a richer pond: a meadow past 1,300 with every species alive. Decide what this pond is actually missing.",
-    "goalText": "A richer pond — 1,300 Solara, everyone alive",
+    "briefing": "A bloom, a mat, decomposers — and nobody eating anybody. Mineral is unlimited this time, and the seeding bench is open. The goal is a richer pond: a meadow past 1,250 and at least 20 Cilio, held. Decide what this pond is actually missing.",
+    "goalText": "A richer pond — 1,250 Solara, 20 Cilio, held",
     "predict": {
       "prompt": "What does a pond need to become richer?",
       "options": [

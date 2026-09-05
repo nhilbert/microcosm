@@ -4,24 +4,24 @@
     "title": "Erstes Licht",
     "science": "Photosynthese · Tragfähigkeit",
     "question": "Warum wächst in einem trüben Teich nichts?",
-    "briefing": "Zwanzig Gründer von Solara treiben unter einer schwachen Sonne auf einen Siedlungsgrund. Lässt du sie allein, verhungert ihr Algenteppich, egal wie groß er wird. Licht ist die einzige Energiequelle dieser Welt. Dein Instrument ist der ☀-Hebel im Eingreifen-Modus.",
+    "briefing": "Zwanzig Gründer von Solara treiben unter einer schwachen Sonne auf einen Siedlungsgrund. Lässt du sie allein, kommt ihr Algenteppich kaum voran: ein paar Dutzend, mehr trägt dieses Licht nicht. Licht ist die einzige Energiequelle dieser Welt. Dein Instrument ist die Sonne: Tippe sie im Eingreifen-Modus an, schiebe ihr Licht hoch.",
     "goalText": "Baue den Algenteppich auf und halte 400 Solara",
     "predict": {
       "prompt": "Zwanzig Gründer unter schwacher Sonne. Was passiert, wenn du nur zuschaust?",
       "options": [
         "Der Algenteppich wächst langsam, aber er schafft es",
-        "Er verhungert, denn Licht ist die einzige Energiequelle",
+        "Er kommt kaum voran: ein paar Dutzend, mehr nicht",
         "Er wächst, bis das Mineral im Wasser ausgeht"
       ],
       "reflect": [
-        "Geduld hilft hier nicht. Ist das Licht zu schwach, verliert der Algenteppich Energie, egal wie groß er ist. Warten macht ihn nur kleiner.",
-        "Genau das zeigten die Energiebalken. Jede Solara verbraucht hier mehr Energie, als das Licht ihr gibt.",
-        "Das Wasser war nie das Problem. Die Energie ging zuerst aus, und Energie kommt hier nur aus dem Licht."
+        "Langsam ja, aber nie bis 400. Unter dieser Sonne kroch der Algenteppich auf ein paar Dutzend und blieb dort.",
+        "Genau das zeigte die Zählung: ein paar Dutzend Solara, mehr nicht. Das Licht setzt hier die Grenze.",
+        "Das Wasser war nie das Problem. Diese Sonne trug ein paar Dutzend Solara, und das Mineral war noch da."
       ]
     },
     "debrief": {
-      "pass": "Licht ist die einzige Energiequelle dieses Teichs. Unter einer trüben Sonne verbraucht der Algenteppich mehr Energie, als das Licht ihm gibt. Also schrumpft er, egal wie groß er ist. Mit genug Licht wächst er schnell, dann flacht er ab. Er beschattet sich selbst, und der Grund wird knapp. Diese Grenze heißt Tragfähigkeit: der Punkt, an dem Zuwachs und Verbrauch sich treffen.",
-      "fail": "Der Algenteppich brauchte mehr Energie, und Energie kommt hier nur aus dem Licht. Tippe eine Solara an und schaue auf ihre Karte: Der Energiebalken füllt sich nie. Der ☀-Hebel hebt, was der ganze Teich bekommt. Alles andere schiebt die Energie nur herum."
+      "pass": "Licht ist die einzige Energiequelle dieses Teichs. Unter der trüben Sonne kroch der Algenteppich auf ein paar Dutzend und blieb dort: Mehr trug das Licht nicht. Mit mehr Licht wuchs er schnell, dann flachte er ab. Er beschattet sich selbst, und der Grund wird knapp. Diese Grenze heißt Tragfähigkeit: der Punkt, an dem Zuwachs und Verluste sich die Waage halten. Verschiebst du das Licht, wandert die Grenze mit.",
+      "fail": "Der Algenteppich brauchte mehr Energie, und Energie kommt hier nur aus dem Licht. Tippe eine Solara an und schaue auf ihre Karte: Der Energiebalken füllt sich kaum. Tippe die Sonne an und schiebe ihr Licht ganz hoch, und zwar früh. Alles andere am Himmel verschiebt nur die Kosten."
     },
     "meter": [
       {
@@ -30,15 +30,15 @@
       }
     ],
     "whys": {
-      "The last Solara died — the mat never caught the light.": "Die letzte Solara ist gestorben. Der Algenteppich hat das Licht nie eingefangen.",
-      "The mat never took hold. Under this sun, every Solara spends more than it earns — at any number.": "Der Algenteppich hat nie Fuß gefasst. Unter dieser Sonne verbraucht jede Solara mehr Energie, als das Licht ihr gibt. Das gilt bei jeder Zahl."
+      "The last Solara died. What it needed was light — warmth only made it spend faster.": "Die letzte Solara ist gestorben. Was sie brauchte, war Licht. Wärme ließ sie nur schneller verbrauchen.",
+      "The mat stayed below 400. This sun carries a few dozen Solara — no more, however long you wait.": "Der Algenteppich blieb unter 400. Diese Sonne trägt ein paar Dutzend Solara, mehr nicht, so lange du auch wartest."
     }
   },
   "mineral": {
     "title": "Das magere Wasser",
     "science": "Liebigs Minimumgesetz",
-    "question": "Die Sonne steht schon am Anschlag. Warum stockt der Algenteppich trotzdem?",
-    "briefing": "Der ☀-Hebel startet auf Maximum, aber das Wasser ist mager. Der Algenteppich wächst, dann stockt er: Mehr Licht bringt nichts mehr. Du hast zehn Gaben Mineral dabei. Tippe offenes Wasser an, um eine zu gießen, und wähle die Stelle mit Bedacht.",
+    "question": "Die Sonne steht schon am Anschlag. Warum bleibt der Algenteppich trotzdem unter 600?",
+    "briefing": "Die Sonne steht schon am Anschlag, mehr Licht gibt es in diesem Versuch nicht. Aber das Wasser ist mager. Der Algenteppich wächst, dann kriecht er nur noch. Du hast zehn Gaben Mineral dabei. Tippe offenes Wasser an, um eine zu gießen, und wähle die Stelle mit Bedacht.",
     "goalText": "Bringe den Algenteppich mit zehn Gaben über 600",
     "predict": {
       "prompt": "Die Sonne ist am Anschlag. Was bringen zehn Gaben Mineral?",
@@ -73,7 +73,7 @@
     "science": "Zersetzung · der Mineralkreislauf",
     "question": "Dem Algenteppich geht es prächtig. Warum leert sich trotzdem das Wasser?",
     "briefing": "Derselbe Teich wie in deinem ersten Experiment, unter voller Sonne. Der Algenteppich wuchert, und trotzdem versickert das freie Mineral. Alles, was stirbt, nimmt sein Mineral mit in den Schlamm, und nichts bringt es zurück. Drücke offenes Wasser lange, um eine Art anzusiedeln, und wähle gut.",
-    "goalText": "Hole das Mineral zurück: Recycler rein, Algenteppich 1.000",
+    "goalText": "Hole das Mineral zurück: Zersetzer rein, Algenteppich 1.000",
     "predict": {
       "prompt": "Dem Algenteppich geht es prächtig. Wohin verschwindet das freie Mineral?",
       "options": [
@@ -88,7 +88,7 @@
       ]
     },
     "debrief": {
-      "pass": "Bacillus frisst die Toten und gibt ihr Mineral ans Wasser zurück. Lebewesen mit diesem Job heißen Zersetzer: Sie schließen den Kreis. Dieselbe Materie wandert jetzt im Kreis, statt sich im Schlamm zu stapeln. Das ist die tiefste Regel dieser Welt: Materie läuft im Kreis, Energie fließt durch wie ein Fluss. Ein Teich ohne seine Recycler kippt langsam um.",
+      "pass": "Bacillus frisst die Toten und gibt ihr Mineral ans Wasser zurück. Lebewesen mit diesem Job heißen Zersetzer: Sie schließen den Kreis. Dieselbe Materie wandert jetzt im Kreis, statt sich im Schlamm zu stapeln. Das ist die tiefste Regel dieser Welt: Materie läuft im Kreis, Energie fließt durch wie ein Fluss. Ein Teich ohne seine Zersetzer kippt langsam um.",
       "fail": "Nur ein Zersetzer holt gebundenes Mineral zurück ins Wasser. Fresser und Jäger schieben Materie nur von Körper zu Körper. Ihre Opfer binden dazu noch mehr Mineral im Schlamm. Siedle Bacillus nahe am Algenteppich an: Dort liegen die Toten."
     },
     "meter": [
@@ -109,25 +109,25 @@
   "garden": {
     "title": "Der Gärtner",
     "science": "Konkurrenzausschluss · Schlüsselart",
-    "question": "Mageres Wasser, und die Blüte trinkt zuerst. Ist die Wiese zu retten?",
-    "briefing": "Mageres Wasser, und das meiste davon trinkt das schnelle Plankton. Drifta trinkt schneller als Solara, und die Wiese verhungert unter heller Sonne. Du hast acht Gaben Mineral dabei, und du kannst neue Arten ansiedeln. Wähle dein Instrument.",
-    "goalText": "Rette die Wiese und halte 250 Solara",
+    "question": "Mageres Wasser, und die Planktonblüte trinkt zuerst. Ist der Algenteppich zu retten?",
+    "briefing": "Mageres Wasser, und das meiste davon trinkt das schnelle Plankton. Drifta trinkt schneller als Solara, und der Algenteppich kommt unter heller Sonne kaum voran. Du hast acht Gaben Mineral dabei, und du kannst neue Arten ansiedeln. Wähle dein Instrument.",
+    "goalText": "Rette den Algenteppich und halte 250 Solara",
     "predict": {
-      "prompt": "Was könnte die Wiese retten?",
+      "prompt": "Was könnte den Algenteppich retten?",
       "options": [
-        "Mineral gießen und die Wiese direkt füttern",
-        "Einen Planktonfresser ansiedeln: Feind der Blüte, Freund der Wiese",
+        "Mineral gießen und den Algenteppich direkt füttern",
+        "Einen Planktonfresser ansiedeln: Feind der Planktonblüte, Freund des Algenteppichs",
         "Nichts, die Schnellen gewinnen immer"
       ],
       "reflect": [
-        "Die Blüte trinkt schneller als die Wiese, also haben deine Gaben zuerst die Blüte gefüttert. Acht davon, und die Wiese blieb unter 70.",
+        "Die Planktonblüte trinkt schneller als der Algenteppich, also haben deine Gaben zuerst die Planktonblüte gefüttert. Acht davon, und der Algenteppich blieb unter 70.",
         "Die Gärtner-Wette: Druck auf den Gewinner ist der einzige Hebel, der dem Verlierer Platz macht.",
         "Das Wasser gewinnen sie, bis etwas sie frisst. Konkurrenz hat mehr als einen Schiedsrichter."
       ]
     },
     "debrief": {
-      "pass": "Cilio fraß die Blüte, und die Wiese nahm sich das Licht und das Mineral, das frei wurde. Ein einziger Planktonfresser hielt der ganzen Wiese die Tür auf. So eine Art nennt man Schlüsselart. Und jetzt schaue weiter zu: In so magerem Wasser frisst sich der Gärtner selbst arbeitslos. Cilio verhungert, und die Blüte kriecht zurück. Schlüsselart ist ein Job, und Jobs brauchen Lohn.",
-      "fail": "Die Blüte behielt das Wasser. Den Verlierer zu füttern klappt hier nicht: Das Plankton trinkt schneller, also fütterte jede Gabe zuerst die Blüte. Versuche die andere Richtung und setze der Blüte ihren Planktonfresser vor die Nase. Druck von oben schafft Platz weiter unten."
+      "pass": "Cilio fraß die Planktonblüte, und der Algenteppich nahm sich das Licht und das Mineral, das frei wurde. Ein einziger Planktonfresser hielt dem ganzen Algenteppich die Tür auf. So eine Art nennt man Schlüsselart. Und jetzt schaue weiter zu: In so magerem Wasser frisst sich der Gärtner selbst arbeitslos. Cilio verhungert, und die Planktonblüte kriecht zurück. Schlüsselart ist ein Job, und Jobs brauchen Lohn.",
+      "fail": "Die Planktonblüte behielt das Wasser. Den Verlierer zu füttern klappt hier nicht: Das Plankton trinkt schneller, also fütterte jede Gabe zuerst die Planktonblüte. Versuche die andere Richtung und setze der Planktonblüte ihren Planktonfresser vor die Nase. Druck von oben schafft Platz weiter unten."
     },
     "meter": [
       {
@@ -140,17 +140,17 @@
       }
     ],
     "whys": {
-      "The last Solara died — the meadow is gone.": "Die letzte Solara ist gestorben, die Wiese ist fort.",
-      "The bloom is gone — exterminated, not gardened. That is not the rescue this pond needed.": "Die Blüte ist fort: ausgerottet, nicht gegärtnert. Das war nicht die Rettung, die dieser Teich brauchte.",
-      "The mat never rose past 250 — the bloom held the water to the end. Minerals feed whoever drinks fastest; only pressure on the bloom itself opens space below it.": "Die Wiese kam nie über 250, die Blüte behielt das Wasser bis zum Schluss. Mineral füttert den, der am schnellsten trinkt; erst Druck auf die Blüte selbst schafft darunter Platz."
+      "The last Solara died — the meadow is gone.": "Die letzte Solara ist gestorben, der Algenteppich ist fort.",
+      "The bloom is gone — exterminated, not gardened. That is not the rescue this pond needed.": "Die Planktonblüte ist fort: ausgerottet, nicht gegärtnert. Das war nicht die Rettung, die dieser Teich brauchte.",
+      "The mat never rose past 250 — the bloom held the water to the end. Minerals feed whoever drinks fastest; only pressure on the bloom itself opens space below it.": "Der Algenteppich kam nie über 250, die Planktonblüte behielt das Wasser bis zum Schluss. Mineral füttert den, der am schnellsten trinkt; erst Druck auf die Planktonblüte selbst schafft darunter Platz."
     }
   },
   "richer": {
     "title": "Der vollere Teich",
     "science": "Struktur von oben · Nachschub von unten",
     "question": "Dieser Teich ist stabil und voller Plankton. Passt noch mehr Leben hinein?",
-    "briefing": "Eine Blüte, eine Wiese, Zersetzer, und niemand frisst irgendwen. Mineral ist diesmal unbegrenzt, und du kannst neue Arten ansiedeln. Das Ziel: ein vollerer Teich, die Wiese über 1.300, alle Arten am Leben. Entscheide, was diesem Teich wirklich fehlt.",
-    "goalText": "Ein vollerer Teich: 1.300 Solara, alle am Leben",
+    "briefing": "Plankton, Algenteppich, Zersetzer, und niemand frisst irgendwen. Mineral gibt es diesmal ohne Ende, und du kannst neue Arten ansiedeln. Das Ziel: ein vollerer Teich, der Algenteppich über 1.250 und 20 Cilio, gehalten. Finde heraus, was diesem Teich fehlt.",
+    "goalText": "Ein vollerer Teich: 1.250 Solara, 20 Cilio, gehalten",
     "predict": {
       "prompt": "Was braucht ein Teich, um voller zu werden?",
       "options": [
@@ -159,14 +159,14 @@
         "Beides, Nachschub und Struktur zusammen"
       ],
       "reflect": [
-        "Dreißig Gaben versanken in der Blüte, und die Wiese blieb bei rund 900. Wie voll ein Teich wird, bestimmt seine Struktur, nicht seine Suppe.",
-        "Die Struktur-Wette: Gib dem Teich einen Planktonfresser, und die Wiese verdoppelt sich beinahe.",
+        "Dreißig Gaben versanken in der Planktonblüte, und der Algenteppich blieb bei rund 900. Wie voll ein Teich wird, bestimmt seine Struktur, nicht seine Suppe.",
+        "Die Struktur-Wette: Gib dem Teich einen Planktonfresser, und der Algenteppich verdoppelt sich beinahe.",
         "Beides geht, aber das Experiment zeigt, welche Hälfte nötig war: Gaben allein scheiterten, der Planktonfresser allein hat es geschafft."
       ]
     },
     "debrief": {
-      "pass": "Du hast einen Planktonfresser angesiedelt, und der ganze Teich wurde voller. Die Wiese hat sich fast verdoppelt; die Blüte fiel auf ein Viertel und blieb dort. Der Grund: Fressen hält das Mineral in Bewegung. Gefressen, ans Wasser zurückgegeben, wieder aufgenommen. All dein Gießen konnte das nicht. Diesem Teich fehlte nie Nachschub. Ihm fehlte ein Planktonfresser.",
-      "fail": "Mehr Suppe macht keinen volleren Teich. Die Blüte trank jede Gabe und stand einfach da. Was diesem Teich fehlt, hat ein Maul. Siedle den Planktonfresser an und schaue zu, was Fressen kann und Gießen nicht."
+      "pass": "Du hast einen Planktonfresser angesiedelt, und der ganze Teich wurde voller. Der Algenteppich hat sich fast verdoppelt; die Planktonblüte fiel auf ein Viertel und blieb dort. Der Grund: Fressen hält das Mineral in Bewegung. Gefressen, ans Wasser zurückgegeben, wieder aufgenommen. All dein Gießen konnte das nicht. Diesem Teich fehlte nie Nachschub. Ihm fehlte ein Planktonfresser.",
+      "fail": "Mehr Suppe macht keinen volleren Teich. Die Planktonblüte trank jede Gabe und stand einfach da. Was diesem Teich fehlt, hat ein Maul. Siedle den Planktonfresser an und schaue zu, was Fressen kann und Gießen nicht."
     },
     "meter": [
       {
@@ -183,16 +183,16 @@
       }
     ],
     "whys": {
-      "The meadow is gone — richer was the goal, and everything died at the bottom.": "Die Wiese ist fort. Voller war das Ziel, und unten ist alles gestorben.",
+      "The meadow is gone — richer was the goal, and everything died at the bottom.": "Der Algenteppich ist fort. Voller war das Ziel, und unten ist alles gestorben.",
       "The plankton is gone — grazed to nothing. A structure with a hole in it feeds no one.": "Das Plankton ist fort, leergefressen. Eine Struktur mit einem Loch ernährt niemanden.",
-      "The pond stayed poor. Everything you poured sank into the standing bloom — nothing turned it over. Richness needed an eater, not an input.": "Der Teich wurde nicht voller. Alles, was du gegossen hast, versank in der stehenden Blüte; nichts hat sie umgewälzt. Mehr Leben brauchte einen Planktonfresser, keinen Nachschub."
+      "The pond stayed poor. Everything you poured sank into the standing bloom — nothing turned it over. Richness needed an eater, not an input.": "Der Teich wurde nicht voller. Alles, was du gegossen hast, versank in der stehenden Planktonblüte; nichts hat sie umgewälzt. Mehr Leben brauchte einen Planktonfresser, keinen Nachschub."
     }
   },
   "hunters": {
     "title": "Der schmale Grat",
     "science": "Energiepyramide · Spitzenjäger",
     "question": "Der Teich ist voll. Wie viele Jäger kann er ernähren?",
-    "briefing": "Ein voller Teich: Wiese, Blüte, Planktonfresser, Recycler. Nur ein Jäger fehlt noch. Du kannst Venator ansiedeln. Gründe ein Rudel, das bleibt.",
+    "briefing": "Ein voller Teich: Algenteppich, Planktonblüte, Planktonfresser, Zersetzer. Nur ein Jäger fehlt noch. Du kannst Venator ansiedeln. Gründe ein Rudel, das bleibt.",
     "goalText": "Halte ein Rudel: 4+ Jäger über lange Zeit",
     "predict": {
       "prompt": "Du siedelst einen Spitzenjäger an. Wie viele Rudel lässt du frei?",
@@ -247,8 +247,8 @@
       ]
     },
     "debrief": {
-      "pass": "Du hast Leben über das Dunkel getragen, und die neue Sonne hält jetzt einen lebendigen Teich. Diese Reise war das ganze Geheimnis. Das Wasser brauchte nie bessere Bedingungen — es brauchte einen Reisenden. Das Plankton kann dunkles Wasser nicht überqueren; der Algenteppich kriecht, aber viel zu langsam. Dass Leben so an neue Orte kommt, nennt man Besiedlung. Und jetzt beobachte deinen Außenposten: Die Blüte bedrängt schon den jungen Algenteppich.",
-      "fail": "Die neue Sonne war nie das Problem — der Weg dorthin war es. Gießen füttert Wasser, nicht Entfernung, und nichts, was treibt, überlebt die dunkle Strecke. Setz den Algenteppich und das Plankton unter der neuen Sonne aus. Beides: Der Algenteppich allein ernährt niemanden, und die Blüte allein sperrt den Algenteppich aus."
+      "pass": "Du hast Leben über das Dunkel getragen, und die neue Sonne hält jetzt einen lebendigen Teich. Diese Reise war das ganze Geheimnis. Das Wasser brauchte nie bessere Bedingungen — es brauchte einen Reisenden. Das Plankton kann dunkles Wasser nicht überqueren; der Algenteppich kriecht, aber viel zu langsam. Dass Leben so an neue Orte kommt, nennt man Besiedlung. Und jetzt beobachte deinen Außenposten: Die Planktonblüte bedrängt schon den jungen Algenteppich.",
+      "fail": "Die neue Sonne war nie das Problem — der Weg dorthin war es. Gießen füttert Wasser, nicht Entfernung, und nichts, was treibt, überlebt die dunkle Strecke. Setz den Algenteppich und das Plankton unter der neuen Sonne aus. Beides: Der Algenteppich allein ernährt niemanden, und die Planktonblüte allein sperrt den Algenteppich aus."
     },
     "meter": [
       { "label": "Solara · Sonne 2", "unit": "" },

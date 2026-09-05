@@ -89,9 +89,19 @@ const pen11 = (t, clear) => ({ [t]: () => {
 const sig12 = t => ({ [t]: () => C.applyEvent({ type: "locus", sp: 2, locus: 2, key: "sigma", v: 0.12 }) });
 
 const CASES = [
+  // L1 (2026-09-05): the taught move is proved through BOTH levers the product offers — the
+  // browser's ☀ slider (lightMul) and the app's sun sheet (source 0's light, capped at 1.5 by
+  // the core, so 0.5 x 1.5 = 0.75 of the founded sun). Until this date the gate knew only the
+  // lightMul event, which no app control emits, while apparatus.sources:false hid the app's
+  // sun sheet inside the level: the level was unwinnable in the product and the gate green.
+  // Measured on the level machinery: light 1.5 at t<=5,000 passes (t=2,000 -> ~5,100;
+  // t=5,000 -> 7,120), at t=6,000 fails at 395; 1.3 at t=2,000 fails at 386. The sun sheet's
+  // other sliders are wrong levers: warmth +8 kills the mat by t=4,720, spread 300 ends at 42.
   ["light",   "null: wait under the dim sun",        null,                                             "failed"],
-  ["light",   "strategy: raise the lever at t=2000", { 2000: () => C.applyEvent({ type: "lightMul", v: 1.2 }) }, "passed"],
+  ["light",   "strategy: browser lever, lightMul 1.2 at t=2000", { 2000: () => C.applyEvent({ type: "lightMul", v: 1.2 }) }, "passed"],
+  ["light",   "strategy: app lever, the sun's light to 1.5 at t=2000", { 2000: () => C.applyEvent({ type: "sourceSet", k: 0, i: 1.5 }) }, "passed"],
   ["light",   "wrong: pour mineral, keep it dim",    dimPours,                                         "failed"],
+  ["light",   "wrong: warm the sun instead of brightening it", { 2000: () => C.applyEvent({ type: "sourceSet", k: 0, a: 8 }) }, "failed"],
   ["mineral", "null: watch the mat stall",           null,                                             "failed"],
   ["mineral", "strategy: ten pours on the mat",      nearPours,                                        "passed"],
   ["mineral", "wrong: ten pours at the dark shore",  farPours,                                         "failed"],
